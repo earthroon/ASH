@@ -1,0 +1,28 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+  "receipt": "workspace/decode02c_probe_integrity_receipt.jsonl",
+  "candidate_trace_version": 4,
+  "required_probe_integrity_fields": [
+    "weighted_logit_changed_count",
+    "active_mask_changed_count",
+    "final_mask_changed_count",
+    "selected_id_changed",
+    "active_count_before",
+    "active_count_after",
+    "final_count_before",
+    "final_count_after",
+    "selected_id_before",
+    "selected_id_after",
+    "max_weighted_logit_delta_abs",
+    "mutation_detected",
+    "status"
+  ],
+  "pass_condition": "probe mode mutation counters all zero and transition parity PASS",
+  "failure_statuses": [
+    "FAIL_WEIGHTED_LOGIT_MUTATED",
+    "FAIL_ACTIVE_MASK_MUTATED",
+    "FAIL_FINAL_MASK_MUTATED",
+    "FAIL_SELECTED_ID_MUTATED",
+    "FAIL_CANDIDATE_COUNT_MUTATED"
+  ]
+}

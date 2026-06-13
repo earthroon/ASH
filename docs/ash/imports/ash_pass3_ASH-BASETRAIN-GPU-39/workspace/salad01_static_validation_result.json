@@ -1,0 +1,70 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01",
+  "static_validation_executed": true,
+  "cargo_check_executed": false,
+  "cargo_check_error": "cargo/rustc unavailable in bake container",
+  "checks": [
+    {
+      "name": "decode_stability_module_present",
+      "pass": true
+    },
+    {
+      "name": "safe_profile_constant_present",
+      "pass": true
+    },
+    {
+      "name": "greedy_profile_constant_present",
+      "pass": true
+    },
+    {
+      "name": "word_salad_audit_present",
+      "pass": true
+    },
+    {
+      "name": "ash_core_exports_decode_stability",
+      "pass": true
+    },
+    {
+      "name": "derive_gate_applies_safe_policy",
+      "pass": true
+    },
+    {
+      "name": "gate_audit_exports_profile",
+      "pass": true
+    },
+    {
+      "name": "runtime_ashgate_event_exports_profile",
+      "pass": true
+    },
+    {
+      "name": "decision_policy_uses_stable_profile",
+      "pass": true
+    },
+    {
+      "name": "profile_registry_artifact_present",
+      "pass": true
+    },
+    {
+      "name": "receipt_artifact_present",
+      "pass": true
+    },
+    {
+      "name": "comparison_artifact_present",
+      "pass": true
+    },
+    {
+      "name": "cargo_available",
+      "pass": false
+    },
+    {
+      "name": "rustc_available",
+      "pass": false
+    },
+    {
+      "name": "no_model_artifact_changes_listed",
+      "pass": true
+    }
+  ],
+  "model_artifact_changes": [],
+  "adjudication": "PASS_STATIC_BAKE_PENDING_LOCAL_RUNTIME_REPLAY"
+}

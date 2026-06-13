@@ -1,0 +1,52 @@
+{
+  "patch_id": "QW-52C-R13-S2",
+  "title": "Promotion Evidence Guard / Stub Source Block Seal",
+  "required_top_level_keys": [
+    "patch_id",
+    "base_patch",
+    "parent_ssot",
+    "guard_status",
+    "runtime_apply_allowed",
+    "promotion_eligible",
+    "entries",
+    "summary"
+  ],
+  "entry_required_keys": [
+    "path",
+    "evidence_kind",
+    "promotion_class",
+    "guarded_uses",
+    "stub_source_blocked",
+    "mock_source_blocked",
+    "fixture_source_blocked",
+    "receipt_only_source_blocked",
+    "promotion_evidence_allowed",
+    "auto_accept_allowed",
+    "commit_candidate_allowed",
+    "runtime_apply_allowed",
+    "weight_commit_allowed",
+    "safe_profile_apply_allowed",
+    "policy_promotion_allowed",
+    "blocking_reasons"
+  ],
+  "guarded_uses": [
+    "ReviewQueue",
+    "PromotionDossier",
+    "AutoAcceptCandidate",
+    "CommitCandidate",
+    "RuntimeApplyCandidate",
+    "WeightCommitCandidate",
+    "SafeProfileApplyCandidate",
+    "PolicyPromotionCandidate"
+  ],
+  "s2_forbidden_allowed_uses": [
+    "PromotionDossier",
+    "AutoAcceptCandidate",
+    "CommitCandidate",
+    "RuntimeApplyCandidate",
+    "WeightCommitCandidate",
+    "SafeProfileApplyCandidate",
+    "PolicyPromotionCandidate"
+  ],
+  "review_queue_only": true
+}

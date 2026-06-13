@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-FT-08",
+  "title": "Single Atlas Group Candidate Delta Packet / No Safetensors Write Seal",
+  "status": "PENDING",
+  "guards": {
+    "single_group_only": true,
+    "delta_packet_created": false,
+    "safetensors_write_allowed": false,
+    "safetensors_write_executed": false,
+    "candidate_weight_write_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "runtime_default_apply_executed": false,
+    "optimizer_state_persisted": false,
+    "full_model_forward_executed": false,
+    "decode_executed": false,
+    "generation_executed": false,
+    "real_corpus_train_executed": false,
+    "multi_group_train_executed": false
+  },
+  "verdict": "PENDING_ASH_FT08_SINGLE_GROUP_CANDIDATE_DELTA_PACKET_NO_SAFETENSORS_WRITE"
+}

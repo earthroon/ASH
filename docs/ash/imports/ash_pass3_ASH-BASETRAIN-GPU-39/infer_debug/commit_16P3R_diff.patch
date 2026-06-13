@@ -1,0 +1,267 @@
+diff -ruN ash_16p3_base/crates/orchestrator_local/src/infer_entry.rs ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs
+--- ash_16p3_base/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:52:37.000000000 +0000
++++ ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 03:54:17.496988265 +0000
+@@ -448,6 +448,7 @@
+     output_json.insert("native_embedding_full_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
+     output_json.insert("native_embedding_full_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
+     output_json.insert("native_embedding_row_gather_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
++    output_json.insert("native_embedding_row_gather_bytes_source".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
+     output_json.insert("native_projection_cache_action".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+     output_json.insert("native_sampling_mode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+     output_json.insert("native_tile_top_k".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
+@@ -817,6 +818,7 @@
+     response_json.insert("nativeEmbeddingFullBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
+     response_json.insert("nativeEmbeddingFullUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
+     response_json.insert("nativeEmbeddingRowGatherBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
++    response_json.insert("nativeEmbeddingRowGatherBytesSource".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
+     response_json.insert("nativeProjectionCacheAction".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+     response_json.insert("nativeSamplingMode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+     response_json.insert("nativeTileTopK".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
+diff -ruN ash_16p3_base/crates/runtime/src/infer.rs ash_16p3r_work/crates/runtime/src/infer.rs
+--- ash_16p3_base/crates/runtime/src/infer.rs	2026-05-06 03:39:49.000000000 +0000
++++ ash_16p3r_work/crates/runtime/src/infer.rs	2026-05-06 03:54:02.486477286 +0000
+@@ -492,6 +492,7 @@
+     pub embedding_full_bytes: usize,
+     pub embedding_full_upload_skipped: bool,
+     pub embedding_row_gather_bytes: Option<usize>,
++    pub embedding_row_gather_bytes_source: Option<String>,
+     pub vocab_atlas_cache_action: Option<String>,
+     pub sampling_mode: String,
+     pub tile_top_k: Option<usize>,
+@@ -518,6 +519,7 @@
+             embedding_full_bytes: 0,
+             embedding_full_upload_skipped: false,
+             embedding_row_gather_bytes: None,
++            embedding_row_gather_bytes_source: None,
+             vocab_atlas_cache_action: None,
+             sampling_mode: "unknown".to_string(),
+             tile_top_k: None,
+@@ -577,6 +579,7 @@
+             embedding_full_bytes: full_vocab_bytes,
+             embedding_full_upload_skipped: effective_embedding_mode == NativeEmbeddingMode::RowGather,
+             embedding_row_gather_bytes: None,
++            embedding_row_gather_bytes_source: None,
+             vocab_atlas_cache_action: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { Some("build_or_reuse_model_instance".to_string()) } else { None },
+             sampling_mode: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { "full_logits_compat_top_k_merge".to_string() } else { "standard".to_string() },
+             tile_top_k: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { Some(64) } else { None },
+@@ -2798,11 +2801,38 @@
+                 .and_then(|shape| shape.get(1).copied()))
+             .unwrap_or(spec.dimensions.hidden_size),
+     );
++    let computed_embedding_row_gather_bytes = if native_vocab_allocation_probe.effective_embedding_mode == "row_gather" {
++        Some(
++            prompt_len
++                .saturating_mul(native_vocab_allocation_probe.hidden_size)
++                .saturating_mul(std::mem::size_of::<f32>()),
++        )
++    } else {
++        None
++    };
+     if let Some(bytes) = native_embedding_row_gather_bytes {
+         native_vocab_allocation_probe.embedding_row_gather_bytes = Some(bytes);
++        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
++            Some("NativeWgpuModel.last_embedding_row_gather_bytes".to_string());
++        eprintln!(
++            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=NativeWgpuModel.last_embedding_row_gather_bytes",
++            bytes,
++        );
++    } else if let Some(bytes) = computed_embedding_row_gather_bytes {
++        native_vocab_allocation_probe.embedding_row_gather_bytes = Some(bytes);
++        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
++            Some("computed_from_prompt_len_hidden_size".to_string());
+         eprintln!(
+-            "[16P-3][telemetry] embedding_row_gather_bytes={} source=NativeVocabAllocationProbe",
++            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=computed_from_prompt_len_hidden_size prompt_len={} hidden={} sizeof_f32={}",
+             bytes,
++            prompt_len,
++            native_vocab_allocation_probe.hidden_size,
++            std::mem::size_of::<f32>(),
++        );
++    } else {
++        eprintln!(
++            "[16P-3R][telemetry] embedding_row_gather_bytes=None source=unavailable effective_embedding_mode={}",
++            native_vocab_allocation_probe.effective_embedding_mode,
+         );
+     }
+     eprintln!(
+diff -ruN ash_16p3_base/infer_debug/commit_16P3R_bake_report.md ash_16p3r_work/infer_debug/commit_16P3R_bake_report.md
+--- ash_16p3_base/infer_debug/commit_16P3R_bake_report.md	1970-01-01 00:00:00.000000000 +0000
++++ ash_16p3r_work/infer_debug/commit_16P3R_bake_report.md	2026-05-06 03:54:54.382581480 +0000
+@@ -0,0 +1,39 @@
++# Commit 16P-3R — Row Gather Telemetry Fallback Calculation Seal
++
++## SSOT
++
++16P-3 1차에서 `NativeWgpuModel.last_embedding_row_gather_bytes()` getter는 `None`을 반환했다. 그러나 request/probe 상태는 `effective_embedding_mode=row_gather`, `prompt_len=135`, `hidden_size=2048`로 확정 가능하므로, response/artifact telemetry는 검증 가능한 fallback 계산값을 봉인해야 한다.
++
++## Patch summary
++
++- `NativeVocabAllocationProbe`에 `embedding_row_gather_bytes_source: Option<String>` 추가.
++- `native_embedding_row_gather_bytes`가 `Some(bytes)`이면 기존 getter 값을 우선 사용.
++- getter가 `None`이고 `effective_embedding_mode == "row_gather"`이면 `prompt_len * hidden_size * sizeof::<f32>()`로 계산.
++- 계산 fallback 사용 시 source를 `computed_from_prompt_len_hidden_size`로 남김.
++- artifact에는 `native_embedding_row_gather_bytes_source`를 추가.
++- response에는 `nativeEmbeddingRowGatherBytesSource`를 추가.
++
++## Expected value for probe_16P3R_telemetry_completion_A
++
++```text
++prompt_len = 135
++hidden = 2048
++sizeof_f32 = 4
++embedding_row_gather_bytes = 135 * 2048 * 4 = 1105920
++source = computed_from_prompt_len_hidden_size
++```
++
++## Acceptance
++
++- stderr contains `[16P-3R][telemetry] embedding_row_gather_bytes=1105920 source=computed_from_prompt_len_hidden_size ...` when getter is None.
++- response `nativeEmbeddingRowGatherBytes == 1105920`.
++- response `nativeEmbeddingRowGatherBytesSource == "computed_from_prompt_len_hidden_size"`.
++- artifact `native_embedding_row_gather_bytes == 1105920`.
++- artifact `native_embedding_row_gather_bytes_source == "computed_from_prompt_len_hidden_size"`.
++- `native_vocab_allocation_probe.embedding_row_gather_bytes == 1105920`.
++- `native_vocab_allocation_probe.embedding_row_gather_bytes_source == "computed_from_prompt_len_hidden_size"`.
++- `ok:true` and `cpu_reference_full+16AC_reference_safe_generation+packed_compact+lane0` remain unchanged.
++
++## Build note
++
++Cargo is not available in the bake container, so local `cargo build -p native_host --bin native_host --release` remains the final SSOT.
+diff -ruN ash_16p3_base/infer_debug/commit_16P3R_diff.patch ash_16p3r_work/infer_debug/commit_16P3R_diff.patch
+--- ash_16p3_base/infer_debug/commit_16P3R_diff.patch	1970-01-01 00:00:00.000000000 +0000
++++ ash_16p3r_work/infer_debug/commit_16P3R_diff.patch	2026-05-06 03:55:06.169421524 +0000
+@@ -0,0 +1,129 @@
++diff -ruN ash_16p3_base/crates/orchestrator_local/src/infer_entry.rs ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs
++--- ash_16p3_base/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:52:37.000000000 +0000
+++++ ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 03:54:17.496988265 +0000
++@@ -448,6 +448,7 @@
++     output_json.insert("native_embedding_full_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
++     output_json.insert("native_embedding_full_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
++     output_json.insert("native_embedding_row_gather_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+++    output_json.insert("native_embedding_row_gather_bytes_source".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
++     output_json.insert("native_projection_cache_action".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
++     output_json.insert("native_sampling_mode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
++     output_json.insert("native_tile_top_k".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
++@@ -817,6 +818,7 @@
++     response_json.insert("nativeEmbeddingFullBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
++     response_json.insert("nativeEmbeddingFullUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
++     response_json.insert("nativeEmbeddingRowGatherBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+++    response_json.insert("nativeEmbeddingRowGatherBytesSource".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
++     response_json.insert("nativeProjectionCacheAction".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
++     response_json.insert("nativeSamplingMode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
++     response_json.insert("nativeTileTopK".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
++diff -ruN ash_16p3_base/crates/runtime/src/infer.rs ash_16p3r_work/crates/runtime/src/infer.rs
++--- ash_16p3_base/crates/runtime/src/infer.rs	2026-05-06 03:39:49.000000000 +0000
+++++ ash_16p3r_work/crates/runtime/src/infer.rs	2026-05-06 03:54:02.486477286 +0000
++@@ -492,6 +492,7 @@
++     pub embedding_full_bytes: usize,
++     pub embedding_full_upload_skipped: bool,
++     pub embedding_row_gather_bytes: Option<usize>,
+++    pub embedding_row_gather_bytes_source: Option<String>,
++     pub vocab_atlas_cache_action: Option<String>,
++     pub sampling_mode: String,
++     pub tile_top_k: Option<usize>,
++@@ -518,6 +519,7 @@
++             embedding_full_bytes: 0,
++             embedding_full_upload_skipped: false,
++             embedding_row_gather_bytes: None,
+++            embedding_row_gather_bytes_source: None,
++             vocab_atlas_cache_action: None,
++             sampling_mode: "unknown".to_string(),
++             tile_top_k: None,
++@@ -577,6 +579,7 @@
++             embedding_full_bytes: full_vocab_bytes,
++             embedding_full_upload_skipped: effective_embedding_mode == NativeEmbeddingMode::RowGather,
++             embedding_row_gather_bytes: None,
+++            embedding_row_gather_bytes_source: None,
++             vocab_atlas_cache_action: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { Some("build_or_reuse_model_instance".to_string()) } else { None },
++             sampling_mode: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { "full_logits_compat_top_k_merge".to_string() } else { "standard".to_string() },
++             tile_top_k: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { Some(64) } else { None },
++@@ -2798,11 +2801,38 @@
++                 .and_then(|shape| shape.get(1).copied()))
++             .unwrap_or(spec.dimensions.hidden_size),
++     );
+++    let computed_embedding_row_gather_bytes = if native_vocab_allocation_probe.effective_embedding_mode == "row_gather" {
+++        Some(
+++            prompt_len
+++                .saturating_mul(native_vocab_allocation_probe.hidden_size)
+++                .saturating_mul(std::mem::size_of::<f32>()),
+++        )
+++    } else {
+++        None
+++    };
++     if let Some(bytes) = native_embedding_row_gather_bytes {
++         native_vocab_allocation_probe.embedding_row_gather_bytes = Some(bytes);
+++        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
+++            Some("NativeWgpuModel.last_embedding_row_gather_bytes".to_string());
+++        eprintln!(
+++            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=NativeWgpuModel.last_embedding_row_gather_bytes",
+++            bytes,
+++        );
+++    } else if let Some(bytes) = computed_embedding_row_gather_bytes {
+++        native_vocab_allocation_probe.embedding_row_gather_bytes = Some(bytes);
+++        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
+++            Some("computed_from_prompt_len_hidden_size".to_string());
++         eprintln!(
++-            "[16P-3][telemetry] embedding_row_gather_bytes={} source=NativeVocabAllocationProbe",
+++            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=computed_from_prompt_len_hidden_size prompt_len={} hidden={} sizeof_f32={}",
++             bytes,
+++            prompt_len,
+++            native_vocab_allocation_probe.hidden_size,
+++            std::mem::size_of::<f32>(),
+++        );
+++    } else {
+++        eprintln!(
+++            "[16P-3R][telemetry] embedding_row_gather_bytes=None source=unavailable effective_embedding_mode={}",
+++            native_vocab_allocation_probe.effective_embedding_mode,
++         );
++     }
++     eprintln!(
++diff -ruN ash_16p3_base/infer_debug/commit_16P3R_bake_report.md ash_16p3r_work/infer_debug/commit_16P3R_bake_report.md
++--- ash_16p3_base/infer_debug/commit_16P3R_bake_report.md	1970-01-01 00:00:00.000000000 +0000
+++++ ash_16p3r_work/infer_debug/commit_16P3R_bake_report.md	2026-05-06 03:54:54.382581480 +0000
++@@ -0,0 +1,39 @@
+++# Commit 16P-3R — Row Gather Telemetry Fallback Calculation Seal
+++
+++## SSOT
+++
+++16P-3 1차에서 `NativeWgpuModel.last_embedding_row_gather_bytes()` getter는 `None`을 반환했다. 그러나 request/probe 상태는 `effective_embedding_mode=row_gather`, `prompt_len=135`, `hidden_size=2048`로 확정 가능하므로, response/artifact telemetry는 검증 가능한 fallback 계산값을 봉인해야 한다.
+++
+++## Patch summary
+++
+++- `NativeVocabAllocationProbe`에 `embedding_row_gather_bytes_source: Option<String>` 추가.
+++- `native_embedding_row_gather_bytes`가 `Some(bytes)`이면 기존 getter 값을 우선 사용.
+++- getter가 `None`이고 `effective_embedding_mode == "row_gather"`이면 `prompt_len * hidden_size * sizeof::<f32>()`로 계산.
+++- 계산 fallback 사용 시 source를 `computed_from_prompt_len_hidden_size`로 남김.
+++- artifact에는 `native_embedding_row_gather_bytes_source`를 추가.
+++- response에는 `nativeEmbeddingRowGatherBytesSource`를 추가.
+++
+++## Expected value for probe_16P3R_telemetry_completion_A
+++
+++```text
+++prompt_len = 135
+++hidden = 2048
+++sizeof_f32 = 4
+++embedding_row_gather_bytes = 135 * 2048 * 4 = 1105920
+++source = computed_from_prompt_len_hidden_size
+++```
+++
+++## Acceptance
+++
+++- stderr contains `[16P-3R][telemetry] embedding_row_gather_bytes=1105920 source=computed_from_prompt_len_hidden_size ...` when getter is None.
+++- response `nativeEmbeddingRowGatherBytes == 1105920`.
+++- response `nativeEmbeddingRowGatherBytesSource == "computed_from_prompt_len_hidden_size"`.
+++- artifact `native_embedding_row_gather_bytes == 1105920`.
+++- artifact `native_embedding_row_gather_bytes_source == "computed_from_prompt_len_hidden_size"`.
+++- `native_vocab_allocation_probe.embedding_row_gather_bytes == 1105920`.
+++- `native_vocab_allocation_probe.embedding_row_gather_bytes_source == "computed_from_prompt_len_hidden_size"`.
+++- `ok:true` and `cpu_reference_full+16AC_reference_safe_generation+packed_compact+lane0` remain unchanged.
+++
+++## Build note
+++
+++Cargo is not available in the bake container, so local `cargo build -p native_host --bin native_host --release` remains the final SSOT.
+diff -ruN ash_16p3_base/infer_debug/probe_16P3R_telemetry_completion_A.jsonl ash_16p3r_work/infer_debug/probe_16P3R_telemetry_completion_A.jsonl
+--- ash_16p3_base/infer_debug/probe_16P3R_telemetry_completion_A.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ ash_16p3r_work/infer_debug/probe_16P3R_telemetry_completion_A.jsonl	2026-05-06 03:54:54.365513742 +0000
+@@ -0,0 +1 @@
++{"cmd":"run.start","id":"probe_16P3R_telemetry_completion_A","payload":{"kind":"infer","input":"A","task":"freeform","modelSpecPath":"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml","checkpointPath":"D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors","tokenizerManifestPath":"D:/1111113232/DUST/1/ash_pass3/artifacts/tokenizer_manifest_v5_final.json","maxNewTokens":1,"decodeMaxNewTokens":1,"decodeTemperature":0.0,"seed":42,"nativeVocabProjection":"gpu_atlas","nativeVocabTileSize":1024,"nativeAvoidFullVocabGpuUpload":true,"nativeMaxSingleGpuBufferBytes":268435456,"nativeEmbeddingMode":"row_gather","disableNativeGpuProfiler":true,"disableNativeAutotuneTiming":true,"disableTimestampQuery":false,"disableNativeStructureRouting":true,"disableNativeTextDensity":true,"disableNativeGpuPenalty":true,"disableNativeHeadwiseAtlas":true,"disableNativeRawBridge":true,"disableNativeQkvBridge":true,"disableNativeMatmulAutotune":true,"disableNativeBurnFusion":true,"forceNativeSafeAttention":true,"forceNativeReferencePrefill":true}}

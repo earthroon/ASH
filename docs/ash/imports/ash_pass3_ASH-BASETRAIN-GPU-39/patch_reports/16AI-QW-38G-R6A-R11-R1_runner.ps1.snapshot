@@ -1,0 +1,95 @@
+param(
+  [switch]$Build,
+  [int]$MaxNewTokens = 1,
+  [string]$InputTextFile = ".\workspace\qw38g_r6a_r2_input.txt",
+  [string]$TargetIds = "13",
+  [int]$TopN = 8,
+  [double]$MinMargin = 1.0,
+  [int]$CurrentSeed = 42,
+  [int]$MaxBytes = 4096
+)
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
+
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+if (!(Test-Path $InputTextFile)) {
+  "1+1은?" | Set-Content $InputTextFile -Encoding UTF8
+}
+
+if ($Build) {
+  Write-Host "[16AI-QW-38G-R6A-R11-R1][build] cargo build --release example infer_only"
+  cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" |
+    Tee-Object ".\workspace\build_qw38g_r6a_r11_r1_live.log"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[16AI-QW-38G-R6A-R11-R1][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r11_r1_live.log"
+    exit $LASTEXITCODE
+  }
+  Write-Host "[16AI-QW-38G-R6A-R11-R1][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r11_r1_live.log"
+}
+
+$env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+$env:ASH_FORCE_NO_LORA = "1"
+
+$env:ASH_PROJECTION_MARGIN_AUDIT = "1"
+$env:ASH_PROJECTION_MARGIN_AUDIT_MODE = "masked_top1_compare"
+$env:ASH_PROJECTION_MARGIN_HOOK_TRACE = "1"
+$env:ASH_PROJECTION_MARGIN_RECEIPT_FALLBACK = "1"
+
+$env:ASH_R8_SCALAR_SOURCE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json"
+$env:ASH_R8_SCALAR_RECEIPT = "workspace/qw38g_r6a_r8_debug_buffer_scalar_receipt.json"
+$env:ASH_R8_SCALAR_TRACE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_trace.jsonl"
+
+$env:ASH_R10_FINAL_BOUNDARY_SOURCE = "workspace/qw38g_r6a_r10_final_boundary_confirm_summary.json"
+$env:ASH_R10_FINAL_BOUNDARY_RECEIPT = "workspace/qw38g_r6a_r10_final_boundary_confirm_receipt.json"
+$env:ASH_R10_FINAL_BOUNDARY_TRACE = "workspace/qw38g_r6a_r10_final_boundary_confirm_trace.jsonl"
+
+$env:ASH_RAW_TOPK_TRACE_SOURCE = "workspace/qw38a_raw_topk_trace.jsonl"
+
+$env:ASH_PROJECTION_MARGIN_TARGET_IDS = $TargetIds
+$env:ASH_PROJECTION_MARGIN_TOP_N = "$TopN"
+$env:ASH_PROJECTION_MARGIN_MIN_MARGIN = "$MinMargin"
+$env:ASH_PROJECTION_MARGIN_SCALAR_ONLY = "1"
+$env:ASH_PROJECTION_MARGIN_MAX_BYTES = "$MaxBytes"
+$env:ASH_SEED = "$CurrentSeed"
+
+$env:ASH_PROJECTION_MARGIN_TRACE = "workspace/qw38g_r6a_r11_projection_margin_trace.jsonl"
+$env:ASH_PROJECTION_MARGIN_SUMMARY = "workspace/qw38g_r6a_r11_projection_margin_summary.json"
+$env:ASH_PROJECTION_MARGIN_RECEIPT = "workspace/qw38g_r6a_r11_projection_margin_receipt.json"
+$env:ASH_PROJECTION_MARGIN_ROLLBACK = "workspace/qw38g_r6a_r11_projection_margin_rollback_receipt.json"
+$env:ASH_PROJECTION_MARGIN_REACHABILITY = "workspace/qw38g_r6a_r11_r1_projection_margin_reachability.json"
+
+$exe = ".\target\release\examples\infer_only.exe"
+if (!(Test-Path $exe)) {
+  Write-Host "[16AI-QW-38G-R6A-R11-R1][error] infer_only.exe missing; rerun with -Build"
+  exit 1
+}
+
+Write-Host "[16AI-QW-38G-R6A-R11-R1][run] reachability=1 fallback=1 margin_audit=1 targets=$TargetIds top_n=$TopN min_margin=$MinMargin max_new_tokens=$MaxNewTokens"
+$cmd = "$exe --model-spec .\specs\model_spec_v5_48259.toml --tokenizer .\artifacts\tokenizer_manifest_v5_final.json --checkpoint .\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors --task freeform --max-new-tokens $MaxNewTokens --seed $CurrentSeed --text-file $InputTextFile --json 2>&1"
+cmd /c $cmd | Tee-Object ".\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+$code = $LASTEXITCODE
+Write-Host "[16AI-QW-38G-R6A-R11-R1][run_done] exit_code=$code live=.\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+
+$paths = @(
+  ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json",
+  ".\workspace\qw38g_r6a_r11_projection_margin_summary.json",
+  ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl",
+  ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json",
+  ".\workspace\qw38g_r6a_r11_r1_projection_margin_reachability.json"
+)
+foreach ($p in $paths) {
+  if (Test-Path $p) {
+    Write-Host "[16AI-QW-38G-R6A-R11-R1][artifact] $p"
+    Get-Content $p -Encoding UTF8
+  } else {
+    Write-Host "[16AI-QW-38G-R6A-R11-R1][warn] artifact missing: $p"
+  }
+}
+
+exit $code

@@ -1,0 +1,33 @@
+ASH-BASETRAIN-GPU-28 STATIC CHECKS
+
+source_file = crates/base_train/src/ash_basetrain_gpu_28_gradient_buffer_allocation_candidate.rs
+bin_file = crates/base_train/src/bin/ash_basetrain_gpu_28_gradient_buffer_allocation_candidate.rs
+
+object_json_macro_policy = object-level json! macro forbidden / Map tile required / scalar json! allowed
+section_tile_map_required = true
+root_atlas_map_required = true
+control_flow_lut_used = true
+match_statement_used_for_verdict = false
+if_keyword_used_for_verdict = false
+early_return_used_for_verdict = false
+panic_based_failure_branch = false
+unwrap_based_hidden_failure = false
+
+source_27_validation_receipt_present = true
+gradient_allocation_candidate_receipt_present = true
+gradient_buffer_descriptor_receipt_present = true
+buffer_usage_contract_receipt_present = true
+allocation_size_alignment_contract_receipt_present = true
+allocation_boundary_receipt_present = true
+allocation_no_write_guard_receipt_present = true
+model_weight_gradient_denylist_revalidation_present = true
+body_training_claim_guard_revalidation_present = true
+no_backward_no_optimizer_contract_present = true
+
+allowed_runtime_boundary_for_28 = gpu device + logits gradient candidate buffer allocation only
+forbidden_runtime_boundary = gradient value write / compute dispatch / readback / backward / optimizer / weight commit
+
+container_cargo_available = false
+container_cargo_build = NOT_EXECUTED_IN_CONTAINER
+container_cargo_run = NOT_EXECUTED_IN_CONTAINER
+user_local_runtime_pass_required = true

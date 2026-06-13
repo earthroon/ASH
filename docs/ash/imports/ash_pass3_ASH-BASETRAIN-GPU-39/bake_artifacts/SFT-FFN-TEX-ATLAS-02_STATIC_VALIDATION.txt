@@ -1,0 +1,46 @@
+SFT-FFN-TEX-ATLAS-02 STATIC VALIDATION
+
+Validated statically in this environment:
+- Created ash_core projection parity module.
+- Created ash_core projection parity tests.
+- Linked module/export in crates/ash_core/src/lib.rs.
+- Added backend WGSL shader shell using textureLoad and integer coordinates.
+- Added backend Rust shader contract shell without wiring it as production/default path.
+- Created acceptance report.
+- Created bake report.
+- Checked brace balance for new Rust/WGSL files.
+
+Runtime validation not performed:
+- cargo was not available in the execution environment.
+- rustc was not available in the execution environment.
+- rustfmt was not available in the execution environment.
+
+Local commands to run:
+- cargo test -p ash_core sft_ffn_tex_atlas_02 -- --nocapture
+- cargo test -p ash_core sft_ffn_tex_atlas_01 -- --nocapture
+- cargo test -p ash_core sft_gpu_stream_03 -- --nocapture
+
+Final SSOT:
+SFT-FFN-TEX-ATLAS-02 seals textureLoad FFN projection parity against a storage-buffer baseline and keeps training, production shader selection, LoRA texture update, runtime attach, promotion, and current pointer update closed.
+
+--- Validation Log ---
+--- tool availability ---
+cargo: unavailable
+rustc: unavailable
+rustfmt: unavailable
+--- added files ---
+OK crates/ash_core/src/sft_ffn_texture_atlas_projection_parity.rs
+OK crates/ash_core/tests/sft_ffn_tex_atlas_02_projection_parity.rs
+OK crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_projection.wgsl
+OK crates/burn_webgpu_backend/src/ffn_texture_atlas_projection.rs
+OK acceptance_reports/SFT-FFN-TEX-ATLAS-02_textureload_ffn_projection_parity.md
+OK bake_artifacts/SFT-FFN-TEX-ATLAS-02_BAKE_REPORT.md
+OK bake_artifacts/SFT-FFN-TEX-ATLAS-02_STATIC_VALIDATION.txt
+--- lib.rs link ---
+350:pub mod sft_ffn_texture_atlas_projection_parity;
+351:pub use sft_ffn_texture_atlas_projection_parity::*;
+--- brace balance ---
+crates/ash_core/src/sft_ffn_texture_atlas_projection_parity.rs brace_balance 0 lines 969
+crates/ash_core/tests/sft_ffn_tex_atlas_02_projection_parity.rs brace_balance 0 lines 215
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_projection.wgsl brace_balance 0 lines 73
+crates/burn_webgpu_backend/src/ffn_texture_atlas_projection.rs brace_balance 0 lines 34

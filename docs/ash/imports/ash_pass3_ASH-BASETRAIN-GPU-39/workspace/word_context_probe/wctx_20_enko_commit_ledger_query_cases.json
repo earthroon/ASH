@@ -1,0 +1,42 @@
+[
+  {
+    "case_id": "wctx20_empty_ledger_summary_query",
+    "query_kind": "ledger_summary",
+    "cue_id_filter": null,
+    "source_ledger_status": "empty_ledger",
+    "source_revision_events": 0,
+    "expected_read_only": true,
+    "expected_target_text_mutated": false,
+    "expected_runtime_default_apply": false
+  },
+  {
+    "case_id": "wctx20_empty_ledger_cue_history_not_found",
+    "query_kind": "cue_history_by_id",
+    "cue_id_filter": "WCTX03-C003",
+    "source_ledger_status": "empty_ledger",
+    "source_revision_events": 0,
+    "expected_read_only": true,
+    "expected_target_text_mutated": false,
+    "expected_runtime_default_apply": false
+  },
+  {
+    "case_id": "wctx20_empty_ledger_latest_target_unavailable",
+    "query_kind": "latest_target_by_cue_id",
+    "cue_id_filter": "WCTX03-C003",
+    "source_ledger_status": "empty_ledger",
+    "source_revision_events": 0,
+    "expected_read_only": true,
+    "expected_target_text_mutated": false,
+    "expected_runtime_default_apply": false
+  },
+  {
+    "case_id": "wctx20_empty_ledger_integrity_inspector",
+    "query_kind": "integrity_inspector",
+    "cue_id_filter": null,
+    "source_ledger_status": "empty_ledger",
+    "source_revision_events": 0,
+    "expected_read_only": true,
+    "expected_target_text_mutated": false,
+    "expected_runtime_default_apply": false
+  }
+]

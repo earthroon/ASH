@@ -1,0 +1,13 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-35-R2C",
+  "pass": true,
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_35_r2c_atlas_group_plan_receipt_locator --jobs 1",
+  "recommended_locator_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2c_atlas_group_plan_receipt_locator",
+  "optional_search_roots_env": "ASH_BASETRAIN_GPU_ATLAS_PLAN_SEARCH_ROOTS",
+  "metadata_source_status": "BLOCKED_NO_ATLAS_GROUP_PLAN_RECEIPT_FOUND",
+  "next_patch_if_metadata_source_found": "ASH-BASETRAIN-GPU-35-R3",
+  "next_patch_if_partial_source_found": "ASH-BASETRAIN-GPU-35-R2D",
+  "next_patch_if_no_source_found": "ASH-BASETRAIN-GPU-35-R2C-AUDIT",
+  "runtime_gpu_required": false,
+  "selected_group_weight_load_required": false
+}

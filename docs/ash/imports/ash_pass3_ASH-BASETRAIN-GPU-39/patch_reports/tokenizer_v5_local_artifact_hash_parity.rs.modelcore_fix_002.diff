@@ -1,0 +1,29 @@
+--- /mnt/data/ash_logfix_orig/crates/model_core/src/tokenizer_v5_local_artifact_hash_parity.rs	2026-06-02 15:19:50.000000000 +0000
++++ crates/model_core/src/tokenizer_v5_local_artifact_hash_parity.rs	2026-06-03 06:26:24.891576233 +0000
+@@ -429,6 +429,11 @@
+     if vocab_probe.hash_parity_known && !vocab_probe.hash_parity_passed {
+         failures.push("vocab hash mismatch".to_string());
+     }
++    let model_hash_parity_known = model_probe.hash_parity_known;
++    let model_hash_parity_passed = model_probe.hash_parity_passed;
++    let vocab_hash_parity_known = vocab_probe.hash_parity_known;
++    let vocab_hash_parity_passed = vocab_probe.hash_parity_passed;
++
+     QwTok00R2LocalArtifactHashParityReport {
+         local_artifacts_dir: config.local_artifacts_dir.clone(),
+         model_probe,
+@@ -437,10 +442,10 @@
+         local_artifacts_verified_in_current_environment,
+         model_file_present,
+         vocab_file_present,
+-        model_hash_parity_known: model_probe.hash_parity_known,
+-        model_hash_parity_passed: model_probe.hash_parity_passed,
+-        vocab_hash_parity_known: vocab_probe.hash_parity_known,
+-        vocab_hash_parity_passed: vocab_probe.hash_parity_passed,
++        model_hash_parity_known,
++        model_hash_parity_passed,
++        vocab_hash_parity_known,
++        vocab_hash_parity_passed,
+         all_required_local_artifacts_present,
+         all_required_hashes_match,
+         failures,

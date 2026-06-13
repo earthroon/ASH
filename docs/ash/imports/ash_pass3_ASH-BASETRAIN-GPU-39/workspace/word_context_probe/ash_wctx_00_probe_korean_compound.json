@@ -1,0 +1,78 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-00",
+  "input_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+  "input_char_len": 21,
+  "input_byte_len": 55,
+  "hits": [
+    {
+      "surface": "브라질",
+      "normalized": null,
+      "span": {
+        "start_char": 0,
+        "end_char": 3,
+        "start_byte": 0,
+        "end_byte": 9
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "장수풍뎅이의",
+      "normalized": null,
+      "span": {
+        "start_char": 4,
+        "end_char": 10,
+        "start_byte": 10,
+        "end_byte": 28
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "장점은",
+      "normalized": null,
+      "span": {
+        "start_char": 11,
+        "end_char": 14,
+        "start_byte": 29,
+        "end_byte": 38
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "무엇인가요?",
+      "normalized": null,
+      "span": {
+        "start_char": 15,
+        "end_char": 21,
+        "start_byte": 39,
+        "end_byte": 55
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    }
+  ],
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true,
+    "unknown_span_count": 4
+  },
+  "deterministic_receipt_key": "sha256:79e6e3755ef1071c9c13497970729d7a2f2bc091598c0a76b2f9408e00c62898",
+  "created_by": "ash_core::word_context",
+  "schema_version": 1
+}

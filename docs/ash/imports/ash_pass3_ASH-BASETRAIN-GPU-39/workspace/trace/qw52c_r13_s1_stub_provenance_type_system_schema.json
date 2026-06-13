@@ -1,0 +1,61 @@
+{
+  "patch_id": "QW-52C-R13-S1",
+  "title": "Stub Provenance Type System / Evidence Kind Seal",
+  "required_top_level_keys": [
+    "patch_id",
+    "base_patch",
+    "parent_ssot",
+    "type_system_status",
+    "runtime_apply_allowed",
+    "promotion_eligible",
+    "entries",
+    "summary"
+  ],
+  "entry_required_keys": [
+    "path",
+    "s0_evidence_kind",
+    "s1_evidence_kind",
+    "promotion_class",
+    "stub_provenance",
+    "mock_provenance",
+    "fixture_provenance",
+    "receipt_only_provenance",
+    "runtime_trace_ingested",
+    "external_model_executed",
+    "human_label_verified",
+    "promotion_evidence_allowed",
+    "auto_accept_allowed",
+    "runtime_apply_allowed",
+    "classification_locked",
+    "requires_s2_guard"
+  ],
+  "allowed_evidence_kinds": [
+    "StaticFixture",
+    "DeterministicStub",
+    "MockReplay",
+    "ParsedReceipt",
+    "ReceiptComposer",
+    "ReadonlyMarker",
+    "UnsupportedCapabilityStub",
+    "HiddenSnapshotStub",
+    "RuntimeShadowStaticSoak",
+    "RealRuntimeTraceCandidate",
+    "RealRuntimeTrace",
+    "ExternalModelScore",
+    "HumanLabelVerified",
+    "Unknown"
+  ],
+  "allowed_promotion_classes": [
+    "NeverPromotionEvidence",
+    "ReviewOnlyEvidence",
+    "CandidateEvidence",
+    "PromotionEligibleEvidence"
+  ],
+  "s1_forbidden_true_flags": [
+    "promotion_evidence_allowed",
+    "auto_accept_allowed",
+    "runtime_apply_allowed",
+    "weight_commit_allowed",
+    "safe_profile_apply_allowed"
+  ]
+}

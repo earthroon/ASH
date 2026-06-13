@@ -1,0 +1,40 @@
+{
+  "patch_id": "QW-52A-R2",
+  "title": "Existing QWave Conditioning Projection Rebind / Cheonjiin Feature Input Bridge Seal",
+  "base_patch": "QW-52A-R1",
+  "status": "PASS_STATIC",
+  "projection_bridge": {
+    "module": "model_core::cheonjiin_projection_input_bridge",
+    "available": true,
+    "facade_input_available": true,
+    "field_order_manifest_available": true,
+    "missing_mask_available": true,
+    "candidate_attach_api_available": true,
+    "dry_run_only": true
+  },
+  "existing_sources": {
+    "cheonjiin_jaso_stroke_facade": true,
+    "qwave_conditioning_projection_dry_run": true
+  },
+  "projection": {
+    "new_projection_matrix_created": false,
+    "new_adapter_weight_created": false,
+    "new_projection_math_added": false,
+    "applied_to_hidden": false,
+    "gate_default": 0.0
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "hidden_state_fusion": false,
+    "adapter_projection_applied": false,
+    "runtime_default_apply": false
+  },
+  "validation_note": "cargo/runtime validation not executed in bake environment; Rust validator source included",
+  "next_candidates": ["QW-52A-R3", "QW-52B"]
+}

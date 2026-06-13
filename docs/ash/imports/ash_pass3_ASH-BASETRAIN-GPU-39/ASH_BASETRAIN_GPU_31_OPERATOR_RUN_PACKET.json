@@ -1,0 +1,10 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-31",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-32",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-31A",
+  "required_env_primary": "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH",
+  "required_env_fallback": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke --jobs 1",
+  "recommended_gpu_write_smoke_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke",
+  "pass": true
+}

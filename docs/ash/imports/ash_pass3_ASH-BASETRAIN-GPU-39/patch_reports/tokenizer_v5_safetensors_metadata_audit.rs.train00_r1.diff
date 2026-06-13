@@ -1,0 +1,893 @@
+--- a/crates/model_core/src/tokenizer_v5_safetensors_metadata_audit.rs
++++ b/crates/model_core/src/tokenizer_v5_safetensors_metadata_audit.rs
+@@ -0,0 +1,890 @@
++use anyhow::{Context, Result};
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use sha2::{Digest, Sha256};
++use std::collections::BTreeMap;
++use std::fs::{self, File};
++use std::io::Read;
++use std::path::Path;
++
++pub const QW_TOK_TRAIN00_R1_PATCH_ID: &str = "QW-TOK-TRAIN-00-R1";
++pub const QW_TOK_TRAIN00_R1_TITLE: &str =
++    "Safetensors Metadata Tokenizer Hash Audit / Rebind Candidate Seal";
++pub const QW_TOK_TRAIN00_R1_REPORT_PATH: &str =
++    "artifacts/qw_tok_train00_r1_safetensors_metadata_audit_report.json";
++pub const QW_TOK_TRAIN00_R1_HEADER_RECEIPT_PATH: &str =
++    "artifacts/qw_tok_train00_r1_checkpoint_header_metadata_receipt.json";
++pub const QW_TOK_TRAIN00_R1_RUNTIME_RECEIPT_PATH: &str =
++    "artifacts/qw_tok_train00_r1_runtime_tokenizer_hash_receipt.json";
++pub const QW_TOK_TRAIN00_R1_MISMATCH_MATRIX_PATH: &str =
++    "artifacts/qw_tok_train00_r1_hash_mismatch_matrix.json";
++pub const QW_TOK_TRAIN00_R1_REBIND_CANDIDATE_PATH: &str =
++    "artifacts/qw_tok_train00_r1_rebind_candidate_manifest.json";
++pub const QW_TOK_TRAIN00_R1_NO_MUTATION_RECEIPT_PATH: &str =
++    "artifacts/qw_tok_train00_r1_no_weight_mutation_receipt.json";
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1Config {
++    pub model_spec_path: String,
++    pub tokenizer_manifest_path: String,
++    pub checkpoint_path: String,
++    pub out_path: String,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub allow_training: bool,
++    pub allow_weight_mutation: bool,
++    pub allow_checkpoint_rewrite: bool,
++    pub allow_metadata_commit: bool,
++    pub allow_decode_execution: bool,
++}
++
++impl Default for QwTokTrain00R1Config {
++    fn default() -> Self {
++        Self {
++            model_spec_path: "specs/model_spec_v5_48259.toml".to_string(),
++            tokenizer_manifest_path: "tokenizer_v5/artifacts/tokenizer_manifest_v5_final.json".to_string(),
++            checkpoint_path: "tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors".to_string(),
++            out_path: QW_TOK_TRAIN00_R1_REPORT_PATH.to_string(),
++            expected_model_spec_id: "model_tinyllama_1p1b_v5_48259".to_string(),
++            expected_vocab_size: 48_259,
++            allow_training: false,
++            allow_weight_mutation: false,
++            allow_checkpoint_rewrite: false,
++            allow_metadata_commit: false,
++            allow_decode_execution: false,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1ModelSpecAudit {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub model_spec_id: Option<String>,
++    pub model_name: Option<String>,
++    pub vocab_size: Option<usize>,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub model_spec_id_match: bool,
++    pub vocab_size_match: bool,
++    pub v4_residue_detected: bool,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1RuntimeTokenizerAudit {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub tokenizer_id: Option<String>,
++    pub manifest_id: Option<String>,
++    pub tokenizer_spec_id: Option<String>,
++    pub top_level_manifest_hash_present: bool,
++    pub vocab_len: Option<usize>,
++    pub hashes_manifest_hash: Option<String>,
++    pub sentencepiece_model_hash: Option<String>,
++    pub sentencepiece_vocab_hash: Option<String>,
++    pub vocab_hash: Option<String>,
++    pub reserved_tokens_hash_present: bool,
++    pub canonical_runtime_manifest_hash: Option<String>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1TensorHeaderSummary {
++    pub key: String,
++    pub dtype: Option<String>,
++    pub shape: Vec<u64>,
++    pub data_offsets: Option<[u64; 2]>,
++    pub element_count: Option<u64>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1CheckpointHeaderAudit {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub file_size_bytes: Option<u64>,
++    pub header_length_bytes: Option<u64>,
++    pub header_bytes_read_only: bool,
++    pub tensor_payload_loaded: bool,
++    pub metadata_available: bool,
++    pub metadata: BTreeMap<String, String>,
++    pub metadata_keys: Vec<String>,
++    pub checkpoint_tokenizer_hash_candidates: BTreeMap<String, String>,
++    pub checkpoint_manifest_hash_candidates: BTreeMap<String, String>,
++    pub checkpoint_vocab_hash_candidates: BTreeMap<String, String>,
++    pub checkpoint_model_spec_id: Option<String>,
++    pub checkpoint_vocab_size: Option<String>,
++    pub tensor_key_count: usize,
++    pub tensor_keys_first_32: Vec<String>,
++    pub tensor_shape_summary: Vec<QwTokTrain00R1TensorHeaderSummary>,
++    pub embedding_tensor_candidates: Vec<QwTokTrain00R1TensorHeaderSummary>,
++    pub lm_head_tensor_candidates: Vec<QwTokTrain00R1TensorHeaderSummary>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1HashComparisonRow {
++    pub checkpoint_key: String,
++    pub checkpoint_value: String,
++    pub runtime_key: String,
++    pub runtime_value: String,
++    pub match_observed: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1HashMismatchMatrix {
++    pub comparison_known: bool,
++    pub any_match: bool,
++    pub mismatch_observed: bool,
++    pub rows: Vec<QwTokTrain00R1HashComparisonRow>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1RebindCandidateManifest {
++    pub patch_id: String,
++    pub candidate_for: String,
++    pub checkpoint_path: String,
++    pub metadata_commit_executed: bool,
++    pub checkpoint_rewrite_executed: bool,
++    pub weight_tensor_mutation_executed: bool,
++    pub tensor_payload_loaded: bool,
++    pub requires_operator_approval: bool,
++    pub runtime_tokenizer: BTreeMap<String, String>,
++    pub checkpoint_metadata_before: BTreeMap<String, String>,
++    pub recommended_metadata_after: BTreeMap<String, String>,
++    pub recommendation_status: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1NoMutationReceipt {
++    pub training_executed: bool,
++    pub forward_training_executed: bool,
++    pub backward_executed: bool,
++    pub gradient_created: bool,
++    pub optimizer_created: bool,
++    pub optimizer_step_executed: bool,
++    pub weight_tensor_mutation_executed: bool,
++    pub embedding_mutation_executed: bool,
++    pub lm_head_mutation_executed: bool,
++    pub transformer_block_mutation_executed: bool,
++    pub checkpoint_rewrite_executed: bool,
++    pub metadata_commit_executed: bool,
++    pub decode_generation_executed: bool,
++    pub tensor_payload_loaded: bool,
++}
++
++impl Default for QwTokTrain00R1NoMutationReceipt {
++    fn default() -> Self {
++        Self {
++            training_executed: false,
++            forward_training_executed: false,
++            backward_executed: false,
++            gradient_created: false,
++            optimizer_created: false,
++            optimizer_step_executed: false,
++            weight_tensor_mutation_executed: false,
++            embedding_mutation_executed: false,
++            lm_head_mutation_executed: false,
++            transformer_block_mutation_executed: false,
++            checkpoint_rewrite_executed: false,
++            metadata_commit_executed: false,
++            decode_generation_executed: false,
++            tensor_payload_loaded: false,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R1AuditReport {
++    pub patch_id: String,
++    pub title: String,
++    pub status: String,
++    pub no_training_seal: bool,
++    pub no_weight_mutation_seal: bool,
++    pub no_checkpoint_rewrite_seal: bool,
++    pub model_spec: QwTokTrain00R1ModelSpecAudit,
++    pub runtime_tokenizer: QwTokTrain00R1RuntimeTokenizerAudit,
++    pub checkpoint_header: QwTokTrain00R1CheckpointHeaderAudit,
++    pub hash_mismatch_matrix: QwTokTrain00R1HashMismatchMatrix,
++    pub rebind_candidate: QwTokTrain00R1RebindCandidateManifest,
++    pub no_mutation: QwTokTrain00R1NoMutationReceipt,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++pub fn qw_tok_train00_r1_config_from_args(args: &[String]) -> QwTokTrain00R1Config {
++    let mut cfg = QwTokTrain00R1Config::default();
++    let mut iter = args.iter();
++    while let Some(arg) = iter.next() {
++        match arg.as_str() {
++            "--model-spec" => {
++                if let Some(v) = iter.next() {
++                    cfg.model_spec_path = v.clone();
++                }
++            }
++            "--tokenizer" | "--tokenizer-manifest" => {
++                if let Some(v) = iter.next() {
++                    cfg.tokenizer_manifest_path = v.clone();
++                }
++            }
++            "--checkpoint" => {
++                if let Some(v) = iter.next() {
++                    cfg.checkpoint_path = v.clone();
++                }
++            }
++            "--out" => {
++                if let Some(v) = iter.next() {
++                    cfg.out_path = v.clone();
++                }
++            }
++            _ => {}
++        }
++    }
++    cfg
++}
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let mut hasher = Sha256::new();
++    hasher.update(bytes);
++    format!("{:x}", hasher.finalize())
++}
++
++fn canonical_manifest_hash(value: &Value) -> Option<String> {
++    let mut cloned = value.clone();
++    if let Some(obj) = cloned.as_object_mut() {
++        obj.remove("manifest_hash");
++        if let Some(hashes) = obj.get_mut("hashes").and_then(Value::as_object_mut) {
++            hashes.insert("manifest_hash".to_string(), Value::String(String::new()));
++        }
++    }
++    serde_json::to_vec(&cloned).ok().map(|bytes| sha256_hex(&bytes))
++}
++
++fn value_to_string(value: &Value) -> String {
++    value
++        .as_str()
++        .map(str::to_string)
++        .unwrap_or_else(|| value.to_string())
++}
++
++fn inspect_model_spec(path: &Path, cfg: &QwTokTrain00R1Config) -> QwTokTrain00R1ModelSpecAudit {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut readable = false;
++    let mut model_spec_id = None;
++    let mut model_name = None;
++    let mut vocab_size = None;
++    let mut v4_residue_detected = false;
++
++    if exists {
++        match fs::read_to_string(path) {
++            Ok(text) => {
++                readable = true;
++                match text.parse::<toml::Value>() {
++                    Ok(value) => {
++                        model_spec_id = value
++                            .get("model_spec_id")
++                            .and_then(|v| v.as_str())
++                            .map(str::to_string);
++                        model_name = value
++                            .get("model_name")
++                            .and_then(|v| v.as_str())
++                            .map(str::to_string);
++                        vocab_size = value
++                            .get("dimensions")
++                            .and_then(|d| d.get("vocab_size"))
++                            .and_then(|v| v.as_integer())
++                            .map(|v| v as usize)
++                            .or_else(|| {
++                                value
++                                    .get("vocab_size")
++                                    .and_then(|v| v.as_integer())
++                                    .map(|v| v as usize)
++                            });
++                        v4_residue_detected = text.contains("model_tinyllama_1p1b_v4")
++                            || text.contains("TinyLlama 1.1B V4")
++                            || text.contains("V4 vocab 56832")
++                            || text.contains("56832");
++                    }
++                    Err(err) => failures.push(format!("model_spec_toml_parse_failed: {err}")),
++                }
++            }
++            Err(err) => failures.push(format!("model_spec_read_failed: {err}")),
++        }
++    } else {
++        failures.push("model_spec_missing".to_string());
++    }
++
++    let model_spec_id_match = model_spec_id.as_deref() == Some(cfg.expected_model_spec_id.as_str());
++    let vocab_size_match = vocab_size == Some(cfg.expected_vocab_size);
++    if !model_spec_id_match {
++        failures.push("model_spec_id_not_v5_48259".to_string());
++    }
++    if !vocab_size_match {
++        failures.push("vocab_size_not_48259".to_string());
++    }
++    if v4_residue_detected {
++        warnings.push("v4_residue_detected_in_model_spec".to_string());
++    }
++
++    QwTokTrain00R1ModelSpecAudit {
++        path: path.display().to_string(),
++        exists,
++        readable,
++        model_spec_id,
++        model_name,
++        vocab_size,
++        expected_model_spec_id: cfg.expected_model_spec_id.clone(),
++        expected_vocab_size: cfg.expected_vocab_size,
++        model_spec_id_match,
++        vocab_size_match,
++        v4_residue_detected,
++        failures,
++        warnings,
++    }
++}
++
++fn inspect_runtime_tokenizer(
++    path: &Path,
++    expected_vocab_size: usize,
++) -> QwTokTrain00R1RuntimeTokenizerAudit {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut readable = false;
++    let mut tokenizer_id = None;
++    let mut manifest_id = None;
++    let mut tokenizer_spec_id = None;
++    let mut top_level_manifest_hash_present = false;
++    let mut vocab_len = None;
++    let mut hashes_manifest_hash = None;
++    let mut sentencepiece_model_hash = None;
++    let mut sentencepiece_vocab_hash = None;
++    let mut vocab_hash = None;
++    let mut reserved_tokens_hash_present = false;
++    let mut canonical_runtime_manifest_hash = None;
++
++    if exists {
++        match fs::read_to_string(path) {
++            Ok(text) => {
++                readable = true;
++                match serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
++                    Ok(value) => {
++                        tokenizer_id = value.get("tokenizer_id").and_then(Value::as_str).map(str::to_string);
++                        manifest_id = value.get("manifest_id").and_then(Value::as_str).map(str::to_string);
++                        tokenizer_spec_id = value
++                            .get("tokenizer_spec_id")
++                            .and_then(Value::as_str)
++                            .map(str::to_string);
++                        top_level_manifest_hash_present = value.get("manifest_hash").is_some();
++                        vocab_len = value.get("vocab").and_then(Value::as_array).map(|v| v.len());
++                        if let Some(hashes) = value.get("hashes") {
++                            hashes_manifest_hash = hashes
++                                .get("manifest_hash")
++                                .and_then(Value::as_str)
++                                .map(str::to_string);
++                            sentencepiece_model_hash = hashes
++                                .get("sentencepiece_model_hash")
++                                .and_then(Value::as_str)
++                                .map(str::to_string);
++                            sentencepiece_vocab_hash = hashes
++                                .get("sentencepiece_vocab_hash")
++                                .and_then(Value::as_str)
++                                .map(str::to_string);
++                            vocab_hash = hashes.get("vocab_hash").and_then(Value::as_str).map(str::to_string);
++                            reserved_tokens_hash_present = hashes.get("reserved_tokens_hash").is_some();
++                        }
++                        canonical_runtime_manifest_hash = canonical_manifest_hash(&value);
++                    }
++                    Err(err) => failures.push(format!("tokenizer_manifest_json_parse_failed: {err}")),
++                }
++            }
++            Err(err) => failures.push(format!("tokenizer_manifest_read_failed: {err}")),
++        }
++    } else {
++        failures.push("tokenizer_manifest_missing".to_string());
++    }
++
++    if top_level_manifest_hash_present {
++        failures.push("top_level_manifest_hash_present".to_string());
++    }
++    if hashes_manifest_hash.is_none() {
++        failures.push("hashes_manifest_hash_missing".to_string());
++    }
++    if vocab_hash.is_none() {
++        warnings.push("hashes_vocab_hash_missing".to_string());
++    }
++    if vocab_len != Some(expected_vocab_size) {
++        failures.push("tokenizer_manifest_vocab_len_not_48259".to_string());
++    }
++
++    QwTokTrain00R1RuntimeTokenizerAudit {
++        path: path.display().to_string(),
++        exists,
++        readable,
++        tokenizer_id,
++        manifest_id,
++        tokenizer_spec_id,
++        top_level_manifest_hash_present,
++        vocab_len,
++        hashes_manifest_hash,
++        sentencepiece_model_hash,
++        sentencepiece_vocab_hash,
++        vocab_hash,
++        reserved_tokens_hash_present,
++        canonical_runtime_manifest_hash,
++        failures,
++        warnings,
++    }
++}
++
++fn parse_shape(value: &Value) -> Vec<u64> {
++    value
++        .get("shape")
++        .and_then(Value::as_array)
++        .map(|shape| shape.iter().filter_map(Value::as_u64).collect())
++        .unwrap_or_default()
++}
++
++fn parse_offsets(value: &Value) -> Option<[u64; 2]> {
++    let offsets = value.get("data_offsets")?.as_array()?;
++    if offsets.len() != 2 {
++        return None;
++    }
++    Some([offsets[0].as_u64()?, offsets[1].as_u64()?])
++}
++
++fn element_count(shape: &[u64]) -> Option<u64> {
++    if shape.is_empty() {
++        return None;
++    }
++    let mut acc = 1u64;
++    for dim in shape {
++        acc = acc.checked_mul(*dim)?;
++    }
++    Some(acc)
++}
++
++fn tensor_summary(key: &str, value: &Value) -> QwTokTrain00R1TensorHeaderSummary {
++    let shape = parse_shape(value);
++    QwTokTrain00R1TensorHeaderSummary {
++        key: key.to_string(),
++        dtype: value.get("dtype").and_then(Value::as_str).map(str::to_string),
++        element_count: element_count(&shape),
++        data_offsets: parse_offsets(value),
++        shape,
++    }
++}
++
++fn collect_metadata_candidates(
++    metadata: &BTreeMap<String, String>,
++    candidate_keys: &[&str],
++) -> BTreeMap<String, String> {
++    let mut out = BTreeMap::new();
++    for key in candidate_keys {
++        if let Some(value) = metadata.get(*key) {
++            out.insert((*key).to_string(), value.clone());
++        }
++    }
++    out
++}
++
++fn inspect_checkpoint_header(path: &Path) -> QwTokTrain00R1CheckpointHeaderAudit {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut readable = false;
++    let mut file_size_bytes = None;
++    let mut header_length_bytes = None;
++    let mut metadata_available = false;
++    let mut metadata = BTreeMap::new();
++    let mut tensor_key_count = 0usize;
++    let mut tensor_keys_first_32 = Vec::new();
++    let mut tensor_shape_summary = Vec::new();
++    let mut embedding_tensor_candidates = Vec::new();
++    let mut lm_head_tensor_candidates = Vec::new();
++
++    if exists {
++        match fs::metadata(path) {
++            Ok(meta) => file_size_bytes = Some(meta.len()),
++            Err(err) => warnings.push(format!("checkpoint_stat_failed: {err}")),
++        }
++        match File::open(path) {
++            Ok(mut file) => {
++                readable = true;
++                let mut len_buf = [0u8; 8];
++                if let Err(err) = file.read_exact(&mut len_buf) {
++                    failures.push(format!("safetensors_header_len_read_failed: {err}"));
++                } else {
++                    let header_len = u64::from_le_bytes(len_buf);
++                    header_length_bytes = Some(header_len);
++                    let mut header_bytes = vec![0u8; header_len as usize];
++                    if let Err(err) = file.read_exact(&mut header_bytes) {
++                        failures.push(format!("safetensors_header_read_failed: {err}"));
++                    } else {
++                        match serde_json::from_slice::<Value>(&header_bytes) {
++                            Ok(header) => {
++                                if let Some(meta_obj) = header.get("__metadata__").and_then(Value::as_object) {
++                                    metadata_available = true;
++                                    for (key, value) in meta_obj {
++                                        metadata.insert(key.clone(), value_to_string(value));
++                                    }
++                                } else {
++                                    warnings.push("safetensors_header_has_no___metadata__".to_string());
++                                }
++                                if let Some(obj) = header.as_object() {
++                                    let mut tensor_keys = obj
++                                        .keys()
++                                        .filter(|key| key.as_str() != "__metadata__")
++                                        .cloned()
++                                        .collect::<Vec<_>>();
++                                    tensor_keys.sort();
++                                    tensor_key_count = tensor_keys.len();
++                                    tensor_keys_first_32 = tensor_keys.iter().take(32).cloned().collect();
++                                    for key in tensor_keys.iter().take(128) {
++                                        if let Some(value) = obj.get(key) {
++                                            let summary = tensor_summary(key, value);
++                                            let lower = key.to_ascii_lowercase();
++                                            if lower.contains("embed") || lower.contains("tok_embeddings") {
++                                                embedding_tensor_candidates.push(summary.clone());
++                                            }
++                                            if lower.contains("lm_head") || lower.contains("output") {
++                                                lm_head_tensor_candidates.push(summary.clone());
++                                            }
++                                            tensor_shape_summary.push(summary);
++                                        }
++                                    }
++                                }
++                            }
++                            Err(err) => failures.push(format!("safetensors_header_json_parse_failed: {err}")),
++                        }
++                    }
++                }
++            }
++            Err(err) => failures.push(format!("checkpoint_open_failed: {err}")),
++        }
++    } else {
++        warnings.push("checkpoint_file_missing_audit_pending".to_string());
++    }
++
++    let checkpoint_tokenizer_hash_candidates = collect_metadata_candidates(
++        &metadata,
++        &[
++            "tokenizer_hash",
++            "tokenizer_manifest_hash",
++            "runtime_tokenizer_hash",
++            "source_tokenizer_hash",
++        ],
++    );
++    let checkpoint_manifest_hash_candidates = collect_metadata_candidates(
++        &metadata,
++        &[
++            "manifest_hash",
++            "checkpoint_manifest_hash",
++            "tokenizer_manifest_hash",
++        ],
++    );
++    let checkpoint_vocab_hash_candidates = collect_metadata_candidates(
++        &metadata,
++        &[
++            "vocab_hash",
++            "sentencepiece_vocab_hash",
++            "tokenizer_vocab_hash",
++        ],
++    );
++    let checkpoint_model_spec_id = metadata.get("model_spec_id").cloned();
++    let checkpoint_vocab_size = metadata.get("vocab_size").cloned();
++    let metadata_keys = metadata.keys().cloned().collect();
++
++    QwTokTrain00R1CheckpointHeaderAudit {
++        path: path.display().to_string(),
++        exists,
++        readable,
++        file_size_bytes,
++        header_length_bytes,
++        header_bytes_read_only: true,
++        tensor_payload_loaded: false,
++        metadata_available,
++        metadata,
++        metadata_keys,
++        checkpoint_tokenizer_hash_candidates,
++        checkpoint_manifest_hash_candidates,
++        checkpoint_vocab_hash_candidates,
++        checkpoint_model_spec_id,
++        checkpoint_vocab_size,
++        tensor_key_count,
++        tensor_keys_first_32,
++        tensor_shape_summary,
++        embedding_tensor_candidates,
++        lm_head_tensor_candidates,
++        failures,
++        warnings,
++    }
++}
++
++fn runtime_hash_candidates(
++    runtime: &QwTokTrain00R1RuntimeTokenizerAudit,
++) -> BTreeMap<String, String> {
++    let mut out = BTreeMap::new();
++    if let Some(value) = &runtime.hashes_manifest_hash {
++        out.insert("runtime.hashes.manifest_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.canonical_runtime_manifest_hash {
++        out.insert("runtime.canonical_manifest_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.vocab_hash {
++        out.insert("runtime.hashes.vocab_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.sentencepiece_vocab_hash {
++        out.insert("runtime.hashes.sentencepiece_vocab_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.sentencepiece_model_hash {
++        out.insert("runtime.hashes.sentencepiece_model_hash".to_string(), value.clone());
++    }
++    out
++}
++
++fn checkpoint_hash_candidates(
++    checkpoint: &QwTokTrain00R1CheckpointHeaderAudit,
++) -> BTreeMap<String, String> {
++    let mut out = BTreeMap::new();
++    for (key, value) in &checkpoint.checkpoint_tokenizer_hash_candidates {
++        out.insert(format!("checkpoint.metadata.{key}"), value.clone());
++    }
++    for (key, value) in &checkpoint.checkpoint_manifest_hash_candidates {
++        out.insert(format!("checkpoint.metadata.{key}"), value.clone());
++    }
++    for (key, value) in &checkpoint.checkpoint_vocab_hash_candidates {
++        out.insert(format!("checkpoint.metadata.{key}"), value.clone());
++    }
++    out
++}
++
++fn build_hash_matrix(
++    checkpoint: &QwTokTrain00R1CheckpointHeaderAudit,
++    runtime: &QwTokTrain00R1RuntimeTokenizerAudit,
++) -> QwTokTrain00R1HashMismatchMatrix {
++    let checkpoint_candidates = checkpoint_hash_candidates(checkpoint);
++    let runtime_candidates = runtime_hash_candidates(runtime);
++    let mut rows = Vec::new();
++    for (ck, cv) in &checkpoint_candidates {
++        for (rk, rv) in &runtime_candidates {
++            rows.push(QwTokTrain00R1HashComparisonRow {
++                checkpoint_key: ck.clone(),
++                checkpoint_value: cv.clone(),
++                runtime_key: rk.clone(),
++                runtime_value: rv.clone(),
++                match_observed: cv == rv,
++            });
++        }
++    }
++    let comparison_known = !rows.is_empty();
++    let any_match = rows.iter().any(|row| row.match_observed);
++    let mismatch_observed = comparison_known && rows.iter().any(|row| !row.match_observed);
++    let mut warnings = Vec::new();
++    if !comparison_known {
++        warnings.push("no_checkpoint_runtime_hash_pair_available".to_string());
++    } else if !any_match {
++        warnings.push("checkpoint_runtime_hash_mismatch_no_matching_candidate".to_string());
++    }
++    QwTokTrain00R1HashMismatchMatrix {
++        comparison_known,
++        any_match,
++        mismatch_observed,
++        rows,
++        warnings,
++    }
++}
++
++fn build_rebind_candidate(
++    cfg: &QwTokTrain00R1Config,
++    model_spec: &QwTokTrain00R1ModelSpecAudit,
++    runtime: &QwTokTrain00R1RuntimeTokenizerAudit,
++    checkpoint: &QwTokTrain00R1CheckpointHeaderAudit,
++    matrix: &QwTokTrain00R1HashMismatchMatrix,
++) -> QwTokTrain00R1RebindCandidateManifest {
++    let mut runtime_tokenizer = BTreeMap::new();
++    if let Some(value) = &runtime.tokenizer_id {
++        runtime_tokenizer.insert("tokenizer_id".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.manifest_id {
++        runtime_tokenizer.insert("manifest_id".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.tokenizer_spec_id {
++        runtime_tokenizer.insert("tokenizer_spec_id".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.hashes_manifest_hash {
++        runtime_tokenizer.insert("tokenizer_manifest_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.vocab_hash {
++        runtime_tokenizer.insert("vocab_hash".to_string(), value.clone());
++    }
++
++    let mut recommended_metadata_after = BTreeMap::new();
++    if let Some(value) = &runtime.tokenizer_id {
++        recommended_metadata_after.insert("tokenizer_id".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.hashes_manifest_hash {
++        recommended_metadata_after.insert("tokenizer_manifest_hash".to_string(), value.clone());
++        recommended_metadata_after.insert("tokenizer_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &runtime.vocab_hash {
++        recommended_metadata_after.insert("vocab_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &model_spec.model_spec_id {
++        recommended_metadata_after.insert("model_spec_id".to_string(), value.clone());
++    }
++    if let Some(value) = model_spec.vocab_size {
++        recommended_metadata_after.insert("vocab_size".to_string(), value.to_string());
++    }
++
++    let recommendation_status = if !checkpoint.exists {
++        "PENDING_CHECKPOINT_FILE_MISSING".to_string()
++    } else if !matrix.comparison_known {
++        "CANDIDATE_AVAILABLE_METADATA_KEY_ABSENT".to_string()
++    } else if matrix.any_match && !matrix.mismatch_observed {
++        "NO_REBIND_NEEDED_HASH_ALREADY_MATCHED".to_string()
++    } else if matrix.any_match {
++        "REVIEW_REQUIRED_PARTIAL_HASH_MATCH".to_string()
++    } else {
++        "REVIEW_REQUIRED_REBIND_CANDIDATE".to_string()
++    };
++
++    QwTokTrain00R1RebindCandidateManifest {
++        patch_id: QW_TOK_TRAIN00_R1_PATCH_ID.to_string(),
++        candidate_for: "QW-TOK-TRAIN-00-R2".to_string(),
++        checkpoint_path: cfg.checkpoint_path.clone(),
++        metadata_commit_executed: false,
++        checkpoint_rewrite_executed: false,
++        weight_tensor_mutation_executed: false,
++        tensor_payload_loaded: false,
++        requires_operator_approval: true,
++        runtime_tokenizer,
++        checkpoint_metadata_before: checkpoint.metadata.clone(),
++        recommended_metadata_after,
++        recommendation_status,
++    }
++}
++
++pub fn run_qw_tok_train00_r1_safetensors_metadata_audit(
++    cfg: QwTokTrain00R1Config,
++) -> Result<QwTokTrain00R1AuditReport> {
++    if cfg.allow_training
++        || cfg.allow_weight_mutation
++        || cfg.allow_checkpoint_rewrite
++        || cfg.allow_metadata_commit
++        || cfg.allow_decode_execution
++    {
++        anyhow::bail!(
++            "QW-TOK-TRAIN-00-R1 forbids training, mutation, checkpoint rewrite, metadata commit, and decode execution"
++        );
++    }
++
++    let model_spec = inspect_model_spec(Path::new(&cfg.model_spec_path), &cfg);
++    let runtime_tokenizer = inspect_runtime_tokenizer(Path::new(&cfg.tokenizer_manifest_path), cfg.expected_vocab_size);
++    let checkpoint_header = inspect_checkpoint_header(Path::new(&cfg.checkpoint_path));
++    let hash_mismatch_matrix = build_hash_matrix(&checkpoint_header, &runtime_tokenizer);
++    let rebind_candidate = build_rebind_candidate(
++        &cfg,
++        &model_spec,
++        &runtime_tokenizer,
++        &checkpoint_header,
++        &hash_mismatch_matrix,
++    );
++    let no_mutation = QwTokTrain00R1NoMutationReceipt::default();
++
++    let mut failures = Vec::new();
++    failures.extend(model_spec.failures.clone());
++    failures.extend(runtime_tokenizer.failures.clone());
++    failures.extend(checkpoint_header.failures.clone());
++
++    let mut warnings = Vec::new();
++    warnings.extend(model_spec.warnings.clone());
++    warnings.extend(runtime_tokenizer.warnings.clone());
++    warnings.extend(checkpoint_header.warnings.clone());
++    warnings.extend(hash_mismatch_matrix.warnings.clone());
++
++    let critical_pass = failures.is_empty()
++        && model_spec.model_spec_id_match
++        && model_spec.vocab_size_match
++        && !runtime_tokenizer.top_level_manifest_hash_present
++        && runtime_tokenizer.hashes_manifest_hash.is_some()
++        && runtime_tokenizer.vocab_len == Some(cfg.expected_vocab_size)
++        && checkpoint_header.header_bytes_read_only
++        && !checkpoint_header.tensor_payload_loaded
++        && !no_mutation.weight_tensor_mutation_executed
++        && !no_mutation.checkpoint_rewrite_executed
++        && !no_mutation.metadata_commit_executed;
++
++    let status = if critical_pass && checkpoint_header.exists && hash_mismatch_matrix.comparison_known {
++        if hash_mismatch_matrix.any_match && !hash_mismatch_matrix.mismatch_observed {
++            "PASS_QW_TOK_TRAIN00_R1_METADATA_HASH_MATCH_AUDIT"
++        } else {
++            "PASS_QW_TOK_TRAIN00_R1_REBIND_CANDIDATE_REVIEW_REQUIRED"
++        }
++    } else if critical_pass {
++        "PARTIAL_QW_TOK_TRAIN00_R1_AUDIT_PENDING_CHECKPOINT_OR_HASH_KEYS"
++    } else {
++        "FAIL_QW_TOK_TRAIN00_R1_METADATA_AUDIT"
++    }
++    .to_string();
++
++    Ok(QwTokTrain00R1AuditReport {
++        patch_id: QW_TOK_TRAIN00_R1_PATCH_ID.to_string(),
++        title: QW_TOK_TRAIN00_R1_TITLE.to_string(),
++        status,
++        no_training_seal: true,
++        no_weight_mutation_seal: true,
++        no_checkpoint_rewrite_seal: true,
++        model_spec,
++        runtime_tokenizer,
++        checkpoint_header,
++        hash_mismatch_matrix,
++        rebind_candidate,
++        no_mutation,
++        failures,
++        warnings,
++    })
++}
++
++fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
++    if let Some(parent) = path.parent() {
++        fs::create_dir_all(parent)?;
++    }
++    fs::write(path, serde_json::to_vec_pretty(value)?)
++        .with_context(|| format!("failed to write {}", path.display()))?;
++    Ok(())
++}
++
++pub fn write_qw_tok_train00_r1_artifacts(root: &Path, report: &QwTokTrain00R1AuditReport) -> Result<()> {
++    write_json(&root.join(QW_TOK_TRAIN00_R1_REPORT_PATH), report)?;
++    write_json(
++        &root.join(QW_TOK_TRAIN00_R1_HEADER_RECEIPT_PATH),
++        &report.checkpoint_header,
++    )?;
++    write_json(
++        &root.join(QW_TOK_TRAIN00_R1_RUNTIME_RECEIPT_PATH),
++        &report.runtime_tokenizer,
++    )?;
++    write_json(
++        &root.join(QW_TOK_TRAIN00_R1_MISMATCH_MATRIX_PATH),
++        &report.hash_mismatch_matrix,
++    )?;
++    write_json(
++        &root.join(QW_TOK_TRAIN00_R1_REBIND_CANDIDATE_PATH),
++        &report.rebind_candidate,
++    )?;
++    write_json(
++        &root.join(QW_TOK_TRAIN00_R1_NO_MUTATION_RECEIPT_PATH),
++        &report.no_mutation,
++    )?;
++    Ok(())
++}

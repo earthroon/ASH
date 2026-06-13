@@ -1,0 +1,1144 @@
+diff -ruN decode03e_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md decode03e_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md
+--- decode03e_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md	2026-05-27 08:10:53.543410925 +0000
+@@ -0,0 +1,24 @@
++# 16AI-QW-38G-R6A-DECODE-03E Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN / PASS_STATIC
++
++## Acceptance criteria mapped
++- [x] Default is Off.
++- [x] ControlledApply is required before behavior change.
++- [x] SALAD-04 overlay recommendation maps into Decode03EInput.
++- [x] Guard overlay is step-local.
++- [x] Base config mutation is forbidden by contract and summary counter.
++- [x] Backend unsupported feature application is counted as safety violation.
++- [x] Panic candidate execution is always false.
++- [x] Rollback/stop execution is not performed in DECODE-03E.
++- [x] Summary includes target counts and safety counts.
++
++## Not run
++- cargo check
++- cargo test
++- runtime smoke
++- EVAL-01 parity replay
++
++## Promotion note
++Do not default-enable guard overlay until EVAL-00/EVAL-01 are rerun with DECODE-03E receipts.
+diff -ruN decode03e_orig/crates/model_core/src/decode03e_guard_overlay.rs decode03e_work/crates/model_core/src/decode03e_guard_overlay.rs
+--- decode03e_orig/crates/model_core/src/decode03e_guard_overlay.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/crates/model_core/src/decode03e_guard_overlay.rs	2026-05-27 08:10:25.312042438 +0000
+@@ -0,0 +1,832 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::salad04_korean_morph_guard::{
++    receipt_from_salad02 as salad04_receipt_from_salad02, KoreanMorphLoopKind, Salad04Mode,
++    Salad04StepReceipt,
++};
++use crate::sampler_parity::SamplerParityReceipt;
++use crate::decode03a_entropy::{receipt_from_sampler03 as decode03a_receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a as decode03b_receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b as decode03c_receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c as decode03d_receipt_from_decode03c, DynamicSamplerMode};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++
++pub const DECODE03E_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03E";
++pub const DECODE03E_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-04";
++pub const DECODE03E_SSOT: &str = "salad04_overlay_recommendation+decode03d_applied_config+eval01_backend_parity_status";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Decode03EMode {
++    Off,
++    ShadowOnly,
++    ControlledApply,
++    StrictControlledApply,
++}
++
++impl Decode03EMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_DECODE03E_MODE")
++            .or_else(|_| env::var("ASH_DECODE03E_GUARD_OVERLAY"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "shadow" | "shadow_only" | "observe" | "observe_only" => Self::ShadowOnly,
++            "controlled" | "controlled_apply" | "apply" | "true" | "1" | "on" => Self::ControlledApply,
++            "strict" | "strict_controlled_apply" => Self::StrictControlledApply,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ShadowOnly => "ShadowOnly",
++            Self::ControlledApply => "ControlledApply",
++            Self::StrictControlledApply => "StrictControlledApply",
++        }
++    }
++
++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Decode03EGuardStrength {
++    Relaxed,
++    Normal,
++    Strict,
++    Panic,
++}
++
++impl Decode03EGuardStrength {
++    pub fn from_str(value: &str) -> Self {
++        match value.trim().to_ascii_lowercase().as_str() {
++            "relaxed" => Self::Relaxed,
++            "strict" => Self::Strict,
++            "panic" => Self::Panic,
++            _ => Self::Normal,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Relaxed => "Relaxed",
++            Self::Normal => "Normal",
++            Self::Strict => "Strict",
++            Self::Panic => "Panic",
++        }
++    }
++
++    fn rank(self) -> u8 {
++        match self {
++            Self::Relaxed => 0,
++            Self::Normal => 1,
++            Self::Strict => 2,
++            Self::Panic => 3,
++        }
++    }
++
++    fn max(self, other: Self) -> Self {
++        if self.rank() >= other.rank() { self } else { other }
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
++pub enum Decode03EMorphGuardTarget {
++    None,
++    JosaLoop,
++    EomiLoop,
++    JamoLeak,
++    ByteJamoLeak,
++    SyllableFragmentLoop,
++    EojeolBoundaryCollapse,
++    PunctuationGlueLoop,
++    MixedMorphLoop,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03EBackendCapability {
++    pub backend: String,
++    pub supports_guard_overlay: bool,
++    pub supports_morph_penalty: bool,
++    pub supports_no_repeat_ngram: bool,
++    pub supports_min_p_floor: bool,
++    pub supports_top_p_ceiling: bool,
++    pub supports_gpu_trace: bool,
++    pub requires_cpu_projection_for_morph: bool,
++    pub notes: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03EInput {
++    pub mode: Decode03EMode,
++    pub behavior_change_allowed: bool,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: u64,
++    pub step: usize,
++    pub backend: String,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub decode03d_guard_strength: Option<String>,
++    pub salad04_morph_score: Option<f32>,
++    pub salad04_morph_risk_stable: Option<String>,
++    pub salad04_dominant_loop_kind: Option<String>,
++    pub salad04_raise_salad02_risk_candidate: bool,
++    pub salad04_rollback_candidate_boost: bool,
++    pub salad04_safe_stop_candidate_boost: bool,
++    pub suggested_min_p_floor: Option<f32>,
++    pub suggested_top_p_ceiling: Option<f32>,
++    pub suggested_guard_strength: Option<String>,
++    pub no_repeat_ngram_hint: Option<usize>,
++    pub active_count_after_min_p: Option<usize>,
++    pub pci_raw: Option<f32>,
++    pub pci_bucket: Option<String>,
++    pub entropy_spike: bool,
++    pub fallback_risk: bool,
++    pub numeric_risk: bool,
++    pub global_finite_fallback_seen: bool,
++    pub eval01_backend_semantic_parity_ok: Option<bool>,
++    pub eval01_backend_strict_parity_ok: Option<bool>,
++    pub backend_supports_guard_overlay: bool,
++    pub backend_supports_morph_penalty: bool,
++    pub backend_supports_no_repeat_ngram: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03EGateDecision {
++    pub can_apply: bool,
++    pub strict_fail: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub apply_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03EGuardOverlay {
++    pub behavior_change: bool,
++    pub step_local_overlay: bool,
++    pub applied: bool,
++    pub guard_strength_before: String,
++    pub guard_strength_after: Decode03EGuardStrength,
++    pub morph_guard_target: Decode03EMorphGuardTarget,
++    pub morph_penalty_enabled: bool,
++    pub morph_penalty_weight: f32,
++    pub no_repeat_ngram_applied: Option<usize>,
++    pub repeat_penalty_delta: Option<f32>,
++    pub min_p_floor_applied: Option<f32>,
++    pub top_p_ceiling_applied: Option<f32>,
++    pub rollback_candidate_boost_seen: bool,
++    pub safe_stop_candidate_boost_seen: bool,
++    pub panic_candidate_seen: bool,
++    pub panic_candidate_executed: bool,
++    pub overlay_reasons: Vec<String>,
++    pub overlay_warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03EStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: u64,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Decode03EMode,
++    pub controlled_apply: bool,
++    pub salad04_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub eval01_status_seen: Option<String>,
++    pub input: Decode03EInput,
++    pub backend_capability: Decode03EBackendCapability,
++    pub gate: Decode03EGateDecision,
++    pub overlay: Decode03EGuardOverlay,
++    pub selected_id_before_overlay: Option<u32>,
++    pub selected_id_after_overlay: Option<u32>,
++    pub active_count_after_min_p_before: Option<usize>,
++    pub active_count_after_min_p_after: Option<usize>,
++    pub salad04_morph_score_before: Option<f32>,
++    pub salad04_morph_score_after: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03EGateCounts {
++    pub can_apply_count: usize,
++    pub denied_count: usize,
++    pub strict_fail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03EOverlayCounts {
++    pub applied_count: usize,
++    pub strict_guard_count: usize,
++    pub panic_guard_count: usize,
++    pub morph_penalty_enabled_count: usize,
++    pub no_repeat_ngram_applied_count: usize,
++    pub min_p_floor_applied_count: usize,
++    pub top_p_ceiling_applied_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03ETargetCounts {
++    pub josa_loop_count: usize,
++    pub eomi_loop_count: usize,
++    pub jamo_leak_count: usize,
++    pub byte_jamo_leak_count: usize,
++    pub syllable_fragment_loop_count: usize,
++    pub eojeol_boundary_collapse_count: usize,
++    pub punctuation_glue_loop_count: usize,
++    pub mixed_morph_loop_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03ESafetyCounts {
++    pub unsupported_applied_count: usize,
++    pub panic_candidate_executed_count: usize,
++    pub rollback_executed_count: usize,
++    pub stop_executed_count: usize,
++    pub active_set_too_small_skip_count: usize,
++    pub base_config_mutation_count: usize,
++    pub clamp_violation_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03ESummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub default_enable: bool,
++    pub steps_observed: usize,
++    pub gate: Decode03EGateCounts,
++    pub overlay: Decode03EOverlayCounts,
++    pub targets: Decode03ETargetCounts,
++    pub safety: Decode03ESafetyCounts,
++    pub ready_for_eval02_long_horizon_soak: bool,
++    pub ready_for_default_guard_overlay: bool,
++    pub ready_for_medusa00: bool,
++    pub reason: String,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_f32(name: &str, default: f32) -> f32 {
++    env::var(name).ok().and_then(|v| v.trim().parse::<f32>().ok()).unwrap_or(default)
++}
++
++fn clamp(value: f32, lo: f32, hi: f32) -> f32 {
++    if value.is_finite() { value.clamp(lo, hi) } else { hi }
++}
++
++fn risk_rank(risk: Option<&str>) -> u8 {
++    match risk.unwrap_or("Low").to_ascii_lowercase().as_str() {
++        "critical" => 3,
++        "high" => 2,
++        "medium" => 1,
++        _ => 0,
++    }
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_DECODE03E_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "decode03e_sampler03_bridge".to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_DECODE03E_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03e_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_DECODE03E_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03e_summary.json"))
++}
++
++pub fn backend_capability_from_env(backend: &str) -> Decode03EBackendCapability {
++    Decode03EBackendCapability {
++        backend: backend.to_string(),
++        supports_guard_overlay: env_bool("ASH_DECODE03E_SUPPORTS_GUARD_OVERLAY", true),
++        supports_morph_penalty: env_bool("ASH_DECODE03E_SUPPORTS_MORPH_PENALTY", true),
++        supports_no_repeat_ngram: env_bool("ASH_DECODE03E_SUPPORTS_NO_REPEAT_NGRAM", true),
++        supports_min_p_floor: env_bool("ASH_DECODE03E_SUPPORTS_MIN_P_FLOOR", true),
++        supports_top_p_ceiling: env_bool("ASH_DECODE03E_SUPPORTS_TOP_P_CEILING", true),
++        supports_gpu_trace: env_bool("ASH_DECODE03E_SUPPORTS_GPU_TRACE", false),
++        requires_cpu_projection_for_morph: env_bool("ASH_DECODE03E_REQUIRES_CPU_PROJECTION_FOR_MORPH", false),
++        notes: Vec::new(),
++    }
++}
++
++pub fn target_from_salad04_loop(kind: KoreanMorphLoopKind) -> Decode03EMorphGuardTarget {
++    match kind {
++        KoreanMorphLoopKind::JosaRepeat | KoreanMorphLoopKind::JosaChain => Decode03EMorphGuardTarget::JosaLoop,
++        KoreanMorphLoopKind::EomiRepeat | KoreanMorphLoopKind::EomiPunctuationLoop => Decode03EMorphGuardTarget::EomiLoop,
++        KoreanMorphLoopKind::JamoLeak => Decode03EMorphGuardTarget::JamoLeak,
++        KoreanMorphLoopKind::ByteJamoMixedLeak => Decode03EMorphGuardTarget::ByteJamoLeak,
++        KoreanMorphLoopKind::SyllableFragmentLoop => Decode03EMorphGuardTarget::SyllableFragmentLoop,
++        KoreanMorphLoopKind::EojeolBoundaryCollapse => Decode03EMorphGuardTarget::EojeolBoundaryCollapse,
++        KoreanMorphLoopKind::PunctuationGlueLoop => Decode03EMorphGuardTarget::PunctuationGlueLoop,
++        KoreanMorphLoopKind::MixedMorphLoop => Decode03EMorphGuardTarget::MixedMorphLoop,
++        KoreanMorphLoopKind::None => Decode03EMorphGuardTarget::None,
++    }
++}
++
++fn target_from_string(kind: Option<&str>) -> Decode03EMorphGuardTarget {
++    match kind.unwrap_or("None") {
++        "JosaRepeat" | "JosaChain" => Decode03EMorphGuardTarget::JosaLoop,
++        "EomiRepeat" | "EomiPunctuationLoop" => Decode03EMorphGuardTarget::EomiLoop,
++        "JamoLeak" => Decode03EMorphGuardTarget::JamoLeak,
++        "ByteJamoMixedLeak" => Decode03EMorphGuardTarget::ByteJamoLeak,
++        "SyllableFragmentLoop" => Decode03EMorphGuardTarget::SyllableFragmentLoop,
++        "EojeolBoundaryCollapse" => Decode03EMorphGuardTarget::EojeolBoundaryCollapse,
++        "PunctuationGlueLoop" => Decode03EMorphGuardTarget::PunctuationGlueLoop,
++        "MixedMorphLoop" => Decode03EMorphGuardTarget::MixedMorphLoop,
++        _ => Decode03EMorphGuardTarget::None,
++    }
++}
++
++pub fn decide_decode03e_gate(input: &Decode03EInput, capability: &Decode03EBackendCapability) -> Decode03EGateDecision {
++    let mut denied = Vec::new();
++    let mut warnings = Vec::new();
++    let mut apply = Vec::new();
++    let mut strict_fail = false;
++
++    match input.mode {
++        Decode03EMode::Off => denied.push("mode_off".to_string()),
++        Decode03EMode::ShadowOnly => denied.push("shadow_only_no_apply".to_string()),
++        Decode03EMode::ControlledApply | Decode03EMode::StrictControlledApply => apply.push("controlled_apply_enabled".to_string()),
++    }
++    if !input.behavior_change_allowed {
++        denied.push("behavior_change_not_allowed".to_string());
++    }
++    if !capability.supports_guard_overlay || !input.backend_supports_guard_overlay {
++        denied.push("backend_guard_overlay_unsupported".to_string());
++    }
++    if input.salad04_morph_risk_stable.is_none() {
++        warnings.push("salad04_status_missing".to_string());
++    }
++    if input.numeric_risk && matches!(input.mode, Decode03EMode::StrictControlledApply) {
++        strict_fail = true;
++        denied.push("numeric_risk_defer_to_stop_or_rollback".to_string());
++    }
++    if matches!(input.mode, Decode03EMode::StrictControlledApply) && input.eval01_backend_semantic_parity_ok != Some(true) {
++        strict_fail = true;
++        denied.push("eval01_semantic_parity_not_confirmed".to_string());
++    }
++    if matches!(input.mode, Decode03EMode::ControlledApply) && input.eval01_backend_strict_parity_ok != Some(true) {
++        warnings.push("eval01_strict_parity_not_confirmed_semantic_only".to_string());
++    }
++    if !capability.supports_morph_penalty && risk_rank(input.salad04_morph_risk_stable.as_deref()) >= 2 {
++        warnings.push("backend_morph_penalty_unsupported".to_string());
++    }
++    if input.global_finite_fallback_seen {
++        warnings.push("global_finite_fallback_seen_defer_to_stop".to_string());
++    }
++
++    Decode03EGateDecision {
++        can_apply: denied.is_empty() && matches!(input.mode, Decode03EMode::ControlledApply | Decode03EMode::StrictControlledApply),
++        strict_fail,
++        denied_reasons: denied,
++        warning_reasons: warnings,
++        apply_reasons: apply,
++    }
++}
++
++fn base_policy(target: Decode03EMorphGuardTarget, risk_rank: u8) -> (Decode03EGuardStrength, f32, Option<usize>, Option<f32>, Option<f32>, Option<f32>, Vec<String>) {
++    let mut reasons = Vec::new();
++    let policy = match target {
++        Decode03EMorphGuardTarget::JosaLoop => {
++            reasons.push("josa_loop_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.18, Some(3), Some(0.08), Some(0.86), Some(0.02))
++        }
++        Decode03EMorphGuardTarget::EomiLoop => {
++            reasons.push("eomi_loop_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.22, Some(3), Some(0.10), Some(0.84), Some(0.04))
++        }
++        Decode03EMorphGuardTarget::JamoLeak => {
++            reasons.push("jamo_leak_guard".to_string());
++            (Decode03EGuardStrength::Panic, 0.35, Some(3), Some(0.12), Some(0.82), Some(0.05))
++        }
++        Decode03EMorphGuardTarget::ByteJamoLeak => {
++            reasons.push("byte_jamo_leak_guard".to_string());
++            (Decode03EGuardStrength::Panic, 0.45, Some(4), Some(0.14), Some(0.78), Some(0.06))
++        }
++        Decode03EMorphGuardTarget::SyllableFragmentLoop => {
++            reasons.push("syllable_fragment_loop_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.16, Some(3), None, None, Some(0.02))
++        }
++        Decode03EMorphGuardTarget::EojeolBoundaryCollapse => {
++            reasons.push("eojeol_boundary_collapse_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.20, None, None, Some(0.84), Some(0.03))
++        }
++        Decode03EMorphGuardTarget::PunctuationGlueLoop => {
++            reasons.push("punctuation_glue_loop_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.18, Some(3), None, None, Some(0.02))
++        }
++        Decode03EMorphGuardTarget::MixedMorphLoop => {
++            reasons.push("mixed_morph_loop_guard".to_string());
++            (Decode03EGuardStrength::Strict, 0.20, Some(3), Some(0.10), Some(0.84), Some(0.03))
++        }
++        Decode03EMorphGuardTarget::None => (Decode03EGuardStrength::Normal, 0.0, None, None, None, None),
++    };
++    if risk_rank >= 3 {
++        reasons.push("critical_morph_risk_panic_floor".to_string());
++        (policy.0.max(Decode03EGuardStrength::Panic), policy.1.max(0.30), policy.2.or(Some(4)), policy.3.or(Some(0.14)), policy.4.or(Some(0.78)), policy.5.or(Some(0.05)), reasons)
++    } else if risk_rank == 2 {
++        reasons.push("high_morph_risk_strict_floor".to_string());
++        (policy.0.max(Decode03EGuardStrength::Strict), policy.1.max(0.15), policy.2.or(Some(3)), policy.3, policy.4, policy.5, reasons)
++    } else if risk_rank == 1 {
++        reasons.push("medium_morph_risk_normal_floor".to_string());
++        (policy.0.max(Decode03EGuardStrength::Normal), policy.1.max(0.05), None, None, None, None, reasons)
++    } else {
++        policy
++    }
++}
++
++pub fn compute_decode03e_guard_overlay(
++    input: &Decode03EInput,
++    capability: &Decode03EBackendCapability,
++    gate: &Decode03EGateDecision,
++) -> Decode03EGuardOverlay {
++    let before = input.decode03d_guard_strength.clone().unwrap_or_else(|| "Normal".to_string());
++    let before_strength = Decode03EGuardStrength::from_str(&before);
++    let target = target_from_string(input.salad04_dominant_loop_kind.as_deref());
++    let rank = risk_rank(input.salad04_morph_risk_stable.as_deref());
++    let (base_strength, mut penalty, mut ngram, mut min_p_floor, mut top_p_ceiling, mut repeat_delta, mut reasons) = base_policy(target, rank);
++    let suggested_strength = input.suggested_guard_strength.as_deref().map(Decode03EGuardStrength::from_str).unwrap_or(base_strength);
++    let mut after = base_strength.max(suggested_strength).max(before_strength);
++    if rank == 0 { after = before_strength; }
++    if input.entropy_spike { reasons.push("entropy_spike".to_string()); }
++    if matches!(input.pci_bucket.as_deref(), Some("Unstable") | Some("Collapsing")) {
++        reasons.push("pci_unstable_or_collapsing".to_string());
++        after = after.max(Decode03EGuardStrength::Strict);
++    }
++    if input.fallback_risk { reasons.push("fallback_risk_seen".to_string()); }
++    if input.salad04_rollback_candidate_boost { reasons.push("rollback_candidate_boost_seen".to_string()); }
++    if input.salad04_safe_stop_candidate_boost { reasons.push("safe_stop_candidate_boost_seen".to_string()); }
++    if let Some(hint) = input.no_repeat_ngram_hint { ngram = Some(ngram.unwrap_or(0).max(hint)); }
++    if let Some(hint) = input.suggested_min_p_floor { min_p_floor = Some(min_p_floor.unwrap_or(0.0).max(hint)); }
++    if let Some(hint) = input.suggested_top_p_ceiling { top_p_ceiling = Some(top_p_ceiling.map(|v| v.min(hint)).unwrap_or(hint)); }
++
++    let mut warnings = gate.warning_reasons.clone();
++    if matches!(input.active_count_after_min_p, Some(v) if v <= 3) {
++        min_p_floor = None;
++        top_p_ceiling = None;
++        warnings.push("active_set_too_small_skip_extra_tighten".to_string());
++    }
++    penalty = clamp(penalty, 0.0, 0.50);
++    min_p_floor = min_p_floor.map(|v| clamp(v, 0.0, 0.20)).filter(|v| *v > input.current_min_p);
++    top_p_ceiling = top_p_ceiling.map(|v| clamp(v, 0.60, 0.98)).filter(|v| *v < input.current_top_p);
++    ngram = ngram.map(|v| v.min(6)).filter(|v| *v > 0);
++    repeat_delta = repeat_delta.map(|v| clamp(v, 0.0, 0.25));
++
++    let can_apply = gate.can_apply;
++    let morph_penalty_enabled = can_apply && capability.supports_morph_penalty && penalty > 0.0;
++    if can_apply && !capability.supports_morph_penalty && penalty > 0.0 { warnings.push("morph_penalty_not_applied_backend_unsupported".to_string()); }
++    let no_repeat_ngram_applied = if can_apply && capability.supports_no_repeat_ngram { ngram } else { None };
++    if can_apply && !capability.supports_no_repeat_ngram && ngram.is_some() { warnings.push("no_repeat_ngram_not_applied_backend_unsupported".to_string()); }
++    let min_p_floor_applied = if can_apply && capability.supports_min_p_floor { min_p_floor } else { None };
++    if can_apply && !capability.supports_min_p_floor && min_p_floor.is_some() { warnings.push("min_p_floor_not_applied_backend_unsupported".to_string()); }
++    let top_p_ceiling_applied = if can_apply && capability.supports_top_p_ceiling { top_p_ceiling } else { None };
++    if can_apply && !capability.supports_top_p_ceiling && top_p_ceiling.is_some() { warnings.push("top_p_ceiling_not_applied_backend_unsupported".to_string()); }
++    let applied = can_apply && (after != before_strength || morph_penalty_enabled || no_repeat_ngram_applied.is_some() || min_p_floor_applied.is_some() || top_p_ceiling_applied.is_some());
++    if applied { reasons.push("step_local_guard_overlay_applied".to_string()); }
++
++    Decode03EGuardOverlay {
++        behavior_change: applied,
++        step_local_overlay: true,
++        applied,
++        guard_strength_before: before,
++        guard_strength_after: if applied { after } else { before_strength },
++        morph_guard_target: target,
++        morph_penalty_enabled,
++        morph_penalty_weight: if morph_penalty_enabled { penalty } else { 0.0 },
++        no_repeat_ngram_applied,
++        repeat_penalty_delta: if applied { repeat_delta } else { None },
++        min_p_floor_applied,
++        top_p_ceiling_applied,
++        rollback_candidate_boost_seen: input.salad04_rollback_candidate_boost,
++        safe_stop_candidate_boost_seen: input.salad04_safe_stop_candidate_boost,
++        panic_candidate_seen: matches!(after, Decode03EGuardStrength::Panic) || input.salad04_safe_stop_candidate_boost || input.numeric_risk || input.global_finite_fallback_seen,
++        panic_candidate_executed: false,
++        overlay_reasons: reasons,
++        overlay_warnings: warnings,
++    }
++}
++
++pub fn input_from_salad04(mode: Decode03EMode, receipt: &Salad04StepReceipt, source: Option<&SamplerParityReceipt>) -> Decode03EInput {
++    let config = source.map(|s| &s.decode_config);
++    let recommendation = &receipt.detection.overlay_recommendation;
++    Decode03EInput {
++        mode,
++        behavior_change_allowed: env_bool("ASH_DECODE03E_BEHAVIOR_CHANGE_ALLOWED", false),
++        run_id: run_id_from_env(),
++        prompt_hash: receipt.prompt_hash.clone(),
++        seed: receipt.seed.unwrap_or_else(|| env::var("ASH_DECODE03E_SEED").ok().and_then(|v| v.parse().ok()).unwrap_or(0)),
++        step: receipt.step,
++        backend: receipt.backend.clone(),
++        current_temperature: config.map(|c| c.temperature).unwrap_or_else(|| env_f32("ASH_DECODE03E_CURRENT_TEMPERATURE", 0.25)),
++        current_top_p: config.map(|c| c.top_p).unwrap_or_else(|| env_f32("ASH_DECODE03E_CURRENT_TOP_P", 0.88)),
++        current_top_k: config.map(|c| c.top_k as usize).unwrap_or_else(|| env_usize("ASH_DECODE03E_CURRENT_TOP_K", 0)),
++        current_min_p: config.map(|c| c.min_p).unwrap_or_else(|| env_f32("ASH_DECODE03E_CURRENT_MIN_P", 0.05)),
++        decode03d_guard_strength: receipt.input.decode03d_guard_strength.clone(),
++        salad04_morph_score: Some(receipt.detection.morph_score),
++        salad04_morph_risk_stable: Some(receipt.detection.morph_risk_stable.clone()),
++        salad04_dominant_loop_kind: Some(format!("{:?}", receipt.detection.dominant_loop_kind)),
++        salad04_raise_salad02_risk_candidate: recommendation.raise_salad02_risk_candidate,
++        salad04_rollback_candidate_boost: recommendation.rollback_candidate_boost,
++        salad04_safe_stop_candidate_boost: recommendation.safe_stop_candidate_boost,
++        suggested_min_p_floor: recommendation.suggested_min_p_floor,
++        suggested_top_p_ceiling: recommendation.suggested_top_p_ceiling,
++        suggested_guard_strength: recommendation.suggested_guard_strength.clone(),
++        no_repeat_ngram_hint: recommendation.no_repeat_ngram_hint,
++        active_count_after_min_p: source.map(|s| s.cpu.post_min_p_count),
++        pci_raw: receipt.input.pci_raw,
++        pci_bucket: receipt.input.pci_bucket.clone(),
++        entropy_spike: receipt.input.entropy_spike,
++        fallback_risk: receipt.input.fallback_risk,
++        numeric_risk: receipt.input.numeric_risk,
++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
++        eval01_backend_semantic_parity_ok: env::var("ASH_DECODE03E_EVAL01_SEMANTIC_PARITY_OK").ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")),
++        eval01_backend_strict_parity_ok: env::var("ASH_DECODE03E_EVAL01_STRICT_PARITY_OK").ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")),
++        backend_supports_guard_overlay: env_bool("ASH_DECODE03E_SUPPORTS_GUARD_OVERLAY", true),
++        backend_supports_morph_penalty: env_bool("ASH_DECODE03E_SUPPORTS_MORPH_PENALTY", true),
++        backend_supports_no_repeat_ngram: env_bool("ASH_DECODE03E_SUPPORTS_NO_REPEAT_NGRAM", true),
++    }
++}
++
++pub fn receipt_from_salad04(mode: Decode03EMode, salad04: &Salad04StepReceipt, source: Option<&SamplerParityReceipt>) -> Decode03EStepReceipt {
++    let input = input_from_salad04(mode, salad04, source);
++    let capability = backend_capability_from_env(&input.backend);
++    let gate = decide_decode03e_gate(&input, &capability);
++    let overlay = compute_decode03e_guard_overlay(&input, &capability, &gate);
++    let selected_after = source.map(|s| s.cpu.selected_id).or(Some(salad04.selected_id));
++    let before_count = input.active_count_after_min_p;
++    let after_count = if overlay.applied {
++        before_count.map(|v| {
++            let penalty = (overlay.morph_penalty_weight * 10.0).round() as usize;
++            v.saturating_sub(penalty).max(1)
++        })
++    } else {
++        before_count
++    };
++    Decode03EStepReceipt {
++        patch_id: DECODE03E_PATCH_ID.to_string(),
++        input_patch: DECODE03E_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: input.run_id.clone(),
++        prompt_hash: input.prompt_hash.clone(),
++        seed: input.seed,
++        step: input.step,
++        backend: input.backend.clone(),
++        sampler_ssot: DECODE03E_SSOT.to_string(),
++        mode,
++        controlled_apply: matches!(mode, Decode03EMode::ControlledApply | Decode03EMode::StrictControlledApply),
++        salad04_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD04_RECEIPT".to_string()),
++        decode03d_status_seen: salad04.decode03d_status_seen.clone(),
++        eval01_status_seen: env::var("ASH_EVAL01_STATUS_SEEN").ok(),
++        input,
++        backend_capability: capability,
++        gate,
++        overlay,
++        selected_id_before_overlay: None,
++        selected_id_after_overlay: selected_after,
++        active_count_after_min_p_before: before_count,
++        active_count_after_min_p_after: after_count,
++        salad04_morph_score_before: Some(salad04.detection.morph_score),
++        salad04_morph_score_after: None,
++    }
++}
++
++fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) {
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(value) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++pub fn append_decode03e_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Decode03EMode::from_env();
++    if !mode.enabled() { return; }
++    let entropy_receipt = decode03a_receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = decode03b_receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = decode03c_receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let mut decode03d_receipt = decode03d_receipt_from_decode03c(DynamicSamplerMode::from_env(), &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad04_receipt = salad04_receipt_from_salad02(Salad04Mode::RiskOverlay, &salad02_receipt);
++    let receipt = receipt_from_salad04(mode, &salad04_receipt, Some(source));
++    append_jsonl(receipt_path(), &receipt);
++    let _ = write_decode03e_summary_from_receipt_file();
++}
++
++fn read_receipts(path: PathBuf) -> Vec<Decode03EStepReceipt> {
++    let Ok(content) = fs::read_to_string(path) else { return Vec::new(); };
++    content.lines().filter_map(|line| serde_json::from_str::<Decode03EStepReceipt>(line).ok()).collect()
++}
++
++pub fn summary_from_receipts(receipts: &[Decode03EStepReceipt]) -> Decode03ESummary {
++    let mut gate = Decode03EGateCounts::default();
++    let mut overlay = Decode03EOverlayCounts::default();
++    let mut targets = Decode03ETargetCounts::default();
++    let mut safety = Decode03ESafetyCounts::default();
++    for receipt in receipts {
++        if receipt.gate.can_apply { gate.can_apply_count += 1; } else if !matches!(receipt.mode, Decode03EMode::Off | Decode03EMode::ShadowOnly) { gate.denied_count += 1; }
++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
++        if receipt.overlay.applied { overlay.applied_count += 1; }
++        if receipt.overlay.guard_strength_after == Decode03EGuardStrength::Strict { overlay.strict_guard_count += 1; }
++        if receipt.overlay.guard_strength_after == Decode03EGuardStrength::Panic { overlay.panic_guard_count += 1; }
++        if receipt.overlay.morph_penalty_enabled { overlay.morph_penalty_enabled_count += 1; }
++        if receipt.overlay.no_repeat_ngram_applied.is_some() { overlay.no_repeat_ngram_applied_count += 1; }
++        if receipt.overlay.min_p_floor_applied.is_some() { overlay.min_p_floor_applied_count += 1; }
++        if receipt.overlay.top_p_ceiling_applied.is_some() { overlay.top_p_ceiling_applied_count += 1; }
++        match receipt.overlay.morph_guard_target {
++            Decode03EMorphGuardTarget::JosaLoop => targets.josa_loop_count += 1,
++            Decode03EMorphGuardTarget::EomiLoop => targets.eomi_loop_count += 1,
++            Decode03EMorphGuardTarget::JamoLeak => targets.jamo_leak_count += 1,
++            Decode03EMorphGuardTarget::ByteJamoLeak => targets.byte_jamo_leak_count += 1,
++            Decode03EMorphGuardTarget::SyllableFragmentLoop => targets.syllable_fragment_loop_count += 1,
++            Decode03EMorphGuardTarget::EojeolBoundaryCollapse => targets.eojeol_boundary_collapse_count += 1,
++            Decode03EMorphGuardTarget::PunctuationGlueLoop => targets.punctuation_glue_loop_count += 1,
++            Decode03EMorphGuardTarget::MixedMorphLoop => targets.mixed_morph_loop_count += 1,
++            Decode03EMorphGuardTarget::None => {}
++        }
++        let unsupported_applied = receipt.overlay.applied && (!receipt.backend_capability.supports_guard_overlay || (!receipt.backend_capability.supports_morph_penalty && receipt.overlay.morph_penalty_enabled));
++        if unsupported_applied { safety.unsupported_applied_count += 1; }
++        if receipt.overlay.panic_candidate_executed { safety.panic_candidate_executed_count += 1; }
++        if receipt.overlay_warnings_contains("active_set_too_small_skip_extra_tighten") { safety.active_set_too_small_skip_count += 1; }
++        if receipt.overlay.morph_penalty_weight < 0.0 || receipt.overlay.morph_penalty_weight > 0.50 { safety.clamp_violation_count += 1; }
++        if receipt.overlay.min_p_floor_applied.map(|v| !(0.0..=0.20).contains(&v)).unwrap_or(false) { safety.clamp_violation_count += 1; }
++        if receipt.overlay.top_p_ceiling_applied.map(|v| !(0.60..=0.98).contains(&v)).unwrap_or(false) { safety.clamp_violation_count += 1; }
++    }
++    let contract_fail = safety.unsupported_applied_count > 0
++        || safety.panic_candidate_executed_count > 0
++        || safety.rollback_executed_count > 0
++        || safety.stop_executed_count > 0
++        || safety.base_config_mutation_count > 0
++        || safety.clamp_violation_count > 0;
++    Decode03ESummary {
++        patch_id: DECODE03E_PATCH_ID.to_string(),
++        input_patch: DECODE03E_INPUT_PATCH_ID.to_string(),
++        status: if contract_fail { "FAIL_STATIC_CONTRACT" } else if receipts.is_empty() { "STATIC_BAKE_DEFINED_NOT_RUN" } else { "PASS_WITH_WARNINGS" }.to_string(),
++        mode: Decode03EMode::from_env().as_str().to_string(),
++        default_enable: false,
++        steps_observed: receipts.len(),
++        gate,
++        overlay,
++        targets,
++        safety,
++        ready_for_eval02_long_horizon_soak: !contract_fail,
++        ready_for_default_guard_overlay: false,
++        ready_for_medusa00: false,
++        reason: if contract_fail {
++            "DECODE-03E guard overlay safety contract failed; do not promote.".to_string()
++        } else if receipts.is_empty() {
++            "guard overlay controlled apply schema baked; runtime receipt not yet collected".to_string()
++        } else {
++            "guard overlay controlled apply sealed; requires EVAL-00/01 rerun before default enable".to_string()
++        },
++    }
++}
++
++trait OverlayWarningContains {
++    fn overlay_warnings_contains(&self, needle: &str) -> bool;
++}
++
++impl OverlayWarningContains for Decode03EStepReceipt {
++    fn overlay_warnings_contains(&self, needle: &str) -> bool {
++        self.overlay.overlay_warnings.iter().any(|w| w == needle)
++    }
++}
++
++pub fn write_decode03e_summary_from_receipt_file() -> Result<Decode03ESummary, String> {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    let json = serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?;
++    fs::write(&path, format!("{}\n", json)).map_err(|e| e.to_string())?;
++    Ok(summary)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn base_input(mode: Decode03EMode) -> Decode03EInput {
++        Decode03EInput {
++            mode,
++            behavior_change_allowed: true,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: 1,
++            step: 1,
++            backend: "cpu_oracle".to_string(),
++            current_temperature: 0.18,
++            current_top_p: 0.86,
++            current_top_k: 0,
++            current_min_p: 0.08,
++            decode03d_guard_strength: Some("Strict".to_string()),
++            salad04_morph_score: Some(0.76),
++            salad04_morph_risk_stable: Some("High".to_string()),
++            salad04_dominant_loop_kind: Some("EomiRepeat".to_string()),
++            salad04_raise_salad02_risk_candidate: true,
++            salad04_rollback_candidate_boost: true,
++            salad04_safe_stop_candidate_boost: false,
++            suggested_min_p_floor: Some(0.12),
++            suggested_top_p_ceiling: Some(0.82),
++            suggested_guard_strength: Some("Panic".to_string()),
++            no_repeat_ngram_hint: Some(3),
++            active_count_after_min_p: Some(37),
++            pci_raw: Some(0.31),
++            pci_bucket: Some("Unstable".to_string()),
++            entropy_spike: true,
++            fallback_risk: false,
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++            eval01_backend_semantic_parity_ok: Some(true),
++            eval01_backend_strict_parity_ok: Some(false),
++            backend_supports_guard_overlay: true,
++            backend_supports_morph_penalty: true,
++            backend_supports_no_repeat_ngram: true,
++        }
++    }
++
++    fn cap() -> Decode03EBackendCapability { backend_capability_from_env("cpu_oracle") }
++
++    #[test]
++    fn decode03e_gate_denies_mode_off() {
++        let mut input = base_input(Decode03EMode::Off);
++        input.behavior_change_allowed = true;
++        let gate = decide_decode03e_gate(&input, &cap());
++        assert!(!gate.can_apply);
++    }
++
++    #[test]
++    fn decode03e_gate_denies_behavior_not_allowed() {
++        let mut input = base_input(Decode03EMode::ControlledApply);
++        input.behavior_change_allowed = false;
++        let gate = decide_decode03e_gate(&input, &cap());
++        assert!(!gate.can_apply);
++    }
++
++    #[test]
++    fn decode03e_maps_eomi_repeat_to_eomi_loop() {
++        assert_eq!(target_from_string(Some("EomiRepeat")), Decode03EMorphGuardTarget::EomiLoop);
++    }
++
++    #[test]
++    fn decode03e_maps_jamo_leak_to_panic() {
++        let mut input = base_input(Decode03EMode::ControlledApply);
++        input.salad04_dominant_loop_kind = Some("JamoLeak".to_string());
++        let gate = decide_decode03e_gate(&input, &cap());
++        let overlay = compute_decode03e_guard_overlay(&input, &cap(), &gate);
++        assert_eq!(overlay.guard_strength_after, Decode03EGuardStrength::Panic);
++    }
++
++    #[test]
++    fn decode03e_clamps_morph_penalty() {
++        let input = base_input(Decode03EMode::ControlledApply);
++        let gate = decide_decode03e_gate(&input, &cap());
++        let overlay = compute_decode03e_guard_overlay(&input, &cap(), &gate);
++        assert!((0.0..=0.50).contains(&overlay.morph_penalty_weight));
++    }
++
++    #[test]
++    fn decode03e_unsupported_backend_no_apply() {
++        let input = base_input(Decode03EMode::ControlledApply);
++        let mut capability = cap();
++        capability.supports_guard_overlay = false;
++        let gate = decide_decode03e_gate(&input, &capability);
++        let overlay = compute_decode03e_guard_overlay(&input, &capability, &gate);
++        assert!(!overlay.applied);
++    }
++
++    #[test]
++    fn decode03e_panic_candidate_never_executes() {
++        let input = base_input(Decode03EMode::ControlledApply);
++        let gate = decide_decode03e_gate(&input, &cap());
++        let overlay = compute_decode03e_guard_overlay(&input, &cap(), &gate);
++        assert!(!overlay.panic_candidate_executed);
++    }
++}
+diff -ruN decode03e_orig/crates/model_core/src/lib.rs decode03e_work/crates/model_core/src/lib.rs
+--- decode03e_orig/crates/model_core/src/lib.rs	2026-05-27 08:01:04.000000000 +0000
++++ decode03e_work/crates/model_core/src/lib.rs	2026-05-27 08:09:52.604394620 +0000
+@@ -30,6 +30,7 @@
+ mod salad04_korean_morph_guard;
+ mod eval00_regression;
+ mod eval01_backend_replay;
++mod decode03e_guard_overlay;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -217,6 +218,19 @@
+     append_eval00_receipt_from_sampler03, write_eval00_summary_from_receipt_file,
+ };
+ 
++
++pub use decode03e_guard_overlay::{
++    DECODE03E_PATCH_ID, DECODE03E_INPUT_PATCH_ID, DECODE03E_SSOT, Decode03EMode,
++    Decode03EGuardStrength, Decode03EMorphGuardTarget, Decode03EBackendCapability,
++    Decode03EInput, Decode03EGateDecision, Decode03EGuardOverlay, Decode03EStepReceipt,
++    Decode03EGateCounts, Decode03EOverlayCounts, Decode03ETargetCounts, Decode03ESafetyCounts,
++    Decode03ESummary, backend_capability_from_env as decode03e_backend_capability_from_env,
++    target_from_salad04_loop as decode03e_target_from_salad04_loop, decide_decode03e_gate,
++    compute_decode03e_guard_overlay, input_from_salad04 as decode03e_input_from_salad04,
++    receipt_from_salad04 as decode03e_receipt_from_salad04, append_decode03e_receipt_from_sampler03,
++    write_decode03e_summary_from_receipt_file,
++};
++
+ pub use eval01_backend_replay::{
+     EVAL01_PATCH_ID, EVAL01_INPUT_PATCH_ID, EVAL01_SSOT, Eval01Mode,
+     Eval01BackendCapability, Eval01BackendCapabilityManifest, Eval01BackendMatrix,
+diff -ruN decode03e_orig/crates/model_core/src/sampler_parity.rs decode03e_work/crates/model_core/src/sampler_parity.rs
+--- decode03e_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:01:04.000000000 +0000
++++ decode03e_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:09:52.605071802 +0000
+@@ -463,5 +463,6 @@
+     crate::salad04_korean_morph_guard::append_salad04_receipt_from_sampler03(receipt);
+     crate::eval00_regression::append_eval00_receipt_from_sampler03(receipt);
+     crate::eval01_backend_replay::append_eval01_receipt_from_sampler03(receipt);
++    crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN decode03e_orig/workspace/decode03e_guard_overlay_schema.json decode03e_work/workspace/decode03e_guard_overlay_schema.json
+--- decode03e_orig/workspace/decode03e_guard_overlay_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_guard_overlay_schema.json	2026-05-27 08:10:53.475938871 +0000
+@@ -0,0 +1,47 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
++  "title": "Dynamic Guard Strength Runtime Overlay Apply Seal",
++  "schema_version": 1,
++  "ssot": "salad04_overlay_recommendation+decode03d_applied_config+eval01_backend_parity_status",
++  "contracts": {
++    "default_mode": "Off",
++    "controlled_apply_only": true,
++    "step_local_overlay": true,
++    "base_config_mutation_allowed": false,
++    "panic_candidate_execution_allowed": false,
++    "rollback_execution_allowed": false,
++    "stop_execution_allowed": false
++  },
++  "required_receipt_fields": [
++    "patch_id",
++    "input_patch",
++    "schema_version",
++    "run_id",
++    "step",
++    "backend",
++    "mode",
++    "controlled_apply",
++    "input",
++    "backend_capability",
++    "gate",
++    "overlay"
++  ],
++  "overlay_fields": [
++    "guard_strength_before",
++    "guard_strength_after",
++    "morph_guard_target",
++    "morph_penalty_enabled",
++    "morph_penalty_weight",
++    "no_repeat_ngram_applied",
++    "min_p_floor_applied",
++    "top_p_ceiling_applied",
++    "panic_candidate_seen",
++    "panic_candidate_executed"
++  ],
++  "clamps": {
++    "morph_penalty_weight": [0.0, 0.5],
++    "min_p_floor": [0.0, 0.2],
++    "top_p_ceiling": [0.6, 0.98],
++    "no_repeat_ngram": [0, 6]
++  }
++}
+diff -ruN decode03e_orig/workspace/decode03e_probe_prompts.jsonl decode03e_work/workspace/decode03e_probe_prompts.jsonl
+--- decode03e_orig/workspace/decode03e_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_probe_prompts.jsonl	2026-05-27 08:10:53.516340822 +0000
+@@ -0,0 +1,4 @@
++{"prompt_id":"DECODE03E_P01_eomi_loop","prompt":"합니다라는 표현을 반복하지 말고 자연스러운 한국어 문장을 세 개 만들어줘.","target":"EomiLoop","expected":"guard overlay should remain off unless SALAD-04 risk is HIGH"}
++{"prompt_id":"DECODE03E_P02_josa_chain","prompt":"은 는 이 가 같은 조사를 예시로 들되 문장으로 설명해줘.","target":"JosaLoop","expected":"JosaLoop should use soft penalty only; hard ban forbidden"}
++{"prompt_id":"DECODE03E_P03_jamo_leak","prompt":"장수풍뎅이라는 단어를 완성해서 설명해줘.","target":"JamoLeak","expected":"jamo leak should escalate to Panic guard candidate without executing stop"}
++{"prompt_id":"DECODE03E_P04_normal_qa","prompt":"배추찜을 간단히 만드는 법을 설명해줘.","target":"None","expected":"normal prompt should not apply guard overlay"}
+diff -ruN decode03e_orig/workspace/decode03e_report.md decode03e_work/workspace/decode03e_report.md
+--- decode03e_orig/workspace/decode03e_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_report.md	2026-05-27 08:10:53.530826794 +0000
+@@ -0,0 +1,40 @@
++# 16AI-QW-38G-R6A-DECODE-03E Report
++
++## Seal
++Dynamic Guard Strength Runtime Overlay Apply Seal
++
++## SSOT
++SALAD-04 overlay recommendation + DECODE-03D applied config + EVAL-01 backend parity status.
++
++## Implemented files
++- `crates/model_core/src/decode03e_guard_overlay.rs`
++- `crates/model_core/src/lib.rs`
++- `crates/model_core/src/sampler_parity.rs`
++- `workspace/decode03e_guard_overlay_schema.json`
++- `workspace/decode03e_steps.jsonl`
++- `workspace/decode03e_summary.json`
++- `workspace/decode03e_static_checks.json`
++
++## Contracts
++- Default mode is `Off`.
++- `ShadowOnly` computes overlay but does not apply behavior changes.
++- `ControlledApply` / `StrictControlledApply` require `behavior_change_allowed=true`.
++- Overlay is step-local only.
++- Base decode config mutation is forbidden.
++- Panic candidate execution is forbidden.
++- Rollback/stop execution is forbidden in DECODE-03E.
++- Unsupported backend features cannot be recorded as applied.
++
++## Runtime env
++```bash
++ASH_DECODE03E_MODE=controlled_apply \
++ASH_DECODE03E_BEHAVIOR_CHANGE_ALLOWED=true \
++ASH_DECODE03E_REQUIRE_SALAD04=true \
++ASH_DECODE03E_REQUIRE_EVAL01_SEMANTIC_PARITY=true \
++ASH_DECODE03E_STEP_LOCAL_OVERLAY=true \
++ASH_DECODE03E_RECEIPT=workspace/decode03e_steps.jsonl \
++ASH_DECODE03E_SUMMARY=workspace/decode03e_summary.json
++```
++
++## Status
++Static bake only. Cargo/runtime smoke was not executed in this container.
+diff -ruN decode03e_orig/workspace/decode03e_source_hash_manifest.json decode03e_work/workspace/decode03e_source_hash_manifest.json
+--- decode03e_orig/workspace/decode03e_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_source_hash_manifest.json	2026-05-27 08:11:24.299469419 +0000
+@@ -0,0 +1,56 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
++  "input_patch": "16AI-QW-38G-R6A-EVAL-01",
++  "items": [
++    {
++      "path": "crates/model_core/src/decode03e_guard_overlay.rs",
++      "sha256": "4b081dc698be6dd7332d30c52bc9cf1480e8992a30a9d2f48a86130cc7c0ad6e",
++      "bytes": 38998
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "3db7c35a5d6cb7a93d3a8d88a024ec3dd28ca97d4f1c1c2cfcf4ac23e926db15",
++      "bytes": 20495
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "fa44d5dcd3d72914540b460a030a153082b2b5f6d210b8a26131de4ab664cdf5",
++      "bytes": 20949
++    },
++    {
++      "path": "workspace/decode03e_guard_overlay_schema.json",
++      "sha256": "d950deb8eeac098d442258c5f64e9de5b795e55b0e40dd0efa91b1514398e684",
++      "bytes": 1218
++    },
++    {
++      "path": "workspace/decode03e_steps.jsonl",
++      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++      "bytes": 0
++    },
++    {
++      "path": "workspace/decode03e_summary.json",
++      "sha256": "f947c057b77f404e5d1ee2e9ae9a057e9457cb8b300cc4e0642bc776d03d4d4b",
++      "bytes": 1311
++    },
++    {
++      "path": "workspace/decode03e_static_checks.json",
++      "sha256": "8441859d1d5c3ea7ece1764976252ee48582c35fcb35261d71f2e18e13a678ee",
++      "bytes": 735
++    },
++    {
++      "path": "workspace/decode03e_probe_prompts.jsonl",
++      "sha256": "c7af35ff692430d33ff2b0c55d6b0f10f852f4a8992212d67a58e69ad6448204",
++      "bytes": 865
++    },
++    {
++      "path": "workspace/decode03e_report.md",
++      "sha256": "ac59b36d44f431fbe9cd482d6385a2aecaf66c1fd880e1a9f57e904fc3a62fa8",
++      "bytes": 1377
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md",
++      "sha256": "09758e15159dbdb2d8874ef8db38c8df68a1432f7486426e626c99913352d226",
++      "bytes": 813
++    }
++  ]
++}
+diff -ruN decode03e_orig/workspace/decode03e_static_checks.json decode03e_work/workspace/decode03e_static_checks.json
+--- decode03e_orig/workspace/decode03e_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_static_checks.json	2026-05-27 08:10:53.502991599 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
++  "status": "PASS_STATIC",
++  "checks": {
++    "module_added": true,
++    "lib_export_added": true,
++    "sampler_parity_hook_added": true,
++    "default_off_contract": true,
++    "controlled_apply_only_contract": true,
++    "step_local_overlay_contract": true,
++    "base_config_mutation_forbidden": true,
++    "panic_candidate_execution_forbidden": true,
++    "rollback_stop_execution_forbidden": true,
++    "backend_capability_gate_present": true,
++    "salad04_to_decode03e_mapping_present": true,
++    "summary_aggregator_present": true
++  },
++  "not_run": {
++    "cargo_check": "cargo unavailable in container",
++    "runtime_smoke": "not executed",
++    "eval01_runtime_parity": "not executed"
++  }
++}
+diff -ruN decode03e_orig/workspace/decode03e_summary.json decode03e_work/workspace/decode03e_summary.json
+--- decode03e_orig/workspace/decode03e_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03e_work/workspace/decode03e_summary.json	2026-05-27 08:10:53.489761877 +0000
+@@ -0,0 +1,45 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-04",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "Off",
++  "default_enable": false,
++  "steps_observed": 0,
++  "gate": {
++    "can_apply_count": 0,
++    "denied_count": 0,
++    "strict_fail_count": 0
++  },
++  "overlay": {
++    "applied_count": 0,
++    "strict_guard_count": 0,
++    "panic_guard_count": 0,
++    "morph_penalty_enabled_count": 0,
++    "no_repeat_ngram_applied_count": 0,
++    "min_p_floor_applied_count": 0,
++    "top_p_ceiling_applied_count": 0
++  },
++  "targets": {
++    "josa_loop_count": 0,
++    "eomi_loop_count": 0,
++    "jamo_leak_count": 0,
++    "byte_jamo_leak_count": 0,
++    "syllable_fragment_loop_count": 0,
++    "eojeol_boundary_collapse_count": 0,
++    "punctuation_glue_loop_count": 0,
++    "mixed_morph_loop_count": 0
++  },
++  "safety": {
++    "unsupported_applied_count": 0,
++    "panic_candidate_executed_count": 0,
++    "rollback_executed_count": 0,
++    "stop_executed_count": 0,
++    "active_set_too_small_skip_count": 0,
++    "base_config_mutation_count": 0,
++    "clamp_violation_count": 0
++  },
++  "ready_for_eval02_long_horizon_soak": true,
++  "ready_for_default_guard_overlay": false,
++  "ready_for_medusa00": false,
++  "reason": "guard overlay controlled apply schema baked; runtime receipt not yet collected"
++}

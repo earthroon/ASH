@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-STOP-01",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": {
+    "module_added": true,
+    "lib_module_registered": true,
+    "lib_exports_registered": true,
+    "sampler_append_hook_registered": true,
+    "default_off_contract": true,
+    "tail_truncate_forbidden": true,
+    "eos_bias_forbidden_default": true,
+    "summary_present": true,
+    "schema_present": true,
+    "acceptance_present": true
+  },
+  "ssot": "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability",
+  "notes": [
+    "Static bake only. Runtime Stop01Runtime integration must be verified in target environment."
+  ]
+}

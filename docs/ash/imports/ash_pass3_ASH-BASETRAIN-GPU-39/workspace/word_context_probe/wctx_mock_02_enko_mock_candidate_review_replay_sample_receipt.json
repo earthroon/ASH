@@ -1,0 +1,244 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-MOCK-02",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX03-C001",
+  "source_mock_fixture_receipt_key": "sha256:23f66371d99e57f2f734ca31dc541ba30c36f9d19d3691dd2a97160c2c482869",
+  "status": "review_replayed",
+  "block_reasons": [],
+  "policy": {
+    "mock_only": true,
+    "allow_runtime_decode": false,
+    "allow_model_forward": false,
+    "allow_sampling": false,
+    "allow_target_mutation": false,
+    "allow_candidate_approval": false,
+    "allow_target_update_candidate": false,
+    "allow_commit": false,
+    "allow_runtime_apply": false,
+    "allow_rerank": false,
+    "requires_fixture_created": true,
+    "requires_review_bridge_ready": true,
+    "requires_mock_candidate_label": true,
+    "requires_non_production_label": true
+  },
+  "input": {
+    "center_cue_id": "WCTX03-C001",
+    "source_mock_fixture_receipt_key": "sha256:23f66371d99e57f2f734ca31dc541ba30c36f9d19d3691dd2a97160c2c482869",
+    "source_staging_receipt_key": "sha256:121f1046975a4b97ca33f04cb7dc364d401c1ee5f78a87fd9e500b8fedca69ab",
+    "mock_candidate_target_hash": "sha256:8abc335d4f7d69cb7c4cf948986410dd1c9b2675b4ae26a7ae25352b2771e1aa",
+    "original_target_hash": "sha256:52b28ed5e337890f418f44d0a5f38b2d85d90dcb9d71a202af0a196a8d172ba7",
+    "review_bridge_ready": true,
+    "bridged_candidate_output_kind": "mock_candidate",
+    "mock_only": true,
+    "production_safe": false
+  },
+  "replay_result": {
+    "replay_result_id": "mock_review_replay:WCTX03-C001:7f500a954919af03",
+    "center_cue_id": "WCTX03-C001",
+    "review_replayed": true,
+    "review_status": "reviewed",
+    "candidate_availability": "candidate_present",
+    "candidate_available": true,
+    "diff_kind": "candidate_changed",
+    "exact_match": false,
+    "changed_from_original": true,
+    "check_count": 8,
+    "critical_fail_count": 0,
+    "warning_count": 0,
+    "can_proceed_to_candidate_approval": true,
+    "can_commit_target_update": false,
+    "can_apply_to_runtime": false,
+    "replay_reason": "mock candidate was replayed through WCTX-13 review path without runtime decode"
+  },
+  "replayed_review_receipt": {
+    "patch_id": "16AI-QW-38G-R6A-WCTX-13",
+    "domain_ssot": "en_to_ko_translation_subtitle_machine",
+    "center_cue_id": "WCTX03-C001",
+    "source_decode_staging_receipt_key": "sha256:36dede83add8110f3fab807a1b46e8fd08867d809ae89d734101d1fed9208afc",
+    "review_status": "reviewed",
+    "candidate_availability": "candidate_present",
+    "target_diff": {
+      "diff_id": "target_diff:WCTX03-C001:mock_candidate:7f500a954919af03",
+      "original_target_korean": "그렇게 하게 둘 순 없어.",
+      "candidate_target_korean": "그렇게 하게 놔둘 수는 없어.",
+      "candidate_available": true,
+      "diff_kind": "candidate_changed",
+      "original_char_count": 14,
+      "candidate_char_count": 16,
+      "original_line_count": 1,
+      "candidate_line_count": 1,
+      "char_delta": 2,
+      "line_delta": 0,
+      "exact_match": false,
+      "changed_from_original": true,
+      "committed": false,
+      "spans": [
+        {
+          "span_id": "diff_span:WCTX03-C001:mock_changed",
+          "original_start_char": 0,
+          "original_end_char": 14,
+          "candidate_start_char": 0,
+          "candidate_end_char": 16,
+          "original_surface": "그렇게 하게 둘 순 없어.",
+          "candidate_surface": "그렇게 하게 놔둘 수는 없어.",
+          "diff_kind": "candidate_changed",
+          "reason": "mock candidate differs from original target for review path replay"
+        }
+      ],
+      "diff_summary": "mock candidate target differs from original target"
+    },
+    "checks": [
+      {
+        "check_id": "review_check:WCTX03-C001:target_original_preserved",
+        "kind": "target_original_preserved",
+        "result": "pass",
+        "severity": "critical",
+        "confidence": 1.0,
+        "evidence": [
+          "target_text_mutated=false",
+          "target_subtitle_committed=false"
+        ],
+        "reason": "original target subtitle was preserved"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:candidate_not_committed",
+        "kind": "candidate_not_committed",
+        "result": "pass",
+        "severity": "critical",
+        "confidence": 1.0,
+        "evidence": [
+          "candidate_output_committed=false"
+        ],
+        "reason": "mock candidate was not committed"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:commit_gate_closed",
+        "kind": "commit_gate_closed",
+        "result": "pass",
+        "severity": "critical",
+        "confidence": 1.0,
+        "evidence": [
+          "commit_gate_open=false"
+        ],
+        "reason": "commit gate remains closed"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:source_meaning_shadow",
+        "kind": "source_meaning_shadow",
+        "result": "pass",
+        "severity": "info",
+        "confidence": 0.8,
+        "evidence": [
+          "I can't let you do that."
+        ],
+        "reason": "mock replay preserves source shadow for review only"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:negation_preservation",
+        "kind": "negation_preservation",
+        "result": "pass",
+        "severity": "critical",
+        "confidence": 0.75,
+        "evidence": [
+          "mock fixture retains local negation/prohibition cues when present"
+        ],
+        "reason": "no obvious negation loss detected in mock review fixture"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:reading_speed_pressure",
+        "kind": "reading_speed_pressure",
+        "result": "pass",
+        "severity": "info",
+        "confidence": 0.7,
+        "evidence": [
+          "duration_ms=2200"
+        ],
+        "reason": "mock review does not alter timing"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:addition_risk",
+        "kind": "addition_risk",
+        "result": "pass",
+        "severity": "info",
+        "confidence": 0.7,
+        "evidence": [
+          "mock candidate is fixture-labeled"
+        ],
+        "reason": "mock candidate remains explicit fixture material"
+      },
+      {
+        "check_id": "review_check:WCTX03-C001:hallucination_risk",
+        "kind": "hallucination_risk",
+        "result": "pass",
+        "severity": "info",
+        "confidence": 0.7,
+        "evidence": [
+          "production_safe=false"
+        ],
+        "reason": "fixture cannot be treated as production generation"
+      }
+    ],
+    "decision": {
+      "decision": "candidate_eligible_for_approval_review",
+      "can_proceed_to_candidate_approval": true,
+      "can_commit_target_update": false,
+      "can_apply_to_runtime": false,
+      "decision_reason": "mock candidate can proceed to mock approval review but cannot commit or apply to runtime"
+    },
+    "risk": {
+      "token_id_mutated": false,
+      "decode_executed_in_review": false,
+      "generation_executed_in_review": false,
+      "model_forward_executed_in_review": false,
+      "sampling_executed_in_review": false,
+      "source_text_mutated": false,
+      "target_text_mutated": false,
+      "timing_mutated": false,
+      "candidate_output_committed": false,
+      "target_subtitle_committed": false,
+      "active_prompt_mutated": false,
+      "generation_input_mutated": false,
+      "runtime_default_apply": false,
+      "runtime_apply_gate_open": false,
+      "rerank_applied": false,
+      "commit_gate_open": false,
+      "review_diff_created": true,
+      "candidate_available": true,
+      "critical_review_failure": false,
+      "byte_leak_observed": false,
+      "roundtrip_exact": true
+    },
+    "deterministic_receipt_key": "sha256:0143c7777a6257d2c31a19c5b8624690eb2c6a79033834cb0081b21c7b475f52",
+    "created_by": "ash_core::word_context_decode_review",
+    "schema_version": 1
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "review_replayed": true,
+    "review_receipt_created": true,
+    "runtime_decode_executed": false,
+    "generation_executed": false,
+    "model_forward_executed": false,
+    "sampling_executed": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "candidate_available_after_replay": true,
+    "candidate_approval_created": false,
+    "target_update_candidate_created": false,
+    "candidate_output_committed": false,
+    "target_subtitle_committed": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "mock_marked_non_production": true,
+    "mock_mislabeled_as_runtime": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:5fbab4210446f5faaa5b13f6929a9e573e9d6ccf0c46a6eb42e06f8d786da260",
+  "created_by": "ash_core::word_context_mock_candidate_review_replay",
+  "schema_version": 1
+}

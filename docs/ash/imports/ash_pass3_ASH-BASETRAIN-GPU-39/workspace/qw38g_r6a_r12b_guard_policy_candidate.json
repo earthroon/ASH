@@ -1,0 +1,21 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12B",
+  "candidate_id": "QW38G_R6A_R12A_R10_HEAD2_ORTHOGONAL_ONLY_LIMITED",
+  "profile": "HEAD2_TARGET_DIRECTION_ORTHOGONAL_ONLY",
+  "confidence": "LOW",
+  "runtime_default_apply": false,
+  "production_safe_confirmed": false,
+  "root_cause_confirmed": false,
+  "apply_policy": {
+    "requires_explicit_enable": true,
+    "requires_target_like_context": true,
+    "requires_baseline_margin_min": true,
+    "baseline_margin_min": 0.05,
+    "blocks_negative_control_actual_apply": true,
+    "negative_control_dry_run_only": true,
+    "blocks_non_positive_baseline_margin": true,
+    "blocks_low_margin_cases": true,
+    "overeffect_threshold": 0.05
+  },
+  "reason": "R12 detected margin overeffect while output stability remained PASS"
+}

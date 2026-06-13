@@ -1,0 +1,19 @@
+SFT-FFN-TEX-ATLAS-04 static validation
+
+[OK] Added ash_core module: crates/ash_core/src/sft_ffn_texture_atlas_budget_guard.rs
+[OK] Added tests: crates/ash_core/tests/sft_ffn_tex_atlas_04_budget_guard.rs
+[OK] Added acceptance report
+[OK] Updated crates/ash_core/src/lib.rs exports
+[OK] Braces balanced in new module and test file
+[OK] Budget preflight opened
+[OK] Batched dispatch execution remains closed
+[OK] Training shader execution remains closed
+[OK] Production shader execution remains closed
+[OK] Default texture FFN path remains closed
+[OK] LoRA texture update remains closed
+[OK] Runtime attach remains closed
+[OK] Promotion apply remains closed
+[OK] Current pointer update remains closed
+
+[PENDING] cargo test -p ash_core sft_ffn_tex_atlas_04 -- --nocapture
+[PENDING] cargo test -p ash_core sft_ffn_tex_atlas_03 -- --nocapture

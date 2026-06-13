@@ -1,0 +1,164 @@
+[
+  {
+    "fixture": "candidate_empty",
+    "decision": "RollbackRetryRequested",
+    "reasons": [
+      "CandidateEmptyAfterGuard",
+      "AllCandidatesBlocked",
+      "GuardRequiresResample",
+      "ByteOrMojibakeHardBlock",
+      "RetryAttemptAvailable"
+    ],
+    "rollback_anchor": {
+      "failure_step": 10,
+      "rollback_token_count": 6,
+      "rollback_start_step": 4,
+      "rollback_end_step": 10,
+      "anchor_reason": "ByteOrMojibakeHardBlock",
+      "anchor_token_trace_hash": "sha256:67d6b3c5a1d41458bcd3d1e56faa5a05a9f9bcb5ff50459189bd0581dc0a590a",
+      "preserves_prefix_before_anchor": true,
+      "discards_unstable_suffix": true
+    },
+    "strict_retry_profile": {
+      "profile_id": "strict_rollback_retry_v1",
+      "temperature": 0.15,
+      "top_p": 0.8,
+      "min_p": 0.08,
+      "top_k": null,
+      "repetition_penalty": 1.15,
+      "force_transition_guard": true,
+      "force_korean_morph_guard": true,
+      "forbid_global_top1_recovery": true,
+      "max_new_tokens_override": null,
+      "retry_attempt_index": 1
+    },
+    "retry_request": {
+      "decode_session_id": "mock-decode-session-0001",
+      "cue_id": "mock-cue-0001",
+      "candidate_id": "candidate-empty-after-guard::retry-1",
+      "retry_request_id": "16AI-QW-38G-R6A-DECODE-08:mock-cue-0001:candidate-empty-after-guard:1",
+      "parent_candidate_id": "candidate-empty-after-guard",
+      "rollback_anchor_hash": "sha256:f4e7a194c5927df31692e4c887d55e9094a543a56202d3e7d1342abd1926d306",
+      "strict_retry_profile_hash": "sha256:5bc48be85d90a718dcfb081f2ad21a99369a70cf5fc2280a327cab0ed253e57b",
+      "retry_from_step": 4,
+      "retry_attempt_index": 1,
+      "max_retry_attempts": 1,
+      "request_only": true,
+      "model_forward_executed": false,
+      "sampling_executed": false
+    },
+    "rollback_first": true,
+    "rollback_retry_requested": true,
+    "safe_eos_recommended": false,
+    "reject_recommended": false,
+    "review_required": false,
+    "top1_recovery_allowed": false,
+    "top1_recovery_blocked": false
+  },
+  {
+    "fixture": "morph_rollback",
+    "decision": "RollbackRetryRequested",
+    "reasons": [
+      "MorphRollbackRecommended",
+      "JosaEomiLoopCollapse",
+      "RetryAttemptAvailable"
+    ],
+    "rollback_anchor": {
+      "failure_step": 8,
+      "rollback_token_count": 6,
+      "rollback_start_step": 2,
+      "rollback_end_step": 8,
+      "anchor_reason": "MorphLoopRollbackRecommended",
+      "anchor_token_trace_hash": "sha256:750c95ca748aa35ca2359e60a0c417699c9573054115c50bc8d4e9908754cd56",
+      "preserves_prefix_before_anchor": true,
+      "discards_unstable_suffix": true
+    },
+    "strict_retry_profile": {
+      "profile_id": "strict_rollback_retry_v1",
+      "temperature": 0.15,
+      "top_p": 0.8,
+      "min_p": 0.08,
+      "top_k": null,
+      "repetition_penalty": 1.15,
+      "force_transition_guard": true,
+      "force_korean_morph_guard": true,
+      "forbid_global_top1_recovery": true,
+      "max_new_tokens_override": null,
+      "retry_attempt_index": 1
+    },
+    "retry_request": {
+      "decode_session_id": "mock-decode-session-0001",
+      "cue_id": "mock-cue-0001",
+      "candidate_id": "candidate-morph-rollback::retry-1",
+      "retry_request_id": "16AI-QW-38G-R6A-DECODE-08:mock-cue-0001:candidate-morph-rollback:1",
+      "parent_candidate_id": "candidate-morph-rollback",
+      "rollback_anchor_hash": "sha256:ea7c11bbfb2a7a761ffc8b95afbefe34321c41d0a2e674df3e524bda6ac86e45",
+      "strict_retry_profile_hash": "sha256:5bc48be85d90a718dcfb081f2ad21a99369a70cf5fc2280a327cab0ed253e57b",
+      "retry_from_step": 2,
+      "retry_attempt_index": 1,
+      "max_retry_attempts": 1,
+      "request_only": true,
+      "model_forward_executed": false,
+      "sampling_executed": false
+    },
+    "rollback_first": true,
+    "rollback_retry_requested": true,
+    "safe_eos_recommended": false,
+    "reject_recommended": false,
+    "review_required": false,
+    "top1_recovery_allowed": false,
+    "top1_recovery_blocked": false
+  },
+  {
+    "fixture": "top1_recovery_block",
+    "decision": "Top1RecoveryBlocked",
+    "reasons": [
+      "GlobalTop1RecoveryForbidden"
+    ],
+    "rollback_anchor": null,
+    "strict_retry_profile": null,
+    "retry_request": null,
+    "rollback_first": true,
+    "rollback_retry_requested": false,
+    "safe_eos_recommended": false,
+    "reject_recommended": false,
+    "review_required": false,
+    "top1_recovery_allowed": false,
+    "top1_recovery_blocked": true
+  },
+  {
+    "fixture": "safe_eos",
+    "decision": "SafeEosRecommended",
+    "reasons": [
+      "RetryAttemptExhausted",
+      "SafeEosAllowed"
+    ],
+    "rollback_anchor": null,
+    "strict_retry_profile": null,
+    "retry_request": null,
+    "rollback_first": true,
+    "rollback_retry_requested": false,
+    "safe_eos_recommended": true,
+    "reject_recommended": false,
+    "review_required": false,
+    "top1_recovery_allowed": false,
+    "top1_recovery_blocked": false
+  },
+  {
+    "fixture": "step_integrity_fail",
+    "decision": "SkippedStepIntegrityFailed",
+    "reasons": [
+      "StepIntegrityMismatch"
+    ],
+    "rollback_anchor": null,
+    "strict_retry_profile": null,
+    "retry_request": null,
+    "rollback_first": true,
+    "rollback_retry_requested": false,
+    "safe_eos_recommended": false,
+    "reject_recommended": false,
+    "review_required": false,
+    "top1_recovery_allowed": false,
+    "top1_recovery_blocked": false
+  }
+]

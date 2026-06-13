@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "16AI-QW-38G-R6A-DECODE-00 Decode Distribution Probe Step",
+  "type": "object",
+  "required": [
+    "step",
+    "selected_id",
+    "selected_piece",
+    "selected_text",
+    "top_n",
+    "decode_mode",
+    "sampler_requested",
+    "sampler_applied",
+    "fallback_applied",
+    "finite_logits",
+    "nan_count",
+    "inf_count",
+    "min_p",
+    "top_p",
+    "top_k",
+    "temperature"
+  ],
+  "properties": {
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected_piece": {
+      "type": "string"
+    },
+    "selected_text": {
+      "type": "string"
+    },
+    "top_n": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rank",
+          "id",
+          "piece",
+          "text",
+          "logit",
+          "is_eos",
+          "is_pad",
+          "is_control",
+          "is_banned"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "piece": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "logit": {
+            "type": "number"
+          },
+          "is_eos": {
+            "type": "boolean"
+          },
+          "is_pad": {
+            "type": "boolean"
+          },
+          "is_control": {
+            "type": "boolean"
+          },
+          "is_banned": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "eos_rank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "eos_logit": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pad_rank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "pad_logit": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "decode_mode": {
+      "type": "string"
+    },
+    "sampler_requested": {
+      "type": "boolean"
+    },
+    "sampler_applied": {
+      "type": "boolean"
+    },
+    "fallback_applied": {
+      "type": "boolean"
+    },
+    "fallback_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "finite_logits": {
+      "type": "boolean"
+    },
+    "nan_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inf_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "entropy_estimate": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "top1_top2_margin": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "min_p": {
+      "type": "number"
+    },
+    "top_p": {
+      "type": "number"
+    },
+    "top_k": {
+      "type": "integer"
+    },
+    "temperature": {
+      "type": "number"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+QW-52A static validation
+PASS test -f /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS test -f /mnt/data/ash_qw52a_bake/crates/runtime/src/infer/qw52a_candidate_awareness_trace.rs
+PASS test -f /mnt/data/ash_qw52a_bake/crates/runtime/src/bin/qw52a_candidate_awareness_probe.rs
+PASS test -f /mnt/data/ash_qw52a_bake/crates/runtime/src/bin/qw52a_validate.rs
+PASS grep -q mod hangul_qwave_candidate_awareness; /mnt/data/ash_qw52a_bake/crates/model_core/src/lib.rs
+PASS grep -q mod qw52a_candidate_awareness_trace; /mnt/data/ash_qw52a_bake/crates/runtime/src/infer.rs
+PASS grep -q qw52a_candidate_awareness_trace /mnt/data/ash_qw52a_bake/crates/runtime/src/infer/candidate_output.rs
+PASS grep -q build_hangul_feature_rows /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS grep -q build_qwave_syllable_cell_batch /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS grep -q build_qwave_pulse_vector_batch /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS grep -q build_qwave_syllable_transition_batch /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS grep -q new_math_rewrite_performed.*false /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS grep -q backend_qwave_switch_performed.*false /mnt/data/ash_qw52a_bake/crates/model_core/src/hangul_qwave_candidate_awareness.rs
+PASS forbidden new math files absent
+PASS forbidden new WGSL absent
+cargo check: NOT RUN - cargo unavailable in bake environment
+runtime inference: NOT RUN - cargo unavailable in bake environment
+status: PASS

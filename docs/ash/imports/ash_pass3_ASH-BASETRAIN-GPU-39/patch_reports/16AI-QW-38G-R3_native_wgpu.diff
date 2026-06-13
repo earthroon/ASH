@@ -1,0 +1,215 @@
+--- /mnt/data/work_38g_r3_orig/crates/model_core/src/native_wgpu.rs	2026-05-22 10:03:26.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 11:43:07.853255824 +0000
+@@ -1,10 +1,11 @@
+ use super::*;
+ use crate::model_layers::grouped_query_attention;
+-use std::collections::{HashMap, HashSet};
++use std::collections::{BTreeMap, HashMap, HashSet};
+ use std::fs::OpenOptions;
+ use std::io::Write;
+ use std::sync::atomic::{AtomicUsize, Ordering};
+ use std::sync::{Mutex, OnceLock};
++use std::time::{SystemTime, UNIX_EPOCH};
+ use crate::reference_math::{
+     add_batched,
+     apply_loras_to_batched_hidden,
+@@ -83,6 +84,105 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R3 — Native Forward Stage Map / Executed Path Discovery Seal
++static QW38G_R3_STAGE_MAP: OnceLock<Mutex<BTreeMap<String, usize>>> = OnceLock::new();
++
++fn qw38g_r3_enabled() -> bool {
++    env_flag("ASH_FORWARD_STAGE_MAP") || env_flag("ASH_QW38G_R3_STAGE_MAP")
++}
++
++fn qw38g_r3_verbose() -> bool {
++    env_flag("ASH_FORWARD_STAGE_MAP_VERBOSE") || env_flag("ASH_QW38G_R3_VERBOSE")
++}
++
++fn qw38g_r3_now_ms() -> u128 {
++    SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .map(|d| d.as_millis())
++        .unwrap_or(0)
++}
++
++fn qw38g_r3_stage_map_path() -> String {
++    std::env::var("ASH_FORWARD_STAGE_MAP_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r3_forward_stage_map.json".to_string())
++}
++
++fn qw38g_r3_stage_map() -> &'static Mutex<BTreeMap<String, usize>> {
++    QW38G_R3_STAGE_MAP.get_or_init(|| Mutex::new(BTreeMap::new()))
++}
++
++fn qw38g_r3_write_stage_map_locked(map: &BTreeMap<String, usize>) {
++    let path = qw38g_r3_stage_map_path();
++    if let Some(parent) = std::path::Path::new(&path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    let get = |name: &str| -> usize { *map.get(name).unwrap_or(&0) };
++    let raw_topk = get("raw_topk_trace_hook") > 0;
++    let hidden_projection = get("hidden_projection_trace_hook") > 0;
++    let forward_hidden = get("NativeWgpuModel::forward_hidden_for_generation_input") > 0;
++    let layerwise = get("layerwise_reserved_trace_hook") > 0;
++    let native_generation = get("NativeWgpuModel::forward_logits_for_generation") > 0
++        || get("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas") > 0;
++    let actual_traceable_boundary = if layerwise {
++        "layerwise_residual"
++    } else if hidden_projection {
++        "final_hidden_projection"
++    } else if raw_topk {
++        "raw_topk_projection"
++    } else if native_generation {
++        "native_generation"
++    } else {
++        "unknown"
++    };
++    let recommended_next_patch = if layerwise {
++        "16AI-QW-38G-R4_LAYER_RESIDUAL_PROJECTION_TAP"
++    } else {
++        "16AI-QW-38G-R4_GPU_DEBUG_TAP_OR_FORWARD_HOOK_RELOCATION"
++    };
++    let stages = map.iter()
++        .map(|(name, count)| serde_json::json!({"name": name, "count": count}))
++        .collect::<Vec<_>>();
++    let payload = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R3",
++        "status": "PASS_STAGE_MAP",
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "stages": stages,
++        "reachability": {
++            "native_generation_entered": native_generation,
++            "forward_hidden_for_generation_input_reached": forward_hidden,
++            "vocab_atlas_projection_reached": get("vocab_atlas_projection") > 0,
++            "raw_topk_hook_reached": raw_topk,
++            "hidden_projection_hook_reached": hidden_projection,
++            "layerwise_reserved_trace_hook_reached": layerwise,
++            "final_hidden_projection_boundary_reached": hidden_projection,
++            "layerwise_residual_boundary_reached": layerwise
++        },
++        "actual_traceable_boundary": actual_traceable_boundary,
++        "layerwise_trace_possible_from_current_hook": layerwise,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": if layerwise { Vec::<String>::new() } else { vec!["LAYERWISE_TRACE_HOOK_NOT_REACHED".to_string(), "RUST_LAYERWISE_RESIDUAL_UNAVAILABLE".to_string()] },
++    });
++    if let Ok(text) = serde_json::to_string_pretty(&payload) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r3_stage_enter(name: &str, note: impl Into<String>) {
++    if !qw38g_r3_enabled() {
++        return;
++    }
++    let note = note.into();
++    if qw38g_r3_verbose() {
++        eprintln!("[16AI-QW-38G-R3][stage_enter] name={} note={}", name, note);
++    }
++    let map = qw38g_r3_stage_map();
++    if let Ok(mut guard) = map.lock() {
++        *guard.entry(name.to_string()).or_insert(0) += 1;
++        qw38g_r3_write_stage_map_locked(&guard);
++    }
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -1121,6 +1221,10 @@
+     atlas: &NativeVocabAtlas,
+     total_layers: usize,
+ ) {
++    qw38g_r3_stage_enter(
++        "layerwise_reserved_trace_hook",
++        format!("step={} layer={} stage={}", step, layer_label, stage),
++    );
+     if !env_flag("ASH_LAYERWISE_RESERVED_TRACE") {
+         return;
+     }
+@@ -1438,6 +1542,7 @@
+         };
+ 
+         for (idx, layer) in self.model.layers.iter().enumerate() {
++            qw38g_r3_stage_enter("layer_loop_candidate", format!("layer={}", idx));
+             let residual = x.clone();
+             let normed = layer.input_norm.forward(x);
+             let q = layer.q_proj.forward_prepared_set(normed.clone(), &prepared_runtime_loras, &[]);
+@@ -2647,6 +2752,7 @@
+         &self,
+         input: Tensor<NativeInferenceBackend, 2, Int>,
+     ) -> Tensor<NativeInferenceBackend, 3> {
++        qw38g_r3_stage_enter("NativeWgpuModel::embed_tokens_for_generation_input", format!("input_dims={:?}", input.dims()));
+         if self.embedding_row_gather_enabled {
+             let (token_ids, batch, seq) = self.input_tensor_to_token_ids(input);
+             self.embedding_rows_for_token_ids(&token_ids, batch, seq)
+@@ -2660,6 +2766,7 @@
+         input: Tensor<NativeInferenceBackend, 2, Int>,
+         active_loras: &[RuntimeLoraAttachment],
+     ) -> Tensor<NativeInferenceBackend, 3> {
++        qw38g_r3_stage_enter("NativeWgpuModel::forward_hidden_for_generation_input", format!("input_dims={:?} active_loras={}", input.dims(), active_loras.len()));
+         // prepared_runtime_lora_generation_path_v1:
+         // Generation is a hot path. Do not pass raw RuntimeLoraAttachment slices into
+         // AshLinear::forward(), because that intentionally trips the raw hot-path guard.
+@@ -2730,6 +2837,7 @@
+                 .reshape([batch, seq, hidden]);
+             let attn_out = layer.o_proj.forward_prepared_set(ctx, &prepared_runtime_loras, &[]);
+             let after_attn = residual + attn_out;
++            qw38g_r3_stage_enter("attention_stage_candidate", format!("layer={}", idx));
+             if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
+                 qw38g_log_layerwise_reserved_direction_trace(
+                     step,
+@@ -2748,6 +2856,7 @@
+             let up = layer.up_proj.forward_prepared_set(normed_ffn, &prepared_runtime_loras, &[]);
+             let ff = layer.down_proj.forward_prepared_set(gate * up, &prepared_runtime_loras, &[]);
+             x = residual + ff;
++            qw38g_r3_stage_enter("mlp_stage_candidate", format!("layer={}", idx));
+             if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
+                 qw38g_log_layerwise_reserved_direction_trace(
+                     step,
+@@ -2773,6 +2882,7 @@
+             );
+         }
+         let out = self.model.final_norm.forward(x);
++        qw38g_r3_stage_enter("final_norm_stage_candidate", "post_final_norm".to_string());
+         if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
+             qw38g_log_layerwise_reserved_direction_trace(
+                 step,
+@@ -2805,6 +2915,7 @@
+         &self,
+         input: Tensor<NativeInferenceBackend, 2, Int>,
+     ) -> Tensor<NativeInferenceBackend, 3> {
++        qw38g_r3_stage_enter("NativeWgpuModel::forward_logits_for_generation", format!("input_dims={:?}", input.dims()));
+         let active_loras = self.active_attached_loras();
+         // prepared_runtime_lora_all_hot_paths_v1_native_wgpu:
+         // Hot inference paths must not call AshLinear::forward with raw RuntimeLoraAttachment.
+@@ -2815,6 +2926,7 @@
+             prepare_runtime_lora_attachment_set(&active_loras, &self.device)
+         };
+         if let Some(atlas) = self.vocab_atlas.as_ref() {
++            qw38g_r3_stage_enter("vocab_atlas_branch", format!("vocab_size={}", atlas.vocab_size));
+             // Commit 16Y-3: legacy callers only consume the last logits row.
+             // Avoid touching the placeholder lm_head by forwarding hidden states
+             // and projecting the last row through vocab atlas tiles.
+@@ -2860,6 +2972,8 @@
+         last_hidden: Tensor<NativeInferenceBackend, 2>,
+         atlas: &NativeVocabAtlas,
+     ) -> Tensor<NativeInferenceBackend, 2> {
++        qw38g_r3_stage_enter("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas", format!("vocab_size={}", atlas.vocab_size));
++        qw38g_r3_stage_enter("vocab_atlas_projection", format!("tile_count={}", atlas.tiles.len()));
+         let mut merged_logits = Vec::with_capacity(atlas.vocab_size);
+         let mut best_token_id = 0usize;
+         let mut best_logit = f32::NEG_INFINITY;
+@@ -2891,7 +3005,9 @@
+         }
+         let global_top_k = merge_atlas_top_k(atlas_top_k_candidates, tile_top_k);
+         qw38a_log_raw_topk_trace(&global_top_k, best_token_id, best_logit, atlas);
++        qw38g_r3_stage_enter("raw_topk_trace_hook", format!("best_token_id={} top_k={}", best_token_id, global_top_k.len()));
+         qw38d_log_hidden_projection_trace(&global_top_k, best_token_id, best_logit, atlas, &last_hidden);
++        qw38g_r3_stage_enter("hidden_projection_trace_hook", format!("best_token_id={} best_logit={}", best_token_id, best_logit));
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

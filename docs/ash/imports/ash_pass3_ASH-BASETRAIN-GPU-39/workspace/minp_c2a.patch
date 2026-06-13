@@ -1,0 +1,890 @@
+diff -ruN minp_c2a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md minp_c2a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md
+--- minp_c2a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md	2026-05-26 23:50:27.382844522 +0000
+@@ -0,0 +1,12 @@
++# 16AI-QW-38G-R6A-MINP-C2A Acceptance
++
++- static alignment module: PASS
++- lib export: PASS
++- runtime C2A gate env: PASS
++- fixture policy SKIPPED != PASS: PASS
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- runtime vocab alignment: NOT_RUN
++- WebGPU runtime: NOT_RUN
++
++Result: STATIC_PASS / EXECUTION_NOT_RUN
+diff -ruN minp_c2a_orig/crates/model_core/src/lib.rs minp_c2a_work/crates/model_core/src/lib.rs
+--- minp_c2a_orig/crates/model_core/src/lib.rs	2026-05-26 23:43:04.000000000 +0000
++++ minp_c2a_work/crates/model_core/src/lib.rs	2026-05-26 23:50:27.369359698 +0000
+@@ -15,6 +15,7 @@
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
++mod minp_c2a_snapshot_alignment;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -66,6 +67,16 @@
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
++pub use minp_c2a_snapshot_alignment::{
++    SemanticScoreAlignmentStatus, SemanticScoreBufferAlignmentReceipt,
++    SemanticScoreFixtureResult, SemanticScoreFixtureStatus,
++    SemanticScoreSnapshotAlignmentReport,
++    validate_semantic_score_snapshot_alignment,
++    semantic_score_alignment_fixture_results,
++    semantic_score_buffer_alignment_receipt,
++    semantic_prior_application_allowed_by_alignment,
++    run_minp_c2a_snapshot_alignment_smoke,
++};
+ pub use semantic_prior_scores::{
+     SemanticPriorProviderConfig, SemanticPriorScoreSnapshot, SemanticPriorScoreSummary,
+     ScoreRange, build_semantic_prior_score_snapshot, classify_piece,
+diff -ruN minp_c2a_orig/crates/model_core/src/minp_c2a_snapshot_alignment.rs minp_c2a_work/crates/model_core/src/minp_c2a_snapshot_alignment.rs
+--- minp_c2a_orig/crates/model_core/src/minp_c2a_snapshot_alignment.rs	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/crates/model_core/src/minp_c2a_snapshot_alignment.rs	2026-05-26 23:50:27.368790163 +0000
+@@ -0,0 +1,292 @@
++use serde::{Deserialize, Serialize};
++
++use crate::semantic_prior_scores::{
++    SemanticPriorProviderConfig,
++    SemanticPriorScoreSnapshot,
++    build_semantic_prior_score_snapshot,
++    stable_vocab_hash,
++};
++
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub enum SemanticScoreAlignmentStatus {
++    Pass,
++    WarnMissingOptionalHash,
++    FailLengthMismatch,
++    FailNaNOrInf,
++    FailOutOfRange,
++    FailFixtureMismatch,
++    FailVocabMismatch,
++    NotRun,
++}
++
++impl SemanticScoreAlignmentStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::WarnMissingOptionalHash => "WARN_MISSING_OPTIONAL_HASH",
++            Self::FailLengthMismatch => "FAIL_LENGTH_MISMATCH",
++            Self::FailNaNOrInf => "FAIL_NAN_OR_INF",
++            Self::FailOutOfRange => "FAIL_OUT_OF_RANGE",
++            Self::FailFixtureMismatch => "FAIL_FIXTURE_MISMATCH",
++            Self::FailVocabMismatch => "FAIL_VOCAB_MISMATCH",
++            Self::NotRun => "NOT_RUN",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub enum SemanticScoreFixtureStatus {
++    Pass,
++    Fail,
++    SkippedTokenNotFound,
++}
++
++impl SemanticScoreFixtureStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::Fail => "FAIL",
++            Self::SkippedTokenNotFound => "SKIPPED_TOKEN_NOT_FOUND",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticScoreFixtureResult {
++    pub fixture: String,
++    pub token: String,
++    pub token_id: Option<u32>,
++    pub qwave_score: Option<f32>,
++    pub deltak_score: Option<f32>,
++    pub status: SemanticScoreFixtureStatus,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticScoreSnapshotAlignmentReport {
++    pub vocab_size: usize,
++    pub qwave_len: usize,
++    pub deltak_len: usize,
++    pub vocab_hash: String,
++    pub expected_vocab_hash: String,
++    pub vocab_hash_present: bool,
++    pub vocab_hash_match: bool,
++    pub tokenizer_hash: Option<String>,
++    pub expected_tokenizer_hash: Option<String>,
++    pub tokenizer_hash_match: Option<bool>,
++    pub lm_head_vocab_size: Option<usize>,
++    pub lm_head_vocab_match: Option<bool>,
++    pub length_match: bool,
++    pub max_token_id_in_vocab: Option<u32>,
++    pub token_id_indexable: bool,
++    pub nan_count_qwave: usize,
++    pub inf_count_qwave: usize,
++    pub nan_count_deltak: usize,
++    pub inf_count_deltak: usize,
++    pub out_of_range_qwave: usize,
++    pub out_of_range_deltak: usize,
++    pub fixture_results: Vec<SemanticScoreFixtureResult>,
++    pub status: SemanticScoreAlignmentStatus,
++}
++
++impl SemanticScoreSnapshotAlignmentReport {
++    pub fn alignment_pass(&self) -> bool {
++        matches!(self.status, SemanticScoreAlignmentStatus::Pass | SemanticScoreAlignmentStatus::WarnMissingOptionalHash)
++            && self.length_match
++            && self.token_id_indexable
++            && self.nan_count_qwave == 0
++            && self.inf_count_qwave == 0
++            && self.nan_count_deltak == 0
++            && self.inf_count_deltak == 0
++            && self.out_of_range_qwave == 0
++            && self.out_of_range_deltak == 0
++            && self.fixture_results.iter().all(|r| !matches!(r.status, SemanticScoreFixtureStatus::Fail))
++    }
++}
++
++pub fn validate_semantic_score_snapshot_alignment(
++    snapshot: &SemanticPriorScoreSnapshot,
++    vocab: &[(u32, String)],
++    lm_head_vocab_size: Option<usize>,
++    tokenizer_hash: Option<&str>,
++) -> SemanticScoreSnapshotAlignmentReport {
++    let vocab_size = snapshot.vocab_size;
++    let qwave_len = snapshot.qwave_scores.len();
++    let deltak_len = snapshot.deltak_scores.len();
++    let expected_vocab_hash = stable_vocab_hash(vocab);
++    let vocab_hash_present = !snapshot.vocab_hash.trim().is_empty();
++    let vocab_hash_match = snapshot.vocab_hash == expected_vocab_hash;
++    let tokenizer_hash_match = tokenizer_hash.map(|expected| snapshot.tokenizer_hash.as_deref() == Some(expected));
++    let lm_head_vocab_match = lm_head_vocab_size.map(|size| size == vocab_size);
++    let length_match = qwave_len == vocab_size && deltak_len == vocab_size;
++    let max_token_id_in_vocab = vocab.iter().map(|(id, _)| *id).max();
++    let token_id_indexable = max_token_id_in_vocab.map(|id| (id as usize) < vocab_size).unwrap_or(true);
++
++    let nan_count_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_nan()).count();
++    let inf_count_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_infinite()).count();
++    let nan_count_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_nan()).count();
++    let inf_count_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_infinite()).count();
++    let out_of_range_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_finite() && (**v < -1.0 || **v > 1.0)).count();
++    let out_of_range_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_finite() && (**v < -1.0 || **v > 1.0)).count();
++    let fixture_results = semantic_score_alignment_fixture_results(snapshot, vocab);
++    let fixture_fail = fixture_results.iter().any(|r| matches!(r.status, SemanticScoreFixtureStatus::Fail));
++
++    let status = if !length_match || !token_id_indexable {
++        SemanticScoreAlignmentStatus::FailLengthMismatch
++    } else if !vocab_hash_match || lm_head_vocab_match == Some(false) || tokenizer_hash_match == Some(false) {
++        SemanticScoreAlignmentStatus::FailVocabMismatch
++    } else if nan_count_qwave + nan_count_deltak + inf_count_qwave + inf_count_deltak > 0 {
++        SemanticScoreAlignmentStatus::FailNaNOrInf
++    } else if out_of_range_qwave + out_of_range_deltak > 0 {
++        SemanticScoreAlignmentStatus::FailOutOfRange
++    } else if fixture_fail {
++        SemanticScoreAlignmentStatus::FailFixtureMismatch
++    } else if tokenizer_hash.is_none() || snapshot.tokenizer_hash.is_none() {
++        SemanticScoreAlignmentStatus::WarnMissingOptionalHash
++    } else {
++        SemanticScoreAlignmentStatus::Pass
++    };
++
++    SemanticScoreSnapshotAlignmentReport {
++        vocab_size,
++        qwave_len,
++        deltak_len,
++        vocab_hash: snapshot.vocab_hash.clone(),
++        expected_vocab_hash,
++        vocab_hash_present,
++        vocab_hash_match,
++        tokenizer_hash: snapshot.tokenizer_hash.clone(),
++        expected_tokenizer_hash: tokenizer_hash.map(ToOwned::to_owned),
++        tokenizer_hash_match,
++        lm_head_vocab_size,
++        lm_head_vocab_match,
++        length_match,
++        max_token_id_in_vocab,
++        token_id_indexable,
++        nan_count_qwave,
++        inf_count_qwave,
++        nan_count_deltak,
++        inf_count_deltak,
++        out_of_range_qwave,
++        out_of_range_deltak,
++        fixture_results,
++        status,
++    }
++}
++
++pub fn semantic_score_alignment_fixture_results(
++    snapshot: &SemanticPriorScoreSnapshot,
++    vocab: &[(u32, String)],
++) -> Vec<SemanticScoreFixtureResult> {
++    let mut results = Vec::new();
++    let control_tokens = ["<pad>", "<bos>", "<eos>", "<unk>", "<glossary:on>", "<glossary:off>"];
++    for token in control_tokens {
++        results.push(check_fixture_token(snapshot, vocab, "control_token_negative", token, |q, k| q <= -0.8 && k <= -0.8));
++    }
++    for token in ["<byte:EC>", "<0xEC>", "<byte:FF>"] {
++        results.push(check_fixture_token(snapshot, vocab, "byte_token_negative", token, |q, k| q < 0.0 && k < 0.0));
++    }
++    for token in ["?댁뼱媛怨?", "Ã", "ì", "ê", "媛", "怨"] {
++        results.push(check_fixture_token(snapshot, vocab, "mojibake_token_negative", token, |q, k| q < 0.0 && k < 0.0));
++    }
++    for token in ["▁이어가고", "합니다", "사람", "안녕"] {
++        results.push(check_fixture_token(snapshot, vocab, "normal_korean_non_negative", token, |q, k| q >= 0.0 && k >= 0.0));
++    }
++    results
++}
++
++fn check_fixture_token(
++    snapshot: &SemanticPriorScoreSnapshot,
++    vocab: &[(u32, String)],
++    fixture: &str,
++    token: &str,
++    predicate: fn(f32, f32) -> bool,
++) -> SemanticScoreFixtureResult {
++    let found = vocab.iter().find(|(_, piece)| piece == token);
++    let Some((token_id, _)) = found else {
++        return SemanticScoreFixtureResult {
++            fixture: fixture.to_string(),
++            token: token.to_string(),
++            token_id: None,
++            qwave_score: None,
++            deltak_score: None,
++            status: SemanticScoreFixtureStatus::SkippedTokenNotFound,
++            reason: Some("token not present in vocab; skipped, not pass".to_string()),
++        };
++    };
++    let idx = *token_id as usize;
++    let q = snapshot.qwave_scores.get(idx).copied();
++    let k = snapshot.deltak_scores.get(idx).copied();
++    match (q, k) {
++        (Some(q), Some(k)) if predicate(q, k) => SemanticScoreFixtureResult {
++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: Some(q), deltak_score: Some(k), status: SemanticScoreFixtureStatus::Pass, reason: None,
++        },
++        (Some(q), Some(k)) => SemanticScoreFixtureResult {
++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: Some(q), deltak_score: Some(k), status: SemanticScoreFixtureStatus::Fail, reason: Some("score did not satisfy fixture predicate".to_string()),
++        },
++        _ => SemanticScoreFixtureResult {
++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: q, deltak_score: k, status: SemanticScoreFixtureStatus::Fail, reason: Some("token id is not indexable in score vectors".to_string()),
++        },
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticScoreBufferAlignmentReceipt {
++    pub cpu_score_source: String,
++    pub gpu_score_source: String,
++    pub same_snapshot_hash: bool,
++    pub qwave_buffer_len: usize,
++    pub deltak_buffer_len: usize,
++    pub buffer_len_matches_vocab: bool,
++    pub alignment_status: SemanticScoreAlignmentStatus,
++}
++
++pub fn semantic_score_buffer_alignment_receipt(
++    snapshot: &SemanticPriorScoreSnapshot,
++    report: &SemanticScoreSnapshotAlignmentReport,
++) -> SemanticScoreBufferAlignmentReceipt {
++    SemanticScoreBufferAlignmentReceipt {
++        cpu_score_source: "SemanticPriorScoreSnapshot".to_string(),
++        gpu_score_source: "SemanticPriorScoreSnapshot".to_string(),
++        same_snapshot_hash: report.vocab_hash_match,
++        qwave_buffer_len: snapshot.qwave_scores.len(),
++        deltak_buffer_len: snapshot.deltak_scores.len(),
++        buffer_len_matches_vocab: snapshot.qwave_scores.len() == snapshot.vocab_size && snapshot.deltak_scores.len() == snapshot.vocab_size,
++        alignment_status: report.status.clone(),
++    }
++}
++
++pub fn semantic_prior_application_allowed_by_alignment(
++    sampler04_status: Option<&str>,
++    c2a_status: Option<&str>,
++) -> bool {
++    sampler04_status == Some("STRICT_CANDIDATE_READY") && c2a_status == Some("PASS")
++}
++
++pub fn run_minp_c2a_snapshot_alignment_smoke() -> (SemanticScoreSnapshotAlignmentReport, SemanticScoreBufferAlignmentReceipt) {
++    let vocab = vec![
++        (0, "<pad>".to_string()),
++        (1, "▁이어가고".to_string()),
++        (2, "<eos>".to_string()),
++        (3, "<byte:EC>".to_string()),
++        (4, "?댁뼱媛怨?".to_string()),
++    ];
++    let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
++    let snapshot = build_semantic_prior_score_snapshot(&vocab, &cfg);
++    let report = validate_semantic_score_snapshot_alignment(&snapshot, &vocab, Some(snapshot.vocab_size), None);
++    let buffer_receipt = semantic_score_buffer_alignment_receipt(&snapshot, &report);
++    (report, buffer_receipt)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn c2a_alignment_smoke_reports_pass_or_optional_hash_warning() {
++        let (report, buffer) = run_minp_c2a_snapshot_alignment_smoke();
++        assert!(matches!(report.status, SemanticScoreAlignmentStatus::Pass | SemanticScoreAlignmentStatus::WarnMissingOptionalHash));
++        assert!(report.length_match);
++        assert!(buffer.buffer_len_matches_vocab);
++    }
++}
+diff -ruN minp_c2a_orig/crates/runtime/src/infer.rs minp_c2a_work/crates/runtime/src/infer.rs
+--- minp_c2a_orig/crates/runtime/src/infer.rs	2026-05-26 23:24:28.000000000 +0000
++++ minp_c2a_work/crates/runtime/src/infer.rs	2026-05-26 23:50:27.379517112 +0000
+@@ -1624,10 +1624,13 @@
+     let mut cfg = GenerationSamplingConfig::default();
+     cfg.semantic_prior = semantic_prior_config_from_env();
+     if cfg.semantic_prior.require_sampler04_strict_ready {
+-        let ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
++        let sampler04_ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
+             .map(|v| v == "STRICT_CANDIDATE_READY")
+             .unwrap_or(false);
+-        if !ready {
++        let c2a_alignment_pass = std::env::var("ASH_MINP_C2A_ALIGNMENT_STATUS")
++            .map(|v| v == "PASS")
++            .unwrap_or(false);
++        if !sampler04_ready || !c2a_alignment_pass {
+             cfg.semantic_prior.enabled = false;
+         }
+     }
+diff -ruN minp_c2a_orig/workspace/minp_c2a.patch minp_c2a_work/workspace/minp_c2a.patch
+--- minp_c2a_orig/workspace/minp_c2a.patch	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a.patch	2026-05-26 23:50:45.632940254 +0000
+@@ -0,0 +1,359 @@
++diff -ruN minp_c2a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md minp_c2a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md
++--- minp_c2a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c2a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2A_acceptance.md	2026-05-26 23:50:27.382844522 +0000
++@@ -0,0 +1,12 @@
+++# 16AI-QW-38G-R6A-MINP-C2A Acceptance
+++
+++- static alignment module: PASS
+++- lib export: PASS
+++- runtime C2A gate env: PASS
+++- fixture policy SKIPPED != PASS: PASS
+++- cargo check: NOT_RUN
+++- cargo test: NOT_RUN
+++- runtime vocab alignment: NOT_RUN
+++- WebGPU runtime: NOT_RUN
+++
+++Result: STATIC_PASS / EXECUTION_NOT_RUN
++diff -ruN minp_c2a_orig/crates/model_core/src/lib.rs minp_c2a_work/crates/model_core/src/lib.rs
++--- minp_c2a_orig/crates/model_core/src/lib.rs	2026-05-26 23:43:04.000000000 +0000
+++++ minp_c2a_work/crates/model_core/src/lib.rs	2026-05-26 23:50:27.369359698 +0000
++@@ -15,6 +15,7 @@
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
+++mod minp_c2a_snapshot_alignment;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -66,6 +67,16 @@
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
+++pub use minp_c2a_snapshot_alignment::{
+++    SemanticScoreAlignmentStatus, SemanticScoreBufferAlignmentReceipt,
+++    SemanticScoreFixtureResult, SemanticScoreFixtureStatus,
+++    SemanticScoreSnapshotAlignmentReport,
+++    validate_semantic_score_snapshot_alignment,
+++    semantic_score_alignment_fixture_results,
+++    semantic_score_buffer_alignment_receipt,
+++    semantic_prior_application_allowed_by_alignment,
+++    run_minp_c2a_snapshot_alignment_smoke,
+++};
++ pub use semantic_prior_scores::{
++     SemanticPriorProviderConfig, SemanticPriorScoreSnapshot, SemanticPriorScoreSummary,
++     ScoreRange, build_semantic_prior_score_snapshot, classify_piece,
++diff -ruN minp_c2a_orig/crates/model_core/src/minp_c2a_snapshot_alignment.rs minp_c2a_work/crates/model_core/src/minp_c2a_snapshot_alignment.rs
++--- minp_c2a_orig/crates/model_core/src/minp_c2a_snapshot_alignment.rs	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c2a_work/crates/model_core/src/minp_c2a_snapshot_alignment.rs	2026-05-26 23:50:27.368790163 +0000
++@@ -0,0 +1,292 @@
+++use serde::{Deserialize, Serialize};
+++
+++use crate::semantic_prior_scores::{
+++    SemanticPriorProviderConfig,
+++    SemanticPriorScoreSnapshot,
+++    build_semantic_prior_score_snapshot,
+++    stable_vocab_hash,
+++};
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum SemanticScoreAlignmentStatus {
+++    Pass,
+++    WarnMissingOptionalHash,
+++    FailLengthMismatch,
+++    FailNaNOrInf,
+++    FailOutOfRange,
+++    FailFixtureMismatch,
+++    FailVocabMismatch,
+++    NotRun,
+++}
+++
+++impl SemanticScoreAlignmentStatus {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Pass => "PASS",
+++            Self::WarnMissingOptionalHash => "WARN_MISSING_OPTIONAL_HASH",
+++            Self::FailLengthMismatch => "FAIL_LENGTH_MISMATCH",
+++            Self::FailNaNOrInf => "FAIL_NAN_OR_INF",
+++            Self::FailOutOfRange => "FAIL_OUT_OF_RANGE",
+++            Self::FailFixtureMismatch => "FAIL_FIXTURE_MISMATCH",
+++            Self::FailVocabMismatch => "FAIL_VOCAB_MISMATCH",
+++            Self::NotRun => "NOT_RUN",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum SemanticScoreFixtureStatus {
+++    Pass,
+++    Fail,
+++    SkippedTokenNotFound,
+++}
+++
+++impl SemanticScoreFixtureStatus {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Pass => "PASS",
+++            Self::Fail => "FAIL",
+++            Self::SkippedTokenNotFound => "SKIPPED_TOKEN_NOT_FOUND",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticScoreFixtureResult {
+++    pub fixture: String,
+++    pub token: String,
+++    pub token_id: Option<u32>,
+++    pub qwave_score: Option<f32>,
+++    pub deltak_score: Option<f32>,
+++    pub status: SemanticScoreFixtureStatus,
+++    pub reason: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticScoreSnapshotAlignmentReport {
+++    pub vocab_size: usize,
+++    pub qwave_len: usize,
+++    pub deltak_len: usize,
+++    pub vocab_hash: String,
+++    pub expected_vocab_hash: String,
+++    pub vocab_hash_present: bool,
+++    pub vocab_hash_match: bool,
+++    pub tokenizer_hash: Option<String>,
+++    pub expected_tokenizer_hash: Option<String>,
+++    pub tokenizer_hash_match: Option<bool>,
+++    pub lm_head_vocab_size: Option<usize>,
+++    pub lm_head_vocab_match: Option<bool>,
+++    pub length_match: bool,
+++    pub max_token_id_in_vocab: Option<u32>,
+++    pub token_id_indexable: bool,
+++    pub nan_count_qwave: usize,
+++    pub inf_count_qwave: usize,
+++    pub nan_count_deltak: usize,
+++    pub inf_count_deltak: usize,
+++    pub out_of_range_qwave: usize,
+++    pub out_of_range_deltak: usize,
+++    pub fixture_results: Vec<SemanticScoreFixtureResult>,
+++    pub status: SemanticScoreAlignmentStatus,
+++}
+++
+++impl SemanticScoreSnapshotAlignmentReport {
+++    pub fn alignment_pass(&self) -> bool {
+++        matches!(self.status, SemanticScoreAlignmentStatus::Pass | SemanticScoreAlignmentStatus::WarnMissingOptionalHash)
+++            && self.length_match
+++            && self.token_id_indexable
+++            && self.nan_count_qwave == 0
+++            && self.inf_count_qwave == 0
+++            && self.nan_count_deltak == 0
+++            && self.inf_count_deltak == 0
+++            && self.out_of_range_qwave == 0
+++            && self.out_of_range_deltak == 0
+++            && self.fixture_results.iter().all(|r| !matches!(r.status, SemanticScoreFixtureStatus::Fail))
+++    }
+++}
+++
+++pub fn validate_semantic_score_snapshot_alignment(
+++    snapshot: &SemanticPriorScoreSnapshot,
+++    vocab: &[(u32, String)],
+++    lm_head_vocab_size: Option<usize>,
+++    tokenizer_hash: Option<&str>,
+++) -> SemanticScoreSnapshotAlignmentReport {
+++    let vocab_size = snapshot.vocab_size;
+++    let qwave_len = snapshot.qwave_scores.len();
+++    let deltak_len = snapshot.deltak_scores.len();
+++    let expected_vocab_hash = stable_vocab_hash(vocab);
+++    let vocab_hash_present = !snapshot.vocab_hash.trim().is_empty();
+++    let vocab_hash_match = snapshot.vocab_hash == expected_vocab_hash;
+++    let tokenizer_hash_match = tokenizer_hash.map(|expected| snapshot.tokenizer_hash.as_deref() == Some(expected));
+++    let lm_head_vocab_match = lm_head_vocab_size.map(|size| size == vocab_size);
+++    let length_match = qwave_len == vocab_size && deltak_len == vocab_size;
+++    let max_token_id_in_vocab = vocab.iter().map(|(id, _)| *id).max();
+++    let token_id_indexable = max_token_id_in_vocab.map(|id| (id as usize) < vocab_size).unwrap_or(true);
+++
+++    let nan_count_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_nan()).count();
+++    let inf_count_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_infinite()).count();
+++    let nan_count_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_nan()).count();
+++    let inf_count_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_infinite()).count();
+++    let out_of_range_qwave = snapshot.qwave_scores.iter().filter(|v| v.is_finite() && (**v < -1.0 || **v > 1.0)).count();
+++    let out_of_range_deltak = snapshot.deltak_scores.iter().filter(|v| v.is_finite() && (**v < -1.0 || **v > 1.0)).count();
+++    let fixture_results = semantic_score_alignment_fixture_results(snapshot, vocab);
+++    let fixture_fail = fixture_results.iter().any(|r| matches!(r.status, SemanticScoreFixtureStatus::Fail));
+++
+++    let status = if !length_match || !token_id_indexable {
+++        SemanticScoreAlignmentStatus::FailLengthMismatch
+++    } else if !vocab_hash_match || lm_head_vocab_match == Some(false) || tokenizer_hash_match == Some(false) {
+++        SemanticScoreAlignmentStatus::FailVocabMismatch
+++    } else if nan_count_qwave + nan_count_deltak + inf_count_qwave + inf_count_deltak > 0 {
+++        SemanticScoreAlignmentStatus::FailNaNOrInf
+++    } else if out_of_range_qwave + out_of_range_deltak > 0 {
+++        SemanticScoreAlignmentStatus::FailOutOfRange
+++    } else if fixture_fail {
+++        SemanticScoreAlignmentStatus::FailFixtureMismatch
+++    } else if tokenizer_hash.is_none() || snapshot.tokenizer_hash.is_none() {
+++        SemanticScoreAlignmentStatus::WarnMissingOptionalHash
+++    } else {
+++        SemanticScoreAlignmentStatus::Pass
+++    };
+++
+++    SemanticScoreSnapshotAlignmentReport {
+++        vocab_size,
+++        qwave_len,
+++        deltak_len,
+++        vocab_hash: snapshot.vocab_hash.clone(),
+++        expected_vocab_hash,
+++        vocab_hash_present,
+++        vocab_hash_match,
+++        tokenizer_hash: snapshot.tokenizer_hash.clone(),
+++        expected_tokenizer_hash: tokenizer_hash.map(ToOwned::to_owned),
+++        tokenizer_hash_match,
+++        lm_head_vocab_size,
+++        lm_head_vocab_match,
+++        length_match,
+++        max_token_id_in_vocab,
+++        token_id_indexable,
+++        nan_count_qwave,
+++        inf_count_qwave,
+++        nan_count_deltak,
+++        inf_count_deltak,
+++        out_of_range_qwave,
+++        out_of_range_deltak,
+++        fixture_results,
+++        status,
+++    }
+++}
+++
+++pub fn semantic_score_alignment_fixture_results(
+++    snapshot: &SemanticPriorScoreSnapshot,
+++    vocab: &[(u32, String)],
+++) -> Vec<SemanticScoreFixtureResult> {
+++    let mut results = Vec::new();
+++    let control_tokens = ["<pad>", "<bos>", "<eos>", "<unk>", "<glossary:on>", "<glossary:off>"];
+++    for token in control_tokens {
+++        results.push(check_fixture_token(snapshot, vocab, "control_token_negative", token, |q, k| q <= -0.8 && k <= -0.8));
+++    }
+++    for token in ["<byte:EC>", "<0xEC>", "<byte:FF>"] {
+++        results.push(check_fixture_token(snapshot, vocab, "byte_token_negative", token, |q, k| q < 0.0 && k < 0.0));
+++    }
+++    for token in ["?댁뼱媛怨?", "Ã", "ì", "ê", "媛", "怨"] {
+++        results.push(check_fixture_token(snapshot, vocab, "mojibake_token_negative", token, |q, k| q < 0.0 && k < 0.0));
+++    }
+++    for token in ["▁이어가고", "합니다", "사람", "안녕"] {
+++        results.push(check_fixture_token(snapshot, vocab, "normal_korean_non_negative", token, |q, k| q >= 0.0 && k >= 0.0));
+++    }
+++    results
+++}
+++
+++fn check_fixture_token(
+++    snapshot: &SemanticPriorScoreSnapshot,
+++    vocab: &[(u32, String)],
+++    fixture: &str,
+++    token: &str,
+++    predicate: fn(f32, f32) -> bool,
+++) -> SemanticScoreFixtureResult {
+++    let found = vocab.iter().find(|(_, piece)| piece == token);
+++    let Some((token_id, _)) = found else {
+++        return SemanticScoreFixtureResult {
+++            fixture: fixture.to_string(),
+++            token: token.to_string(),
+++            token_id: None,
+++            qwave_score: None,
+++            deltak_score: None,
+++            status: SemanticScoreFixtureStatus::SkippedTokenNotFound,
+++            reason: Some("token not present in vocab; skipped, not pass".to_string()),
+++        };
+++    };
+++    let idx = *token_id as usize;
+++    let q = snapshot.qwave_scores.get(idx).copied();
+++    let k = snapshot.deltak_scores.get(idx).copied();
+++    match (q, k) {
+++        (Some(q), Some(k)) if predicate(q, k) => SemanticScoreFixtureResult {
+++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: Some(q), deltak_score: Some(k), status: SemanticScoreFixtureStatus::Pass, reason: None,
+++        },
+++        (Some(q), Some(k)) => SemanticScoreFixtureResult {
+++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: Some(q), deltak_score: Some(k), status: SemanticScoreFixtureStatus::Fail, reason: Some("score did not satisfy fixture predicate".to_string()),
+++        },
+++        _ => SemanticScoreFixtureResult {
+++            fixture: fixture.to_string(), token: token.to_string(), token_id: Some(*token_id), qwave_score: q, deltak_score: k, status: SemanticScoreFixtureStatus::Fail, reason: Some("token id is not indexable in score vectors".to_string()),
+++        },
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticScoreBufferAlignmentReceipt {
+++    pub cpu_score_source: String,
+++    pub gpu_score_source: String,
+++    pub same_snapshot_hash: bool,
+++    pub qwave_buffer_len: usize,
+++    pub deltak_buffer_len: usize,
+++    pub buffer_len_matches_vocab: bool,
+++    pub alignment_status: SemanticScoreAlignmentStatus,
+++}
+++
+++pub fn semantic_score_buffer_alignment_receipt(
+++    snapshot: &SemanticPriorScoreSnapshot,
+++    report: &SemanticScoreSnapshotAlignmentReport,
+++) -> SemanticScoreBufferAlignmentReceipt {
+++    SemanticScoreBufferAlignmentReceipt {
+++        cpu_score_source: "SemanticPriorScoreSnapshot".to_string(),
+++        gpu_score_source: "SemanticPriorScoreSnapshot".to_string(),
+++        same_snapshot_hash: report.vocab_hash_match,
+++        qwave_buffer_len: snapshot.qwave_scores.len(),
+++        deltak_buffer_len: snapshot.deltak_scores.len(),
+++        buffer_len_matches_vocab: snapshot.qwave_scores.len() == snapshot.vocab_size && snapshot.deltak_scores.len() == snapshot.vocab_size,
+++        alignment_status: report.status.clone(),
+++    }
+++}
+++
+++pub fn semantic_prior_application_allowed_by_alignment(
+++    sampler04_status: Option<&str>,
+++    c2a_status: Option<&str>,
+++) -> bool {
+++    sampler04_status == Some("STRICT_CANDIDATE_READY") && c2a_status == Some("PASS")
+++}
+++
+++pub fn run_minp_c2a_snapshot_alignment_smoke() -> (SemanticScoreSnapshotAlignmentReport, SemanticScoreBufferAlignmentReceipt) {
+++    let vocab = vec![
+++        (0, "<pad>".to_string()),
+++        (1, "▁이어가고".to_string()),
+++        (2, "<eos>".to_string()),
+++        (3, "<byte:EC>".to_string()),
+++        (4, "?댁뼱媛怨?".to_string()),
+++    ];
+++    let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
+++    let snapshot = build_semantic_prior_score_snapshot(&vocab, &cfg);
+++    let report = validate_semantic_score_snapshot_alignment(&snapshot, &vocab, Some(snapshot.vocab_size), None);
+++    let buffer_receipt = semantic_score_buffer_alignment_receipt(&snapshot, &report);
+++    (report, buffer_receipt)
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    #[test]
+++    fn c2a_alignment_smoke_reports_pass_or_optional_hash_warning() {
+++        let (report, buffer) = run_minp_c2a_snapshot_alignment_smoke();
+++        assert!(matches!(report.status, SemanticScoreAlignmentStatus::Pass | SemanticScoreAlignmentStatus::WarnMissingOptionalHash));
+++        assert!(report.length_match);
+++        assert!(buffer.buffer_len_matches_vocab);
+++    }
+++}
++diff -ruN minp_c2a_orig/crates/runtime/src/infer.rs minp_c2a_work/crates/runtime/src/infer.rs
++--- minp_c2a_orig/crates/runtime/src/infer.rs	2026-05-26 23:24:28.000000000 +0000
+++++ minp_c2a_work/crates/runtime/src/infer.rs	2026-05-26 23:50:27.379517112 +0000
++@@ -1624,10 +1624,13 @@
++     let mut cfg = GenerationSamplingConfig::default();
++     cfg.semantic_prior = semantic_prior_config_from_env();
++     if cfg.semantic_prior.require_sampler04_strict_ready {
++-        let ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
+++        let sampler04_ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
++             .map(|v| v == "STRICT_CANDIDATE_READY")
++             .unwrap_or(false);
++-        if !ready {
+++        let c2a_alignment_pass = std::env::var("ASH_MINP_C2A_ALIGNMENT_STATUS")
+++            .map(|v| v == "PASS")
+++            .unwrap_or(false);
+++        if !sampler04_ready || !c2a_alignment_pass {
++             cfg.semantic_prior.enabled = false;
++         }
++     }
+diff -ruN minp_c2a_orig/workspace/minp_c2a_fixture_results.json minp_c2a_work/workspace/minp_c2a_fixture_results.json
+--- minp_c2a_orig/workspace/minp_c2a_fixture_results.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_fixture_results.json	2026-05-26 23:50:27.380853693 +0000
+@@ -0,0 +1,49 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
++  "fixture_policy": "SKIPPED_TOKEN_NOT_FOUND is not PASS",
++  "fixtures": [
++    {
++      "name": "control_token_negative",
++      "tokens": [
++        "<pad>",
++        "<bos>",
++        "<eos>",
++        "<unk>",
++        "<glossary:on>",
++        "<glossary:off>"
++      ],
++      "expect": "qwave <= -0.8 and deltak <= -0.8"
++    },
++    {
++      "name": "byte_token_negative",
++      "tokens": [
++        "<byte:EC>",
++        "<0xEC>",
++        "<byte:FF>"
++      ],
++      "expect": "qwave < 0 and deltak < 0"
++    },
++    {
++      "name": "mojibake_token_negative",
++      "tokens": [
++        "?댁뼱媛怨?",
++        "Ã",
++        "ì",
++        "ê",
++        "媛",
++        "怨"
++      ],
++      "expect": "qwave < 0 and deltak < 0"
++    },
++    {
++      "name": "normal_korean_non_negative",
++      "tokens": [
++        "▁이어가고",
++        "합니다",
++        "사람",
++        "안녕"
++      ],
++      "expect": "qwave >= 0 and deltak >= 0"
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN minp_c2a_orig/workspace/minp_c2a_report.md minp_c2a_work/workspace/minp_c2a_report.md
+--- minp_c2a_orig/workspace/minp_c2a_report.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_report.md	2026-05-26 23:50:27.382645837 +0000
+@@ -0,0 +1,22 @@
++# 16AI-QW-38G-R6A-MINP-C2A Report
++
++## Scope
++Semantic Score Provider Build / Snapshot Alignment Smoke Seal.
++
++## Implemented
++- Added `model_core::minp_c2a_snapshot_alignment`.
++- Added `SemanticScoreSnapshotAlignmentReport` and alignment status enums.
++- Added validator for vocab size, token-id indexability, finite/range checks, optional tokenizer/lm_head alignment, and fixture predicates.
++- Added CPU/GPU score buffer alignment receipt structure.
++- Added runtime semantic prior gate requiring both:
++  - `ASH_SAMPLER04_PROMOTION_STATUS=STRICT_CANDIDATE_READY`
++  - `ASH_MINP_C2A_ALIGNMENT_STATUS=PASS`
++
++## Non-scope
++- No dynamic QWave/Delta-K scoring.
++- No weighted Min-P formula change.
++- No shader formula change.
++- No semantic prior default enable.
++
++## Execution
++`cargo`, `rustc`, `rustfmt`, and runtime vocab manifest were unavailable in this environment. Runtime alignment is therefore recorded as `NOT_RUN`, not `PASS`.
+diff -ruN minp_c2a_orig/workspace/minp_c2a_score_buffer_alignment_receipt.json minp_c2a_work/workspace/minp_c2a_score_buffer_alignment_receipt.json
+--- minp_c2a_orig/workspace/minp_c2a_score_buffer_alignment_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_score_buffer_alignment_receipt.json	2026-05-26 23:50:27.380698643 +0000
+@@ -0,0 +1,11 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
++  "cpu_score_source": "SemanticPriorScoreSnapshot",
++  "gpu_score_source": "SemanticPriorScoreSnapshot",
++  "same_snapshot_hash": "NOT_RUN",
++  "qwave_buffer_len": "NOT_RUN",
++  "deltak_buffer_len": "NOT_RUN",
++  "buffer_len_matches_vocab": "NOT_RUN",
++  "alignment_status": "NOT_RUN",
++  "note": "Runtime vocab manifest/cargo unavailable in this bake environment; static validator and receipt schema were added."
++}
+\ No newline at end of file
+diff -ruN minp_c2a_orig/workspace/minp_c2a_snapshot_alignment_receipt.json minp_c2a_work/workspace/minp_c2a_snapshot_alignment_receipt.json
+--- minp_c2a_orig/workspace/minp_c2a_snapshot_alignment_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_snapshot_alignment_receipt.json	2026-05-26 23:50:27.380527201 +0000
+@@ -0,0 +1,16 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
++  "status": "NOT_RUN",
++  "reason": "NO_RUNTIME_VOCAB_MANIFEST_OR_CARGO",
++  "static_validator_added": true,
++  "required_runtime_checks": [
++    "qwave_scores.len == vocab_size",
++    "deltak_scores.len == vocab_size",
++    "max_token_id < vocab_size",
++    "finite scores only",
++    "scores within [-1,1]",
++    "lm_head_vocab_match if available",
++    "tokenizer_hash_match if available",
++    "fixture pass or explicit skipped"
++  ]
++}
+\ No newline at end of file
+diff -ruN minp_c2a_orig/workspace/minp_c2a_snapshot_alignment_summary.json minp_c2a_work/workspace/minp_c2a_snapshot_alignment_summary.json
+--- minp_c2a_orig/workspace/minp_c2a_snapshot_alignment_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_snapshot_alignment_summary.json	2026-05-26 23:50:27.380223066 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
++  "status": "SEMANTIC_SCORE_PROVIDER_BUILD_AND_SNAPSHOT_ALIGNMENT_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-MINP-C2",
++  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
++  "alignment_validator": "model_core::minp_c2a_snapshot_alignment::validate_semantic_score_snapshot_alignment",
++  "score_basis": "token_static_prior_v1",
++  "semantic_prior_default_enabled": false,
++  "requires_sampler04_strict_ready": true,
++  "requires_snapshot_alignment_pass": true,
++  "runtime_gate_env": [
++    "ASH_SAMPLER04_PROMOTION_STATUS=STRICT_CANDIDATE_READY",
++    "ASH_MINP_C2A_ALIGNMENT_STATUS=PASS"
++  ],
++  "alignment_status": "NOT_RUN",
++  "non_scope": [
++    "dynamic_context_qwave",
++    "dynamic_context_deltak",
++    "weighted_minp_formula_change",
++    "shader_algorithm_change",
++    "semantic_prior_default_enable"
++  ]
++}
+\ No newline at end of file
+diff -ruN minp_c2a_orig/workspace/minp_c2a_static_checks.json minp_c2a_work/workspace/minp_c2a_static_checks.json
+--- minp_c2a_orig/workspace/minp_c2a_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2a_work/workspace/minp_c2a_static_checks.json	2026-05-26 23:50:27.382443580 +0000
+@@ -0,0 +1,18 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
++  "checks": {
++    "alignment_module_exists": true,
++    "lib_declares_alignment_module": true,
++    "lib_exports_alignment_types": true,
++    "alignment_report_type": true,
++    "alignment_status_enum": true,
++    "validate_function": true,
++    "fixture_results": true,
++    "buffer_alignment_receipt": true,
++    "skipped_not_pass": true,
++    "application_gate_helper": true,
++    "runtime_gate_has_c2a_env": true,
++    "runtime_requires_sampler04_and_c2a": true
++  },
++  "status": "STATIC_PASS"
++}
+\ No newline at end of file

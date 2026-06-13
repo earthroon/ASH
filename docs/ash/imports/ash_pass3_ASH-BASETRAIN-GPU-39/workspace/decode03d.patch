@@ -1,0 +1,1844 @@
+diff -ruN /mnt/data/decode03c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md /mnt/data/decode03d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md
+--- /mnt/data/decode03c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md	2026-05-27 06:39:12.234996137 +0000
+@@ -0,0 +1,23 @@
++# 16AI-QW-38G-R6A-DECODE-03D Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Accepted static surface
++- `DynamicSamplerMode` default-off gate added.
++- Controlled / strict-controlled gate decision added.
++- Applied config overlay data structure added.
++- Min-p unsupported backend guard added.
++- Rollback / safe-stop / EOS candidate non-execution contract added.
++- JSONL receipt and summary writer added.
++- Sampler parity append chain now invokes DECODE-03D receipt hook after DECODE-03C.
++
++## Runtime acceptance pending
++- `cargo check -p model_core`
++- `cargo test -p model_core decode03d_*`
++- Controlled run with DECODE-03A/03B/03C receipts enabled
++- Confirmation that `behavior_change` only occurs under controlled gate
++- Confirmation that rollback/safe-stop/EOS candidates remain unexecuted
++
++## Next patch candidate
++16AI-QW-38G-R6A-SALAD-02 — Word Salad Online Detector Seal
+diff -ruN /mnt/data/decode03c_work/crates/model_core/src/decode03d_controlled_enable.rs /mnt/data/decode03d_work/crates/model_core/src/decode03d_controlled_enable.rs
+--- /mnt/data/decode03c_work/crates/model_core/src/decode03d_controlled_enable.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/crates/model_core/src/decode03d_controlled_enable.rs	2026-05-27 06:38:18.274853378 +0000
+@@ -0,0 +1,734 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AEntropyStepReceipt, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{
++    receipt_from_decode03b, Decode03CMode, Decode03CShadowPolicy, Decode03CStepReceipt,
++    ShadowGuardStrength,
++};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const DECODE03D_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03D";
++pub const DECODE03D_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03C";
++pub const DECODE03D_SAMPLER_SSOT: &str = "model_core::decode03c_shadow_policy";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum DynamicSamplerMode {
++    Off,
++    ShadowOnly,
++    Controlled,
++    StrictControlled,
++}
++
++impl DynamicSamplerMode {
++    pub fn from_env() -> Self {
++        let enabled = env_bool("ASH_DECODE03D_CONTROLLED_ENABLE", false)
++            || env_bool("ASH_DECODE03D_ENABLE", false);
++        let raw = env::var("ASH_DECODE03D_MODE")
++            .unwrap_or_else(|_| if enabled { "controlled".to_string() } else { "off".to_string() })
++            .trim()
++            .to_ascii_lowercase();
++        match raw.as_str() {
++            "shadow" | "shadow_only" | "shadow-only" | "observe" | "receipt" => Self::ShadowOnly,
++            "controlled" | "control" | "on" | "true" | "1" => if enabled { Self::Controlled } else { Self::Off },
++            "strict" | "strict_controlled" | "strict-controlled" => if enabled { Self::StrictControlled } else { Self::Off },
++            _ => Self::Off,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ShadowOnly => "ShadowOnly",
++            Self::Controlled => "Controlled",
++            Self::StrictControlled => "StrictControlled",
++        }
++    }
++
++    pub fn can_change_behavior(self) -> bool {
++        matches!(self, Self::Controlled | Self::StrictControlled)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DGateInput {
++    pub mode: DynamicSamplerMode,
++    pub behavior_change_allowed: bool,
++    pub receipt_required: bool,
++    pub sampler05_status_seen: Option<String>,
++    pub decode03a_status_seen: Option<String>,
++    pub decode03b_status_seen: Option<String>,
++    pub decode03c_status_seen: Option<String>,
++    pub backend: String,
++    pub backend_supports_min_p: bool,
++    pub backend_supports_top_p: bool,
++    pub backend_supports_temperature: bool,
++    pub backend_supports_guard_strength: bool,
++    pub numeric_risk: bool,
++    pub fallback_risk: bool,
++    pub shadow_only_seen: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DGateDecision {
++    pub can_apply: bool,
++    pub mode: DynamicSamplerMode,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub requires_receipt: bool,
++    pub strict_fail: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DCurrentConfig {
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k: usize,
++    pub min_p: f32,
++    pub repeat_penalty: Option<f32>,
++    pub repeat_last_n: Option<usize>,
++    pub static_prior_enabled: bool,
++    pub transition_guard_enabled: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DAppliedConfig {
++    pub behavior_change: bool,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub shadow_temperature: f32,
++    pub shadow_top_p: f32,
++    pub shadow_top_k: usize,
++    pub shadow_min_p: f32,
++    pub applied_temperature: f32,
++    pub applied_top_p: f32,
++    pub applied_top_k: usize,
++    pub applied_min_p: f32,
++    pub applied_guard_strength: String,
++    pub temperature_changed: bool,
++    pub top_p_changed: bool,
++    pub top_k_changed: bool,
++    pub min_p_changed: bool,
++    pub guard_strength_changed: bool,
++    pub rollback_candidate_seen: bool,
++    pub rollback_candidate_applied: bool,
++    pub safe_stop_candidate_seen: bool,
++    pub safe_stop_candidate_applied: bool,
++    pub eos_bias_candidate_seen: bool,
++    pub eos_bias_candidate_applied: bool,
++    pub apply_reason: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DRiskFlags {
++    pub applied_without_gate: bool,
++    pub missing_shadow_policy: bool,
++    pub min_p_unsupported_but_requested: bool,
++    pub min_p_unsupported_but_applied: bool,
++    pub panic_candidate_seen: bool,
++    pub panic_candidate_executed: bool,
++    pub numeric_risk_seen: bool,
++    pub fallback_risk_seen: bool,
++    pub behavior_change_without_controlled_mode: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: DynamicSamplerMode,
++    pub controlled_enable: bool,
++    pub gate: Decode03DGateDecision,
++    pub pci_raw: Option<f32>,
++    pub pci_smoothed: Option<f32>,
++    pub bucket_stable: Option<String>,
++    pub shadow_policy_seen: bool,
++    pub shadow_policy: Option<Decode03CShadowPolicy>,
++    pub current_config: Decode03DCurrentConfig,
++    pub applied_config: Decode03DAppliedConfig,
++    pub selected_id_before_apply: Option<u32>,
++    pub selected_id_after_apply: Option<u32>,
++    pub selected_piece_preview: Option<String>,
++    pub risk_flags: Decode03DRiskFlags,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03DGateCounts {
++    pub can_apply_count: usize,
++    pub denied_count: usize,
++    pub strict_fail_count: usize,
++    pub missing_shadow_policy_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03DAppliedCounts {
++    pub behavior_change_count: usize,
++    pub temperature_changed_count: usize,
++    pub min_p_changed_count: usize,
++    pub top_p_changed_count: usize,
++    pub top_k_changed_count: usize,
++    pub guard_strength_changed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03DShadowCandidateCounts {
++    pub rollback_candidate_seen_count: usize,
++    pub rollback_candidate_applied_count: usize,
++    pub safe_stop_candidate_seen_count: usize,
++    pub safe_stop_candidate_applied_count: usize,
++    pub eos_bias_candidate_seen_count: usize,
++    pub eos_bias_candidate_applied_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03DBackendSupportCounts {
++    pub min_p_unsupported_count: usize,
++    pub min_p_unsupported_but_applied_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03DRiskCounts {
++    pub applied_without_gate_count: usize,
++    pub panic_candidate_seen_count: usize,
++    pub panic_candidate_executed_count: usize,
++    pub numeric_risk_seen_count: usize,
++    pub fallback_risk_seen_count: usize,
++    pub behavior_change_without_controlled_mode_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03DSummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub controlled_enable: bool,
++    pub mode: String,
++    pub default_enable: bool,
++    pub requires_decode03c: bool,
++    pub decode03c_status_seen: Option<String>,
++    pub decode03b_status_seen: Option<String>,
++    pub decode03a_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub gate: Decode03DGateCounts,
++    pub applied: Decode03DAppliedCounts,
++    pub shadow_candidate_not_executed: Decode03DShadowCandidateCounts,
++    pub backend_support: Decode03DBackendSupportCounts,
++    pub risk: Decode03DRiskCounts,
++    pub ready_for_salad02_online_detector: bool,
++    pub ready_for_decode03d_default_enable: bool,
++    pub ready_for_salad03_rollback: bool,
++    pub reason: String,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_f32(name: &str, default: f32) -> f32 {
++    env::var(name)
++        .ok()
++        .and_then(|v| v.trim().parse::<f32>().ok())
++        .filter(|v| v.is_finite())
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name)
++        .ok()
++        .and_then(|v| v.trim().parse::<usize>().ok())
++        .unwrap_or(default)
++}
++
++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
++    if value.is_finite() { value.clamp(lo, hi) } else { lo }
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_DECODE03D_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "decode03d_sampler03_bridge".to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_DECODE03D_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03d_applied_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_DECODE03D_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03d_summary.json"))
++}
++
++pub fn backend_supports_min_p_from_env() -> bool {
++    env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_MIN_P", true)
++}
++
++pub fn decide_decode03d_gate(input: &Decode03DGateInput) -> Decode03DGateDecision {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    let mut strict_fail = false;
++
++    if matches!(input.mode, DynamicSamplerMode::Off) {
++        denied_reasons.push("mode_off".to_string());
++    }
++    if !input.mode.can_change_behavior() {
++        denied_reasons.push("mode_not_controlled".to_string());
++    }
++    if !input.behavior_change_allowed {
++        denied_reasons.push("behavior_change_not_allowed".to_string());
++    }
++    if matches!(input.sampler05_status_seen.as_deref(), Some("FAIL") | Some("FAIL_BEHAVIOR_CHANGE") | Some("FAIL_THRESHOLD_KIND")) {
++        denied_reasons.push("sampler05_failed".to_string());
++    }
++    if input.decode03c_status_seen.is_none() {
++        denied_reasons.push("missing_decode03c_status".to_string());
++    }
++    if !input.shadow_only_seen {
++        denied_reasons.push("decode03c_shadow_contract_missing".to_string());
++    }
++    if !input.backend_supports_temperature {
++        denied_reasons.push("backend_temperature_unsupported".to_string());
++    }
++    if !input.backend_supports_top_p {
++        denied_reasons.push("backend_top_p_unsupported".to_string());
++    }
++    if !input.backend_supports_min_p {
++        warning_reasons.push("backend_min_p_unsupported".to_string());
++    }
++    if !input.backend_supports_guard_strength {
++        warning_reasons.push("backend_guard_strength_unsupported".to_string());
++    }
++
++    if matches!(input.mode, DynamicSamplerMode::StrictControlled) && input.numeric_risk {
++        strict_fail = true;
++        denied_reasons.push("numeric_risk_in_strict_mode".to_string());
++    }
++    if matches!(input.mode, DynamicSamplerMode::StrictControlled) && input.fallback_risk {
++        strict_fail = true;
++        denied_reasons.push("fallback_risk_in_strict_mode".to_string());
++    }
++
++    Decode03DGateDecision {
++        can_apply: denied_reasons.is_empty() && input.mode.can_change_behavior(),
++        mode: input.mode,
++        denied_reasons,
++        warning_reasons,
++        requires_receipt: input.receipt_required,
++        strict_fail,
++    }
++}
++
++fn guard_strength_name(value: ShadowGuardStrength) -> String {
++    match value {
++        ShadowGuardStrength::Relaxed => "Relaxed",
++        ShadowGuardStrength::Normal => "Normal",
++        ShadowGuardStrength::Strict => "Strict",
++        ShadowGuardStrength::Panic => "Panic",
++    }
++    .to_string()
++}
++
++pub fn current_config_from_shadow(shadow: &Decode03CShadowPolicy) -> Decode03DCurrentConfig {
++    Decode03DCurrentConfig {
++        temperature: shadow.current_temperature,
++        top_p: shadow.current_top_p,
++        top_k: shadow.current_top_k,
++        min_p: shadow.current_min_p,
++        repeat_penalty: None,
++        repeat_last_n: None,
++        static_prior_enabled: env_bool("ASH_DECODE03D_STATIC_PRIOR_ENABLED", true),
++        transition_guard_enabled: env_bool("ASH_DECODE03D_TRANSITION_GUARD_ENABLED", true),
++    }
++}
++
++pub fn apply_decode03d_controlled_config(
++    current: &Decode03DCurrentConfig,
++    shadow: &Decode03CShadowPolicy,
++    gate: &Decode03DGateDecision,
++    backend_supports_min_p: bool,
++) -> Decode03DAppliedConfig {
++    let mut apply_reason = Vec::new();
++    let mut applied_temperature = current.temperature;
++    let mut applied_top_p = current.top_p;
++    let mut applied_top_k = current.top_k;
++    let mut applied_min_p = current.min_p;
++    let mut applied_guard_strength = "Current".to_string();
++
++    if gate.can_apply {
++        apply_reason.push("controlled_enable".to_string());
++        apply_reason.push("shadow_policy_applied".to_string());
++        applied_temperature = clamp_f32(shadow.shadow_temperature, 0.03, 1.20);
++        applied_top_p = clamp_f32(shadow.shadow_top_p, 0.50, 1.00);
++        applied_top_k = shadow.shadow_top_k.min(env_usize("ASH_DECODE03D_TOP_K_MAX", 1024));
++        if backend_supports_min_p {
++            applied_min_p = clamp_f32(shadow.shadow_min_p, 0.00, 0.25);
++        } else {
++            apply_reason.push("backend_min_p_unsupported_min_p_not_applied".to_string());
++        }
++        applied_guard_strength = guard_strength_name(shadow.guard_strength);
++        apply_reason.extend(shadow.policy_reason.iter().cloned());
++    } else {
++        apply_reason.push("gate_denied".to_string());
++        apply_reason.extend(gate.denied_reasons.iter().cloned());
++    }
++
++    let temperature_changed = (applied_temperature - current.temperature).abs() > 0.001;
++    let top_p_changed = (applied_top_p - current.top_p).abs() > 0.001;
++    let top_k_changed = applied_top_k != current.top_k;
++    let min_p_changed = (applied_min_p - current.min_p).abs() > 0.001;
++    let guard_strength_changed = gate.can_apply && applied_guard_strength != "Current";
++    let behavior_change = gate.can_apply && (
++        temperature_changed || top_p_changed || top_k_changed || min_p_changed || guard_strength_changed
++    );
++
++    Decode03DAppliedConfig {
++        behavior_change,
++        current_temperature: current.temperature,
++        current_top_p: current.top_p,
++        current_top_k: current.top_k,
++        current_min_p: current.min_p,
++        shadow_temperature: shadow.shadow_temperature,
++        shadow_top_p: shadow.shadow_top_p,
++        shadow_top_k: shadow.shadow_top_k,
++        shadow_min_p: shadow.shadow_min_p,
++        applied_temperature,
++        applied_top_p,
++        applied_top_k,
++        applied_min_p,
++        applied_guard_strength,
++        temperature_changed,
++        top_p_changed,
++        top_k_changed,
++        min_p_changed,
++        guard_strength_changed,
++        rollback_candidate_seen: shadow.rollback_candidate,
++        rollback_candidate_applied: false,
++        safe_stop_candidate_seen: shadow.safe_stop_candidate,
++        safe_stop_candidate_applied: false,
++        eos_bias_candidate_seen: shadow.eos_bias_candidate,
++        eos_bias_candidate_applied: false,
++        apply_reason,
++    }
++}
++
++pub fn gate_input_from_shadow(mode: DynamicSamplerMode, shadow_receipt: &Decode03CStepReceipt) -> Decode03DGateInput {
++    Decode03DGateInput {
++        mode,
++        behavior_change_allowed: env_bool("ASH_DECODE03D_BEHAVIOR_CHANGE_ALLOWED", false),
++        receipt_required: env_bool("ASH_DECODE03D_RECEIPT_REQUIRED", true),
++        sampler05_status_seen: shadow_receipt.sampler05_status_seen.clone(),
++        decode03a_status_seen: shadow_receipt.decode03a_status_seen.clone(),
++        decode03b_status_seen: shadow_receipt.decode03b_status_seen.clone(),
++        decode03c_status_seen: shadow_receipt.decode03b_status_seen.as_ref().map(|_| "DERIVED_IN_MEMORY_FROM_DECODE03C_RECEIPT".to_string()),
++        backend: shadow_receipt.backend.clone(),
++        backend_supports_min_p: backend_supports_min_p_from_env(),
++        backend_supports_top_p: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_TOP_P", true),
++        backend_supports_temperature: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_TEMPERATURE", true),
++        backend_supports_guard_strength: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_GUARD_STRENGTH", true),
++        numeric_risk: shadow_receipt.input.numeric_risk,
++        fallback_risk: shadow_receipt.input.fallback_risk,
++        shadow_only_seen: shadow_receipt.shadow_only && !shadow_receipt.behavior_change,
++    }
++}
++
++pub fn receipt_from_decode03c(mode: DynamicSamplerMode, shadow_receipt: &Decode03CStepReceipt) -> Decode03DStepReceipt {
++    let gate_input = gate_input_from_shadow(mode, shadow_receipt);
++    let gate = decide_decode03d_gate(&gate_input);
++    let current_config = current_config_from_shadow(&shadow_receipt.shadow_policy);
++    let applied_config = apply_decode03d_controlled_config(
++        &current_config,
++        &shadow_receipt.shadow_policy,
++        &gate,
++        gate_input.backend_supports_min_p,
++    );
++    let risk_flags = Decode03DRiskFlags {
++        applied_without_gate: applied_config.behavior_change && !gate.can_apply,
++        missing_shadow_policy: false,
++        min_p_unsupported_but_requested: !gate_input.backend_supports_min_p && (shadow_receipt.shadow_policy.shadow_min_p - current_config.min_p).abs() > 0.001,
++        min_p_unsupported_but_applied: !gate_input.backend_supports_min_p && (applied_config.applied_min_p - current_config.min_p).abs() > 0.001,
++        panic_candidate_seen: matches!(shadow_receipt.shadow_policy.guard_strength, ShadowGuardStrength::Panic)
++            || shadow_receipt.shadow_policy.rollback_candidate
++            || shadow_receipt.shadow_policy.safe_stop_candidate
++            || shadow_receipt.shadow_policy.eos_bias_candidate,
++        panic_candidate_executed: applied_config.rollback_candidate_applied
++            || applied_config.safe_stop_candidate_applied
++            || applied_config.eos_bias_candidate_applied,
++        numeric_risk_seen: shadow_receipt.input.numeric_risk,
++        fallback_risk_seen: shadow_receipt.input.fallback_risk,
++        behavior_change_without_controlled_mode: applied_config.behavior_change && !mode.can_change_behavior(),
++    };
++    Decode03DStepReceipt {
++        patch_id: DECODE03D_PATCH_ID.to_string(),
++        input_patch: DECODE03D_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: shadow_receipt.prompt_hash.clone(),
++        seed: shadow_receipt.seed,
++        step: shadow_receipt.step,
++        backend: shadow_receipt.backend.clone(),
++        sampler_ssot: DECODE03D_SAMPLER_SSOT.to_string(),
++        mode,
++        controlled_enable: mode.can_change_behavior(),
++        gate,
++        pci_raw: Some(shadow_receipt.input.pci_raw),
++        pci_smoothed: shadow_receipt.input.pci_smoothed,
++        bucket_stable: Some(format!("{:?}", shadow_receipt.input.bucket_stable)),
++        shadow_policy_seen: true,
++        shadow_policy: Some(shadow_receipt.shadow_policy.clone()),
++        current_config,
++        applied_config,
++        selected_id_before_apply: None,
++        selected_id_after_apply: None,
++        selected_piece_preview: None,
++        risk_flags,
++    }
++}
++
++pub fn append_decode03d_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = DynamicSamplerMode::from_env();
++    if matches!(mode, DynamicSamplerMode::Off) && !env_bool("ASH_DECODE03D_RECEIPT_WHEN_OFF", false) {
++        return;
++    }
++    let entropy_receipt: Decode03AEntropyStepReceipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let receipt = receipt_from_decode03c(mode, &shadow_receipt);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++pub fn summary_from_receipts(receipts: &[Decode03DStepReceipt]) -> Decode03DSummary {
++    let mut gate = Decode03DGateCounts::default();
++    let mut applied = Decode03DAppliedCounts::default();
++    let mut candidates = Decode03DShadowCandidateCounts::default();
++    let mut backend = Decode03DBackendSupportCounts::default();
++    let mut risk = Decode03DRiskCounts::default();
++    let mut any_controlled = false;
++    let mut mode_seen = "Off".to_string();
++
++    for receipt in receipts {
++        mode_seen = receipt.mode.as_str().to_string();
++        any_controlled |= receipt.controlled_enable;
++        if receipt.gate.can_apply { gate.can_apply_count += 1; } else { gate.denied_count += 1; }
++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
++        if !receipt.shadow_policy_seen || receipt.risk_flags.missing_shadow_policy { gate.missing_shadow_policy_count += 1; }
++        if receipt.applied_config.behavior_change { applied.behavior_change_count += 1; }
++        if receipt.applied_config.temperature_changed { applied.temperature_changed_count += 1; }
++        if receipt.applied_config.min_p_changed { applied.min_p_changed_count += 1; }
++        if receipt.applied_config.top_p_changed { applied.top_p_changed_count += 1; }
++        if receipt.applied_config.top_k_changed { applied.top_k_changed_count += 1; }
++        if receipt.applied_config.guard_strength_changed { applied.guard_strength_changed_count += 1; }
++        if receipt.applied_config.rollback_candidate_seen { candidates.rollback_candidate_seen_count += 1; }
++        if receipt.applied_config.rollback_candidate_applied { candidates.rollback_candidate_applied_count += 1; }
++        if receipt.applied_config.safe_stop_candidate_seen { candidates.safe_stop_candidate_seen_count += 1; }
++        if receipt.applied_config.safe_stop_candidate_applied { candidates.safe_stop_candidate_applied_count += 1; }
++        if receipt.applied_config.eos_bias_candidate_seen { candidates.eos_bias_candidate_seen_count += 1; }
++        if receipt.applied_config.eos_bias_candidate_applied { candidates.eos_bias_candidate_applied_count += 1; }
++        if receipt.risk_flags.min_p_unsupported_but_requested { backend.min_p_unsupported_count += 1; }
++        if receipt.risk_flags.min_p_unsupported_but_applied { backend.min_p_unsupported_but_applied_count += 1; }
++        if receipt.risk_flags.applied_without_gate { risk.applied_without_gate_count += 1; }
++        if receipt.risk_flags.panic_candidate_seen { risk.panic_candidate_seen_count += 1; }
++        if receipt.risk_flags.panic_candidate_executed { risk.panic_candidate_executed_count += 1; }
++        if receipt.risk_flags.numeric_risk_seen { risk.numeric_risk_seen_count += 1; }
++        if receipt.risk_flags.fallback_risk_seen { risk.fallback_risk_seen_count += 1; }
++        if receipt.risk_flags.behavior_change_without_controlled_mode { risk.behavior_change_without_controlled_mode_count += 1; }
++    }
++
++    let steps_observed = receipts.len();
++    let fail = backend.min_p_unsupported_but_applied_count > 0
++        || risk.applied_without_gate_count > 0
++        || risk.panic_candidate_executed_count > 0
++        || risk.behavior_change_without_controlled_mode_count > 0
++        || candidates.rollback_candidate_applied_count > 0
++        || candidates.safe_stop_candidate_applied_count > 0
++        || candidates.eos_bias_candidate_applied_count > 0;
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if fail {
++        "FAIL_CONTRACT_VIOLATION"
++    } else if gate.denied_count > 0 || risk.panic_candidate_seen_count > 0 || backend.min_p_unsupported_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }
++    .to_string();
++    let ready_for_salad02_online_detector = steps_observed > 0 && !fail;
++    Decode03DSummary {
++        patch_id: DECODE03D_PATCH_ID.to_string(),
++        input_patch: DECODE03D_INPUT_PATCH_ID.to_string(),
++        status,
++        controlled_enable: any_controlled,
++        mode: mode_seen,
++        default_enable: false,
++        requires_decode03c: env_bool("ASH_DECODE03D_REQUIRE_DECODE03C", true),
++        decode03c_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_DECODE03C_RECEIPT".to_string()) } else { None },
++        decode03b_status_seen: receipts.iter().find_map(|r| r.shadow_policy.as_ref()).map(|_| "OBSERVED_OR_DERIVED".to_string()),
++        decode03a_status_seen: None,
++        sampler05_status_seen: None,
++        steps_observed,
++        gate,
++        applied,
++        shadow_candidate_not_executed: candidates,
++        backend_support: backend,
++        risk,
++        ready_for_salad02_online_detector,
++        ready_for_decode03d_default_enable: false,
++        ready_for_salad03_rollback: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run ASH_DECODE03D_CONTROLLED_ENABLE=true with ASH_DECODE03D_MODE=controlled after DECODE-03C shadow evidence".to_string()
++        } else if ready_for_salad02_online_detector {
++            "controlled enable receipt sealed; rollback/safe-stop/EOS candidates remain unexecuted and should be handled by SALAD-02/03".to_string()
++        } else {
++            "DECODE-03D contract violation detected; dynamic default enable remains blocked".to_string()
++        },
++    }
++}
++
++pub fn write_decode03d_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() {
++                continue;
++            }
++            if let Ok(receipt) = serde_json::from_str::<Decode03DStepReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::decode03c_shadow_policy::{DynamicSamplerBucket, ShadowGuardStrength};
++
++    fn shadow_policy() -> Decode03CShadowPolicy {
++        Decode03CShadowPolicy {
++            shadow_only: true,
++            behavior_change: false,
++            bucket: DynamicSamplerBucket::UncertainPath,
++            current_temperature: 0.25,
++            current_top_p: 0.88,
++            current_top_k: 0,
++            current_min_p: 0.05,
++            shadow_temperature: 0.18,
++            shadow_top_p: 0.86,
++            shadow_top_k: 0,
++            shadow_min_p: 0.08,
++            temperature_delta: -0.07,
++            top_p_delta: -0.02,
++            min_p_delta: 0.03,
++            guard_strength: ShadowGuardStrength::Strict,
++            rollback_candidate: false,
++            safe_stop_candidate: false,
++            eos_bias_candidate: false,
++            no_repeat_ngram_shadow: None,
++            repeat_penalty_shadow: None,
++            policy_reason: vec!["bucket_uncertain_path".to_string()],
++        }
++    }
++
++    fn current() -> Decode03DCurrentConfig {
++        current_config_from_shadow(&shadow_policy())
++    }
++
++    fn gate(mode: DynamicSamplerMode, allow: bool) -> Decode03DGateDecision {
++        decide_decode03d_gate(&Decode03DGateInput {
++            mode,
++            behavior_change_allowed: allow,
++            receipt_required: true,
++            sampler05_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            decode03a_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            decode03b_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            decode03c_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            backend: "unit".to_string(),
++            backend_supports_min_p: true,
++            backend_supports_top_p: true,
++            backend_supports_temperature: true,
++            backend_supports_guard_strength: true,
++            numeric_risk: false,
++            fallback_risk: false,
++            shadow_only_seen: true,
++        })
++    }
++
++    #[test]
++    fn decode03d_gate_denies_mode_off() {
++        let decision = gate(DynamicSamplerMode::Off, true);
++        assert!(!decision.can_apply);
++    }
++
++    #[test]
++    fn decode03d_gate_denies_without_behavior_permission() {
++        let decision = gate(DynamicSamplerMode::Controlled, false);
++        assert!(!decision.can_apply);
++    }
++
++    #[test]
++    fn decode03d_applies_shadow_when_controlled() {
++        let decision = gate(DynamicSamplerMode::Controlled, true);
++        let applied = apply_decode03d_controlled_config(&current(), &shadow_policy(), &decision, true);
++        assert!(applied.behavior_change);
++        assert!(applied.min_p_changed);
++        assert!(applied.temperature_changed);
++    }
++
++    #[test]
++    fn decode03d_does_not_apply_minp_when_unsupported() {
++        let decision = gate(DynamicSamplerMode::Controlled, true);
++        let applied = apply_decode03d_controlled_config(&current(), &shadow_policy(), &decision, false);
++        assert_eq!(applied.applied_min_p, applied.current_min_p);
++        assert!(!applied.min_p_changed);
++    }
++
++    #[test]
++    fn decode03d_does_not_execute_rollback_candidate() {
++        let mut shadow = shadow_policy();
++        shadow.rollback_candidate = true;
++        shadow.safe_stop_candidate = true;
++        shadow.eos_bias_candidate = true;
++        let decision = gate(DynamicSamplerMode::Controlled, true);
++        let applied = apply_decode03d_controlled_config(&current(), &shadow, &decision, true);
++        assert!(applied.rollback_candidate_seen);
++        assert!(!applied.rollback_candidate_applied);
++        assert!(applied.safe_stop_candidate_seen);
++        assert!(!applied.safe_stop_candidate_applied);
++        assert!(applied.eos_bias_candidate_seen);
++        assert!(!applied.eos_bias_candidate_applied);
++    }
++}
+diff -ruN /mnt/data/decode03c_work/crates/model_core/src/lib.rs /mnt/data/decode03d_work/crates/model_core/src/lib.rs
+--- /mnt/data/decode03c_work/crates/model_core/src/lib.rs	2026-05-27 06:30:02.454812884 +0000
++++ /mnt/data/decode03d_work/crates/model_core/src/lib.rs	2026-05-27 06:38:19.420199353 +0000
+@@ -19,6 +19,7 @@
+ mod decode03a_entropy;
+ mod decode03b_pci;
+ mod decode03c_shadow_policy;
++mod decode03d_controlled_enable;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -109,6 +110,14 @@
+     classify_shadow_effect, append_decode03c_receipt_from_sampler03,
+     write_decode03c_summary_from_receipt_file,
+ };
++pub use decode03d_controlled_enable::{
++    DECODE03D_PATCH_ID, DECODE03D_INPUT_PATCH_ID, DynamicSamplerMode,
++    Decode03DGateInput, Decode03DGateDecision, Decode03DCurrentConfig,
++    Decode03DAppliedConfig, Decode03DStepReceipt, Decode03DRiskFlags, Decode03DSummary,
++    decide_decode03d_gate, apply_decode03d_controlled_config, receipt_from_decode03c,
++    append_decode03d_receipt_from_sampler03, write_decode03d_summary_from_receipt_file,
++};
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN /mnt/data/decode03c_work/crates/model_core/src/sampler_parity.rs /mnt/data/decode03d_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/decode03c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:30:03.641828256 +0000
++++ /mnt/data/decode03d_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:38:19.420750776 +0000
+@@ -452,5 +452,6 @@
+     crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
+     crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
+     crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
++    crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d.patch /mnt/data/decode03d_work/workspace/decode03d.patch
+--- /mnt/data/decode03c_work/workspace/decode03d.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d.patch	2026-05-27 06:39:12.496038313 +0000
+@@ -0,0 +1,801 @@
++diff -ruN /mnt/data/decode03c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md /mnt/data/decode03d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md
++--- /mnt/data/decode03c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode03d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md	2026-05-27 06:39:12.234996137 +0000
++@@ -0,0 +1,23 @@
+++# 16AI-QW-38G-R6A-DECODE-03D Acceptance
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN
+++
+++## Accepted static surface
+++- `DynamicSamplerMode` default-off gate added.
+++- Controlled / strict-controlled gate decision added.
+++- Applied config overlay data structure added.
+++- Min-p unsupported backend guard added.
+++- Rollback / safe-stop / EOS candidate non-execution contract added.
+++- JSONL receipt and summary writer added.
+++- Sampler parity append chain now invokes DECODE-03D receipt hook after DECODE-03C.
+++
+++## Runtime acceptance pending
+++- `cargo check -p model_core`
+++- `cargo test -p model_core decode03d_*`
+++- Controlled run with DECODE-03A/03B/03C receipts enabled
+++- Confirmation that `behavior_change` only occurs under controlled gate
+++- Confirmation that rollback/safe-stop/EOS candidates remain unexecuted
+++
+++## Next patch candidate
+++16AI-QW-38G-R6A-SALAD-02 — Word Salad Online Detector Seal
++diff -ruN /mnt/data/decode03c_work/crates/model_core/src/decode03d_controlled_enable.rs /mnt/data/decode03d_work/crates/model_core/src/decode03d_controlled_enable.rs
++--- /mnt/data/decode03c_work/crates/model_core/src/decode03d_controlled_enable.rs	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode03d_work/crates/model_core/src/decode03d_controlled_enable.rs	2026-05-27 06:38:18.274853378 +0000
++@@ -0,0 +1,734 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AEntropyStepReceipt, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{
+++    receipt_from_decode03b, Decode03CMode, Decode03CShadowPolicy, Decode03CStepReceipt,
+++    ShadowGuardStrength,
+++};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const DECODE03D_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03D";
+++pub const DECODE03D_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03C";
+++pub const DECODE03D_SAMPLER_SSOT: &str = "model_core::decode03c_shadow_policy";
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum DynamicSamplerMode {
+++    Off,
+++    ShadowOnly,
+++    Controlled,
+++    StrictControlled,
+++}
+++
+++impl DynamicSamplerMode {
+++    pub fn from_env() -> Self {
+++        let enabled = env_bool("ASH_DECODE03D_CONTROLLED_ENABLE", false)
+++            || env_bool("ASH_DECODE03D_ENABLE", false);
+++        let raw = env::var("ASH_DECODE03D_MODE")
+++            .unwrap_or_else(|_| if enabled { "controlled".to_string() } else { "off".to_string() })
+++            .trim()
+++            .to_ascii_lowercase();
+++        match raw.as_str() {
+++            "shadow" | "shadow_only" | "shadow-only" | "observe" | "receipt" => Self::ShadowOnly,
+++            "controlled" | "control" | "on" | "true" | "1" => if enabled { Self::Controlled } else { Self::Off },
+++            "strict" | "strict_controlled" | "strict-controlled" => if enabled { Self::StrictControlled } else { Self::Off },
+++            _ => Self::Off,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ShadowOnly => "ShadowOnly",
+++            Self::Controlled => "Controlled",
+++            Self::StrictControlled => "StrictControlled",
+++        }
+++    }
+++
+++    pub fn can_change_behavior(self) -> bool {
+++        matches!(self, Self::Controlled | Self::StrictControlled)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DGateInput {
+++    pub mode: DynamicSamplerMode,
+++    pub behavior_change_allowed: bool,
+++    pub receipt_required: bool,
+++    pub sampler05_status_seen: Option<String>,
+++    pub decode03a_status_seen: Option<String>,
+++    pub decode03b_status_seen: Option<String>,
+++    pub decode03c_status_seen: Option<String>,
+++    pub backend: String,
+++    pub backend_supports_min_p: bool,
+++    pub backend_supports_top_p: bool,
+++    pub backend_supports_temperature: bool,
+++    pub backend_supports_guard_strength: bool,
+++    pub numeric_risk: bool,
+++    pub fallback_risk: bool,
+++    pub shadow_only_seen: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DGateDecision {
+++    pub can_apply: bool,
+++    pub mode: DynamicSamplerMode,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub requires_receipt: bool,
+++    pub strict_fail: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DCurrentConfig {
+++    pub temperature: f32,
+++    pub top_p: f32,
+++    pub top_k: usize,
+++    pub min_p: f32,
+++    pub repeat_penalty: Option<f32>,
+++    pub repeat_last_n: Option<usize>,
+++    pub static_prior_enabled: bool,
+++    pub transition_guard_enabled: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DAppliedConfig {
+++    pub behavior_change: bool,
+++    pub current_temperature: f32,
+++    pub current_top_p: f32,
+++    pub current_top_k: usize,
+++    pub current_min_p: f32,
+++    pub shadow_temperature: f32,
+++    pub shadow_top_p: f32,
+++    pub shadow_top_k: usize,
+++    pub shadow_min_p: f32,
+++    pub applied_temperature: f32,
+++    pub applied_top_p: f32,
+++    pub applied_top_k: usize,
+++    pub applied_min_p: f32,
+++    pub applied_guard_strength: String,
+++    pub temperature_changed: bool,
+++    pub top_p_changed: bool,
+++    pub top_k_changed: bool,
+++    pub min_p_changed: bool,
+++    pub guard_strength_changed: bool,
+++    pub rollback_candidate_seen: bool,
+++    pub rollback_candidate_applied: bool,
+++    pub safe_stop_candidate_seen: bool,
+++    pub safe_stop_candidate_applied: bool,
+++    pub eos_bias_candidate_seen: bool,
+++    pub eos_bias_candidate_applied: bool,
+++    pub apply_reason: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DRiskFlags {
+++    pub applied_without_gate: bool,
+++    pub missing_shadow_policy: bool,
+++    pub min_p_unsupported_but_requested: bool,
+++    pub min_p_unsupported_but_applied: bool,
+++    pub panic_candidate_seen: bool,
+++    pub panic_candidate_executed: bool,
+++    pub numeric_risk_seen: bool,
+++    pub fallback_risk_seen: bool,
+++    pub behavior_change_without_controlled_mode: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DStepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: DynamicSamplerMode,
+++    pub controlled_enable: bool,
+++    pub gate: Decode03DGateDecision,
+++    pub pci_raw: Option<f32>,
+++    pub pci_smoothed: Option<f32>,
+++    pub bucket_stable: Option<String>,
+++    pub shadow_policy_seen: bool,
+++    pub shadow_policy: Option<Decode03CShadowPolicy>,
+++    pub current_config: Decode03DCurrentConfig,
+++    pub applied_config: Decode03DAppliedConfig,
+++    pub selected_id_before_apply: Option<u32>,
+++    pub selected_id_after_apply: Option<u32>,
+++    pub selected_piece_preview: Option<String>,
+++    pub risk_flags: Decode03DRiskFlags,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03DGateCounts {
+++    pub can_apply_count: usize,
+++    pub denied_count: usize,
+++    pub strict_fail_count: usize,
+++    pub missing_shadow_policy_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03DAppliedCounts {
+++    pub behavior_change_count: usize,
+++    pub temperature_changed_count: usize,
+++    pub min_p_changed_count: usize,
+++    pub top_p_changed_count: usize,
+++    pub top_k_changed_count: usize,
+++    pub guard_strength_changed_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03DShadowCandidateCounts {
+++    pub rollback_candidate_seen_count: usize,
+++    pub rollback_candidate_applied_count: usize,
+++    pub safe_stop_candidate_seen_count: usize,
+++    pub safe_stop_candidate_applied_count: usize,
+++    pub eos_bias_candidate_seen_count: usize,
+++    pub eos_bias_candidate_applied_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03DBackendSupportCounts {
+++    pub min_p_unsupported_count: usize,
+++    pub min_p_unsupported_but_applied_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03DRiskCounts {
+++    pub applied_without_gate_count: usize,
+++    pub panic_candidate_seen_count: usize,
+++    pub panic_candidate_executed_count: usize,
+++    pub numeric_risk_seen_count: usize,
+++    pub fallback_risk_seen_count: usize,
+++    pub behavior_change_without_controlled_mode_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03DSummary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub controlled_enable: bool,
+++    pub mode: String,
+++    pub default_enable: bool,
+++    pub requires_decode03c: bool,
+++    pub decode03c_status_seen: Option<String>,
+++    pub decode03b_status_seen: Option<String>,
+++    pub decode03a_status_seen: Option<String>,
+++    pub sampler05_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub gate: Decode03DGateCounts,
+++    pub applied: Decode03DAppliedCounts,
+++    pub shadow_candidate_not_executed: Decode03DShadowCandidateCounts,
+++    pub backend_support: Decode03DBackendSupportCounts,
+++    pub risk: Decode03DRiskCounts,
+++    pub ready_for_salad02_online_detector: bool,
+++    pub ready_for_decode03d_default_enable: bool,
+++    pub ready_for_salad03_rollback: bool,
+++    pub reason: String,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_f32(name: &str, default: f32) -> f32 {
+++    env::var(name)
+++        .ok()
+++        .and_then(|v| v.trim().parse::<f32>().ok())
+++        .filter(|v| v.is_finite())
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name)
+++        .ok()
+++        .and_then(|v| v.trim().parse::<usize>().ok())
+++        .unwrap_or(default)
+++}
+++
+++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
+++    if value.is_finite() { value.clamp(lo, hi) } else { lo }
+++}
+++
+++fn run_id_from_env() -> String {
+++    env::var("ASH_DECODE03D_RUN_ID")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "decode03d_sampler03_bridge".to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_DECODE03D_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03d_applied_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_DECODE03D_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03d_summary.json"))
+++}
+++
+++pub fn backend_supports_min_p_from_env() -> bool {
+++    env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_MIN_P", true)
+++}
+++
+++pub fn decide_decode03d_gate(input: &Decode03DGateInput) -> Decode03DGateDecision {
+++    let mut denied_reasons = Vec::new();
+++    let mut warning_reasons = Vec::new();
+++    let mut strict_fail = false;
+++
+++    if matches!(input.mode, DynamicSamplerMode::Off) {
+++        denied_reasons.push("mode_off".to_string());
+++    }
+++    if !input.mode.can_change_behavior() {
+++        denied_reasons.push("mode_not_controlled".to_string());
+++    }
+++    if !input.behavior_change_allowed {
+++        denied_reasons.push("behavior_change_not_allowed".to_string());
+++    }
+++    if matches!(input.sampler05_status_seen.as_deref(), Some("FAIL") | Some("FAIL_BEHAVIOR_CHANGE") | Some("FAIL_THRESHOLD_KIND")) {
+++        denied_reasons.push("sampler05_failed".to_string());
+++    }
+++    if input.decode03c_status_seen.is_none() {
+++        denied_reasons.push("missing_decode03c_status".to_string());
+++    }
+++    if !input.shadow_only_seen {
+++        denied_reasons.push("decode03c_shadow_contract_missing".to_string());
+++    }
+++    if !input.backend_supports_temperature {
+++        denied_reasons.push("backend_temperature_unsupported".to_string());
+++    }
+++    if !input.backend_supports_top_p {
+++        denied_reasons.push("backend_top_p_unsupported".to_string());
+++    }
+++    if !input.backend_supports_min_p {
+++        warning_reasons.push("backend_min_p_unsupported".to_string());
+++    }
+++    if !input.backend_supports_guard_strength {
+++        warning_reasons.push("backend_guard_strength_unsupported".to_string());
+++    }
+++
+++    if matches!(input.mode, DynamicSamplerMode::StrictControlled) && input.numeric_risk {
+++        strict_fail = true;
+++        denied_reasons.push("numeric_risk_in_strict_mode".to_string());
+++    }
+++    if matches!(input.mode, DynamicSamplerMode::StrictControlled) && input.fallback_risk {
+++        strict_fail = true;
+++        denied_reasons.push("fallback_risk_in_strict_mode".to_string());
+++    }
+++
+++    Decode03DGateDecision {
+++        can_apply: denied_reasons.is_empty() && input.mode.can_change_behavior(),
+++        mode: input.mode,
+++        denied_reasons,
+++        warning_reasons,
+++        requires_receipt: input.receipt_required,
+++        strict_fail,
+++    }
+++}
+++
+++fn guard_strength_name(value: ShadowGuardStrength) -> String {
+++    match value {
+++        ShadowGuardStrength::Relaxed => "Relaxed",
+++        ShadowGuardStrength::Normal => "Normal",
+++        ShadowGuardStrength::Strict => "Strict",
+++        ShadowGuardStrength::Panic => "Panic",
+++    }
+++    .to_string()
+++}
+++
+++pub fn current_config_from_shadow(shadow: &Decode03CShadowPolicy) -> Decode03DCurrentConfig {
+++    Decode03DCurrentConfig {
+++        temperature: shadow.current_temperature,
+++        top_p: shadow.current_top_p,
+++        top_k: shadow.current_top_k,
+++        min_p: shadow.current_min_p,
+++        repeat_penalty: None,
+++        repeat_last_n: None,
+++        static_prior_enabled: env_bool("ASH_DECODE03D_STATIC_PRIOR_ENABLED", true),
+++        transition_guard_enabled: env_bool("ASH_DECODE03D_TRANSITION_GUARD_ENABLED", true),
+++    }
+++}
+++
+++pub fn apply_decode03d_controlled_config(
+++    current: &Decode03DCurrentConfig,
+++    shadow: &Decode03CShadowPolicy,
+++    gate: &Decode03DGateDecision,
+++    backend_supports_min_p: bool,
+++) -> Decode03DAppliedConfig {
+++    let mut apply_reason = Vec::new();
+++    let mut applied_temperature = current.temperature;
+++    let mut applied_top_p = current.top_p;
+++    let mut applied_top_k = current.top_k;
+++    let mut applied_min_p = current.min_p;
+++    let mut applied_guard_strength = "Current".to_string();
+++
+++    if gate.can_apply {
+++        apply_reason.push("controlled_enable".to_string());
+++        apply_reason.push("shadow_policy_applied".to_string());
+++        applied_temperature = clamp_f32(shadow.shadow_temperature, 0.03, 1.20);
+++        applied_top_p = clamp_f32(shadow.shadow_top_p, 0.50, 1.00);
+++        applied_top_k = shadow.shadow_top_k.min(env_usize("ASH_DECODE03D_TOP_K_MAX", 1024));
+++        if backend_supports_min_p {
+++            applied_min_p = clamp_f32(shadow.shadow_min_p, 0.00, 0.25);
+++        } else {
+++            apply_reason.push("backend_min_p_unsupported_min_p_not_applied".to_string());
+++        }
+++        applied_guard_strength = guard_strength_name(shadow.guard_strength);
+++        apply_reason.extend(shadow.policy_reason.iter().cloned());
+++    } else {
+++        apply_reason.push("gate_denied".to_string());
+++        apply_reason.extend(gate.denied_reasons.iter().cloned());
+++    }
+++
+++    let temperature_changed = (applied_temperature - current.temperature).abs() > 0.001;
+++    let top_p_changed = (applied_top_p - current.top_p).abs() > 0.001;
+++    let top_k_changed = applied_top_k != current.top_k;
+++    let min_p_changed = (applied_min_p - current.min_p).abs() > 0.001;
+++    let guard_strength_changed = gate.can_apply && applied_guard_strength != "Current";
+++    let behavior_change = gate.can_apply && (
+++        temperature_changed || top_p_changed || top_k_changed || min_p_changed || guard_strength_changed
+++    );
+++
+++    Decode03DAppliedConfig {
+++        behavior_change,
+++        current_temperature: current.temperature,
+++        current_top_p: current.top_p,
+++        current_top_k: current.top_k,
+++        current_min_p: current.min_p,
+++        shadow_temperature: shadow.shadow_temperature,
+++        shadow_top_p: shadow.shadow_top_p,
+++        shadow_top_k: shadow.shadow_top_k,
+++        shadow_min_p: shadow.shadow_min_p,
+++        applied_temperature,
+++        applied_top_p,
+++        applied_top_k,
+++        applied_min_p,
+++        applied_guard_strength,
+++        temperature_changed,
+++        top_p_changed,
+++        top_k_changed,
+++        min_p_changed,
+++        guard_strength_changed,
+++        rollback_candidate_seen: shadow.rollback_candidate,
+++        rollback_candidate_applied: false,
+++        safe_stop_candidate_seen: shadow.safe_stop_candidate,
+++        safe_stop_candidate_applied: false,
+++        eos_bias_candidate_seen: shadow.eos_bias_candidate,
+++        eos_bias_candidate_applied: false,
+++        apply_reason,
+++    }
+++}
+++
+++pub fn gate_input_from_shadow(mode: DynamicSamplerMode, shadow_receipt: &Decode03CStepReceipt) -> Decode03DGateInput {
+++    Decode03DGateInput {
+++        mode,
+++        behavior_change_allowed: env_bool("ASH_DECODE03D_BEHAVIOR_CHANGE_ALLOWED", false),
+++        receipt_required: env_bool("ASH_DECODE03D_RECEIPT_REQUIRED", true),
+++        sampler05_status_seen: shadow_receipt.sampler05_status_seen.clone(),
+++        decode03a_status_seen: shadow_receipt.decode03a_status_seen.clone(),
+++        decode03b_status_seen: shadow_receipt.decode03b_status_seen.clone(),
+++        decode03c_status_seen: shadow_receipt.decode03b_status_seen.as_ref().map(|_| "DERIVED_IN_MEMORY_FROM_DECODE03C_RECEIPT".to_string()),
+++        backend: shadow_receipt.backend.clone(),
+++        backend_supports_min_p: backend_supports_min_p_from_env(),
+++        backend_supports_top_p: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_TOP_P", true),
+++        backend_supports_temperature: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_TEMPERATURE", true),
+++        backend_supports_guard_strength: env_bool("ASH_DECODE03D_BACKEND_SUPPORTS_GUARD_STRENGTH", true),
+++        numeric_risk: shadow_receipt.input.numeric_risk,
+++        fallback_risk: shadow_receipt.input.fallback_risk,
+++        shadow_only_seen: shadow_receipt.shadow_only && !shadow_receipt.behavior_change,
+++    }
+++}
+++
+++pub fn receipt_from_decode03c(mode: DynamicSamplerMode, shadow_receipt: &Decode03CStepReceipt) -> Decode03DStepReceipt {
+++    let gate_input = gate_input_from_shadow(mode, shadow_receipt);
+++    let gate = decide_decode03d_gate(&gate_input);
+++    let current_config = current_config_from_shadow(&shadow_receipt.shadow_policy);
+++    let applied_config = apply_decode03d_controlled_config(
+++        &current_config,
+++        &shadow_receipt.shadow_policy,
+++        &gate,
+++        gate_input.backend_supports_min_p,
+++    );
+++    let risk_flags = Decode03DRiskFlags {
+++        applied_without_gate: applied_config.behavior_change && !gate.can_apply,
+++        missing_shadow_policy: false,
+++        min_p_unsupported_but_requested: !gate_input.backend_supports_min_p && (shadow_receipt.shadow_policy.shadow_min_p - current_config.min_p).abs() > 0.001,
+++        min_p_unsupported_but_applied: !gate_input.backend_supports_min_p && (applied_config.applied_min_p - current_config.min_p).abs() > 0.001,
+++        panic_candidate_seen: matches!(shadow_receipt.shadow_policy.guard_strength, ShadowGuardStrength::Panic)
+++            || shadow_receipt.shadow_policy.rollback_candidate
+++            || shadow_receipt.shadow_policy.safe_stop_candidate
+++            || shadow_receipt.shadow_policy.eos_bias_candidate,
+++        panic_candidate_executed: applied_config.rollback_candidate_applied
+++            || applied_config.safe_stop_candidate_applied
+++            || applied_config.eos_bias_candidate_applied,
+++        numeric_risk_seen: shadow_receipt.input.numeric_risk,
+++        fallback_risk_seen: shadow_receipt.input.fallback_risk,
+++        behavior_change_without_controlled_mode: applied_config.behavior_change && !mode.can_change_behavior(),
+++    };
+++    Decode03DStepReceipt {
+++        patch_id: DECODE03D_PATCH_ID.to_string(),
+++        input_patch: DECODE03D_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_hash: shadow_receipt.prompt_hash.clone(),
+++        seed: shadow_receipt.seed,
+++        step: shadow_receipt.step,
+++        backend: shadow_receipt.backend.clone(),
+++        sampler_ssot: DECODE03D_SAMPLER_SSOT.to_string(),
+++        mode,
+++        controlled_enable: mode.can_change_behavior(),
+++        gate,
+++        pci_raw: Some(shadow_receipt.input.pci_raw),
+++        pci_smoothed: shadow_receipt.input.pci_smoothed,
+++        bucket_stable: Some(format!("{:?}", shadow_receipt.input.bucket_stable)),
+++        shadow_policy_seen: true,
+++        shadow_policy: Some(shadow_receipt.shadow_policy.clone()),
+++        current_config,
+++        applied_config,
+++        selected_id_before_apply: None,
+++        selected_id_after_apply: None,
+++        selected_piece_preview: None,
+++        risk_flags,
+++    }
+++}
+++
+++pub fn append_decode03d_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = DynamicSamplerMode::from_env();
+++    if matches!(mode, DynamicSamplerMode::Off) && !env_bool("ASH_DECODE03D_RECEIPT_WHEN_OFF", false) {
+++        return;
+++    }
+++    let entropy_receipt: Decode03AEntropyStepReceipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let receipt = receipt_from_decode03c(mode, &shadow_receipt);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Decode03DStepReceipt]) -> Decode03DSummary {
+++    let mut gate = Decode03DGateCounts::default();
+++    let mut applied = Decode03DAppliedCounts::default();
+++    let mut candidates = Decode03DShadowCandidateCounts::default();
+++    let mut backend = Decode03DBackendSupportCounts::default();
+++    let mut risk = Decode03DRiskCounts::default();
+++    let mut any_controlled = false;
+++    let mut mode_seen = "Off".to_string();
+++
+++    for receipt in receipts {
+++        mode_seen = receipt.mode.as_str().to_string();
+++        any_controlled |= receipt.controlled_enable;
+++        if receipt.gate.can_apply { gate.can_apply_count += 1; } else { gate.denied_count += 1; }
+++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
+++        if !receipt.shadow_policy_seen || receipt.risk_flags.missing_shadow_policy { gate.missing_shadow_policy_count += 1; }
+++        if receipt.applied_config.behavior_change { applied.behavior_change_count += 1; }
+++        if receipt.applied_config.temperature_changed { applied.temperature_changed_count += 1; }
+++        if receipt.applied_config.min_p_changed { applied.min_p_changed_count += 1; }
+++        if receipt.applied_config.top_p_changed { applied.top_p_changed_count += 1; }
+++        if receipt.applied_config.top_k_changed { applied.top_k_changed_count += 1; }
+++        if receipt.applied_config.guard_strength_changed { applied.guard_strength_changed_count += 1; }
+++        if receipt.applied_config.rollback_candidate_seen { candidates.rollback_candidate_seen_count += 1; }
+++        if receipt.applied_config.rollback_candidate_applied { candidates.rollback_candidate_applied_count += 1; }
+++        if receipt.applied_config.safe_stop_candidate_seen { candidates.safe_stop_candidate_seen_count += 1; }
+++        if receipt.applied_config.safe_stop_candidate_applied { candidates.safe_stop_candidate_applied_count += 1; }
+++        if receipt.applied_config.eos_bias_candidate_seen { candidates.eos_bias_candidate_seen_count += 1; }
+++        if receipt.applied_config.eos_bias_candidate_applied { candidates.eos_bias_candidate_applied_count += 1; }
+++        if receipt.risk_flags.min_p_unsupported_but_requested { backend.min_p_unsupported_count += 1; }
+++        if receipt.risk_flags.min_p_unsupported_but_applied { backend.min_p_unsupported_but_applied_count += 1; }
+++        if receipt.risk_flags.applied_without_gate { risk.applied_without_gate_count += 1; }
+++        if receipt.risk_flags.panic_candidate_seen { risk.panic_candidate_seen_count += 1; }
+++        if receipt.risk_flags.panic_candidate_executed { risk.panic_candidate_executed_count += 1; }
+++        if receipt.risk_flags.numeric_risk_seen { risk.numeric_risk_seen_count += 1; }
+++        if receipt.risk_flags.fallback_risk_seen { risk.fallback_risk_seen_count += 1; }
+++        if receipt.risk_flags.behavior_change_without_controlled_mode { risk.behavior_change_without_controlled_mode_count += 1; }
+++    }
+++
+++    let steps_observed = receipts.len();
+++    let fail = backend.min_p_unsupported_but_applied_count > 0
+++        || risk.applied_without_gate_count > 0
+++        || risk.panic_candidate_executed_count > 0
+++        || risk.behavior_change_without_controlled_mode_count > 0
+++        || candidates.rollback_candidate_applied_count > 0
+++        || candidates.safe_stop_candidate_applied_count > 0
+++        || candidates.eos_bias_candidate_applied_count > 0;
+++    let status = if steps_observed == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if fail {
+++        "FAIL_CONTRACT_VIOLATION"
+++    } else if gate.denied_count > 0 || risk.panic_candidate_seen_count > 0 || backend.min_p_unsupported_count > 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }
+++    .to_string();
+++    let ready_for_salad02_online_detector = steps_observed > 0 && !fail;
+++    Decode03DSummary {
+++        patch_id: DECODE03D_PATCH_ID.to_string(),
+++        input_patch: DECODE03D_INPUT_PATCH_ID.to_string(),
+++        status,
+++        controlled_enable: any_controlled,
+++        mode: mode_seen,
+++        default_enable: false,
+++        requires_decode03c: env_bool("ASH_DECODE03D_REQUIRE_DECODE03C", true),
+++        decode03c_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_DECODE03C_RECEIPT".to_string()) } else { None },
+++        decode03b_status_seen: receipts.iter().find_map(|r| r.shadow_policy.as_ref()).map(|_| "OBSERVED_OR_DERIVED".to_string()),
+++        decode03a_status_seen: None,
+++        sampler05_status_seen: None,
+++        steps_observed,
+++        gate,
+++        applied,
+++        shadow_candidate_not_executed: candidates,
+++        backend_support: backend,
+++        risk,
+++        ready_for_salad02_online_detector,
+++        ready_for_decode03d_default_enable: false,
+++        ready_for_salad03_rollback: false,
+++        reason: if steps_observed == 0 {
+++            "static bake only; run ASH_DECODE03D_CONTROLLED_ENABLE=true with ASH_DECODE03D_MODE=controlled after DECODE-03C shadow evidence".to_string()
+++        } else if ready_for_salad02_online_detector {
+++            "controlled enable receipt sealed; rollback/safe-stop/EOS candidates remain unexecuted and should be handled by SALAD-02/03".to_string()
+++        } else {
+++            "DECODE-03D contract violation detected; dynamic default enable remains blocked".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_decode03d_summary_from_receipt_file() {
+++    let path = receipt_path();
+++    let mut receipts = Vec::new();
+++    if let Ok(text) = fs::read_to_string(&path) {
+++        for line in text.lines() {
+++            if line.trim().is_empty() {
+++                continue;
+++            }
+++            if let Ok(receipt) = serde_json::from_str::<Decode03DStepReceipt>(line) {
+++                receipts.push(receipt);
+++            }
+++        }
+++    }
+++    let summary = summary_from_receipts(&receipts);
+++    let out = summary_path();
+++    if let Some(parent) = out.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(out, format!("{}\n", text));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++    use crate::decode03c_shadow_policy::{DynamicSamplerBucket, ShadowGuardStrength};
+++
+++    fn shadow_policy() -> Decode03CShadowPolicy {
+++        Decode03CShadowPolicy {
+++            shadow_only: true,
+++            behavior_change: false,
+++            bucket: DynamicSamplerBucket::UncertainPath,
+++            current_temperature: 0.25,
+++            current_top_p: 0.88,
+++            current_top_k: 0,
+++            current_min_p: 0.05,
+++            shadow_temperature: 0.18,
+++            shadow_top_p: 0.86,
+++            shadow_top_k: 0,
+++            shadow_min_p: 0.08,
+++            temperature_delta: -0.07,
+++            top_p_delta: -0.02,
+++            min_p_delta: 0.03,
+++            guard_strength: ShadowGuardStrength::Strict,
+++            rollback_candidate: false,
+++            safe_stop_candidate: false,
+++            eos_bias_candidate: false,
+++            no_repeat_ngram_shadow: None,
+++            repeat_penalty_shadow: None,
+++            policy_reason: vec!["bucket_uncertain_path".to_string()],
+++        }
+++    }
+++
+++    fn current() -> Decode03DCurrentConfig {
+++        current_config_from_shadow(&shadow_policy())
+++    }
+++
+++    fn gate(mode: DynamicSamplerMode, allow: bool) -> Decode03DGateDecision {
+++        decide_decode03d_gate(&Decode03DGateInput {
+++            mode,
+++            behavior_change_allowed: allow,
+++            receipt_required: true,
+++            sampler05_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            decode03a_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            decode03b_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            decode03c_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            backend: "unit".to_string(),
+++            backend_supports_min_p: true,
+++            backend_supports_top_p: true,
+++            backend_supports_temperature: true,
+++            backend_supports_guard_strength: true,
+++            numeric_risk: false,
+++            fallback_risk: false,
+++            shadow_only_seen: true,
+++        })
+++    }
+++
+++    #[test]
+++    fn decode03d_gate_denies_mode_off() {
+++        let decision = gate(DynamicSamplerMode::Off, true);
+++        assert!(!decision.can_apply);
+++    }
+++
+++    #[test]
+++    fn decode03d_gate_denies_without_behavior_permission() {
+++        let decision = gate(DynamicSamplerMode::Controlled, false);
+++        assert!(!decision.can_apply);
+++    }
+++
+++    #[test]
+++    fn decode03d_applies_shadow_when_controlled() {
+++        let decision = gate(DynamicSamplerMode::Controlled, true);
+++        let applied = apply_decode03d_controlled_config(&current(), &shadow_policy(), &decision, true);
+++        assert!(applied.behavior_change);
+++        assert!(applied.min_p_changed);
+++        assert!(applied.temperature_changed);
+++    }
+++
+++    #[test]
+++    fn decode03d_does_not_apply_minp_when_unsupported() {
+++        let decision = gate(DynamicSamplerMode::Controlled, true);
+++        let applied = apply_decode03d_controlled_config(&current(), &shadow_policy(), &decision, false);
+++        assert_eq!(applied.applied_min_p, applied.current_min_p);
+++        assert!(!applied.min_p_changed);
+++    }
+++
+++    #[test]
+++    fn decode03d_does_not_execute_rollback_candidate() {
+++        let mut shadow = shadow_policy();
+++        shadow.rollback_candidate = true;
+++        shadow.safe_stop_candidate = true;
+++        shadow.eos_bias_candidate = true;
+++        let decision = gate(DynamicSamplerMode::Controlled, true);
+++        let applied = apply_decode03d_controlled_config(&current(), &shadow, &decision, true);
+++        assert!(applied.rollback_candidate_seen);
+++        assert!(!applied.rollback_candidate_applied);
+++        assert!(applied.safe_stop_candidate_seen);
+++        assert!(!applied.safe_stop_candidate_applied);
+++        assert!(applied.eos_bias_candidate_seen);
+++        assert!(!applied.eos_bias_candidate_applied);
+++    }
+++}
++diff -ruN /mnt/data/decode03c_work/crates/model_core/src/lib.rs /mnt/data/decode03d_work/crates/model_core/src/lib.rs
++--- /mnt/data/decode03c_work/crates/model_core/src/lib.rs	2026-05-27 06:30:02.454812884 +0000
+++++ /mnt/data/decode03d_work/crates/model_core/src/lib.rs	2026-05-27 06:38:19.420199353 +0000
++@@ -19,6 +19,7 @@
++ mod decode03a_entropy;
++ mod decode03b_pci;
++ mod decode03c_shadow_policy;
+++mod decode03d_controlled_enable;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -109,6 +110,14 @@
++     classify_shadow_effect, append_decode03c_receipt_from_sampler03,
++     write_decode03c_summary_from_receipt_file,
++ };
+++pub use decode03d_controlled_enable::{
+++    DECODE03D_PATCH_ID, DECODE03D_INPUT_PATCH_ID, DynamicSamplerMode,
+++    Decode03DGateInput, Decode03DGateDecision, Decode03DCurrentConfig,
+++    Decode03DAppliedConfig, Decode03DStepReceipt, Decode03DRiskFlags, Decode03DSummary,
+++    decide_decode03d_gate, apply_decode03d_controlled_config, receipt_from_decode03c,
+++    append_decode03d_receipt_from_sampler03, write_decode03d_summary_from_receipt_file,
+++};
+++
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN /mnt/data/decode03c_work/crates/model_core/src/sampler_parity.rs /mnt/data/decode03d_work/crates/model_core/src/sampler_parity.rs
++--- /mnt/data/decode03c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:30:03.641828256 +0000
+++++ /mnt/data/decode03d_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:38:19.420750776 +0000
++@@ -452,5 +452,6 @@
++     crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
++     crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
++     crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
+++    crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d_controlled_enable_schema.json /mnt/data/decode03d_work/workspace/decode03d_controlled_enable_schema.json
+--- /mnt/data/decode03c_work/workspace/decode03d_controlled_enable_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d_controlled_enable_schema.json	2026-05-27 06:39:10.844613922 +0000
+@@ -0,0 +1,43 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
++  "title": "Dynamic Temperature / Min-p Controlled Enable Seal receipt schema",
++  "type": "object",
++  "required": [
++    "patch_id", "schema_version", "mode", "controlled_enable", "gate",
++    "shadow_policy_seen", "current_config", "applied_config", "risk_flags"
++  ],
++  "properties": {
++    "patch_id": { "const": "16AI-QW-38G-R6A-DECODE-03D" },
++    "input_patch": { "const": "16AI-QW-38G-R6A-DECODE-03C" },
++    "schema_version": { "type": "integer", "minimum": 1 },
++    "mode": { "enum": ["Off", "ShadowOnly", "Controlled", "StrictControlled"] },
++    "controlled_enable": { "type": "boolean" },
++    "gate": {
++      "type": "object",
++      "required": ["can_apply", "denied_reasons", "warning_reasons", "strict_fail"],
++      "properties": {
++        "can_apply": { "type": "boolean" },
++        "denied_reasons": { "type": "array", "items": { "type": "string" } },
++        "warning_reasons": { "type": "array", "items": { "type": "string" } },
++        "strict_fail": { "type": "boolean" }
++      }
++    },
++    "current_config": { "type": "object" },
++    "applied_config": {
++      "type": "object",
++      "required": [
++        "behavior_change", "applied_temperature", "applied_top_p", "applied_top_k", "applied_min_p",
++        "rollback_candidate_applied", "safe_stop_candidate_applied", "eos_bias_candidate_applied"
++      ],
++      "properties": {
++        "behavior_change": { "type": "boolean" },
++        "applied_temperature": { "type": "number", "minimum": 0.03, "maximum": 1.20 },
++        "applied_top_p": { "type": "number", "minimum": 0.50, "maximum": 1.00 },
++        "applied_min_p": { "type": "number", "minimum": 0.00, "maximum": 0.25 },
++        "rollback_candidate_applied": { "const": false },
++        "safe_stop_candidate_applied": { "const": false },
++        "eos_bias_candidate_applied": { "const": false }
++      }
++    }
++  }
++}
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d_probe_prompts.jsonl /mnt/data/decode03d_work/workspace/decode03d_probe_prompts.jsonl
+--- /mnt/data/decode03c_work/workspace/decode03d_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d_probe_prompts.jsonl	2026-05-27 06:39:10.861486760 +0000
+@@ -0,0 +1,6 @@
++{"id":"P01_short_korean_qa","prompt":"한국어로 짧게 답해줘. 1 더하기 1은?","max_new_tokens":64,"seed":1234}
++{"id":"P02_hangul_completion","prompt":"장수풍뎅","max_new_tokens":64,"seed":1234}
++{"id":"P03_repetition_trap","prompt":"다음 문장을 반복하지 말고 자연스럽게 이어줘: 합니다 합니다 합니다","max_new_tokens":64,"seed":1234}
++{"id":"P04_josa_eomi_loop_probe","prompt":"은 는 이 가 을 를 의 에 에서 으로 — 이 조사를 반복하지 말고 문장으로 정리해.","max_new_tokens":64,"seed":1234}
++{"id":"P05_structured_markdown","prompt":"세 줄 마크다운으로 디코더 안정화 계획을 써줘.","max_new_tokens":64,"seed":1234}
++{"id":"P06_noisy_user_input","prompt":"아니 그니까 샐러드 말고 정상문장으로 정리좀;;;;","max_new_tokens":64,"seed":1234}
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d_report.md /mnt/data/decode03d_work/workspace/decode03d_report.md
+--- /mnt/data/decode03c_work/workspace/decode03d_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d_report.md	2026-05-27 06:39:12.222912157 +0000
+@@ -0,0 +1,44 @@
++# 16AI-QW-38G-R6A-DECODE-03D Bake Report
++
++## Patch
++Dynamic Temperature / Min-p Controlled Enable Seal
++
++## Baked status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Implemented files
++- `crates/model_core/src/decode03d_controlled_enable.rs`
++- `crates/model_core/src/lib.rs`
++- `crates/model_core/src/sampler_parity.rs`
++- `workspace/decode03d_controlled_enable_schema.json`
++- `workspace/decode03d_applied_steps.jsonl`
++- `workspace/decode03d_summary.json`
++- `workspace/decode03d_static_checks.json`
++- `workspace/decode03d_probe_prompts.jsonl`
++
++## Contract
++- Default mode is `Off`.
++- Behavior changes require `ASH_DECODE03D_CONTROLLED_ENABLE=true`, `ASH_DECODE03D_MODE=controlled` or `strict_controlled`, and `ASH_DECODE03D_BEHAVIOR_CHANGE_ALLOWED=true`.
++- DECODE-03C shadow policy is consumed as the input SSOT.
++- Temperature / top-p / min-p / top-k / guard strength are converted into a step-local applied config receipt.
++- Rollback / safe stop / EOS bias candidates are recorded but never executed in DECODE-03D.
++- Unsupported Min-p backends keep `applied_min_p = current_min_p` and record a warning.
++
++## Runtime command sketch
++
++```bash
++ASH_SAMPLER_PARITY=probe \
++ASH_SAMPLER05_PARITY=receipt \
++ASH_DECODE03A_ENTROPY=receipt \
++ASH_DECODE03B_PCI=receipt \
++ASH_DECODE03C_SHADOW=receipt \
++ASH_DECODE03D_CONTROLLED_ENABLE=true \
++ASH_DECODE03D_MODE=controlled \
++ASH_DECODE03D_BEHAVIOR_CHANGE_ALLOWED=true \
++ASH_DECODE03D_REQUIRE_DECODE03C=true \
++ASH_DECODE03D_RECEIPT=workspace/decode03d_applied_steps.jsonl \
++ASH_DECODE03D_SUMMARY=workspace/decode03d_summary.json
++```
++
++## Not run
++`cargo` is unavailable in this container, so cargo check, unit tests, shader compile, and runtime smoke are not run here.
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d_static_checks.json /mnt/data/decode03d_work/workspace/decode03d_static_checks.json
+--- /mnt/data/decode03c_work/workspace/decode03d_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d_static_checks.json	2026-05-27 06:39:12.111046184 +0000
+@@ -0,0 +1,73 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03C",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "name": "module_exists",
++      "pass": true
++    },
++    {
++      "name": "module_contains_DynamicSamplerMode",
++      "pass": true
++    },
++    {
++      "name": "module_contains_Decode03DGateInput",
++      "pass": true
++    },
++    {
++      "name": "module_contains_Decode03DAppliedConfig",
++      "pass": true
++    },
++    {
++      "name": "module_contains_decide_decode03d_gate",
++      "pass": true
++    },
++    {
++      "name": "module_contains_apply_decode03d_controlled_config",
++      "pass": true
++    },
++    {
++      "name": "module_contains_append_decode03d_receipt_from_sampler03",
++      "pass": true
++    },
++    {
++      "name": "module_contains_write_decode03d_summary_from_receipt_file",
++      "pass": true
++    },
++    {
++      "name": "rollback_candidate_applied_false_contract",
++      "pass": true
++    },
++    {
++      "name": "safe_stop_candidate_applied_false_contract",
++      "pass": true
++    },
++    {
++      "name": "eos_bias_candidate_applied_false_contract",
++      "pass": true
++    },
++    {
++      "name": "lib_exists",
++      "pass": true
++    },
++    {
++      "name": "lib_declares_decode03d_module",
++      "pass": true
++    },
++    {
++      "name": "lib_exports_decode03d",
++      "pass": true
++    },
++    {
++      "name": "sampler_parity_exists",
++      "pass": true
++    },
++    {
++      "name": "sampler_parity_invokes_decode03d",
++      "pass": true
++    }
++  ]
++}
+diff -ruN /mnt/data/decode03c_work/workspace/decode03d_summary.json /mnt/data/decode03d_work/workspace/decode03d_summary.json
+--- /mnt/data/decode03c_work/workspace/decode03d_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03d_work/workspace/decode03d_summary.json	2026-05-27 06:39:10.854172769 +0000
+@@ -0,0 +1,52 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03C",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "controlled_enable": false,
++  "mode": "Off",
++  "default_enable": false,
++  "requires_decode03c": true,
++  "decode03c_status_seen": null,
++  "decode03b_status_seen": null,
++  "decode03a_status_seen": null,
++  "sampler05_status_seen": null,
++  "steps_observed": 0,
++  "gate": {
++    "can_apply_count": 0,
++    "denied_count": 0,
++    "strict_fail_count": 0,
++    "missing_shadow_policy_count": 0
++  },
++  "applied": {
++    "behavior_change_count": 0,
++    "temperature_changed_count": 0,
++    "min_p_changed_count": 0,
++    "top_p_changed_count": 0,
++    "top_k_changed_count": 0,
++    "guard_strength_changed_count": 0
++  },
++  "shadow_candidate_not_executed": {
++    "rollback_candidate_seen_count": 0,
++    "rollback_candidate_applied_count": 0,
++    "safe_stop_candidate_seen_count": 0,
++    "safe_stop_candidate_applied_count": 0,
++    "eos_bias_candidate_seen_count": 0,
++    "eos_bias_candidate_applied_count": 0
++  },
++  "backend_support": {
++    "min_p_unsupported_count": 0,
++    "min_p_unsupported_but_applied_count": 0
++  },
++  "risk": {
++    "applied_without_gate_count": 0,
++    "panic_candidate_seen_count": 0,
++    "panic_candidate_executed_count": 0,
++    "numeric_risk_seen_count": 0,
++    "fallback_risk_seen_count": 0,
++    "behavior_change_without_controlled_mode_count": 0
++  },
++  "ready_for_salad02_online_detector": false,
++  "ready_for_decode03d_default_enable": false,
++  "ready_for_salad03_rollback": false,
++  "reason": "static bake only; run ASH_DECODE03D_CONTROLLED_ENABLE=true with ASH_DECODE03D_MODE=controlled after DECODE-03C shadow evidence"
++}

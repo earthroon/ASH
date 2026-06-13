@@ -1,0 +1,50 @@
+{
+  "patch_id": "ASH-FT-01",
+  "title": "Atlas Group Memory Budget Planner / Optimizer State Shard Estimate / No Tensor Load Seal",
+  "status": "PENDING_RUNTIME",
+  "dependency": {
+    "ash_ft00_pass_required": true,
+    "ft00_manifest_read": false,
+    "ft00_atlas_plan_read": false,
+    "ft00_manifest_sha256": null,
+    "ft00_atlas_plan_sha256": null,
+    "ft00_manifest_patch_id": null,
+    "ft00_atlas_plan_patch_id": null,
+    "ft00_all_tensors_registered": false
+  },
+  "budget": {
+    "memory_budget_created": false,
+    "memory_budget_path": "artifacts\\ash_ft\\ash_ft01_atlas_group_memory_budget.json",
+    "optimizer_shard_estimate_created": false,
+    "optimizer_shard_estimate_path": "artifacts\\ash_ft\\ash_ft01_optimizer_shard_estimate.json",
+    "total_group_count": 0,
+    "black_group_count": 0,
+    "atlas_split_required": true,
+    "full_load_required": false
+  },
+  "guards": {
+    "candidate_safetensors_data_opened": false,
+    "tensor_value_materialized": false,
+    "tensor_slice_read_executed": false,
+    "full_tensor_load_executed": false,
+    "mmap_materialization_executed": false,
+    "gpu_device_created": false,
+    "gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "backward_executed": false,
+    "loss_calculation_executed": false,
+    "optimizer_created": false,
+    "optimizer_step_executed": false,
+    "gradient_write_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "runtime_config_mutation_executed": false
+  },
+  "warnings": [],
+  "hard_failures": [],
+  "verdict": "PENDING_RUNTIME_NO_TENSOR_LOAD_MEMORY_BUDGET_PLANNER"
+}

@@ -1,0 +1,1153 @@
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03A_acceptance.md /mnt/data/decode03a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03A_acceptance.md
+--- /mnt/data/decode03a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03A_acceptance.md	2026-05-27 06:00:28.841709066 +0000
+@@ -0,0 +1,39 @@
++# 16AI-QW-38G-R6A-DECODE-03A Acceptance
++
++## Patch
++Entropy / Confidence Metric Receipt Seal
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Confirmed static changes
++- Added `crates/model_core/src/decode03a_entropy.rs`.
++- Registered `mod decode03a_entropy` and public exports in `crates/model_core/src/lib.rs`.
++- Added observe-only DECODE-03A append hook to `sampler_parity::append_receipt()`.
++- Added CPU oracle entropy/top1/top2 fields to `CpuOracleCandidateTrace`.
++- Propagated entropy/confidence seed fields through `CpuSamplerRuntimeTrace`.
++- Added optional GPU entropy fields to `GpuSamplerRuntimeTrace`; GPU entropy remains optional for DECODE-03A.
++- Added static workspace schema/summary/probe fixtures.
++
++## Contract
++- `behavior_change=false`.
++- CPU oracle remains sampler SSOT.
++- DECODE-03A does not enable dynamic sampling.
++- DECODE-03A only writes entropy/confidence receipts when `ASH_DECODE03A_ENTROPY=receipt` or `strict`.
++
++## Runtime not executed
++The bake container does not provide `cargo`/`rustc`, so cargo check, unit tests, shader validation, and runtime smoke were not executed here.
++
++## Required runtime command shape
++```bash
++ASH_SAMPLER_PARITY=probe \
++ASH_SAMPLER05_PARITY=receipt \
++ASH_DECODE03A_ENTROPY=receipt \
++ASH_DECODE03A_REQUIRE_SAMPLER05=true \
++ASH_DECODE03A_RECEIPT=workspace/decode03a_entropy_steps.jsonl \
++ASH_DECODE03A_SUMMARY=workspace/decode03a_summary.json \
++<existing inference command>
++```
++
++## Promotion rule
++DECODE-03B PCI may start only after DECODE-03A runtime receipt has no NaN/Inf and no behavior-change evidence.
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/cpu_oracle_sampler.rs /mnt/data/decode03a_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:23:00.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:57:37.045432009 +0000
+@@ -113,6 +113,22 @@
+     pub selected_transition_penalty: Option<f32>,
+     pub selected_transition_action: Option<String>,
+     pub selected_transition_reasons: Vec<String>,
++    pub active_entropy: Option<f32>,
++    pub active_normalized_entropy: Option<f32>,
++    pub final_entropy: Option<f32>,
++    pub final_normalized_entropy: Option<f32>,
++    pub active_top1_id: Option<u32>,
++    pub active_top1_score: Option<f32>,
++    pub active_top1_prob: Option<f32>,
++    pub active_top2_id: Option<u32>,
++    pub active_top2_score: Option<f32>,
++    pub active_top2_prob: Option<f32>,
++    pub final_top1_id: Option<u32>,
++    pub final_top1_score: Option<f32>,
++    pub final_top1_prob: Option<f32>,
++    pub final_top2_id: Option<u32>,
++    pub final_top2_score: Option<f32>,
++    pub final_top2_prob: Option<f32>,
+ }
+ 
+ impl Default for CpuOracleCandidateTrace {
+@@ -149,6 +165,22 @@
+             selected_transition_penalty: None,
+             selected_transition_action: None,
+             selected_transition_reasons: Vec::new(),
++            active_entropy: None,
++            active_normalized_entropy: None,
++            final_entropy: None,
++            final_normalized_entropy: None,
++            active_top1_id: None,
++            active_top1_score: None,
++            active_top1_prob: None,
++            active_top2_id: None,
++            active_top2_score: None,
++            active_top2_prob: None,
++            final_top1_id: None,
++            final_top1_score: None,
++            final_top1_prob: None,
++            final_top2_id: None,
++            final_top2_score: None,
++            final_top2_prob: None,
+         }
+     }
+ }
+@@ -181,6 +213,51 @@
+     transition: TransitionDecision,
+ }
+ 
++#[derive(Debug, Clone, Default)]
++struct DistributionStats {
++    entropy: Option<f32>,
++    normalized_entropy: Option<f32>,
++    top1_id: Option<u32>,
++    top1_score: Option<f32>,
++    top1_prob: Option<f32>,
++    top2_id: Option<u32>,
++    top2_score: Option<f32>,
++    top2_prob: Option<f32>,
++}
++
++fn distribution_stats(candidates: &[Candidate]) -> DistributionStats {
++    if candidates.is_empty() {
++        return DistributionStats::default();
++    }
++    let mut ordered = candidates.to_vec();
++    ordered.sort_by(|a, b| b.prob.total_cmp(&a.prob));
++    let entropy = ordered.iter().filter_map(|c| {
++        if c.prob.is_finite() && c.prob > 0.0 {
++            Some(-c.prob * c.prob.ln())
++        } else {
++            None
++        }
++    }).sum::<f32>();
++    let normalized_entropy = if ordered.len() > 1 {
++        let denom = (ordered.len() as f32).ln();
++        if denom.is_finite() && denom > 0.0 { Some(entropy / denom) } else { None }
++    } else {
++        None
++    };
++    let top1 = ordered.get(0);
++    let top2 = ordered.get(1);
++    DistributionStats {
++        entropy: Some(entropy),
++        normalized_entropy,
++        top1_id: top1.map(|c| c.id),
++        top1_score: top1.map(|c| c.weighted),
++        top1_prob: top1.map(|c| c.prob),
++        top2_id: top2.map(|c| c.id),
++        top2_score: top2.map(|c| c.weighted),
++        top2_prob: top2.map(|c| c.prob),
++    }
++}
++
+ fn candidate_trace_from(
+     active: &[Candidate],
+     final_candidates: &[Candidate],
+@@ -194,6 +271,8 @@
+     prior_scores: SemanticPriorScores<'_>,
+ ) -> CpuOracleCandidateTrace {
+     let (active_max, active_sum_exp) = active_stats(active);
++    let active_distribution = distribution_stats(active);
++    let final_distribution = distribution_stats(final_candidates);
+     let semantic_prior_enabled = config.semantic_prior.enabled;
+     let semantic_prior_effective = semantic_prior_enabled && prior_scores.any_source_available();
+     let qwave_source_available = prior_scores.qwave_scores.is_some();
+@@ -241,6 +320,22 @@
+         selected_transition_penalty,
+         selected_transition_action,
+         selected_transition_reasons,
++        active_entropy: active_distribution.entropy,
++        active_normalized_entropy: active_distribution.normalized_entropy,
++        final_entropy: final_distribution.entropy,
++        final_normalized_entropy: final_distribution.normalized_entropy,
++        active_top1_id: active_distribution.top1_id,
++        active_top1_score: active_distribution.top1_score,
++        active_top1_prob: active_distribution.top1_prob,
++        active_top2_id: active_distribution.top2_id,
++        active_top2_score: active_distribution.top2_score,
++        active_top2_prob: active_distribution.top2_prob,
++        final_top1_id: final_distribution.top1_id,
++        final_top1_score: final_distribution.top1_score,
++        final_top1_prob: final_distribution.top1_prob,
++        final_top2_id: final_distribution.top2_id,
++        final_top2_score: final_distribution.top2_score,
++        final_top2_prob: final_distribution.top2_prob,
+     }
+ }
+ 
+@@ -569,6 +664,14 @@
+             active_sum_exp: if best_logit.is_finite() { Some(1.0) } else { None },
+             final_mask_recovered: false,
+             recovery_mode: SamplerRecoveryMode::None,
++            active_entropy: if best_logit.is_finite() { Some(0.0) } else { None },
++            final_entropy: if best_logit.is_finite() { Some(0.0) } else { None },
++            active_top1_id: if best_logit.is_finite() { Some(best_id) } else { None },
++            active_top1_score: if best_logit.is_finite() { Some(best_logit) } else { None },
++            active_top1_prob: if best_logit.is_finite() { Some(1.0) } else { None },
++            final_top1_id: if best_logit.is_finite() { Some(best_id) } else { None },
++            final_top1_score: if best_logit.is_finite() { Some(best_logit) } else { None },
++            final_top1_prob: if best_logit.is_finite() { Some(1.0) } else { None },
+             ..Default::default()
+         },
+     }
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/decode03a_entropy.rs /mnt/data/decode03a_work/crates/model_core/src/decode03a_entropy.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/decode03a_entropy.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/decode03a_entropy.rs	2026-05-27 06:01:12.059965675 +0000
+@@ -0,0 +1,627 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const DECODE03A_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03A";
++pub const DECODE03A_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SAMPLER-05";
++pub const DECODE03A_SAMPLER_SSOT: &str = "model_core::cpu_oracle_sampler";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum Decode03AMode {
++    Off,
++    Receipt,
++    Strict,
++}
++
++impl Decode03AMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_DECODE03A_ENTROPY")
++            .or_else(|_| env::var("ASH_DECODE03A_RECEIPT_MODE"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "observe" => Self::Receipt,
++            "strict" => Self::Strict,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn enabled(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::Receipt => "Receipt",
++            Self::Strict => "Strict",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum DecodeEntropyStage {
++    Raw,
++    Scaled,
++    AfterStaticPrior,
++    AfterTransitionGuard,
++    AfterMinP,
++    AfterTopP,
++    FinalActive,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct DecodeEntropyMetric {
++    pub stage: DecodeEntropyStage,
++    pub entropy: Option<f32>,
++    pub normalized_entropy: Option<f32>,
++    pub active_count: Option<usize>,
++    pub finite_count: Option<usize>,
++    pub top1_id: Option<u32>,
++    pub top1_score: Option<f32>,
++    pub top1_prob: Option<f32>,
++    pub top2_id: Option<u32>,
++    pub top2_score: Option<f32>,
++    pub top2_prob: Option<f32>,
++    pub top1_top2_margin: Option<f32>,
++    pub nan_seen: bool,
++    pub inf_seen: bool,
++    pub metric_status: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct DecodeEntropyDeltas {
++    pub d_static_prior: Option<f32>,
++    pub d_transition_guard: Option<f32>,
++    pub d_min_p: Option<f32>,
++    pub d_top_p: Option<f32>,
++    pub d_total_guard: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct DecodeActiveSetMetrics {
++    pub active_count_raw: Option<usize>,
++    pub active_count_after_static_prior: Option<usize>,
++    pub active_count_after_transition_guard: Option<usize>,
++    pub active_count_after_min_p: usize,
++    pub active_count_after_top_p: usize,
++    pub active_count_final: usize,
++    pub compression_ratio_min_p: Option<f32>,
++    pub compression_ratio_top_p: Option<f32>,
++    pub compression_ratio_total: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct DecodeConfidenceSeedMetrics {
++    pub weighted_top1_id: Option<u32>,
++    pub weighted_top1_prob: Option<f32>,
++    pub weighted_top1_score: Option<f32>,
++    pub weighted_top2_id: Option<u32>,
++    pub weighted_top2_prob: Option<f32>,
++    pub weighted_top2_score: Option<f32>,
++    pub top1_top2_margin: Option<f32>,
++    pub selected_token_rank: Option<usize>,
++    pub selected_token_prob: Option<f32>,
++    pub selected_token_logprob: Option<f32>,
++    pub fallback_count_window: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03ARiskFlags {
++    pub high_raw_entropy: bool,
++    pub high_guarded_entropy: bool,
++    pub entropy_spike: bool,
++    pub guard_entropy_inversion: bool,
++    pub min_p_overcompression: bool,
++    pub top_p_overcompression: bool,
++    pub empty_active_set_seen: bool,
++    pub global_finite_fallback_seen: bool,
++    pub nan_seen: bool,
++    pub inf_seen: bool,
++    pub partial_entropy_trace: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03ADecodeConfig {
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k_requested: u32,
++    pub top_k_effective: u32,
++    pub min_p: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03AEntropyStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub behavior_change: bool,
++    pub mode: String,
++    pub decode_config: Decode03ADecodeConfig,
++    pub static_prior_enabled: bool,
++    pub transition_guard_enabled: bool,
++    pub sampler05_required: bool,
++    pub sampler05_parity_status: Option<String>,
++    pub entropy_metrics: Vec<DecodeEntropyMetric>,
++    pub entropy_deltas: DecodeEntropyDeltas,
++    pub active_set_metrics: DecodeActiveSetMetrics,
++    pub confidence_seed_metrics: DecodeConfidenceSeedMetrics,
++    pub selected_id: u32,
++    pub selected_piece_preview: Option<String>,
++    pub selected_rank_final: Option<usize>,
++    pub selected_logprob_final: Option<f32>,
++    pub fallback_mode: String,
++    pub fallback_reason: Option<String>,
++    pub risk_flags: Decode03ARiskFlags,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03AEntropySummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub behavior_change: bool,
++    pub sampler_ssot: String,
++    pub requires_sampler05_pass: bool,
++    pub steps_observed: usize,
++    pub partial_entropy_trace_count: usize,
++    pub entropy_spike_count: usize,
++    pub guard_entropy_inversion_count: usize,
++    pub high_guarded_entropy_count: usize,
++    pub min_p_overcompression_count: usize,
++    pub top_p_overcompression_count: usize,
++    pub empty_active_set_count: usize,
++    pub global_finite_fallback_count: usize,
++    pub nan_count: usize,
++    pub inf_count: usize,
++    pub selected_rank_gt_5_count: usize,
++    pub ready_for_decode03b_pci: bool,
++    pub ready_for_decode03c_shadow_policy: bool,
++    pub reason: String,
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_DECODE03A_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03a_entropy_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_DECODE03A_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03a_summary.json"))
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_DECODE03A_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "decode03a_sampler03_bridge".to_string())
++}
++
++fn require_sampler05() -> bool {
++    env_bool("ASH_DECODE03A_REQUIRE_SAMPLER05", true)
++}
++
++fn is_global_finite_fallback(mode: &str) -> bool {
++    matches!(mode, "valid_global_top1" | "GLOBAL_FINITE_FALLBACK" | "global_finite_fallback")
++}
++
++fn margin(top1: Option<f32>, top2: Option<f32>) -> Option<f32> {
++    top1.zip(top2).map(|(a, b)| a - b)
++}
++
++fn finite_flags(values: &[Option<f32>]) -> (bool, bool) {
++    let mut nan_seen = false;
++    let mut inf_seen = false;
++    for value in values.iter().flatten().copied() {
++        if value.is_nan() {
++            nan_seen = true;
++        }
++        if value.is_infinite() {
++            inf_seen = true;
++        }
++    }
++    (nan_seen, inf_seen)
++}
++
++fn metric(
++    stage: DecodeEntropyStage,
++    entropy: Option<f32>,
++    normalized_entropy: Option<f32>,
++    active_count: Option<usize>,
++    top1_id: Option<u32>,
++    top1_score: Option<f32>,
++    top1_prob: Option<f32>,
++    top2_id: Option<u32>,
++    top2_score: Option<f32>,
++    top2_prob: Option<f32>,
++    status: &str,
++) -> DecodeEntropyMetric {
++    let top1_top2_margin = margin(top1_score, top2_score);
++    let (nan_seen, inf_seen) = finite_flags(&[
++        entropy,
++        normalized_entropy,
++        top1_score,
++        top1_prob,
++        top2_score,
++        top2_prob,
++        top1_top2_margin,
++    ]);
++    DecodeEntropyMetric {
++        stage,
++        entropy,
++        normalized_entropy,
++        active_count,
++        finite_count: active_count,
++        top1_id,
++        top1_score,
++        top1_prob,
++        top2_id,
++        top2_score,
++        top2_prob,
++        top1_top2_margin,
++        nan_seen,
++        inf_seen,
++        metric_status: status.to_string(),
++    }
++}
++
++fn selected_rank(final_ids: &[u32], selected_id: u32) -> Option<usize> {
++    final_ids.iter().position(|id| *id == selected_id).map(|idx| idx + 1)
++}
++
++fn ratio(num: usize, denom: usize) -> Option<f32> {
++    if denom == 0 { None } else { Some(num as f32 / denom as f32) }
++}
++
++pub fn logsumexp_entropy(scores: &[f32]) -> Option<f32> {
++    let finite = scores.iter().copied().filter(|v| v.is_finite()).collect::<Vec<_>>();
++    if finite.is_empty() {
++        return None;
++    }
++    let max_score = finite.iter().copied().reduce(f32::max)?;
++    let mut sum_exp = 0.0f32;
++    let mut sum_exp_score = 0.0f32;
++    for score in finite {
++        let e = (score - max_score).exp();
++        sum_exp += e;
++        sum_exp_score += e * score;
++    }
++    if !sum_exp.is_finite() || sum_exp <= 0.0 {
++        return None;
++    }
++    Some(sum_exp.ln() + max_score - (sum_exp_score / sum_exp))
++}
++
++pub fn receipt_from_sampler03(mode: Decode03AMode, source: &SamplerParityReceipt) -> Decode03AEntropyStepReceipt {
++    let sampler05_required = require_sampler05();
++    let fallback_mode = source.cpu.recovery_mode.clone();
++    let selected_rank_final = selected_rank(&source.cpu.final_ids_head, source.cpu.selected_id);
++    let active_count_after_min_p = source.cpu.post_min_p_count;
++    let active_count_after_top_p = source.cpu.post_top_p_count;
++    let compression_ratio_min_p = ratio(source.cpu.post_min_p_count, source.cpu.pre_min_p_count);
++    let compression_ratio_top_p = ratio(source.cpu.post_top_p_count, source.cpu.post_min_p_count);
++    let compression_ratio_total = ratio(source.cpu.post_top_p_count, source.cpu.pre_min_p_count);
++
++    let after_minp = metric(
++        DecodeEntropyStage::AfterMinP,
++        source.cpu.active_entropy,
++        source.cpu.active_normalized_entropy,
++        Some(source.cpu.active_count),
++        source.cpu.weighted_top1_id,
++        source.cpu.weighted_top1_score,
++        source.cpu.weighted_top1_prob,
++        source.cpu.weighted_top2_id,
++        source.cpu.weighted_top2_score,
++        source.cpu.weighted_top2_prob,
++        "cpu_oracle_weighted_active_distribution",
++    );
++    let final_active = metric(
++        DecodeEntropyStage::FinalActive,
++        source.cpu.final_entropy,
++        source.cpu.final_normalized_entropy,
++        Some(source.cpu.final_count),
++        source.cpu.final_top1_id,
++        source.cpu.final_top1_score,
++        source.cpu.final_top1_prob,
++        source.cpu.final_top2_id,
++        source.cpu.final_top2_score,
++        source.cpu.final_top2_prob,
++        "cpu_oracle_final_distribution",
++    );
++    let unavailable_raw = metric(
++        DecodeEntropyStage::Raw,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        "raw_logits_entropy_not_available_from_sampler03_bridge",
++    );
++    let unavailable_scaled = metric(
++        DecodeEntropyStage::Scaled,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        "scaled_logits_entropy_not_available_from_sampler03_bridge",
++    );
++    let unavailable_prior = metric(
++        DecodeEntropyStage::AfterStaticPrior,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        "static_prior_stage_entropy_not_available_from_sampler03_bridge",
++    );
++    let unavailable_transition = metric(
++        DecodeEntropyStage::AfterTransitionGuard,
++        None,
++        None,
++        Some(source.cpu.pre_min_p_count),
++        None,
++        None,
++        None,
++        None,
++        None,
++        None,
++        "transition_stage_entropy_not_available_from_sampler03_bridge",
++    );
++    let after_topp = metric(
++        DecodeEntropyStage::AfterTopP,
++        source.cpu.final_entropy,
++        source.cpu.final_normalized_entropy,
++        Some(source.cpu.final_count),
++        source.cpu.final_top1_id,
++        source.cpu.final_top1_score,
++        source.cpu.final_top1_prob,
++        source.cpu.final_top2_id,
++        source.cpu.final_top2_score,
++        source.cpu.final_top2_prob,
++        "cpu_oracle_after_top_p_distribution",
++    );
++
++    let entropy_metrics = vec![
++        unavailable_raw,
++        unavailable_scaled,
++        unavailable_prior,
++        unavailable_transition,
++        after_minp,
++        after_topp,
++        final_active,
++    ];
++
++    let nan_seen = entropy_metrics.iter().any(|m| m.nan_seen);
++    let inf_seen = entropy_metrics.iter().any(|m| m.inf_seen);
++    let high_guarded_entropy = source.cpu.final_normalized_entropy.map(|h| h >= 0.80).unwrap_or(false);
++    let min_p_overcompression = (source.cpu.pre_min_p_count >= 100 && source.cpu.post_min_p_count <= 3)
++        || compression_ratio_min_p.map(|r| r <= 0.01).unwrap_or(false);
++    let top_p_overcompression = (source.cpu.post_min_p_count >= 20 && source.cpu.post_top_p_count <= 2)
++        || compression_ratio_top_p.map(|r| r <= 0.10 && source.cpu.post_min_p_count >= 20).unwrap_or(false);
++    let empty_active_set_seen = source.cpu.final_count == 0;
++    let global_finite_fallback_seen = is_global_finite_fallback(&fallback_mode);
++    let partial_entropy_trace = entropy_metrics.iter().any(|m| m.entropy.is_none());
++
++    Decode03AEntropyStepReceipt {
++        patch_id: DECODE03A_PATCH_ID.to_string(),
++        input_patch: DECODE03A_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        seed: None,
++        step: source.step,
++        backend: "sampler03_cpu_oracle_bridge".to_string(),
++        sampler_ssot: DECODE03A_SAMPLER_SSOT.to_string(),
++        behavior_change: false,
++        mode: mode.as_str().to_string(),
++        decode_config: Decode03ADecodeConfig {
++            temperature: source.decode_config.temperature,
++            top_p: source.decode_config.top_p,
++            top_k_requested: source.decode_config.top_k,
++            top_k_effective: source.decode_config.top_k,
++            min_p: source.decode_config.min_p,
++        },
++        static_prior_enabled: source.cpu.semantic_prior_effective,
++        transition_guard_enabled: source.cpu.transition_guard_enabled,
++        sampler05_required,
++        sampler05_parity_status: None,
++        entropy_metrics,
++        entropy_deltas: DecodeEntropyDeltas {
++            d_min_p: source.cpu.active_entropy.zip(source.cpu.final_entropy).map(|(a, f)| f - a),
++            d_top_p: source.cpu.active_entropy.zip(source.cpu.final_entropy).map(|(a, f)| f - a),
++            ..Default::default()
++        },
++        active_set_metrics: DecodeActiveSetMetrics {
++            active_count_raw: None,
++            active_count_after_static_prior: None,
++            active_count_after_transition_guard: Some(source.cpu.pre_min_p_count),
++            active_count_after_min_p,
++            active_count_after_top_p,
++            active_count_final: source.cpu.final_count,
++            compression_ratio_min_p,
++            compression_ratio_top_p,
++            compression_ratio_total,
++        },
++        confidence_seed_metrics: DecodeConfidenceSeedMetrics {
++            weighted_top1_id: source.cpu.weighted_top1_id,
++            weighted_top1_prob: source.cpu.weighted_top1_prob,
++            weighted_top1_score: source.cpu.weighted_top1_score,
++            weighted_top2_id: source.cpu.weighted_top2_id,
++            weighted_top2_prob: source.cpu.weighted_top2_prob,
++            weighted_top2_score: source.cpu.weighted_top2_score,
++            top1_top2_margin: margin(source.cpu.weighted_top1_score, source.cpu.weighted_top2_score),
++            selected_token_rank: selected_rank_final,
++            selected_token_prob: source.cpu.selected_logprob.map(|lp| lp.exp()),
++            selected_token_logprob: source.cpu.selected_logprob,
++            fallback_count_window: if fallback_mode == "none" { 0 } else { 1 },
++        },
++        selected_id: source.cpu.selected_id,
++        selected_piece_preview: None,
++        selected_rank_final,
++        selected_logprob_final: source.cpu.selected_logprob,
++        fallback_mode,
++        fallback_reason: if source.cpu.recovery_mode == "none" { None } else { Some(source.cpu.recovery_mode.clone()) },
++        risk_flags: Decode03ARiskFlags {
++            high_raw_entropy: false,
++            high_guarded_entropy,
++            entropy_spike: false,
++            guard_entropy_inversion: false,
++            min_p_overcompression,
++            top_p_overcompression,
++            empty_active_set_seen,
++            global_finite_fallback_seen,
++            nan_seen,
++            inf_seen,
++            partial_entropy_trace,
++        },
++    }
++}
++
++pub fn append_decode03a_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Decode03AMode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    if env_bool("ASH_DECODE03A_FAIL_ON_BEHAVIOR_CHANGE", true) {
++        // DECODE-03A is observe-only by contract. There is no mutation path here.
++    }
++    let receipt = receipt_from_sampler03(mode, source);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++    write_decode03a_summary_from_receipt_file();
++}
++
++fn classify_summary_status(receipts: &[Decode03AEntropyStepReceipt]) -> String {
++    if receipts.is_empty() {
++        "STATIC_BAKE_DEFINED_NOT_RUN".to_string()
++    } else if receipts.iter().any(|r| r.behavior_change || r.risk_flags.nan_seen || r.risk_flags.inf_seen) {
++        "FAIL".to_string()
++    } else if receipts.iter().any(|r| r.risk_flags.partial_entropy_trace || r.risk_flags.min_p_overcompression || r.risk_flags.global_finite_fallback_seen) {
++        "PASS_WITH_WARNINGS".to_string()
++    } else {
++        "PASS".to_string()
++    }
++}
++
++pub fn summary_from_receipts(receipts: &[Decode03AEntropyStepReceipt]) -> Decode03AEntropySummary {
++    let steps_observed = receipts.len();
++    let status = classify_summary_status(receipts);
++    let partial_entropy_trace_count = receipts.iter().filter(|r| r.risk_flags.partial_entropy_trace).count();
++    let entropy_spike_count = receipts.iter().filter(|r| r.risk_flags.entropy_spike).count();
++    let guard_entropy_inversion_count = receipts.iter().filter(|r| r.risk_flags.guard_entropy_inversion).count();
++    let high_guarded_entropy_count = receipts.iter().filter(|r| r.risk_flags.high_guarded_entropy).count();
++    let min_p_overcompression_count = receipts.iter().filter(|r| r.risk_flags.min_p_overcompression).count();
++    let top_p_overcompression_count = receipts.iter().filter(|r| r.risk_flags.top_p_overcompression).count();
++    let empty_active_set_count = receipts.iter().filter(|r| r.risk_flags.empty_active_set_seen).count();
++    let global_finite_fallback_count = receipts.iter().filter(|r| r.risk_flags.global_finite_fallback_seen).count();
++    let nan_count = receipts.iter().filter(|r| r.risk_flags.nan_seen).count();
++    let inf_count = receipts.iter().filter(|r| r.risk_flags.inf_seen).count();
++    let selected_rank_gt_5_count = receipts.iter().filter(|r| r.selected_rank_final.map(|rank| rank > 5).unwrap_or(false)).count();
++    let ready_for_decode03b_pci = steps_observed > 0 && nan_count == 0 && inf_count == 0;
++    Decode03AEntropySummary {
++        patch_id: DECODE03A_PATCH_ID.to_string(),
++        input_patch: DECODE03A_INPUT_PATCH_ID.to_string(),
++        status: status.clone(),
++        behavior_change: false,
++        sampler_ssot: DECODE03A_SAMPLER_SSOT.to_string(),
++        requires_sampler05_pass: require_sampler05(),
++        steps_observed,
++        partial_entropy_trace_count,
++        entropy_spike_count,
++        guard_entropy_inversion_count,
++        high_guarded_entropy_count,
++        min_p_overcompression_count,
++        top_p_overcompression_count,
++        empty_active_set_count,
++        global_finite_fallback_count,
++        nan_count,
++        inf_count,
++        selected_rank_gt_5_count,
++        ready_for_decode03b_pci,
++        ready_for_decode03c_shadow_policy: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run ASH_DECODE03A_ENTROPY=receipt with sampler parity to produce entropy evidence".to_string()
++        } else if ready_for_decode03b_pci {
++            "entropy/confidence seed metrics are available for DECODE-03B PCI; shadow policy remains blocked until PCI is sealed".to_string()
++        } else {
++            "numeric or behavior-change failure blocks PCI promotion".to_string()
++        },
++    }
++}
++
++pub fn write_decode03a_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() {
++                continue;
++            }
++            if let Ok(receipt) = serde_json::from_str::<Decode03AEntropyStepReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn decode03a_entropy_logsumexp_stable() {
++        let h = logsumexp_entropy(&[1.0, 1.0]).unwrap();
++        assert!((h - std::f32::consts::LN_2).abs() < 1e-5);
++    }
++
++    #[test]
++    fn decode03a_summary_static_not_run() {
++        let summary = summary_from_receipts(&[]);
++        assert_eq!(summary.status, "STATIC_BAKE_DEFINED_NOT_RUN");
++        assert!(!summary.ready_for_decode03b_pci);
++    }
++}
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/generation_sampling.rs /mnt/data/decode03a_work/crates/model_core/src/generation_sampling.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 05:23:00.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/generation_sampling.rs	2026-05-27 05:59:33.526423667 +0000
+@@ -2549,6 +2549,22 @@
+             final_count_after_transition: candidate_trace.map(|t| t.final_count_total as usize),
+             selected_id_before_transition: Some(sampled.token_id),
+             selected_id_after_transition: Some(sampled.token_id),
++            active_entropy: None,
++            active_normalized_entropy: None,
++            final_entropy: None,
++            final_normalized_entropy: None,
++            weighted_top1_id: None,
++            weighted_top1_score: None,
++            weighted_top1_prob: None,
++            weighted_top2_id: None,
++            weighted_top2_score: None,
++            weighted_top2_prob: None,
++            final_top1_id: None,
++            final_top1_score: None,
++            final_top1_prob: None,
++            final_top2_id: None,
++            final_top2_score: None,
++            final_top2_prob: None,
+         };
+         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
+         let strict_demote = receipt.parity.strict_demoted;
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/lib.rs /mnt/data/decode03a_work/crates/model_core/src/lib.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/lib.rs	2026-05-27 05:49:24.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/lib.rs	2026-05-27 05:58:56.428471132 +0000
+@@ -16,6 +16,7 @@
+ mod sampler_parity;
+ mod sampler_parity_validation;
+ mod sampler05_parity;
++mod decode03a_entropy;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -83,6 +84,13 @@
+     Sampler05ParityReceipt, Sampler05Summary, append_sampler05_receipt_from_sampler03,
+     write_summary_from_receipt_file as write_sampler05_summary_from_receipt_file,
+ };
++pub use decode03a_entropy::{
++    DECODE03A_PATCH_ID, DECODE03A_INPUT_PATCH_ID, Decode03AMode, DecodeEntropyStage,
++    DecodeEntropyMetric, DecodeEntropyDeltas, DecodeActiveSetMetrics,
++    DecodeConfidenceSeedMetrics, Decode03ARiskFlags, Decode03AEntropyStepReceipt,
++    Decode03AEntropySummary, logsumexp_entropy as decode03a_logsumexp_entropy,
++    append_decode03a_receipt_from_sampler03, write_decode03a_summary_from_receipt_file,
++};
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/sampler05_parity.rs /mnt/data/decode03a_work/crates/model_core/src/sampler05_parity.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/sampler05_parity.rs	2026-05-27 05:49:22.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/sampler05_parity.rs	2026-05-27 06:01:10.904616702 +0000
+@@ -477,10 +477,31 @@
+                 recovery_mode: "none".to_string(),
+                 transition_guard_enabled: true,
+                 transition_guard_probe_only: false,
++                semantic_prior_enabled: true,
++                semantic_prior_effective: true,
+                 selected_transition_risk: Some(0.0),
+                 selected_transition_penalty: Some(0.0),
+                 selected_transition_action_code: Some(0),
+                 selected_transition_reason_mask: Some(0),
++                pre_min_p_count: 3,
++                post_min_p_count: 3,
++                post_top_p_count: 2,
++                active_entropy: Some(0.9),
++                active_normalized_entropy: Some(0.8),
++                final_entropy: Some(0.5),
++                final_normalized_entropy: Some(0.7),
++                weighted_top1_id: Some(42),
++                weighted_top1_score: Some(4.0),
++                weighted_top1_prob: Some(0.7),
++                weighted_top2_id: Some(2),
++                weighted_top2_score: Some(3.0),
++                weighted_top2_prob: Some(0.2),
++                final_top1_id: Some(42),
++                final_top1_score: Some(4.0),
++                final_top1_prob: Some(0.8),
++                final_top2_id: Some(2),
++                final_top2_score: Some(3.0),
++                final_top2_prob: Some(0.2),
+             },
+             gpu: GpuSamplerRuntimeTrace {
+                 selected_id: 42,
+@@ -518,6 +539,22 @@
+                 final_count_after_transition: Some(2),
+                 selected_id_before_transition: Some(42),
+                 selected_id_after_transition: Some(42),
++                active_entropy: None,
++                active_normalized_entropy: None,
++                final_entropy: None,
++                final_normalized_entropy: None,
++                weighted_top1_id: None,
++                weighted_top1_score: None,
++                weighted_top1_prob: None,
++                weighted_top2_id: None,
++                weighted_top2_score: None,
++                weighted_top2_prob: None,
++                final_top1_id: None,
++                final_top1_score: None,
++                final_top1_prob: None,
++                final_top2_id: None,
++                final_top2_score: None,
++                final_top2_prob: None,
+             },
+             parity: SamplerParityStatus {
+                 candidate_set_match: Some(true),
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/crates/model_core/src/sampler_parity.rs /mnt/data/decode03a_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/decode03a_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 05:49:24.000000000 +0000
++++ /mnt/data/decode03a_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:01:09.838424463 +0000
+@@ -74,6 +74,8 @@
+     pub candidate_trace_version: u32,
+     pub transition_guard_enabled: bool,
+     pub transition_guard_probe_only: bool,
++    pub semantic_prior_enabled: bool,
++    pub semantic_prior_effective: bool,
+     pub selected_transition_risk: Option<f32>,
+     pub selected_transition_penalty: Option<f32>,
+     pub selected_transition_action_code: Option<u32>,
+@@ -90,6 +92,22 @@
+     pub final_count_after_transition: Option<usize>,
+     pub selected_id_before_transition: Option<u32>,
+     pub selected_id_after_transition: Option<u32>,
++    pub active_entropy: Option<f32>,
++    pub active_normalized_entropy: Option<f32>,
++    pub final_entropy: Option<f32>,
++    pub final_normalized_entropy: Option<f32>,
++    pub weighted_top1_id: Option<u32>,
++    pub weighted_top1_score: Option<f32>,
++    pub weighted_top1_prob: Option<f32>,
++    pub weighted_top2_id: Option<u32>,
++    pub weighted_top2_score: Option<f32>,
++    pub weighted_top2_prob: Option<f32>,
++    pub final_top1_id: Option<u32>,
++    pub final_top1_score: Option<f32>,
++    pub final_top1_prob: Option<f32>,
++    pub final_top2_id: Option<u32>,
++    pub final_top2_score: Option<f32>,
++    pub final_top2_prob: Option<f32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -110,6 +128,25 @@
+     pub selected_transition_penalty: Option<f32>,
+     pub selected_transition_action_code: Option<u32>,
+     pub selected_transition_reason_mask: Option<u32>,
++    pub pre_min_p_count: usize,
++    pub post_min_p_count: usize,
++    pub post_top_p_count: usize,
++    pub active_entropy: Option<f32>,
++    pub active_normalized_entropy: Option<f32>,
++    pub final_entropy: Option<f32>,
++    pub final_normalized_entropy: Option<f32>,
++    pub weighted_top1_id: Option<u32>,
++    pub weighted_top1_score: Option<f32>,
++    pub weighted_top1_prob: Option<f32>,
++    pub weighted_top2_id: Option<u32>,
++    pub weighted_top2_score: Option<f32>,
++    pub weighted_top2_prob: Option<f32>,
++    pub final_top1_id: Option<u32>,
++    pub final_top1_score: Option<f32>,
++    pub final_top1_prob: Option<f32>,
++    pub final_top2_id: Option<u32>,
++    pub final_top2_score: Option<f32>,
++    pub final_top2_prob: Option<f32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -192,6 +229,8 @@
+         recovery_mode: trace.recovery_mode.as_str().to_string(),
+         transition_guard_enabled: trace.transition_guard_enabled,
+         transition_guard_probe_only: trace.transition_guard_probe_only,
++        semantic_prior_enabled: trace.semantic_prior_enabled,
++        semantic_prior_effective: trace.semantic_prior_effective,
+         selected_transition_risk: trace.selected_transition_risk,
+         selected_transition_penalty: trace.selected_transition_penalty,
+         selected_transition_action_code: trace.selected_transition_action.as_ref().and_then(|name| match name.as_str() {
+@@ -203,6 +242,25 @@
+             _ => None,
+         }),
+         selected_transition_reason_mask: Some(transition_reason_string_mask(&trace.selected_transition_reasons)),
++        pre_min_p_count: trace.pre_min_p_count,
++        post_min_p_count: trace.post_min_p_count,
++        post_top_p_count: trace.post_top_p_count,
++        active_entropy: trace.active_entropy,
++        active_normalized_entropy: trace.active_normalized_entropy,
++        final_entropy: trace.final_entropy,
++        final_normalized_entropy: trace.final_normalized_entropy,
++        weighted_top1_id: trace.active_top1_id,
++        weighted_top1_score: trace.active_top1_score,
++        weighted_top1_prob: trace.active_top1_prob,
++        weighted_top2_id: trace.active_top2_id,
++        weighted_top2_score: trace.active_top2_score,
++        weighted_top2_prob: trace.active_top2_prob,
++        final_top1_id: trace.final_top1_id,
++        final_top1_score: trace.final_top1_score,
++        final_top1_prob: trace.final_top1_prob,
++        final_top2_id: trace.final_top2_id,
++        final_top2_score: trace.final_top2_score,
++        final_top2_prob: trace.final_top2_prob,
+     }
+ }
+ 
+@@ -391,5 +449,6 @@
+     }
+     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
+     crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
++    crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/workspace/decode03a_entropy_receipt_schema.json /mnt/data/decode03a_work/workspace/decode03a_entropy_receipt_schema.json
+--- /mnt/data/decode03a_orig/workspace/decode03a_entropy_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/workspace/decode03a_entropy_receipt_schema.json	2026-05-27 06:00:28.816594177 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03A",
++  "schema_version": 1,
++  "description": "Entropy / Confidence Metric Receipt Seal. Observe-only decode step receipt produced from sampler parity CPU oracle evidence.",
++  "required_contract": {
++    "behavior_change": false,
++    "sampler_ssot": "model_core::cpu_oracle_sampler",
++    "input_patch": "16AI-QW-38G-R6A-SAMPLER-05",
++    "runtime_enable_env": "ASH_DECODE03A_ENTROPY=receipt"
++  },
++  "receipt_path_default": "workspace/decode03a_entropy_steps.jsonl",
++  "summary_path_default": "workspace/decode03a_summary.json",
++  "stages": [
++    "Raw",
++    "Scaled",
++    "AfterStaticPrior",
++    "AfterTransitionGuard",
++    "AfterMinP",
++    "AfterTopP",
++    "FinalActive"
++  ],
++  "note": "Raw/scaled/prior stage entropy is marked partial when only sampler03 bridge evidence is available. CPU oracle active/final entropy is populated from CpuOracleCandidateTrace."
++}
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/workspace/decode03a_probe_prompts.jsonl /mnt/data/decode03a_work/workspace/decode03a_probe_prompts.jsonl
+--- /mnt/data/decode03a_orig/workspace/decode03a_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/workspace/decode03a_probe_prompts.jsonl	2026-05-27 06:00:28.832658393 +0000
+@@ -0,0 +1,8 @@
++{"fixture_id":"P01_short_korean_qa","prompt":"애쉬야, 1 더하기 1은?","max_new_tokens":64}
++{"fixture_id":"P02_hangul_completion","prompt":"장수풍뎅","max_new_tokens":64}
++{"fixture_id":"P03_repetition_trap","prompt":"다음 문장을 반복하지 말고 자연스럽게 이어 써라: 합니다 합니다 합니다","max_new_tokens":64}
++{"fixture_id":"P04_josa_eomi_loop_probe","prompt":"나는 오늘 집에","max_new_tokens":64}
++{"fixture_id":"P05_structured_markdown","prompt":"아래 내용을 마크다운 체크리스트로 정리해줘: 디코더, 샘플러, 엔트로피","max_new_tokens":96}
++{"fixture_id":"P06_emotional_prose_short","prompt":"비가 오는 날, 젖은 강아지처럼 웅크린 사람을 묘사해줘.","max_new_tokens":96}
++{"fixture_id":"P07_noisy_user_input","prompt":"아니 이거 왜 자꾸 말이 샐러드처럼 섞이냐???? 로그 보고 말해","max_new_tokens":96}
++{"fixture_id":"P08_transition_guard_sensitive","prompt":"이전 토큰의 흐름을 유지하면서 자연스러운 한국어 문장으로 계속해.","max_new_tokens":96}
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/workspace/decode03a_report.md /mnt/data/decode03a_work/workspace/decode03a_report.md
+--- /mnt/data/decode03a_orig/workspace/decode03a_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/workspace/decode03a_report.md	2026-05-27 06:00:28.851070568 +0000
+@@ -0,0 +1,25 @@
++# DECODE-03A Bake Report
++
++`16AI-QW-38G-R6A-DECODE-03A` adds an observe-only entropy/confidence receipt layer on top of the SAMPLER-05 parity lane.
++
++## What changed
++
++- CPU oracle candidate trace now records:
++  - active/final entropy
++  - active/final normalized entropy
++  - active/final top1/top2 id, score, probability
++- sampler parity runtime trace now carries entropy/confidence seed fields.
++- DECODE-03A receipt generation is attached to `sampler_parity::append_receipt()`.
++- The receipt writer is off by default and enabled through `ASH_DECODE03A_ENTROPY=receipt`.
++- Summary aggregation is included through `write_decode03a_summary_from_receipt_file()`.
++
++## What did not change
++
++- No sampler behavior change.
++- No dynamic temperature/min-p enable.
++- No rollback or word-salad intervention.
++- GPU entropy is optional and not required for this seal.
++
++## Runtime gate
++
++Status remains `STATIC_BAKE_DEFINED_NOT_RUN` until the target machine runs sampler parity + DECODE-03A receipt capture.
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/workspace/decode03a_static_checks.json /mnt/data/decode03a_work/workspace/decode03a_static_checks.json
+--- /mnt/data/decode03a_orig/workspace/decode03a_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/workspace/decode03a_static_checks.json	2026-05-27 06:01:24.771983980 +0000
+@@ -0,0 +1,20 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03A",
++  "status": "PASS_STATIC",
++  "checks": {
++    "decode03a_module_exists": true,
++    "decode03a_module_registered": true,
++    "decode03a_exports_registered": true,
++    "decode03a_append_hook_registered": true,
++    "cpu_trace_entropy_fields": true,
++    "cpu_trace_semantic_prior_fields": true,
++    "gpu_trace_entropy_fields": true,
++    "cpu_oracle_entropy_fields": true,
++    "observe_only_contract": true,
++    "logsumexp_helper": true,
++    "cargo_available": false
++  },
++  "runtime": "NOT_RUN",
++  "cargo_check": "NOT_RUN",
++  "reason": "rustc/cargo unavailable in bake container; static source checks only"
++}
+diff -ruN '--exclude=decode03a.patch' /mnt/data/decode03a_orig/workspace/decode03a_summary.json /mnt/data/decode03a_work/workspace/decode03a_summary.json
+--- /mnt/data/decode03a_orig/workspace/decode03a_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode03a_work/workspace/decode03a_summary.json	2026-05-27 06:00:28.824395210 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03A",
++  "input_patch": "16AI-QW-38G-R6A-SAMPLER-05",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "behavior_change": false,
++  "sampler_ssot": "model_core::cpu_oracle_sampler",
++  "requires_sampler05_pass": true,
++  "steps_observed": 0,
++  "partial_entropy_trace_count": 0,
++  "entropy_spike_count": 0,
++  "guard_entropy_inversion_count": 0,
++  "high_guarded_entropy_count": 0,
++  "min_p_overcompression_count": 0,
++  "top_p_overcompression_count": 0,
++  "empty_active_set_count": 0,
++  "global_finite_fallback_count": 0,
++  "nan_count": 0,
++  "inf_count": 0,
++  "selected_rank_gt_5_count": 0,
++  "ready_for_decode03b_pci": false,
++  "ready_for_decode03c_shadow_policy": false,
++  "reason": "static bake only; run ASH_DECODE03A_ENTROPY=receipt with sampler parity to produce entropy evidence"
++}

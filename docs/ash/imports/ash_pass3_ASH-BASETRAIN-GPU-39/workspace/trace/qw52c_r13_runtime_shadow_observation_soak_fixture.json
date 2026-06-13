@@ -1,0 +1,47 @@
+{
+  "patch_id": "QW-52C-R13",
+  "cases": [
+    {
+      "case_id": "clean_long_horizon_pass_no_apply",
+      "expected": {
+        "soak_status": "PassNoApply",
+        "promotion_eligible": false,
+        "runtime_apply_allowed": false,
+        "proceed_to_promotion_review_gate": true,
+        "recommended_next_patch": "QW-52C-R14"
+      }
+    },
+    {
+      "case_id": "late_risky_diff_warn_no_apply",
+      "expected": {
+        "soak_status": "WarnNoApply",
+        "riskydiff_drift_detected": true,
+        "promotion_eligible": false
+      }
+    },
+    {
+      "case_id": "beneficial_decay_warn_no_apply",
+      "expected": {
+        "soak_status": "WarnNoApply",
+        "beneficial_decay_detected": true,
+        "promotion_eligible": false
+      }
+    },
+    {
+      "case_id": "long_horizon_token_mutation_fails",
+      "expected": {
+        "soak_status": "FailInvariant",
+        "mutation_invariant_drift_detected": true,
+        "runtime_apply_allowed": false
+      }
+    },
+    {
+      "case_id": "missing_r12_audit_unavailable",
+      "expected": {
+        "soak_status": "Unavailable",
+        "total_observation_sample_count": 0,
+        "runtime_apply_allowed": false
+      }
+    }
+  ]
+}

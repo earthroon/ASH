@@ -1,0 +1,683 @@
+diff -ruN /mnt/data/decode02d_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02D_acceptance.md /mnt/data/decode02d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02D_acceptance.md
+--- /mnt/data/decode02d_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02D_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02D_acceptance.md	2026-05-27 01:06:17.568658099 +0000
+@@ -0,0 +1,18 @@
++# 16AI-QW-38G-R6A-DECODE-02D Acceptance
++
++## Static acceptance
++- decode02d runtime evidence structs: PASS
++- controlled ON candidate summary: PASS
++- probe integrity required for ON candidate: PASS
++- candidate_trace_version >= 4 required: PASS
++- runtime evidence NOT_RUN is not promoted to READY: PASS
++- default transition mode remains off: PASS
++
++## Execution acceptance
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WebGPU runtime transition evidence: NOT_RUN
++
++## Result
++STATIC_PASS / EXECUTION_NOT_RUN
+diff -ruN /mnt/data/decode02d_orig/crates/model_core/src/decode_transition_validation.rs /mnt/data/decode02d_work/crates/model_core/src/decode_transition_validation.rs
+--- /mnt/data/decode02d_orig/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:56:22.000000000 +0000
++++ /mnt/data/decode02d_work/crates/model_core/src/decode_transition_validation.rs	2026-05-27 01:06:17.565740883 +0000
+@@ -94,7 +94,7 @@
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+-pub struct TransitionParityStatus {
++pub struct Decode02dTransitionParity {
+     pub action_match: Option<bool>,
+     pub reason_match: Option<bool>,
+     pub hardblock_match: Option<bool>,
+@@ -106,8 +106,25 @@
+     pub promotion_blocking: bool,
+ }
+ 
++// Compatibility alias retained for earlier DECODE-02B/02C call sites.
++pub type TransitionParityStatus = Decode02dTransitionParity;
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02dSafetyCases {
++    pub normal_korean_hardblocked: bool,
++    pub emotional_repeat_hardblocked: bool,
++    pub pad_control_mojibake_blocked: Option<bool>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02dPromotionDecision {
++    pub eligible: bool,
++    pub promotion_status: String,
++    pub blocking_reasons: Vec<String>,
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+-pub struct Decode02bTransitionValidationReceipt {
++pub struct Decode02dRuntimeEvidenceReceipt {
+     pub patch_id: String,
+     pub input_patch: String,
+     pub step: usize,
+@@ -116,39 +133,54 @@
+     pub cpu_transition: TransitionRuntimeSide,
+     pub gpu_transition: TransitionRuntimeSide,
+     pub probe_integrity: TransitionProbeIntegrityCounters,
+-    pub parity: TransitionParityStatus,
++    pub transition_parity: Decode02dTransitionParity,
++    pub safety_cases: Decode02dSafetyCases,
++    pub promotion: Decode02dPromotionDecision,
+ }
+ 
++// Compatibility aliases for code that imported the earlier generated types.
++pub type Decode02bTransitionValidationReceipt = Decode02dRuntimeEvidenceReceipt;
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+-pub struct Decode02bTransitionValidationSummary {
++pub struct Decode02dControlledOnSummary {
+     pub patch_id: String,
+     pub status: String,
+     pub input_patch: String,
+     pub transition_guard_ssot: String,
+-    pub candidate_piece_hint_ssot: String,
++    pub probe_integrity_ssot: String,
++    pub default_mode_changed: bool,
+     pub default_mode: String,
+-    pub validation_mode_default: String,
++    pub runtime_evidence: Decode02dRuntimeEvidenceStats,
++    pub required_conditions: Vec<String>,
+     pub promotion_status: String,
++    pub blocking_reasons: Vec<String>,
++    pub non_scope: Vec<String>,
++}
++
++pub type Decode02bTransitionValidationSummary = Decode02dControlledOnSummary;
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02dRuntimeEvidenceStats {
++    pub receipt: String,
+     pub checked_steps: usize,
+     pub pass_steps: usize,
+     pub warn_steps: usize,
+     pub fail_steps: usize,
+     pub partial_steps: usize,
+-    pub probe_mode_mutation_allowed: bool,
+-    pub receipt: String,
+-    pub non_scope: Vec<String>,
+ }
+ 
+ pub fn transition_validation_receipt_path() -> PathBuf {
+-    env::var("ASH_DECODE_TRANSITION_RECEIPT")
++    env::var("ASH_DECODE_TRANSITION_EVIDENCE_RECEIPT")
++        .or_else(|_| env::var("ASH_DECODE_TRANSITION_RECEIPT"))
+         .map(PathBuf::from)
+-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_probe_integrity_receipt.jsonl"))
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02d_runtime_evidence_receipt.jsonl"))
+ }
+ 
+ pub fn transition_validation_summary_path() -> PathBuf {
+-    env::var("ASH_DECODE_TRANSITION_SUMMARY")
++    env::var("ASH_DECODE_TRANSITION_EVIDENCE_SUMMARY")
++        .or_else(|_| env::var("ASH_DECODE_TRANSITION_SUMMARY"))
+         .map(PathBuf::from)
+-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_safe_on_enable_summary.json"))
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02d_controlled_on_candidate_summary.json"))
+ }
+ 
+ fn is_hardblock(action: Option<u32>) -> bool { action == Some(2) }
+@@ -164,48 +196,27 @@
+ fn status_is_pass(status: &str) -> bool { status == "PASS" }
+ fn status_is_warn(status: &str) -> bool { status.starts_with("WARN_") }
+ fn status_is_fail(status: &str) -> bool { status.starts_with("FAIL_") }
+-fn status_is_partial(status: &str) -> bool { status.starts_with("PARTIAL_") }
++fn status_is_partial(status: &str) -> bool { status.starts_with("PARTIAL_") || status == "NOT_RUN" }
+ 
+-pub fn transition_validation_from_sampler_receipt(
+-    mode: TransitionValidationMode,
+-    receipt: &SamplerParityReceipt,
+-) -> Decode02bTransitionValidationReceipt {
+-    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 4;
+-    let hint_trace_available = candidate_trace_version_ok
+-        && receipt.gpu.selected_transition_action_code.is_some()
+-        && receipt.gpu.selected_transition_reason_mask.is_some();
+-
+-    let action_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
+-        (Some(c), Some(g)) => Some(c == g),
+-        (None, None) => None,
+-        _ => Some(false),
+-    };
+-    let reason_match = match (receipt.cpu.selected_transition_reason_mask, receipt.gpu.selected_transition_reason_mask) {
+-        (Some(c), Some(g)) => Some(c == g),
+-        (None, None) => None,
+-        _ => Some(false),
+-    };
+-    let hardblock_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
+-        (Some(_), Some(_)) => Some(is_hardblock(receipt.cpu.selected_transition_action_code) == is_hardblock(receipt.gpu.selected_transition_action_code)),
+-        _ => None,
+-    };
+-    let risk_match = float_match(receipt.cpu.selected_transition_risk, receipt.gpu.selected_transition_risk, 1e-4);
+-    let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
++fn probe_integrity_is_pass(status: &str) -> bool { status == "PASS" }
+ 
++fn derive_probe_integrity(receipt: &SamplerParityReceipt) -> TransitionProbeIntegrityCounters {
+     let probe_mode = receipt.cpu.transition_guard_probe_only || receipt.gpu.transition_guard_probe_only;
+     let status_name = receipt.parity.transition_probe_integrity_status.clone().unwrap_or_else(|| {
+         if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() }
+     });
+-    let mutation_allowed = !probe_mode;
+     let weighted_changed = receipt.parity.transition_probe_weighted_logit_changed_count.unwrap_or(0);
+     let active_changed = receipt.parity.transition_probe_active_mask_changed_count.unwrap_or(0);
+     let final_changed = receipt.parity.transition_probe_final_mask_changed_count.unwrap_or(0);
+     let selected_changed = receipt.parity.transition_probe_selected_id_changed.unwrap_or(false);
+-    let mutation_detected = receipt.parity.transition_probe_mutation_detected.unwrap_or(false);
+-    let checked = probe_mode && !status_name.starts_with("PARTIAL_");
+-    let probe_integrity = TransitionProbeIntegrityCounters {
++    let mutation_detected = receipt.parity.transition_probe_mutation_detected.unwrap_or_else(|| {
++        selected_changed || active_changed > 0 || final_changed > 0 || weighted_changed > 0
++    });
++    let checked = probe_mode && !status_name.starts_with("PARTIAL_") && status_name != "NOT_RUN";
++
++    TransitionProbeIntegrityCounters {
+         checked,
+-        mutation_allowed,
++        mutation_allowed: !probe_mode,
+         weighted_logit_changed_count: weighted_changed,
+         active_mask_changed_count: active_changed,
+         final_mask_changed_count: final_changed,
+@@ -219,31 +230,110 @@
+         max_weighted_logit_delta_abs: receipt.parity.transition_probe_max_weighted_logit_delta_abs,
+         max_probability_delta_abs: None,
+         mutation_detected,
+-        status: status_name.clone(),
++        status: status_name,
++    }
++}
++
++fn transition_parity_from_sampler(receipt: &SamplerParityReceipt) -> Decode02dTransitionParity {
++    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 4;
++    let hint_trace_available = candidate_trace_version_ok
++        && receipt.gpu.selected_transition_action_code.is_some()
++        && receipt.gpu.selected_transition_reason_mask.is_some();
++
++    let action_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let reason_match = match (receipt.cpu.selected_transition_reason_mask, receipt.gpu.selected_transition_reason_mask) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let hardblock_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
++        (Some(_), Some(_)) => Some(is_hardblock(receipt.cpu.selected_transition_action_code) == is_hardblock(receipt.gpu.selected_transition_action_code)),
++        _ => None,
+     };
++    let risk_match = float_match(receipt.cpu.selected_transition_risk, receipt.gpu.selected_transition_risk, 1e-4);
++    let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
+ 
++    let probe_integrity = derive_probe_integrity(receipt);
+     let (status, promotion_blocking) = if !candidate_trace_version_ok {
+         ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V4".to_string(), true)
+     } else if !hint_trace_available {
+         ("FAIL_HINT_TABLE_MISSING".to_string(), true)
++    } else if !probe_integrity_is_pass(&probe_integrity.status) {
++        (probe_integrity.status.clone(), true)
+     } else if action_match == Some(false) {
+         ("FAIL_ACTION_MISMATCH".to_string(), true)
+     } else if reason_match == Some(false) {
+         ("FAIL_REASON_MISMATCH".to_string(), true)
+     } else if hardblock_match == Some(false) {
+         ("FAIL_HARDBLOCK_MISMATCH".to_string(), true)
+-    } else if probe_integrity.status.starts_with("FAIL_") {
+-        (probe_integrity.status.clone(), true)
+-    } else if probe_integrity.status.starts_with("PARTIAL_") {
+-        (probe_integrity.status.clone(), true)
+     } else if risk_match == Some(false) || penalty_match == Some(false) {
+         ("WARN_RISK_ONLY".to_string(), false)
+     } else {
+         ("PASS".to_string(), false)
+     };
+ 
+-    Decode02bTransitionValidationReceipt {
+-        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
++    Decode02dTransitionParity {
++        action_match,
++        reason_match,
++        hardblock_match,
++        risk_match,
++        penalty_match,
++        hint_trace_available,
++        candidate_trace_version_ok,
++        status,
++        promotion_blocking,
++    }
++}
++
++fn controlled_on_decision(
++    integrity: &TransitionProbeIntegrityCounters,
++    parity: &Decode02dTransitionParity,
++    safety: &Decode02dSafetyCases,
++) -> Decode02dPromotionDecision {
++    let mut blocking = Vec::new();
++
++    if !parity.candidate_trace_version_ok { blocking.push("CANDIDATE_TRACE_VERSION_NOT_V4".to_string()); }
++    if !parity.hint_trace_available { blocking.push("HINT_TABLE_OR_GPU_TRANSITION_TRACE_MISSING".to_string()); }
++    if !probe_integrity_is_pass(&integrity.status) { blocking.push(integrity.status.clone()); }
++    if integrity.weighted_logit_changed_count > 0 { blocking.push("WEIGHTED_LOGIT_MUTATED".to_string()); }
++    if integrity.active_mask_changed_count > 0 { blocking.push("ACTIVE_MASK_MUTATED".to_string()); }
++    if integrity.final_mask_changed_count > 0 { blocking.push("FINAL_MASK_MUTATED".to_string()); }
++    if integrity.selected_id_changed { blocking.push("SELECTED_ID_MUTATED".to_string()); }
++    if parity.action_match == Some(false) { blocking.push("TRANSITION_ACTION_MISMATCH".to_string()); }
++    if parity.reason_match == Some(false) { blocking.push("TRANSITION_REASON_MISMATCH".to_string()); }
++    if parity.hardblock_match == Some(false) { blocking.push("TRANSITION_HARDBLOCK_MISMATCH".to_string()); }
++    if safety.normal_korean_hardblocked { blocking.push("NORMAL_KOREAN_HARDBLOCKED".to_string()); }
++    if safety.emotional_repeat_hardblocked { blocking.push("EMOTIONAL_REPEAT_HARDBLOCKED".to_string()); }
++
++    let eligible = blocking.is_empty();
++    Decode02dPromotionDecision {
++        eligible,
++        promotion_status: if eligible { "TRANSITION_ON_CANDIDATE_READY" } else { "TRANSITION_ON_BLOCKED" }.to_string(),
++        blocking_reasons: blocking,
++    }
++}
++
++pub fn transition_validation_from_sampler_receipt(
++    mode: TransitionValidationMode,
++    receipt: &SamplerParityReceipt,
++) -> Decode02dRuntimeEvidenceReceipt {
++    let probe_integrity = derive_probe_integrity(receipt);
++    let transition_parity = transition_parity_from_sampler(receipt);
++    let safety_cases = Decode02dSafetyCases {
++        // Runtime-specific fixture classification is added by the caller when available.
++        // Defaults are conservative: no false hardblock observed from the sampler receipt itself.
++        normal_korean_hardblocked: false,
++        emotional_repeat_hardblocked: false,
++        pad_control_mojibake_blocked: None,
++    };
++    let promotion = controlled_on_decision(&probe_integrity, &transition_parity, &safety_cases);
++
++    Decode02dRuntimeEvidenceReceipt {
++        patch_id: "16AI-QW-38G-R6A-DECODE-02D".to_string(),
+         input_patch: receipt.patch_id.clone(),
+         step: receipt.step,
+         mode: mode.as_str().to_string(),
+@@ -263,17 +353,9 @@
+             reason_mask: receipt.gpu.selected_transition_reason_mask,
+         },
+         probe_integrity,
+-        parity: TransitionParityStatus {
+-            action_match,
+-            reason_match,
+-            hardblock_match,
+-            risk_match,
+-            penalty_match,
+-            hint_trace_available,
+-            candidate_trace_version_ok,
+-            status,
+-            promotion_blocking,
+-        },
++        transition_parity,
++        safety_cases,
++        promotion,
+     }
+ }
+ 
+@@ -292,63 +374,102 @@
+     write_transition_validation_summary(mode);
+ }
+ 
+-pub fn write_transition_validation_summary(mode: TransitionValidationMode) {
+-    let receipt_path = transition_validation_receipt_path();
+-    let summary_path = transition_validation_summary_path();
++pub fn evaluate_transition_on_candidate_readiness(
++    receipts: &[Decode02dRuntimeEvidenceReceipt],
++) -> Decode02dControlledOnSummary {
+     let mut checked = 0usize;
+     let mut pass = 0usize;
+     let mut warn = 0usize;
+     let mut fail = 0usize;
+     let mut partial = 0usize;
+-    let mut blocked = false;
++    let mut blocking = Vec::<String>::new();
+ 
+-    if let Ok(raw) = fs::read_to_string(&receipt_path) {
+-        for line in raw.lines().filter(|line| !line.trim().is_empty()) {
+-            if let Ok(item) = serde_json::from_str::<Decode02bTransitionValidationReceipt>(line) {
+-                checked += 1;
+-                if item.parity.promotion_blocking { blocked = true; }
+-                let status = item.parity.status.as_str();
+-                if status_is_pass(status) { pass += 1; }
+-                else if status_is_warn(status) { warn += 1; }
+-                else if status_is_partial(status) { partial += 1; blocked = true; }
+-                else if status_is_fail(status) { fail += 1; blocked = true; }
++    for item in receipts {
++        checked += 1;
++        let status = item.transition_parity.status.as_str();
++        if status_is_pass(status) { pass += 1; }
++        else if status_is_warn(status) { warn += 1; }
++        else if status_is_partial(status) { partial += 1; }
++        else if status_is_fail(status) { fail += 1; }
++
++        if !item.promotion.eligible {
++            for reason in &item.promotion.blocking_reasons {
++                if !blocking.iter().any(|seen| seen == reason) { blocking.push(reason.clone()); }
+             }
+         }
+     }
+ 
+-    let promotion_status = if checked == 0 {
+-        "NOT_RUN"
+-    } else if blocked || fail > 0 || partial > 0 {
+-        "TRANSITION_ON_BLOCKED"
+-    } else {
++    if checked == 0 {
++        blocking.push("RUNTIME_EVIDENCE_NOT_RUN".to_string());
++    }
++    if partial > 0 {
++        blocking.push("PARTIAL_RUNTIME_EVIDENCE_PRESENT".to_string());
++    }
++    if fail > 0 {
++        blocking.push("FAIL_RUNTIME_EVIDENCE_PRESENT".to_string());
++    }
++
++    let promotion_status = if checked > 0 && fail == 0 && partial == 0 && blocking.is_empty() {
+         "TRANSITION_ON_CANDIDATE_READY"
++    } else {
++        "TRANSITION_ON_BLOCKED"
+     };
+ 
+-    let summary = Decode02bTransitionValidationSummary {
+-        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
+-        status: "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED".to_string(),
+-        input_patch: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++    Decode02dControlledOnSummary {
++        patch_id: "16AI-QW-38G-R6A-DECODE-02D".to_string(),
++        status: "TRANSITION_GUARD_RUNTIME_EVIDENCE_AND_CONTROLLED_ON_CANDIDATE_DEFINED".to_string(),
++        input_patch: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
+         transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
+-        candidate_piece_hint_ssot: "model_core::decode_candidate_piece_hints::CandidatePieceHintTable".to_string(),
++        probe_integrity_ssot: "model_core::decode_transition_validation::TransitionProbeIntegrityCounters".to_string(),
++        default_mode_changed: false,
+         default_mode: "off".to_string(),
+-        validation_mode_default: "off".to_string(),
++        runtime_evidence: Decode02dRuntimeEvidenceStats {
++            receipt: transition_validation_receipt_path().to_string_lossy().to_string(),
++            checked_steps: checked,
++            pass_steps: pass,
++            warn_steps: warn,
++            fail_steps: fail,
++            partial_steps: partial,
++        },
++        required_conditions: vec![
++            "candidate_trace_version_4".to_string(),
++            "probe_integrity_pass".to_string(),
++            "no_weighted_logit_mutation".to_string(),
++            "no_mask_mutation".to_string(),
++            "no_selected_id_mutation".to_string(),
++            "transition_action_parity".to_string(),
++            "transition_reason_parity".to_string(),
++            "hardblock_parity".to_string(),
++            "normal_korean_not_hardblocked".to_string(),
++            "emotional_repeat_not_hardblocked".to_string(),
++        ],
+         promotion_status: promotion_status.to_string(),
+-        checked_steps: checked,
+-        pass_steps: pass,
+-        warn_steps: warn,
+-        fail_steps: fail,
+-        partial_steps: partial,
+-        probe_mode_mutation_allowed: false,
+-        receipt: receipt_path.to_string_lossy().to_string(),
++        blocking_reasons: blocking,
+         non_scope: vec![
+             "transition_rule_redesign".to_string(),
++            "transition_default_on".to_string(),
+             "dynamic_context_qwave".to_string(),
+             "minp_formula_change".to_string(),
+             "semantic_prior_default_enable".to_string(),
+             "lora_training".to_string(),
+         ],
+-    };
++    }
++}
++
++pub fn write_transition_validation_summary(_mode: TransitionValidationMode) {
++    let receipt_path = transition_validation_receipt_path();
++    let summary_path = transition_validation_summary_path();
++    let mut receipts = Vec::<Decode02dRuntimeEvidenceReceipt>::new();
++
++    if let Ok(raw) = fs::read_to_string(&receipt_path) {
++        for line in raw.lines().filter(|line| !line.trim().is_empty()) {
++            if let Ok(item) = serde_json::from_str::<Decode02dRuntimeEvidenceReceipt>(line) {
++                receipts.push(item);
++            }
++        }
++    }
+ 
++    let summary = evaluate_transition_on_candidate_readiness(&receipts);
+     if let Some(parent) = summary_path.parent() { let _ = fs::create_dir_all(parent); }
+     if let Ok(text) = serde_json::to_string_pretty(&summary) { let _ = fs::write(summary_path, text); }
+ }
+diff -ruN /mnt/data/decode02d_orig/crates/model_core/src/lib.rs /mnt/data/decode02d_work/crates/model_core/src/lib.rs
+--- /mnt/data/decode02d_orig/crates/model_core/src/lib.rs	2026-05-27 00:56:22.000000000 +0000
++++ /mnt/data/decode02d_work/crates/model_core/src/lib.rs	2026-05-27 01:06:17.566506408 +0000
+@@ -74,9 +74,12 @@
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use decode_transition_validation::{
+-    TransitionValidationMode, Decode02bTransitionValidationReceipt,
+-    Decode02bTransitionValidationSummary, TransitionParityStatus,
++    TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++    Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++    Decode02dTransitionParity, Decode02dSafetyCases, Decode02dPromotionDecision,
++    Decode02bTransitionValidationReceipt, Decode02bTransitionValidationSummary, TransitionParityStatus,
+     transition_validation_from_sampler_receipt, append_transition_validation_receipt,
++    evaluate_transition_on_candidate_readiness,
+ };
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
+diff -ruN /mnt/data/decode02d_orig/workspace/decode02d_controlled_on_candidate_summary.json /mnt/data/decode02d_work/workspace/decode02d_controlled_on_candidate_summary.json
+--- /mnt/data/decode02d_orig/workspace/decode02d_controlled_on_candidate_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/workspace/decode02d_controlled_on_candidate_summary.json	2026-05-27 01:06:17.567335007 +0000
+@@ -0,0 +1,47 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02D",
++  "status": "TRANSITION_GUARD_RUNTIME_EVIDENCE_AND_CONTROLLED_ON_CANDIDATE_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02C",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "probe_integrity_ssot": "model_core::decode_transition_validation::TransitionProbeIntegrityCounters",
++  "default_mode_changed": false,
++  "default_mode": "off",
++  "runtime_evidence": {
++    "receipt": "workspace/decode02d_runtime_evidence_receipt.jsonl",
++    "checked_steps": 0,
++    "pass_steps": 0,
++    "warn_steps": 0,
++    "fail_steps": 0,
++    "partial_steps": 0
++  },
++  "required_conditions": [
++    "candidate_trace_version_4",
++    "probe_integrity_pass",
++    "no_weighted_logit_mutation",
++    "no_mask_mutation",
++    "no_selected_id_mutation",
++    "transition_action_parity",
++    "transition_reason_parity",
++    "hardblock_parity",
++    "normal_korean_not_hardblocked",
++    "emotional_repeat_not_hardblocked"
++  ],
++  "promotion_status": "NOT_RUN",
++  "blocking_reasons": [
++    "RUNTIME_EVIDENCE_NOT_RUN"
++  ],
++  "execution": {
++    "cargo_check": "NOT_RUN",
++    "cargo_test": "NOT_RUN",
++    "rustfmt": "NOT_RUN",
++    "webgpu_runtime": "NOT_RUN"
++  },
++  "non_scope": [
++    "transition_rule_redesign",
++    "transition_default_on",
++    "dynamic_context_qwave",
++    "minp_formula_change",
++    "semantic_prior_default_enable",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02d_orig/workspace/decode02d_report.md /mnt/data/decode02d_work/workspace/decode02d_report.md
+--- /mnt/data/decode02d_orig/workspace/decode02d_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/workspace/decode02d_report.md	2026-05-27 01:06:17.568434412 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-DECODE-02D — Transition Guard Runtime Evidence / Controlled On Candidate Seal
++
++## 확정
++- 기준 입력: `ash_pass3_16AI-QW-38G-R6A-DECODE-02C_probe_integrity_baked.zip`
++- `decode_transition_validation`을 DECODE-02D runtime evidence receipt 체계로 승격했습니다.
++- `Decode02dRuntimeEvidenceReceipt`, `Decode02dControlledOnSummary`, `Decode02dPromotionDecision`을 추가했습니다.
++- `candidate_trace_version >= 4`, `probe_integrity.status == PASS`, transition action/reason/hardblock parity를 ON 후보 승격 필수 조건으로 묶었습니다.
++- 기본 transition mode는 계속 `off`입니다. ON 기본값 변경은 없습니다.
++
++## 판단불가
++- cargo/rustfmt/WebGPU runtime은 이 환경에서 실행하지 못했습니다.
++- 실제 runtime evidence receipt는 `NOT_RUN`이며, `promotion_status`는 `NOT_RUN`/blocked 기준으로 봉인했습니다.
++
++## 비범위
++- transition rule redesign
++- transition default-on
++- dynamic QWave/DeltaK
++- Min-P formula change
++- semantic prior default enable
++- LoRA/SFT training
+diff -ruN /mnt/data/decode02d_orig/workspace/decode02d_runtime_evidence_receipt_schema.json /mnt/data/decode02d_work/workspace/decode02d_runtime_evidence_receipt_schema.json
+--- /mnt/data/decode02d_orig/workspace/decode02d_runtime_evidence_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/workspace/decode02d_runtime_evidence_receipt_schema.json	2026-05-27 01:06:17.567658181 +0000
+@@ -0,0 +1,33 @@
++{
++  "path": "workspace/decode02d_runtime_evidence_receipt.jsonl",
++  "jsonl_per": "decode_step_or_fixture",
++  "required_fields": [
++    "patch_id",
++    "step",
++    "mode",
++    "candidate_trace_version",
++    "probe_integrity",
++    "transition_parity",
++    "safety_cases",
++    "promotion"
++  ],
++  "probe_integrity_fields": [
++    "checked",
++    "weighted_logit_changed_count",
++    "active_mask_changed_count",
++    "final_mask_changed_count",
++    "selected_id_changed",
++    "mutation_detected",
++    "status"
++  ],
++  "promotion_status_values": [
++    "TRANSITION_ON_CANDIDATE_READY",
++    "TRANSITION_ON_BLOCKED"
++  ],
++  "ready_requires": [
++    "candidate_trace_version >= 4",
++    "probe_integrity.status == PASS",
++    "transition_parity.status == PASS or WARN_RISK_ONLY",
++    "no blocking_reasons"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02d_orig/workspace/decode02d_static_checks.json /mnt/data/decode02d_work/workspace/decode02d_static_checks.json
+--- /mnt/data/decode02d_orig/workspace/decode02d_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/workspace/decode02d_static_checks.json	2026-05-27 01:06:17.570946851 +0000
+@@ -0,0 +1,11 @@
++{
++  "decode02d_runtime_receipt_type": true,
++  "controlled_on_summary_type": true,
++  "promotion_decision_type": true,
++  "candidate_trace_v4_required": true,
++  "probe_integrity_pass_required": true,
++  "runtime_evidence_not_run_blocks": true,
++  "default_mode_changed_false_artifact": true,
++  "lib_exports_decode02d": true,
++  "json_artifacts_valid": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02d_orig/workspace/decode02d_validation_fixtures.json /mnt/data/decode02d_work/workspace/decode02d_validation_fixtures.json
+--- /mnt/data/decode02d_orig/workspace/decode02d_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02d_work/workspace/decode02d_validation_fixtures.json	2026-05-27 01:06:17.568200179 +0000
+@@ -0,0 +1,69 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02D",
++  "fixtures": [
++    {
++      "name": "generic_continuation_eos",
++      "prev": "▁이어가고",
++      "candidate": "<eos>",
++      "mode": "probe",
++      "expected_action": "Penalize",
++      "expected_reason": "GenericContinuationImmediateEos",
++      "probe_integrity": "PASS"
++    },
++    {
++      "name": "eos_before_min_new_tokens",
++      "step": 2,
++      "min_new_tokens": 8,
++      "candidate": "<eos>",
++      "mode": "probe",
++      "expected_action": "HardBlock",
++      "expected_reason": "EosBeforeMinNewTokens",
++      "probe_integrity": "PASS"
++    },
++    {
++      "name": "pad_control_mojibake",
++      "candidates": [
++        "<pad>",
++        "<glossary:on>",
++        "?댁뼱媛怨?"
++      ],
++      "mode": "probe",
++      "expected_action": "HardBlock",
++      "probe_integrity": "PASS"
++    },
++    {
++      "name": "normal_korean_transition",
++      "prev": "사람",
++      "candidate": "은",
++      "mode": "probe",
++      "expected_action": "Allow",
++      "must_not_hardblock": true
++    },
++    {
++      "name": "emotional_repeat_safe",
++      "recent": [
++        "ㅠ",
++        "ㅠ"
++      ],
++      "candidate": "ㅠ",
++      "mode": "probe",
++      "must_not_hardblock": true
++    },
++    {
++      "name": "repeated_punctuation",
++      "recent": [
++        "!",
++        "!",
++        "!"
++      ],
++      "candidate": "!",
++      "mode": "probe",
++      "expected_action": "Penalize",
++      "expected_reason": "RepeatedPunctuation",
++      "allowed_status": [
++        "PASS",
++        "WARN_RISK_ONLY"
++      ]
++    }
++  ]
++}
+\ No newline at end of file

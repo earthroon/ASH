@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-08",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "status": "PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE",
+  "rust_module_added": "crates/ash_core/src/word_context_context_plan_injection.rs",
+  "runner_added": "crates/ash_core/src/bin/ash_word_context_context_plan_injection_candidate.rs",
+  "lib_export_added": true,
+  "candidate_only_invariants": {
+    "candidate_created_count": 24,
+    "candidate_prompt_created_count": 24,
+    "candidate_prompt_applied_count": 0,
+    "active_prompt_mutation_count": 0,
+    "approval_granted_count": 0,
+    "runtime_default_apply_count": 0,
+    "rerank_applied_count": 0,
+    "pending_approval_count": 24
+  },
+  "notes": [
+    "WCTX-08 creates candidate prompt preview only.",
+    "Approval gate status remains pending.",
+    "Active prompt, generation input, runtime default apply, and rerank are not mutated.",
+    "cargo/rustc unavailable in this environment; compile should be checked in local Rust toolchain."
+  ]
+}

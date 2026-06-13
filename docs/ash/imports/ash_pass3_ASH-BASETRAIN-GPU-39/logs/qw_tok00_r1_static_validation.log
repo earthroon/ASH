@@ -1,0 +1,28 @@
+QW-TOK-00-R1 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok00R1VocabCapExtensionConfig: PASS
+QwTok00R1FinalManifestSummary: PASS
+QwTok00R1ReservedTokenParityReport: PASS
+QwTok00R1ByteTailContractReport: PASS
+QwTok00R1ExistingIdDriftReport: PASS
+QwTok00R1VocabCapExtensionReport: PASS
+build_qw_tok00_r1_vocab_cap_extension_report: PASS
+QW_TOK00_R1_FINAL_VOCAB_SIZE: usize = 48_259: PASS
+QW_TOK00_R1_BYTE_TAIL_ID_START: usize = 48_003: PASS
+QW_TOK00_R1_BYTE_TAIL_ID_END: usize = 48_258: PASS
+default blocks new reserved tail: PASS
+default blocks tokenizer retrain: PASS
+default blocks token remap: PASS
+default blocks lm_head resize: PASS
+default blocks runtime decode bind: PASS
+test vocab cap present: PASS
+test byte tail present: PASS
+test no drift present: PASS
+test no repair present: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+tokenizer model not packaged in workdir: PASS
+tokenizer vocab not packaged in workdir: PASS
+overall: PASS

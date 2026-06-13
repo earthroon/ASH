@@ -1,0 +1,19 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-RUN-00",
+  "cargo_test": {
+    "model_core_decode": "NOT_RUN",
+    "model_core_sampler": "NOT_RUN",
+    "model_core_minp": "NOT_RUN",
+    "model_core_transition": "NOT_RUN",
+    "burn_webgpu_backend_gpu_sampling": "NOT_RUN"
+  },
+  "commands": {
+    "model_core_decode": "cargo test -p model_core decode",
+    "model_core_sampler": "cargo test -p model_core sampler",
+    "model_core_minp": "cargo test -p model_core minp",
+    "model_core_transition": "cargo test -p model_core transition",
+    "burn_webgpu_backend_gpu_sampling": "cargo test -p burn_webgpu_backend gpu_sampling"
+  },
+  "status": "NOT_RUN",
+  "reason": "NO_CARGO_IN_BAKE_ENVIRONMENT"
+}

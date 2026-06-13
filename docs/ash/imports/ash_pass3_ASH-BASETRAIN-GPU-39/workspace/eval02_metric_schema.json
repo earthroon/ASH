@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
+  "schema_version": 1,
+  "files": {
+    "long_prompt_suite": "workspace/eval02_long_prompt_suite.jsonl",
+    "matrix": "workspace/eval02_matrix.json",
+    "window_runs": "workspace/eval02_window_runs.jsonl",
+    "step_samples": "workspace/eval02_step_samples.jsonl",
+    "summary": "workspace/eval02_summary.json"
+  },
+  "metric_groups": [
+    "window_metrics",
+    "drift_metrics",
+    "judgement",
+    "profile_summary"
+  ],
+  "hard_fail": [
+    "global_finite_fallback_count > 0",
+    "salad02_critical_count > 0 in normal long prompt",
+    "salad04_critical_count > 0 in normal long prompt",
+    "byte_piece_count >= 3 in any window",
+    "jamo_leak_count >= 5 total",
+    "active_set_empty",
+    "stop receipt missing for premature stop",
+    "ledger mutation forbidden violation"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
+  "fixture_policy": "SKIPPED_TOKEN_NOT_FOUND is not PASS",
+  "fixtures": [
+    {
+      "name": "control_token_negative",
+      "tokens": [
+        "<pad>",
+        "<bos>",
+        "<eos>",
+        "<unk>",
+        "<glossary:on>",
+        "<glossary:off>"
+      ],
+      "expect": "qwave <= -0.8 and deltak <= -0.8"
+    },
+    {
+      "name": "byte_token_negative",
+      "tokens": [
+        "<byte:EC>",
+        "<0xEC>",
+        "<byte:FF>"
+      ],
+      "expect": "qwave < 0 and deltak < 0"
+    },
+    {
+      "name": "mojibake_token_negative",
+      "tokens": [
+        "?댁뼱媛怨?",
+        "Ã",
+        "ì",
+        "ê",
+        "媛",
+        "怨"
+      ],
+      "expect": "qwave < 0 and deltak < 0"
+    },
+    {
+      "name": "normal_korean_non_negative",
+      "tokens": [
+        "▁이어가고",
+        "합니다",
+        "사람",
+        "안녕"
+      ],
+      "expect": "qwave >= 0 and deltak >= 0"
+    }
+  ]
+}

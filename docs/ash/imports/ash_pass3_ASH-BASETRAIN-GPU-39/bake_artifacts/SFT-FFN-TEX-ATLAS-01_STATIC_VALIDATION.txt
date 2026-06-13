@@ -1,0 +1,38 @@
+SFT-FFN-TEX-ATLAS-01 static validation
+
+Environment:
+- cargo: unavailable
+- rustc: unavailable
+- rustfmt: unavailable
+
+Validated statically:
+- crates/ash_core/src/sft_ffn_texture_atlas.rs exists
+- crates/ash_core/tests/sft_ffn_tex_atlas_01_manifest.rs exists
+- crates/ash_core/src/lib.rs exports sft_ffn_texture_atlas exactly once
+- acceptance report exists
+- bake report exists
+- Rust source delimiter balance checked for module and test file
+
+Opened:
+- frozen FFN texture atlas bake manifest
+- gate/up/down tile map seal
+- texture format policy
+- packing policy
+- numeric fetch policy
+- atlas_sha256 / manifest_sha256 / tile_map_digest recording
+- RGB payload alpha checksum guard mode
+
+Closed:
+- shader execution
+- FFN projection execution
+- SFT training execution in core
+- gradient write in core
+- optimizer step in core
+- trainable LoRA texture update
+- runtime attach
+- promotion apply
+- current pointer update
+
+Local validation commands for user machine:
+- cargo test -p ash_core sft_ffn_tex_atlas_01 -- --nocapture
+- cargo test -p ash_core sft_gpu_stream_03 -- --nocapture

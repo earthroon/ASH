@@ -1,0 +1,96 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-19",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "ledger_status": "empty_ledger",
+  "source_commit_receipt_keys": [],
+  "source_rollback_receipt_keys": [],
+  "cue_revision_chains": [],
+  "integrity_checks": [
+    {
+      "check_id": "ledger_check:empty_ledger_allowed",
+      "kind": "empty_ledger_allowed",
+      "pass": true,
+      "severity": "info",
+      "detail": "no committed or reverted cue revision events are available; empty ledger is valid"
+    },
+    {
+      "check_id": "ledger_check:commit_receipt_included",
+      "kind": "commit_receipt_included",
+      "pass": true,
+      "severity": "info",
+      "detail": "commit revision events included: 0"
+    },
+    {
+      "check_id": "ledger_check:rollback_receipt_included",
+      "kind": "rollback_receipt_included",
+      "pass": true,
+      "severity": "info",
+      "detail": "revert revision events included: 0"
+    },
+    {
+      "check_id": "ledger_check:no_orphan_rollback",
+      "kind": "no_orphan_rollback",
+      "pass": true,
+      "severity": "critical",
+      "detail": "rollback events must reference an existing WCTX-17 commit event"
+    },
+    {
+      "check_id": "ledger_check:no_duplicate_event",
+      "kind": "no_duplicate_event",
+      "pass": true,
+      "severity": "critical",
+      "detail": "source receipt keys and cue revision indexes must not duplicate"
+    },
+    {
+      "check_id": "ledger_check:single_cue_boundary",
+      "kind": "single_cue_boundary",
+      "pass": true,
+      "severity": "critical",
+      "detail": "each revision event must affect exactly one cue"
+    },
+    {
+      "check_id": "ledger_check:runtime_apply_closed",
+      "kind": "runtime_apply_closed",
+      "pass": true,
+      "severity": "critical",
+      "detail": "ledger construction must not open runtime apply or default apply"
+    },
+    {
+      "check_id": "ledger_check:target_mutation_not_performed_in_ledger",
+      "kind": "target_mutation_not_performed_in_ledger",
+      "pass": true,
+      "severity": "critical",
+      "detail": "WCTX-19 records prior commit/revert events and never mutates target text"
+    }
+  ],
+  "total_revision_events": 0,
+  "total_commit_events": 0,
+  "total_revert_events": 0,
+  "risk": {
+    "token_id_mutated": false,
+    "decode_executed_in_ledger": false,
+    "generation_executed_in_ledger": false,
+    "model_forward_executed_in_ledger": false,
+    "sampling_executed_in_ledger": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "commit_executed_in_ledger": false,
+    "rollback_executed_in_ledger": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "ledger_created": true,
+    "empty_ledger": true,
+    "orphan_rollback_detected": false,
+    "duplicate_revision_detected": false,
+    "cue_boundary_violation_detected": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "created_by": "ash_core::word_context_commit_ledger",
+  "schema_version": 1,
+  "deterministic_receipt_key": "sha256:ffb8a566493286947e69172081e58fa36880d01ab6c44bb0acdf32259c4c7320"
+}

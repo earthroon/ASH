@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02A",
+  "status": "GPU_TRANSITION_GUARD_PARITY_AND_CANDIDATE_PIECE_HINT_BAKED_STATIC",
+  "decode_ssot": "tokenizer_core::decode_ssot",
+  "transition_guard_ssot": "model_core::decode_transition_guard",
+  "candidate_piece_hint_ssot": "model_core::decode_candidate_piece_hints::CandidatePieceHintTable",
+  "candidate_trace_version": 3,
+  "default_mode": "off",
+  "recommended_validation_mode": "probe",
+  "gpu_transition_implementation": "compact_hint_bits",
+  "parity_required": [
+    "transition_action",
+    "transition_reason_mask",
+    "hardblock_decision"
+  ],
+  "non_scope": [
+    "transition_rule_redesign",
+    "dynamic_context_qwave",
+    "tokenizer_vocab_change",
+    "lora_training"
+  ],
+  "execution": "NOT_RUN_NO_CARGO_WGPU_RUNTIME",
+  "prev_token_uniform": "transition_prev_token_id / transition_prev_token_available"
+}

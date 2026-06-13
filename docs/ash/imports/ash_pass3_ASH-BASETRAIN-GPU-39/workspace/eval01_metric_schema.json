@@ -1,0 +1,30 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-01",
+  "files": {
+    "canonical_cpu_runs": "workspace/eval01_canonical_cpu_runs.jsonl",
+    "backend_runs": "workspace/eval01_backend_runs.jsonl",
+    "step_diffs": "workspace/eval01_step_diffs.jsonl",
+    "run_pair_diffs": "workspace/eval01_run_pair_diffs.jsonl",
+    "summary": "workspace/eval01_summary.json"
+  },
+  "required_step_fields": [
+    "selected_id",
+    "top5_ids",
+    "min_p_threshold_score_kind",
+    "active_count_after_min_p",
+    "entropy_final",
+    "pci_raw",
+    "fallback_mode",
+    "effective_temperature",
+    "effective_top_p",
+    "effective_top_k",
+    "effective_min_p"
+  ],
+  "fail_conditions": [
+    "min_p_threshold_kind_mismatch",
+    "global_finite_fallback_divergence",
+    "selected_mismatch_and_top5_overlap_lt_3",
+    "normal_prompt_stop_divergence",
+    "unsupported_feature_applied_true"
+  ]
+}

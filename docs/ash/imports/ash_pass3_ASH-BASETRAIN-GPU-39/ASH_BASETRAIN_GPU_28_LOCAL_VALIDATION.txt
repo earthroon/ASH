@@ -1,0 +1,26 @@
+ASH-BASETRAIN-GPU-28 LOCAL VALIDATION
+
+patch_id = ASH-BASETRAIN-GPU-28
+expected_verdict = PASS_ASH_BASETRAIN_GPU_28_GRADIENT_BUFFER_ALLOCATION_CANDIDATE_CONTRACTED_LOGITS_GRADIENT_BUFFER_ALLOCATION_NO_BACKWARD_NO_OPTIMIZER
+
+container_cargo_available = false
+container_cargo_build = NOT_EXECUTED_IN_CONTAINER
+container_cargo_run = NOT_EXECUTED_IN_CONTAINER
+container_gpu_runtime_confirmed = false
+
+reason = This bake environment has no Rust cargo toolchain. Runtime allocation must be confirmed on the operator local machine.
+
+required_operator_commands =
+  cargo build -p base_train --bin ash_basetrain_gpu_28_gradient_buffer_allocation_candidate --jobs 1
+  cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_28_gradient_buffer_allocation_candidate
+
+runtime_pass_expected_fields =
+  pass = true
+  violation_mask = 0
+  verdict_lut_index = 0
+  gradient_buffer_created = true
+  gradient_buffer_written = false
+  gradient_value_computed = false
+  backward_executed = false
+  optimizer_step_executed = false
+  safetensors_mutation_present = false

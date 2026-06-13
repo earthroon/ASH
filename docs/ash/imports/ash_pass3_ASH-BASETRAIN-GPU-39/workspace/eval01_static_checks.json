@@ -1,0 +1,34 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-01",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_bench": "NOT_RUN",
+  "backend_replay": "NOT_RUN",
+  "checks": [
+    {
+      "path": "crates/model_core/src/eval01_backend_replay.rs",
+      "missing": [],
+      "ok": true
+    },
+    {
+      "path": "crates/model_core/src/lib.rs",
+      "missing": [],
+      "ok": true
+    },
+    {
+      "path": "crates/model_core/src/sampler_parity.rs",
+      "missing": [],
+      "ok": true
+    },
+    {
+      "path": "workspace/eval01_backend_matrix.json",
+      "missing": [],
+      "ok": true
+    },
+    {
+      "path": "workspace/eval01_backend_capability_manifest.json",
+      "missing": [],
+      "ok": true
+    }
+  ]
+}

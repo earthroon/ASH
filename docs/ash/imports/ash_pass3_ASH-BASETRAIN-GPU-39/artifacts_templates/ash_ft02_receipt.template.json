@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-FT-02",
+  "title": "Full Coverage Slice Read Probe / All Tensor Families / No GPU Upload Seal",
+  "status": "PENDING",
+  "guards": {
+    "candidate_safetensors_opened_readonly": false,
+    "bounded_slice_read_executed": false,
+    "tensor_value_materialized": false,
+    "full_tensor_load_executed": false,
+    "mmap_materialization_executed": false,
+    "gpu_device_created": false,
+    "gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false
+  },
+  "verdict": "PENDING_NO_GPU_UPLOAD_SLICE_PROBE"
+}

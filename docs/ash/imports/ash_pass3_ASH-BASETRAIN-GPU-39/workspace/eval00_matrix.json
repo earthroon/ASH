@@ -1,0 +1,147 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "backends": [
+    "cpu_oracle",
+    "standard_runtime",
+    "webgpu_runtime"
+  ],
+  "profiles": [
+    {
+      "profile_id": "M00_greedy_baseline",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "top_k": 1,
+      "min_p": 0.0,
+      "dynamic_sampler": false,
+      "salad02": false,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "greedy model/tokenizer sanity baseline"
+    },
+    {
+      "profile_id": "M01_static_safe",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": false,
+      "salad02": false,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "fixed safe sampler baseline"
+    },
+    {
+      "profile_id": "M02_minp_c2b",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": false,
+      "salad02": false,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "MINP-C2B static prior controlled baseline"
+    },
+    {
+      "profile_id": "M03_dynamic_shadow_only",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": false,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "03A/B/C shadow metrics without 03D apply"
+    },
+    {
+      "profile_id": "M04_dynamic_controlled",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": false,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "03D dynamic sampler controlled enable"
+    },
+    {
+      "profile_id": "M05_dynamic_controlled_salad02",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": true,
+      "salad04": false,
+      "rollback": false,
+      "stop": false,
+      "description": "dynamic sampler with SALAD-02 detector"
+    },
+    {
+      "profile_id": "M06_dynamic_controlled_salad04_overlay",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": true,
+      "salad04": true,
+      "rollback": false,
+      "stop": false,
+      "description": "dynamic sampler with Korean morph overlay"
+    },
+    {
+      "profile_id": "M07_full_guard_no_rollback",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": true,
+      "salad04": true,
+      "rollback": false,
+      "stop": true,
+      "description": "full guard surface without rollback execute"
+    },
+    {
+      "profile_id": "M08_full_guard_with_rollback_plan",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": true,
+      "salad04": true,
+      "rollback": true,
+      "stop": false,
+      "description": "rollback plan and KV probes without execute"
+    },
+    {
+      "profile_id": "M09_full_guard_with_safe_stop_surface",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "dynamic_sampler": true,
+      "salad02": true,
+      "salad04": true,
+      "rollback": true,
+      "stop": true,
+      "description": "full guarded line with safe stop surface"
+    }
+  ],
+  "max_new_tokens_default": 96,
+  "strict_replay": true
+}

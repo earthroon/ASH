@@ -1,0 +1,27 @@
+{
+  "patch_id": "QW-52C-R9",
+  "schema_version": "runtime_shadow_gate_v1",
+  "status_values": [
+    "Unavailable",
+    "NoEligibleCandidate",
+    "GateCreated",
+    "GateClosed",
+    "Pass",
+    "Warn"
+  ],
+  "required_outputs": [
+    "artifacts/qw52c_r9_runtime_shadow_gate_config.json",
+    "artifacts/qw52c_r9_runtime_shadow_gate_report.json",
+    "artifacts/qw52c_r9_runtime_shadow_gate_manifest.json",
+    "workspace/trace/qw52c_r9_runtime_shadow_gate_receipt.json"
+  ],
+  "invariants": {
+    "runtime_shadow_gate_created": true,
+    "runtime_shadow_gate_open": false,
+    "explicit_enable_receipt_required": true,
+    "explicit_enable_receipt_present": false,
+    "shadow_apply_execution": false,
+    "runtime_default_apply": false,
+    "runtime_apply": false
+  }
+}

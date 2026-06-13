@@ -1,0 +1,52 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "index_kind": "transition_guard_canonical_receipt_path_index",
+  "created_by": "16AI-QW-38G-R6A-CLOSURE-04",
+  "canonical_receipt_ref_count": 4,
+  "canonical_receipt_refs": [
+    {
+      "source_aggregate_entry": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[0]",
+      "candidate_id": "candidate-allow",
+      "decision": "Allow",
+      "canonical_receipt_path": "workspace/qw38g_r6a_decode06_transition_guard_allow_receipt.json",
+      "canonical_deterministic_receipt_key": "q4sha256:34cb9627385ef45ba0734ff3785f2f5ab4bad70e1bd37659c5d5da087af8c4c6",
+      "canonical_receipt_content_sha256": "ea6a2b56baeceaad075b784a4958aee72c0dd3752cf496dfd3f26dbad73b379c",
+      "duplicate_resolution": "replaced_embedded_receipt_with_canonical_receipt_reference"
+    },
+    {
+      "source_aggregate_entry": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[1]",
+      "candidate_id": "candidate-byte-token",
+      "decision": "HardBlock",
+      "canonical_receipt_path": "workspace/qw38g_r6a_decode06_transition_guard_hard_block_byte_token_receipt.json",
+      "canonical_deterministic_receipt_key": "q4sha256:b99f5ea97af70d07471515fc48ed335f69fed95db28c1210976ace44961a6756",
+      "canonical_receipt_content_sha256": "f8bf7dbf32b8a07a90b7fe721de04b6afa543c34d69597bd6210af8d68ec0118",
+      "duplicate_resolution": "replaced_embedded_receipt_with_canonical_receipt_reference"
+    },
+    {
+      "source_aggregate_entry": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[2]",
+      "candidate_id": "candidate-repeat-punctuation",
+      "decision": "SoftPenalty",
+      "canonical_receipt_path": "workspace/qw38g_r6a_decode06_transition_guard_soft_penalty_repeated_punctuation_receipt.json",
+      "canonical_deterministic_receipt_key": "q4sha256:4ed10c88c3292936969bae0a3272c3ea259c37372c3d9dbb284c3c3328df8a59",
+      "canonical_receipt_content_sha256": "3fadaa3d94ab7d248ddd02bbc873d1abc3c177bdc1266408b497e5884f91d897",
+      "duplicate_resolution": "replaced_embedded_receipt_with_canonical_receipt_reference"
+    },
+    {
+      "source_aggregate_entry": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[3]",
+      "candidate_id": "candidate-step-fail",
+      "decision": "SkippedStepIntegrityFailed",
+      "canonical_receipt_path": "workspace/qw38g_r6a_decode06_transition_guard_step_integrity_fail_receipt.json",
+      "canonical_deterministic_receipt_key": "q4sha256:1c8bb719e91cb87f17927754e5668fd8357c38f5569cd45550b378cba7cdddca",
+      "canonical_receipt_content_sha256": "6b8d27cb9ba0bdeb58daf9b4191638238ff9ce01ff56bcea1cfa52055841e00c",
+      "duplicate_resolution": "replaced_embedded_receipt_with_canonical_receipt_reference"
+    }
+  ],
+  "runtime_decode_executed": false,
+  "model_forward_executed": false,
+  "sampling_executed": false,
+  "subtitle_export_executed": false,
+  "closure04_resolution_note": "The previous aggregate file embedded four receipt objects whose deterministic_receipt_key values duplicated standalone canonical receipt files. CLOSURE-04 preserves the aggregate as a reference index and keeps standalone files as canonical receipt SSOT.",
+  "schema_version": 1,
+  "deterministic_receipt_key": "q4sha256:66e0debb5bcfe8c3bc21f7ce8b842791e69f0811d3cc4d4835473329c3dad64d"
+}

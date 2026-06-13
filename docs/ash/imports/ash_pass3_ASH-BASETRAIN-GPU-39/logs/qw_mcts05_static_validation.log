@@ -1,0 +1,27 @@
+QW-MCTS-05 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwMcts05AtlasGroupingConfig: PASS
+QwMcts05AtlasFeatureChannel: PASS
+QwMcts05AtlasNodeFeatureRow: PASS
+QwMcts05AtlasNodeGroup: PASS
+QwMcts05AtlasNodeBatch: PASS
+QwMcts05Vtc16ConsumerReceipt: PASS
+build_qw_mcts05_atlas_node_batch: PASS
+build_qw_mcts05_atlas_grouping_report: PASS
+build_qw_mcts05_default_atlas_grouping_report: PASS
+Tile16LogicalFromTile8: PASS
+creates_contiguous_16x16_tile: false: PASS
+uses_existing_tile8x8_layout: true: PASS
+gpu_dispatch_used: false: PASS
+wgpu_queue_write_used: false: PASS
+backend_mutation_used: false: PASS
+node_selection_authority_used: false: PASS
+pruning_authority_used: false: PASS
+test atlas grouping present: PASS
+test no dispatch/no authority present: PASS
+no QW-MCTS-05 marker in generation_sampling.rs: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+overall: PASS

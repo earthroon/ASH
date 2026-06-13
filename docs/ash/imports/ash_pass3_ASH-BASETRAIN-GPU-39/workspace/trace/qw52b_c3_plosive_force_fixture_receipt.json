@@ -1,0 +1,98 @@
+{
+  "patch_id": "QW-52B-C3",
+  "title": "CJI Plosive / Fortis / Aspirated Minimal Pair Fixture Seal",
+  "base_patch": "QW-52B-C2",
+  "status": "PASS_STATIC_CJI_FORCE_CLASS_MINIMAL_PAIR_FIXTURE",
+  "detector_added": {
+    "detector_id": "cji_plosive_fortis_aspirated_minimal_pair_fixture",
+    "detector_family": "cji_force_class_fixture_validation",
+    "registry_detector_count_before": 17,
+    "registry_detector_count_after": 18
+  },
+  "fixture_policy": {
+    "fixture_policy_version": "cji_minimal_pair_fixture_v1",
+    "force_policy_version": "cji_force_class_fixture_v1",
+    "prediction_scope": "FixtureOnly",
+    "runtime_apply": false
+  },
+  "fixture_groups": [
+    {
+      "family": "G",
+      "fixture_group_id": "g_family_plain_fortis_aspirated",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    },
+    {
+      "family": "D",
+      "fixture_group_id": "d_family_plain_fortis_aspirated",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    },
+    {
+      "family": "B",
+      "fixture_group_id": "b_family_plain_fortis_aspirated",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    },
+    {
+      "family": "J",
+      "fixture_group_id": "j_family_plain_fortis_aspirated",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    },
+    {
+      "family": "S",
+      "fixture_group_id": "s_family_plain_fortis",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    },
+    {
+      "family": "NgH",
+      "fixture_group_id": "ng_h_special_zero_glottal",
+      "group_status": "Pass",
+      "group_accuracy": 1.0
+    }
+  ],
+  "summary": {
+    "fixture_case_count": 16,
+    "pass_case_count": 16,
+    "fail_case_count": 0,
+    "group_count": 6,
+    "pass_group_count": 6,
+    "min_group_accuracy": 0.8
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "memory_mutation": false,
+    "force_class_runtime_apply": false,
+    "force_class_sampler_apply": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-53A",
+    "QW-52C",
+    "QW-52B-C4"
+  ],
+  "notes": [
+    "C3 validates force-class separation using fixture-only prediction.",
+    "No runtime force-class application is allowed.",
+    "No token rank or sampling behavior is changed.",
+    "Ng/H special group is not forced into plain/fortis/aspirated classification."
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-28",
+  "gradient_allocation_candidate_created": true,
+  "gradient_allocation_contract_bound": true,
+  "gradient_contract_scope": "local_window_2048_target_1_loss_candidate",
+  "gradient_target": "logits_gradient_candidate",
+  "gradient_source_patch": "ASH-BASETRAIN-GPU-27",
+  "gradient_source_loss_patch": "ASH-BASETRAIN-GPU-26",
+  "gradient_source_loss": 7.624625205993652,
+  "source_payload_digest_hex": "856552759fc5e7f0b0b7c7b2de78fe0f1e59f82b2ff7c935f819758572878052",
+  "loss_window_start": 0,
+  "loss_window_end": 2048,
+  "loss_window_size": 2048,
+  "target_token_id": 1,
+  "target_index_inside_local_window": 1,
+  "gradient_dtype": "f32",
+  "gradient_shape": [
+    1,
+    1,
+    2048
+  ],
+  "gradient_element_count": 2048,
+  "gradient_bytes": 8192,
+  "gradient_byte_order": "little_endian",
+  "pass": true
+}

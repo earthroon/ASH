@@ -1,0 +1,28 @@
+--- /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/src/tensorcube_atlas_microtile_logical16_bridge.rs.before_tensorcube_check_fix	2026-06-03 06:17:32.400229210 +0000
++++ /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/src/tensorcube_atlas_microtile_logical16_bridge.rs	2026-06-03 06:17:34.419291878 +0000
+@@ -13,7 +13,7 @@
+     pub logical_col_offset: usize,
+     pub physical_tile_rows: usize,
+     pub physical_tile_cols: usize,
+-    pub values_row_major: [f32; 64],
++    pub values_row_major: Vec<f32>,
+     pub creates_contiguous_16x16_tile: bool,
+ }
+ 
+@@ -69,6 +69,7 @@
+     let tile8_block_shapes_valid = payload.tile8_blocks.iter().all(|block| {
+         block.physical_tile_rows == 8
+             && block.physical_tile_cols == 8
++            && block.values_row_major.len() == 64
+             && !block.creates_contiguous_16x16_tile
+     }) && payload.expected_physical_tile_rows == 8
+         && payload.expected_physical_tile_cols == 8;
+@@ -102,7 +103,7 @@
+         failures.push("tile8_block_count_must_be_4".to_string());
+     }
+     if !tile8_block_shapes_valid {
+-        failures.push("tile8_block_shapes_must_be_8x8".to_string());
++        failures.push("tile8_block_shapes_must_be_8x8_and_values_len_must_be_64".to_string());
+     }
+     if !tile8_block_offsets_valid {
+         failures.push("tile8_block_offsets_must_cover_quadrants".to_string());

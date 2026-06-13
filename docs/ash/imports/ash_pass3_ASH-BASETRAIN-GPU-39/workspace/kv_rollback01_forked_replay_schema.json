@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "16AI-QW-38G-R6A-KV-ROLLBACK-01 Forked Replay Restore Verification Step Receipt",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "schema_version",
+    "mode",
+    "behavior_change",
+    "probe_only",
+    "fork_capability",
+    "replay_result",
+    "verification_grade",
+    "restore_verified_for_salad03b"
+  ],
+  "properties": {
+    "patch_id": {"const": "16AI-QW-38G-R6A-KV-ROLLBACK-01"},
+    "input_patch": {"const": "16AI-QW-38G-R6A-KV-ROLLBACK-00"},
+    "schema_version": {"type": "integer"},
+    "mode": {"enum": ["Off", "PlanOnly", "ForkedReplayProbe", "StrictForkedReplayProbe"]},
+    "behavior_change": {"const": false},
+    "probe_only": {"const": true},
+    "snapshot_id": {"type": ["string", "null"]},
+    "snapshot_step": {"type": ["integer", "null"]},
+    "verification_grade": {"enum": ["NotAttempted", "Denied", "ShapeOnly", "Top5Overlap", "Top1Match", "LogitsToleranceMatch", "StrictMatch", "Failed"]},
+    "restore_verified_for_salad03b": {"type": "boolean"},
+    "replay_input": {"type": ["object", "null"]},
+    "fork_capability": {"type": "object"},
+    "replay_result": {"type": "object"}
+  }
+}

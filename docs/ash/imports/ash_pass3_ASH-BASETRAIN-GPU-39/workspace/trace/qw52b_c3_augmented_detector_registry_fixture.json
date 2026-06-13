@@ -1,0 +1,50 @@
+{
+  "patch_id": "QW-52B-C3",
+  "base_patch": "QW-52B-C2",
+  "detectors_before": 17,
+  "detectors_after": 18,
+  "added_detector": {
+    "detector_id": "cji_plosive_fortis_aspirated_minimal_pair_fixture",
+    "detector_family": "cji_force_class_fixture_validation",
+    "available": true,
+    "input_sources": [
+      "QW-52B-C1.CheonjiinXyzTensorProjectionTrace",
+      "QW-52B-C2.CjiCairoCounterexampleTrace",
+      "QW-52B.DecodeDetectorRegistryTrace"
+    ],
+    "risk_score": 0.0,
+    "risk_level": "None",
+    "evidence": {
+      "prediction_scope": "FixtureOnly",
+      "group_count": 6,
+      "pass_group_count": 6,
+      "force_class_runtime_apply": false,
+      "force_class_sampler_apply": false
+    },
+    "action_allowed": false,
+    "mutation_allowed": false
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "memory_mutation": false,
+    "force_class_runtime_apply": false,
+    "force_class_sampler_apply": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  }
+}

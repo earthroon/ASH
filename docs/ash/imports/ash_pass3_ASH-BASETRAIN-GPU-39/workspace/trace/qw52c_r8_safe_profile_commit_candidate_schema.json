@@ -1,0 +1,26 @@
+{
+  "patch_id": "QW-52C-R8",
+  "schema_version": "safe_profile_commit_candidate_v1",
+  "status_values": [
+    "Unavailable",
+    "NoEligibleProfile",
+    "Partial",
+    "CandidateSealed",
+    "Pass",
+    "Warn"
+  ],
+  "required_outputs": [
+    "artifacts/qw52c_r8_safe_profile_commit_candidate.json",
+    "artifacts/qw52c_r8_commit_candidate_report.json",
+    "artifacts/qw52c_r8_commit_candidate_manifest.json",
+    "workspace/trace/qw52c_r8_safe_profile_commit_candidate_receipt.json"
+  ],
+  "invariants": {
+    "runtime_default_apply": false,
+    "runtime_apply": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "requires_explicit_enable": true,
+    "explicit_enable_receipt_required": true
+  }
+}

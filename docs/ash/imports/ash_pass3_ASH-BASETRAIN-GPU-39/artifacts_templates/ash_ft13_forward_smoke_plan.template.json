@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-FT-13",
+  "kind": "forward_smoke_plan",
+  "shadow_candidate": {
+    "path": "",
+    "expected_sha256": "",
+    "actual_sha256": "",
+    "sha256_matches": true,
+    "expected_source": "auto_observed_ft13_readonly"
+  },
+  "forward_mode": {
+    "mode": "synthetic_single_step",
+    "batch_size": 1,
+    "seq_len": 1,
+    "synthetic_token_id": 0,
+    "user_prompt_allowed": false
+  },
+  "execution_boundary": {
+    "allow_model_construction": true,
+    "allow_gpu_upload": true,
+    "actual_model_construction_executed": false,
+    "gpu_upload_executed": false,
+    "decode_allowed": false,
+    "generation_allowed": false,
+    "sampling_allowed": false,
+    "execution_mode": "lightweight_numeric_forward_proxy_no_generation"
+  }
+}

@@ -1,0 +1,48 @@
+diff -ruN /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs /mnt/data/r4_work/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs
+--- /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs	2026-06-08 15:21:09.209890185 +0000
++++ /mnt/data/r4_work/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs	2026-06-08 15:31:13.559135255 +0000
+@@ -36,7 +36,7 @@
+     pub uploaded_bytes_match_estimated_bytes: bool,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r2ActualGpuUploadState {
+     pub patch_id: &'static str,
+     pub title: &'static str,
+@@ -62,7 +62,7 @@
+     pub verdict: &'static str,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r2NoForwardNoOptimizerContract {
+     pub patch_id: &'static str,
+     pub source_readiness_receipt_read_allowed: bool,
+diff -ruN /mnt/data/r3_work/crates/model_core/src/bin/ash_ft31_mini_corpus_shadow_eval.rs /mnt/data/r4_work/crates/model_core/src/bin/ash_ft31_mini_corpus_shadow_eval.rs
+--- /mnt/data/r3_work/crates/model_core/src/bin/ash_ft31_mini_corpus_shadow_eval.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r4_work/crates/model_core/src/bin/ash_ft31_mini_corpus_shadow_eval.rs	2026-06-08 15:31:13.557751567 +0000
+@@ -24,7 +24,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-31\",\"status\":\"FAIL_ASH_FT31_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-31","status":"FAIL_ASH_FT31_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r3_work/crates/model_core/src/bin/ash_ft37_atlas_group_train_run_plan.rs /mnt/data/r4_work/crates/model_core/src/bin/ash_ft37_atlas_group_train_run_plan.rs
+--- /mnt/data/r3_work/crates/model_core/src/bin/ash_ft37_atlas_group_train_run_plan.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r4_work/crates/model_core/src/bin/ash_ft37_atlas_group_train_run_plan.rs	2026-06-08 15:31:13.558300467 +0000
+@@ -19,9 +19,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", ash_ft37_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-37\",\"status\":\"BLOCKED_ASH_FT37_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-37","status":"BLOCKED_ASH_FT37_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-37\",\"status\":\"BLOCKED_ASH_FT37_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-37","status":"BLOCKED_ASH_FT37_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 

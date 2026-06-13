@@ -1,0 +1,47 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
+  "fixtures": [
+    {
+      "name": "gate_blocked_sampler04_not_ready",
+      "expected": "semantic_prior_effective=false; weighted_logit==scaled_logit"
+    },
+    {
+      "name": "alignment_blocked",
+      "expected": "semantic_prior_effective=false when MINP_C2A alignment != PASS"
+    },
+    {
+      "name": "no_source_regression",
+      "expected": "candidate_set == vanilla_candidate_set"
+    },
+    {
+      "name": "weak_bias_formula",
+      "input": {
+        "scaled_logit": 10.0,
+        "qwave_score": 0.8,
+        "deltak_score": 0.5
+      },
+      "expected": {
+        "semantic_bias": 0.065,
+        "weighted_logit": 10.065
+      }
+    },
+    {
+      "name": "bias_cap",
+      "input": {
+        "qwave_score": 10.0,
+        "deltak_score": 10.0
+      },
+      "expected": {
+        "semantic_bias": 0.2
+      }
+    },
+    {
+      "name": "hard_safety_cannot_resurrect",
+      "expected": "pad/control/eos hard safety cannot be revived by semantic prior"
+    },
+    {
+      "name": "domination_warning",
+      "expected": "WARN_SEMANTIC_PRIOR_DOMINATION when rank_flip ratio or bias/margin ratio exceeds cap"
+    }
+  ]
+}

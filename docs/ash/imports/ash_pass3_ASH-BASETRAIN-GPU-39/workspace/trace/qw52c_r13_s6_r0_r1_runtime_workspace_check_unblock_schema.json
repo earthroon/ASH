@@ -1,0 +1,20 @@
+{
+  "schema_id": "qw52c_r13_s6_r0_r1_runtime_workspace_check_unblock_schema",
+  "patch_id": "QW-52C-R13-S6-R0-R1",
+  "required_checks": [
+    "legacy example must be feature gated or dependency boundary sealed",
+    "runtime_profile_path references in resolved request context must be removed",
+    "no runtime apply/promotion flags opened"
+  ],
+  "forbidden_true_fields": [
+    "runtime_apply_allowed",
+    "promotion_eligible",
+    "weight_commit_allowed",
+    "safe_profile_apply_allowed",
+    "policy_promotion_allowed",
+    "token_selection_mutation_allowed",
+    "token_rank_mutation_allowed",
+    "logit_mutation_allowed",
+    "sampler_mutation_allowed"
+  ]
+}

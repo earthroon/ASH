@@ -1,0 +1,22 @@
+python .\workspace\scripts\lora_fs02_train_export.py `
+  --request-id "lora_fs02a_pilot64_01" `
+  --feature-root ".\workspace\lora_runs\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\feature_store_work" `
+  --feature-manifest ".\workspace\lora_runs\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\feature_store_work\feature_store_manifest.json" `
+  --export-plan ".\workspace\lora_fs01_export_plan.json" `
+  --out ".\workspace\domain_adapters\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.pilot64.safetensors" `
+  --manifest-out ".\workspace\domain_adapters\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.pilot64.manifest.json" `
+  --receipt-out ".\workspace\lora_fs02a_pilot64_export_receipt.json" `
+  --trainer-receipt-out ".\workspace\lora_fs02a_pilot64_trainer_receipt.json" `
+  --loss-ledger ".\workspace\lora_fs02a_pilot64_loss_ledger.jsonl" `
+  --rank 8 `
+  --alpha 16 `
+  --max-shards 64 `
+  --batch-tokens 2048 `
+  --epochs 1 `
+  --negative-samples 128 `
+  --lr 0.0001 `
+  --weight-decay 0.0 `
+  --grad-clip-norm 1.0 `
+  --seed 42 `
+  --device cuda `
+  --dtype f16

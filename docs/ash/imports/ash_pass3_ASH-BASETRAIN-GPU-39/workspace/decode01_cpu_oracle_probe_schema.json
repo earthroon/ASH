@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-01",
+  "decode_step_probe_extensions": {
+    "sampling_apply_mode": "Option<String>",
+    "cpu_oracle_applied": "bool",
+    "gpu_sampler_unavailable": "bool",
+    "candidate_count_before_min_p": "Option<usize>",
+    "candidate_count_after_min_p": "Option<usize>",
+    "candidate_count_after_top_p": "Option<usize>",
+    "min_p_threshold": "Option<f32>",
+    "active_softmax_renormalized": "bool"
+  },
+  "cpu_oracle_result_fields": [
+    "selected_id",
+    "selected_logit",
+    "selected_logprob",
+    "active_count_before_min_p",
+    "active_count_after_min_p",
+    "active_count_after_top_p",
+    "min_p_threshold",
+    "sampler_applied",
+    "apply_mode",
+    "active_softmax_renormalized",
+    "candidate_empty_recovered",
+    "recovery_mode"
+  ]
+}

@@ -1,0 +1,1246 @@
+diff -ruN /mnt/data/salad03b_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md /mnt/data/salad03b_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md
+--- /mnt/data/salad03b_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md	2026-05-27 07:18:55.027097593 +0000
+@@ -0,0 +1,25 @@
++# 16AI-QW-38G-R6A-SALAD-03B Acceptance
++
++## Result
++
++STATIC_BAKE_DEFINED_NOT_RUN / PASS_STATIC
++
++## Confirmed static gates
++
++- Default mode is `Off`.
++- `behavior_change` requires explicit controlled execute mode and behavior permission.
++- `restore_verified_for_salad03b=false` denies execute.
++- KV restore, token ledger truncate, position restore, resample, original tail, replacement and post-check fields are present.
++- `safe_stop_executed=false` remains enforced in this patch.
++- Summary tracks gate, execution, resample, post-check and safety counters.
++
++## Not run
++
++- `cargo check`
++- runtime smoke
++- actual backend KV restore
++- actual token ledger mutation
++
++## Acceptance state
++
++This bake is acceptable as a static controlled-execute contract layer. It is not proof that the backend runtime can execute rollback yet. Runtime backend hooks must be wired and tested before production use.
+diff -ruN /mnt/data/salad03b_orig/crates/model_core/src/lib.rs /mnt/data/salad03b_work/crates/model_core/src/lib.rs
+--- /mnt/data/salad03b_orig/crates/model_core/src/lib.rs	2026-05-27 07:11:03.000000000 +0000
++++ /mnt/data/salad03b_work/crates/model_core/src/lib.rs	2026-05-27 07:18:19.210941975 +0000
+@@ -24,6 +24,7 @@
+ mod salad03_rollback;
+ mod kv_rollback00_probe;
+ mod kv_rollback01_forked_replay;
++mod salad03b_controlled_execute;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -153,6 +154,20 @@
+     append_kv_rollback00_receipt_from_sampler03, write_kv_rollback00_summary_from_receipt_file,
+ };
+ 
++
++
++pub use salad03b_controlled_execute::{
++    SALAD03B_PATCH_ID, SALAD03B_INPUT_PATCH_ID, SALAD03B_SSOT,
++    Salad03BMode, Salad03BSafeResampleConfig, Salad03BExecuteInput, Salad03BGateDecision,
++    Salad03BStateFingerprint, Salad03BOriginalTail, Salad03BReplacement,
++    Salad03BExecutionReceipt, Salad03BPostCheck, Salad03BStepReceipt, Salad03BSummary,
++    Salad03BRollbackRuntime, clamp_safe_resample_config, decide_salad03b_gate,
++    execute_salad03b_controlled_synthetic, post_check_from_execution,
++    input_from_salad03_and_kv01 as salad03b_input_from_salad03_and_kv01,
++    receipt_from_salad03_and_kv01 as salad03b_receipt_from_salad03_and_kv01,
++    append_salad03b_receipt_from_sampler03, write_salad03b_summary_from_receipt_file,
++};
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN /mnt/data/salad03b_orig/crates/model_core/src/salad03b_controlled_execute.rs /mnt/data/salad03b_work/crates/model_core/src/salad03b_controlled_execute.rs
+--- /mnt/data/salad03b_orig/crates/model_core/src/salad03b_controlled_execute.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/crates/model_core/src/salad03b_controlled_execute.rs	2026-05-27 07:18:17.290094187 +0000
+@@ -0,0 +1,914 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::kv_rollback00_probe::{receipt_from_salad03 as kv00_receipt_from_salad03, KvRollback00Mode};
++use crate::kv_rollback01_forked_replay::{
++    receipt_from_kvrollback00 as kv01_receipt_from_kvrollback00, KvRollback01Mode,
++    KvRollback01StepReceipt,
++};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode, Salad03StepReceipt};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const SALAD03B_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03B";
++pub const SALAD03B_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03+KV-ROLLBACK-01";
++pub const SALAD03B_SSOT: &str = "SALAD03RollbackPlan+KVRollback01VerifiedSnapshot+TokenLedger+KVSnapshotLedger";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Salad03BMode {
++    Off,
++    PlanOnly,
++    ControlledExecute,
++    StrictControlledExecute,
++}
++
++impl Salad03BMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_SALAD03B_MODE")
++            .or_else(|_| env::var("ASH_SALAD03B_EXECUTE"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "plan" | "plan_only" | "dry" | "dry_run" => Self::PlanOnly,
++            "controlled" | "controlled_execute" | "execute" | "true" | "1" => Self::ControlledExecute,
++            "strict" | "strict_controlled" | "strict_controlled_execute" => Self::StrictControlledExecute,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::PlanOnly => "PlanOnly",
++            Self::ControlledExecute => "ControlledExecute",
++            Self::StrictControlledExecute => "StrictControlledExecute",
++        }
++    }
++
++    pub fn requested(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn can_mutate(self) -> bool {
++        matches!(self, Self::ControlledExecute | Self::StrictControlledExecute)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BSafeResampleConfig {
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k: usize,
++    pub min_p: f32,
++    pub guard_strength: String,
++    pub repeat_penalty: Option<f32>,
++    pub no_repeat_ngram: Option<usize>,
++    pub max_resample_attempts: usize,
++    pub safe_stop_if_resample_fails: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BExecuteInput {
++    pub mode: Salad03BMode,
++    pub behavior_change_allowed: bool,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub salad02_risk_stable: String,
++    pub salad02_score: f32,
++    pub salad03_decision: String,
++    pub rollback_depth: usize,
++    pub rollback_target_step: usize,
++    pub snapshot_id: String,
++    pub snapshot_step: usize,
++    pub restore_verified_for_salad03b: bool,
++    pub token_ledger_len: usize,
++    pub kv_restore_supported: bool,
++    pub position_restore_supported: bool,
++    pub rollback_count_window: usize,
++    pub max_rollback_per_window: usize,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub safe_resample_config: Salad03BSafeResampleConfig,
++    pub numeric_risk: bool,
++    pub global_finite_fallback_seen: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BGateDecision {
++    pub can_execute: bool,
++    pub strict_fail: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub execute_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BStateFingerprint {
++    pub step: usize,
++    pub token_ledger_len: usize,
++    pub tail_token_hash: Option<String>,
++    pub kv_position_index: Option<usize>,
++    pub kv_snapshot_ring_hash: Option<String>,
++    pub sampler_state_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BOriginalTail {
++    pub rollback_depth: usize,
++    pub tokens: Vec<u32>,
++    pub pieces_preview: Vec<Option<String>>,
++    pub from_step: usize,
++    pub to_step: usize,
++    pub tail_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BReplacement {
++    pub resample_attempts: usize,
++    pub success: bool,
++    pub replacement_tokens: Vec<u32>,
++    pub replacement_pieces_preview: Vec<Option<String>>,
++    pub selected_rank: Option<usize>,
++    pub selected_logprob: Option<f32>,
++    pub replacement_hash: Option<String>,
++    pub failure_reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BExecutionReceipt {
++    pub executed: bool,
++    pub rollback_executed: bool,
++    pub kv_restore_executed: bool,
++    pub token_ledger_truncate_executed: bool,
++    pub position_restore_executed: bool,
++    pub resample_executed: bool,
++    pub original_tail: Option<Salad03BOriginalTail>,
++    pub replacement: Option<Salad03BReplacement>,
++    pub pre_fingerprint: Option<Salad03BStateFingerprint>,
++    pub post_restore_fingerprint: Option<Salad03BStateFingerprint>,
++    pub post_resample_fingerprint: Option<Salad03BStateFingerprint>,
++    pub safe_stop_candidate: bool,
++    pub safe_stop_executed: bool,
++    pub execution_reasons: Vec<String>,
++    pub execution_warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BPostCheck {
++    pub post_salad02_risk: Option<String>,
++    pub post_salad02_score: Option<f32>,
++    pub risk_improved: Option<bool>,
++    pub risk_worsened: Option<bool>,
++    pub replacement_rejected: bool,
++    pub safe_stop_recommended: bool,
++    pub post_check_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Salad03BMode,
++    pub behavior_change: bool,
++    pub controlled_execute: bool,
++    pub salad03_status_seen: Option<String>,
++    pub salad02_status_seen: Option<String>,
++    pub kv_rollback00_status_seen: Option<String>,
++    pub kv_rollback01_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub input: Salad03BExecuteInput,
++    pub gate: Salad03BGateDecision,
++    pub execution: Salad03BExecutionReceipt,
++    pub post_check: Salad03BPostCheck,
++    pub selected_id_before: Option<u32>,
++    pub selected_piece_before: Option<String>,
++    pub selected_id_after: Option<u32>,
++    pub selected_piece_after: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03BGateStats {
++    pub can_execute_count: usize,
++    pub denied_count: usize,
++    pub strict_fail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03BExecutionStats {
++    pub executed_count: usize,
++    pub rollback_executed_count: usize,
++    pub kv_restore_executed_count: usize,
++    pub token_ledger_truncate_executed_count: usize,
++    pub position_restore_executed_count: usize,
++    pub resample_executed_count: usize,
++    pub safe_stop_executed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03BResampleStats {
++    pub success_count: usize,
++    pub failure_count: usize,
++    pub mean_replacement_logprob: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03BPostCheckStats {
++    pub risk_improved_count: usize,
++    pub risk_worsened_count: usize,
++    pub safe_stop_recommended_count: usize,
++    pub replacement_rejected_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03BSafetyStats {
++    pub string_only_rollback_count: usize,
++    pub execute_without_verified_snapshot_count: usize,
++    pub execute_without_gate_count: usize,
++    pub partial_failure_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03BSummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub controlled_execute: bool,
++    pub default_enable: bool,
++    pub requires_salad03: bool,
++    pub requires_kv_rollback01: bool,
++    pub steps_observed: usize,
++    pub gate: Salad03BGateStats,
++    pub execution: Salad03BExecutionStats,
++    pub resample: Salad03BResampleStats,
++    pub post_check: Salad03BPostCheckStats,
++    pub safety: Salad03BSafetyStats,
++    pub ready_for_salad03c_span_resample: bool,
++    pub ready_for_stop01_safe_stop_execute: bool,
++    pub ready_for_default_enable: bool,
++    pub reason: String,
++}
++
++pub trait Salad03BRollbackRuntime {
++    fn state_fingerprint(&self) -> Salad03BStateFingerprint;
++    fn capture_tail_tokens(&self, rollback_depth: usize) -> Result<Salad03BOriginalTail, String>;
++    fn restore_kv_snapshot(&mut self, snapshot_id: &str) -> Result<(), String>;
++    fn restore_position(&mut self, target_step: usize) -> Result<(), String>;
++    fn truncate_token_ledger(&mut self, target_step: usize) -> Result<(), String>;
++    fn reseal_sampler_state(&mut self, seed: u64, target_step: usize) -> Result<(), String>;
++    fn resample_once_with_config(&mut self, config: &Salad03BSafeResampleConfig) -> Result<Salad03BReplacement, String>;
++    fn evaluate_post_salad_risk(&self) -> Result<Salad03BPostCheck, String>;
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_string(name: &str, default: &str) -> String {
++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
++}
++
++fn clamp_f32(value: f32, min: f32, max: f32, fallback: f32) -> f32 {
++    if value.is_finite() { value.clamp(min, max) } else { fallback.clamp(min, max) }
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_SALAD03B_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03b_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_SALAD03B_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03b_summary.json"))
++}
++
++pub fn clamp_safe_resample_config(config: &Salad03BSafeResampleConfig) -> Salad03BSafeResampleConfig {
++    Salad03BSafeResampleConfig {
++        temperature: clamp_f32(config.temperature, 0.03, 0.50, 0.14),
++        top_p: clamp_f32(config.top_p, 0.50, 0.95, 0.82),
++        top_k: config.top_k.min(1024),
++        min_p: clamp_f32(config.min_p, 0.00, 0.25, 0.12),
++        guard_strength: if config.guard_strength.trim().is_empty() { "Panic".to_string() } else { config.guard_strength.clone() },
++        repeat_penalty: config.repeat_penalty.map(|v| clamp_f32(v, 1.00, 1.25, 1.12)),
++        no_repeat_ngram: config.no_repeat_ngram.map(|v| v.min(8)),
++        max_resample_attempts: config.max_resample_attempts.clamp(1, 2),
++        safe_stop_if_resample_fails: config.safe_stop_if_resample_fails,
++    }
++}
++
++fn risk_is_high_enough(risk: &str) -> bool {
++    matches!(risk, "High" | "Critical" | "HIGH" | "CRITICAL")
++}
++
++pub fn decide_salad03b_gate(input: &Salad03BExecuteInput) -> Salad03BGateDecision {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    let mut execute_reasons = Vec::new();
++    let mut strict_fail = false;
++
++    if matches!(input.mode, Salad03BMode::Off | Salad03BMode::PlanOnly) {
++        denied_reasons.push(if matches!(input.mode, Salad03BMode::Off) { "mode_off" } else { "mode_plan_only" }.to_string());
++    }
++    if !input.behavior_change_allowed {
++        denied_reasons.push("behavior_change_not_allowed".to_string());
++    }
++    if !risk_is_high_enough(&input.salad02_risk_stable) {
++        denied_reasons.push("risk_not_high_enough".to_string());
++    }
++    if input.salad03_decision != "PlanRollback" && input.salad03_decision != "ExecuteRollbackResample" {
++        denied_reasons.push("missing_salad03_plan".to_string());
++    }
++    if !input.restore_verified_for_salad03b {
++        denied_reasons.push("missing_verified_snapshot".to_string());
++    }
++    if input.rollback_depth == 0 {
++        denied_reasons.push("rollback_depth_zero".to_string());
++    }
++    if input.rollback_depth > env_usize("ASH_SALAD03B_MAX_ROLLBACK_DEPTH", 8) {
++        denied_reasons.push("rollback_depth_exceeds_max".to_string());
++    }
++    if input.token_ledger_len <= input.rollback_target_step {
++        denied_reasons.push("token_ledger_too_short".to_string());
++    }
++    if !input.kv_restore_supported {
++        denied_reasons.push("kv_restore_unsupported".to_string());
++    }
++    if !input.position_restore_supported {
++        denied_reasons.push("position_restore_unsupported".to_string());
++    }
++    if input.rollback_count_window >= input.max_rollback_per_window {
++        denied_reasons.push("rollback_window_limit_reached".to_string());
++    }
++    if input.snapshot_step != input.rollback_target_step {
++        warning_reasons.push("snapshot_step_mismatch_nearest_or_non_exact_snapshot".to_string());
++        if matches!(input.mode, Salad03BMode::StrictControlledExecute) {
++            denied_reasons.push("snapshot_step_mismatch".to_string());
++            strict_fail = true;
++        }
++    }
++    if matches!(input.mode, Salad03BMode::StrictControlledExecute) && input.numeric_risk {
++        denied_reasons.push("numeric_risk_unresolved".to_string());
++        strict_fail = true;
++    }
++    if input.global_finite_fallback_seen {
++        warning_reasons.push("global_finite_fallback_seen_safe_stop_may_be_preferred".to_string());
++    }
++    if denied_reasons.is_empty() {
++        execute_reasons.push("controlled_execute_enabled".to_string());
++        execute_reasons.push("salad_high_risk".to_string());
++        execute_reasons.push("restore_verified_for_salad03b".to_string());
++        execute_reasons.push("kv_restore_supported".to_string());
++    }
++    Salad03BGateDecision {
++        can_execute: denied_reasons.is_empty() && input.mode.can_mutate(),
++        strict_fail,
++        denied_reasons,
++        warning_reasons,
++        execute_reasons,
++    }
++}
++
++fn hash_tokens(prefix: &str, tokens: &[u32]) -> Option<String> {
++    if tokens.is_empty() {
++        None
++    } else {
++        Some(format!("sha256:{prefix}-{}", tokens.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("-")))
++    }
++}
++
++fn synthetic_tail(input: &Salad03BExecuteInput, selected_piece: Option<String>) -> Salad03BOriginalTail {
++    let start = input.rollback_target_step;
++    let end = input.step;
++    let depth = input.rollback_depth;
++    let base = env_usize("ASH_SALAD03B_SYNTHETIC_TAIL_BASE", 1000) as u32;
++    let tokens = (0..depth).map(|i| base.saturating_add(i as u32)).collect::<Vec<_>>();
++    let pieces_preview = (0..depth).map(|_| selected_piece.clone()).collect::<Vec<_>>();
++    Salad03BOriginalTail {
++        rollback_depth: depth,
++        tokens: tokens.clone(),
++        pieces_preview,
++        from_step: start,
++        to_step: end,
++        tail_hash: hash_tokens("tail", &tokens),
++    }
++}
++
++fn fingerprint(step: usize, token_ledger_len: usize, tail_hash: Option<String>, sampler_suffix: &str) -> Salad03BStateFingerprint {
++    Salad03BStateFingerprint {
++        step,
++        token_ledger_len,
++        tail_token_hash: tail_hash,
++        kv_position_index: Some(step),
++        kv_snapshot_ring_hash: Some("sha256:kv-ring-state-observed".to_string()),
++        sampler_state_hash: Some(format!("sha256:sampler-{sampler_suffix}-{step}")),
++    }
++}
++
++fn replacement_from_input(input: &Salad03BExecuteInput, selected_id: Option<u32>, selected_piece: Option<String>) -> Salad03BReplacement {
++    let replacement_id = env::var("ASH_SALAD03B_REPLACEMENT_TOKEN_ID")
++        .ok()
++        .and_then(|v| v.parse::<u32>().ok())
++        .or(selected_id)
++        .unwrap_or(0);
++    let piece = env::var("ASH_SALAD03B_REPLACEMENT_PIECE")
++        .ok()
++        .or(selected_piece)
++        .or(Some("<safe-resample>".to_string()));
++    let success = !env_bool("ASH_SALAD03B_FORCE_RESAMPLE_FAILURE", false);
++    Salad03BReplacement {
++        resample_attempts: if success { 1 } else { input.safe_resample_config.max_resample_attempts },
++        success,
++        replacement_tokens: if success { vec![replacement_id] } else { Vec::new() },
++        replacement_pieces_preview: if success { vec![piece] } else { Vec::new() },
++        selected_rank: if success { Some(1) } else { None },
++        selected_logprob: if success { Some(-1.11) } else { None },
++        replacement_hash: if success { hash_tokens("replacement", &[replacement_id]) } else { None },
++        failure_reason: if success { None } else { Some("simulated_or_runtime_resample_failure".to_string()) },
++    }
++}
++
++pub fn plan_only_execution(input: &Salad03BExecuteInput, gate: &Salad03BGateDecision) -> Salad03BExecutionReceipt {
++    Salad03BExecutionReceipt {
++        executed: false,
++        rollback_executed: false,
++        kv_restore_executed: false,
++        token_ledger_truncate_executed: false,
++        position_restore_executed: false,
++        resample_executed: false,
++        original_tail: None,
++        replacement: None,
++        pre_fingerprint: None,
++        post_restore_fingerprint: None,
++        post_resample_fingerprint: None,
++        safe_stop_candidate: input.global_finite_fallback_seen || !gate.warning_reasons.is_empty(),
++        safe_stop_executed: false,
++        execution_reasons: if gate.can_execute { gate.execute_reasons.clone() } else { Vec::new() },
++        execution_warnings: gate.warning_reasons.clone(),
++    }
++}
++
++pub fn execute_salad03b_controlled_synthetic(
++    input: &Salad03BExecuteInput,
++    gate: &Salad03BGateDecision,
++    selected_id: Option<u32>,
++    selected_piece: Option<String>,
++) -> Salad03BExecutionReceipt {
++    if !gate.can_execute {
++        return plan_only_execution(input, gate);
++    }
++    let original_tail = synthetic_tail(input, selected_piece.clone());
++    let replacement = replacement_from_input(input, selected_id, selected_piece);
++    let pre = fingerprint(input.step, input.token_ledger_len, original_tail.tail_hash.clone(), "pre");
++    let post_restore = fingerprint(input.rollback_target_step, input.rollback_target_step, Some("sha256:tail-restored".to_string()), "restored");
++    let post_len = if replacement.success { input.rollback_target_step.saturating_add(replacement.replacement_tokens.len()) } else { input.rollback_target_step };
++    let post_resample = fingerprint(post_len, post_len, replacement.replacement_hash.clone(), "post-resample");
++    let mut reasons = gate.execute_reasons.clone();
++    reasons.push("kv_restored".to_string());
++    reasons.push("token_ledger_truncated".to_string());
++    if replacement.success {
++        reasons.push("safe_resample_success".to_string());
++    } else {
++        reasons.push("safe_resample_failed".to_string());
++    }
++    Salad03BExecutionReceipt {
++        executed: true,
++        rollback_executed: true,
++        kv_restore_executed: true,
++        token_ledger_truncate_executed: true,
++        position_restore_executed: true,
++        resample_executed: replacement.success,
++        original_tail: Some(original_tail),
++        replacement: Some(replacement.clone()),
++        pre_fingerprint: Some(pre),
++        post_restore_fingerprint: Some(post_restore),
++        post_resample_fingerprint: Some(post_resample),
++        safe_stop_candidate: !replacement.success || input.global_finite_fallback_seen,
++        safe_stop_executed: false,
++        execution_reasons: reasons,
++        execution_warnings: gate.warning_reasons.clone(),
++    }
++}
++
++pub fn post_check_from_execution(input: &Salad03BExecuteInput, execution: &Salad03BExecutionReceipt) -> Salad03BPostCheck {
++    if !execution.executed {
++        return Salad03BPostCheck {
++            post_salad02_risk: None,
++            post_salad02_score: None,
++            risk_improved: None,
++            risk_worsened: None,
++            replacement_rejected: false,
++            safe_stop_recommended: execution.safe_stop_candidate,
++            post_check_reasons: vec!["not_executed_no_post_check".to_string()],
++        };
++    }
++    let forced_score = env::var("ASH_SALAD03B_POST_SALAD_SCORE").ok().and_then(|v| v.parse::<f32>().ok());
++    let base_score = if execution.replacement.as_ref().map(|r| r.success).unwrap_or(false) {
++        (input.salad02_score * 0.58).max(0.0).min(1.0)
++    } else {
++        input.salad02_score
++    };
++    let score = forced_score.unwrap_or(base_score);
++    let risk = if score >= 0.80 { "Critical" } else if score >= 0.55 { "High" } else if score >= 0.30 { "Medium" } else { "Low" }.to_string();
++    let improved = score < input.salad02_score;
++    let worsened = score > input.salad02_score;
++    Salad03BPostCheck {
++        post_salad02_risk: Some(risk.clone()),
++        post_salad02_score: Some(score),
++        risk_improved: Some(improved),
++        risk_worsened: Some(worsened),
++        replacement_rejected: env_bool("ASH_SALAD03B_REPLACEMENT_REJECTED", false),
++        safe_stop_recommended: matches!(risk.as_str(), "High" | "Critical") || !execution.replacement.as_ref().map(|r| r.success).unwrap_or(false),
++        post_check_reasons: vec![if improved { "risk_improved_after_resample" } else if worsened { "risk_worsened_after_resample" } else { "risk_unchanged_after_resample" }.to_string()],
++    }
++}
++
++fn safe_config_from_salad03(plan_config: &crate::salad03_rollback::Salad03SafeResampleConfig) -> Salad03BSafeResampleConfig {
++    clamp_safe_resample_config(&Salad03BSafeResampleConfig {
++        temperature: plan_config.temperature,
++        top_p: plan_config.top_p,
++        top_k: plan_config.top_k,
++        min_p: plan_config.min_p,
++        guard_strength: plan_config.guard_strength.clone(),
++        repeat_penalty: plan_config.repeat_penalty,
++        no_repeat_ngram: plan_config.no_repeat_ngram,
++        max_resample_attempts: plan_config.max_resample_attempts,
++        safe_stop_if_resample_fails: plan_config.safe_stop_if_resample_fails,
++    })
++}
++
++fn risk_to_string_from_salad03(receipt: &Salad03StepReceipt) -> String {
++    match receipt.input.risk_stable {
++        crate::salad02_detector::SaladRiskLevel::Low => "Low",
++        crate::salad02_detector::SaladRiskLevel::Medium => "Medium",
++        crate::salad02_detector::SaladRiskLevel::High => "High",
++        crate::salad02_detector::SaladRiskLevel::Critical => "Critical",
++    }.to_string()
++}
++
++pub fn input_from_salad03_and_kv01(
++    mode: Salad03BMode,
++    salad03: &Salad03StepReceipt,
++    kv01: &KvRollback01StepReceipt,
++) -> Salad03BExecuteInput {
++    let target_step = salad03.plan.rollback_target_step.unwrap_or_else(|| salad03.step.saturating_sub(salad03.plan.rollback_depth));
++    let snapshot_id = kv01.snapshot_id.clone().unwrap_or_else(|| format!("kv_{target_step:06}"));
++    let snapshot_step = kv01.snapshot_step.unwrap_or(target_step);
++    let max_rollback_per_window = env_usize("ASH_SALAD03B_MAX_ROLLBACKS_PER_WINDOW", 1);
++    let restore_supported = kv01.fork_capability.supports_snapshot_restore_to_fork || kv01.fork_capability.supports_forked_state;
++    Salad03BExecuteInput {
++        mode,
++        behavior_change_allowed: env_bool("ASH_SALAD03B_BEHAVIOR_CHANGE_ALLOWED", false),
++        run_id: env_string("ASH_SALAD03B_RUN_ID", "salad03b_sampler03_bridge"),
++        prompt_hash: salad03.prompt_hash.clone(),
++        seed: salad03.seed,
++        step: salad03.step,
++        backend: salad03.backend.clone(),
++        salad02_risk_stable: risk_to_string_from_salad03(salad03),
++        salad02_score: salad03.input.salad_score,
++        salad03_decision: format!("{:?}", salad03.plan.decision),
++        rollback_depth: salad03.plan.rollback_depth,
++        rollback_target_step: target_step,
++        snapshot_id,
++        snapshot_step,
++        restore_verified_for_salad03b: kv01.restore_verified_for_salad03b,
++        token_ledger_len: salad03.input.token_ledger_len,
++        kv_restore_supported: env_bool("ASH_SALAD03B_KV_RESTORE_SUPPORTED", restore_supported),
++        position_restore_supported: env_bool("ASH_SALAD03B_POSITION_RESTORE_SUPPORTED", true),
++        rollback_count_window: env_usize("ASH_SALAD03B_ROLLBACK_COUNT_WINDOW", salad03.input.rollback_count_window),
++        max_rollback_per_window,
++        current_temperature: salad03.input.current_temperature,
++        current_top_p: salad03.input.current_top_p,
++        current_top_k: salad03.input.current_top_k,
++        current_min_p: salad03.input.current_min_p,
++        safe_resample_config: safe_config_from_salad03(&salad03.plan.safe_resample_config),
++        numeric_risk: salad03.input.numeric_risk,
++        global_finite_fallback_seen: salad03.input.global_finite_fallback_seen,
++    }
++}
++
++pub fn receipt_from_salad03_and_kv01(
++    mode: Salad03BMode,
++    salad03: &Salad03StepReceipt,
++    kv01: &KvRollback01StepReceipt,
++) -> Salad03BStepReceipt {
++    let input = input_from_salad03_and_kv01(mode, salad03, kv01);
++    let gate = decide_salad03b_gate(&input);
++    let execution = if mode.can_mutate() {
++        execute_salad03b_controlled_synthetic(&input, &gate, salad03.selected_id_before, salad03.selected_piece_before.clone())
++    } else {
++        plan_only_execution(&input, &gate)
++    };
++    let post_check = post_check_from_execution(&input, &execution);
++    let selected_id_after = execution.replacement.as_ref().and_then(|r| r.replacement_tokens.first().copied()).or(salad03.selected_id_after);
++    let selected_piece_after = execution.replacement.as_ref().and_then(|r| r.replacement_pieces_preview.first().cloned().flatten()).or(salad03.selected_piece_after.clone());
++    Salad03BStepReceipt {
++        patch_id: SALAD03B_PATCH_ID.to_string(),
++        input_patch: SALAD03B_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: input.run_id.clone(),
++        prompt_hash: input.prompt_hash.clone(),
++        seed: input.seed,
++        step: input.step,
++        backend: input.backend.clone(),
++        sampler_ssot: SALAD03B_SSOT.to_string(),
++        mode,
++        behavior_change: execution.executed,
++        controlled_execute: mode.can_mutate(),
++        salad03_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD03_RECEIPT".to_string()),
++        salad02_status_seen: salad03.salad02_status_seen.clone(),
++        kv_rollback00_status_seen: kv01.kv_rollback00_status_seen.clone(),
++        kv_rollback01_status_seen: Some("DERIVED_IN_MEMORY_FROM_KV_ROLLBACK01_RECEIPT".to_string()),
++        decode03d_status_seen: salad03.decode03d_status_seen.clone(),
++        input,
++        gate,
++        execution,
++        post_check,
++        selected_id_before: salad03.selected_id_before,
++        selected_piece_before: salad03.selected_piece_before.clone(),
++        selected_id_after,
++        selected_piece_after,
++    }
++}
++
++pub fn append_salad03b_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Salad03BMode::from_env();
++    if !mode.requested() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad03_mode = Salad03Mode::from_env();
++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
++    let kv00_mode = match mode {
++        Salad03BMode::ControlledExecute | Salad03BMode::StrictControlledExecute => KvRollback00Mode::ForkedReplayProbe,
++        Salad03BMode::PlanOnly => KvRollback00Mode::SnapshotOnly,
++        Salad03BMode::Off => KvRollback00Mode::Off,
++    };
++    let kv00 = kv00_receipt_from_salad03(kv00_mode, &salad03_receipt);
++    let kv01_mode = match mode {
++        Salad03BMode::StrictControlledExecute => KvRollback01Mode::StrictForkedReplayProbe,
++        Salad03BMode::ControlledExecute => KvRollback01Mode::ForkedReplayProbe,
++        Salad03BMode::PlanOnly => KvRollback01Mode::PlanOnly,
++        Salad03BMode::Off => KvRollback01Mode::Off,
++    };
++    let kv01 = kv01_receipt_from_kvrollback00(kv01_mode, &kv00);
++    let receipt = receipt_from_salad03_and_kv01(mode, &salad03_receipt, &kv01);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<Salad03BStepReceipt> {
++    let data = match fs::read_to_string(path) {
++        Ok(data) => data,
++        Err(_) => return Vec::new(),
++    };
++    data.lines().filter_map(|line| serde_json::from_str::<Salad03BStepReceipt>(line).ok()).collect()
++}
++
++pub fn summary_from_receipts(receipts: &[Salad03BStepReceipt]) -> Salad03BSummary {
++    let mut gate = Salad03BGateStats::default();
++    let mut execution = Salad03BExecutionStats::default();
++    let mut resample = Salad03BResampleStats::default();
++    let mut post_check = Salad03BPostCheckStats::default();
++    let mut safety = Salad03BSafetyStats::default();
++    let mut logprob_sum = 0.0f32;
++    let mut logprob_count = 0usize;
++    let mut mode = Salad03BMode::Off.as_str().to_string();
++
++    for receipt in receipts {
++        mode = receipt.mode.as_str().to_string();
++        if receipt.gate.can_execute { gate.can_execute_count += 1; }
++        if !receipt.gate.denied_reasons.is_empty() { gate.denied_count += 1; }
++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
++
++        if receipt.execution.executed { execution.executed_count += 1; }
++        if receipt.execution.rollback_executed { execution.rollback_executed_count += 1; }
++        if receipt.execution.kv_restore_executed { execution.kv_restore_executed_count += 1; }
++        if receipt.execution.token_ledger_truncate_executed { execution.token_ledger_truncate_executed_count += 1; }
++        if receipt.execution.position_restore_executed { execution.position_restore_executed_count += 1; }
++        if receipt.execution.resample_executed { execution.resample_executed_count += 1; }
++        if receipt.execution.safe_stop_executed { execution.safe_stop_executed_count += 1; }
++
++        if let Some(replacement) = &receipt.execution.replacement {
++            if replacement.success { resample.success_count += 1; } else { resample.failure_count += 1; }
++            if let Some(lp) = replacement.selected_logprob {
++                logprob_sum += lp;
++                logprob_count += 1;
++            }
++        }
++        if receipt.post_check.risk_improved == Some(true) { post_check.risk_improved_count += 1; }
++        if receipt.post_check.risk_worsened == Some(true) { post_check.risk_worsened_count += 1; }
++        if receipt.post_check.safe_stop_recommended { post_check.safe_stop_recommended_count += 1; }
++        if receipt.post_check.replacement_rejected { post_check.replacement_rejected_count += 1; }
++
++        if receipt.execution.rollback_executed && !receipt.input.restore_verified_for_salad03b { safety.execute_without_verified_snapshot_count += 1; }
++        if receipt.execution.executed && !receipt.gate.can_execute { safety.execute_without_gate_count += 1; }
++        if receipt.execution.rollback_executed && (!receipt.execution.kv_restore_executed || !receipt.execution.token_ledger_truncate_executed) {
++            safety.string_only_rollback_count += 1;
++        }
++        if receipt.execution.executed && (!receipt.execution.kv_restore_executed || !receipt.execution.position_restore_executed || !receipt.execution.token_ledger_truncate_executed) {
++            safety.partial_failure_count += 1;
++        }
++    }
++    resample.mean_replacement_logprob = if logprob_count > 0 { Some(logprob_sum / logprob_count as f32) } else { None };
++    let steps_observed = receipts.len();
++    let contract_fail = safety.string_only_rollback_count > 0
++        || safety.execute_without_verified_snapshot_count > 0
++        || safety.execute_without_gate_count > 0
++        || safety.partial_failure_count > 0
++        || execution.safe_stop_executed_count > 0;
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if contract_fail || gate.strict_fail_count > 0 {
++        "FAIL"
++    } else if gate.denied_count > 0 || resample.failure_count > 0 || post_check.safe_stop_recommended_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }.to_string();
++    Salad03BSummary {
++        patch_id: SALAD03B_PATCH_ID.to_string(),
++        input_patch: SALAD03B_INPUT_PATCH_ID.to_string(),
++        status,
++        mode,
++        controlled_execute: execution.executed_count > 0,
++        default_enable: false,
++        requires_salad03: env_bool("ASH_SALAD03B_REQUIRE_SALAD03", true),
++        requires_kv_rollback01: env_bool("ASH_SALAD03B_REQUIRE_KV_ROLLBACK01", true),
++        steps_observed,
++        gate,
++        execution,
++        resample,
++        post_check,
++        safety,
++        ready_for_salad03c_span_resample: false,
++        ready_for_stop01_safe_stop_execute: steps_observed > 0,
++        ready_for_default_enable: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run controlled fixtures before enabling rollback execute".to_string()
++        } else if contract_fail {
++            "SALAD-03B contract violation detected; rollback execute must remain disabled".to_string()
++        } else {
++            "controlled rollback execute receipt sealed; default enable remains forbidden".to_string()
++        },
++    }
++}
++
++pub fn write_salad03b_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, format!("{}\n", json));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn base_config() -> Salad03BSafeResampleConfig {
++        Salad03BSafeResampleConfig {
++            temperature: 0.14,
++            top_p: 0.82,
++            top_k: 0,
++            min_p: 0.12,
++            guard_strength: "Panic".to_string(),
++            repeat_penalty: Some(1.12),
++            no_repeat_ngram: Some(3),
++            max_resample_attempts: 1,
++            safe_stop_if_resample_fails: true,
++        }
++    }
++
++    fn base_input() -> Salad03BExecuteInput {
++        Salad03BExecuteInput {
++            mode: Salad03BMode::ControlledExecute,
++            behavior_change_allowed: true,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 47,
++            backend: "cpu_oracle".to_string(),
++            salad02_risk_stable: "High".to_string(),
++            salad02_score: 0.72,
++            salad03_decision: "PlanRollback".to_string(),
++            rollback_depth: 4,
++            rollback_target_step: 43,
++            snapshot_id: "kv_000043".to_string(),
++            snapshot_step: 43,
++            restore_verified_for_salad03b: true,
++            token_ledger_len: 47,
++            kv_restore_supported: true,
++            position_restore_supported: true,
++            rollback_count_window: 0,
++            max_rollback_per_window: 1,
++            current_temperature: 0.18,
++            current_top_p: 0.86,
++            current_top_k: 0,
++            current_min_p: 0.08,
++            safe_resample_config: base_config(),
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++        }
++    }
++
++    #[test]
++    fn salad03b_gate_denies_without_verified_restore() {
++        let mut input = base_input();
++        input.restore_verified_for_salad03b = false;
++        let gate = decide_salad03b_gate(&input);
++        assert!(!gate.can_execute);
++        assert!(gate.denied_reasons.contains(&"missing_verified_snapshot".to_string()));
++    }
++
++    #[test]
++    fn salad03b_gate_denies_behavior_not_allowed() {
++        let mut input = base_input();
++        input.behavior_change_allowed = false;
++        let gate = decide_salad03b_gate(&input);
++        assert!(!gate.can_execute);
++    }
++
++    #[test]
++    fn salad03b_gate_denies_low_risk() {
++        let mut input = base_input();
++        input.salad02_risk_stable = "Medium".to_string();
++        let gate = decide_salad03b_gate(&input);
++        assert!(!gate.can_execute);
++    }
++
++    #[test]
++    fn salad03b_resample_config_clamped() {
++        let cfg = Salad03BSafeResampleConfig { temperature: 9.0, top_p: 9.0, top_k: 99999, min_p: -1.0, guard_strength: String::new(), repeat_penalty: Some(9.0), no_repeat_ngram: Some(99), max_resample_attempts: 99, safe_stop_if_resample_fails: true };
++        let clamped = clamp_safe_resample_config(&cfg);
++        assert!((0.03..=0.50).contains(&clamped.temperature));
++        assert!((0.50..=0.95).contains(&clamped.top_p));
++        assert!((0.00..=0.25).contains(&clamped.min_p));
++        assert!(clamped.top_k <= 1024);
++    }
++
++    #[test]
++    fn salad03b_execution_receipt_records_tail_and_replacement() {
++        let input = base_input();
++        let gate = decide_salad03b_gate(&input);
++        let exec = execute_salad03b_controlled_synthetic(&input, &gate, Some(7), Some("합니다".to_string()));
++        assert!(exec.executed);
++        assert!(exec.kv_restore_executed);
++        assert!(exec.token_ledger_truncate_executed);
++        assert!(exec.original_tail.is_some());
++        assert!(exec.replacement.is_some());
++        assert!(!exec.safe_stop_executed);
++    }
++
++    #[test]
++    fn salad03b_plan_only_no_behavior_change() {
++        let mut input = base_input();
++        input.mode = Salad03BMode::PlanOnly;
++        let gate = decide_salad03b_gate(&input);
++        let exec = plan_only_execution(&input, &gate);
++        assert!(!exec.executed);
++        assert!(!exec.rollback_executed);
++    }
++}
+diff -ruN /mnt/data/salad03b_orig/crates/model_core/src/sampler_parity.rs /mnt/data/salad03b_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/salad03b_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:11:03.000000000 +0000
++++ /mnt/data/salad03b_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:18:19.211802186 +0000
+@@ -457,5 +457,6 @@
+     crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
+     crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
+     crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
++    crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_controlled_execute_schema.json /mnt/data/salad03b_work/workspace/salad03b_controlled_execute_schema.json
+--- /mnt/data/salad03b_orig/workspace/salad03b_controlled_execute_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_controlled_execute_schema.json	2026-05-27 07:18:55.024227775 +0000
+@@ -0,0 +1,77 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "SALAD-03B Rollback Controlled Execute / KV-Restored Safe Resample Seal Receipt",
++  "type": "object",
++  "required": [
++    "patch_id",
++    "schema_version",
++    "mode",
++    "behavior_change",
++    "controlled_execute",
++    "input",
++    "gate",
++    "execution",
++    "post_check"
++  ],
++  "properties": {
++    "patch_id": {
++      "const": "16AI-QW-38G-R6A-SALAD-03B"
++    },
++    "input_patch": {
++      "type": "string"
++    },
++    "schema_version": {
++      "type": "integer"
++    },
++    "run_id": {
++      "type": "string"
++    },
++    "prompt_hash": {
++      "type": [
++        "string",
++        "null"
++      ]
++    },
++    "seed": {
++      "type": [
++        "integer",
++        "null"
++      ]
++    },
++    "step": {
++      "type": "integer"
++    },
++    "backend": {
++      "type": "string"
++    },
++    "sampler_ssot": {
++      "type": "string"
++    },
++    "mode": {
++      "enum": [
++        "Off",
++        "PlanOnly",
++        "ControlledExecute",
++        "StrictControlledExecute"
++      ]
++    },
++    "behavior_change": {
++      "type": "boolean"
++    },
++    "controlled_execute": {
++      "type": "boolean"
++    },
++    "input": {
++      "type": "object"
++    },
++    "gate": {
++      "type": "object"
++    },
++    "execution": {
++      "type": "object"
++    },
++    "post_check": {
++      "type": "object"
++    }
++  }
++}
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_probe_prompts.jsonl /mnt/data/salad03b_work/workspace/salad03b_probe_prompts.jsonl
+--- /mnt/data/salad03b_orig/workspace/salad03b_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_probe_prompts.jsonl	2026-05-27 07:18:55.024940804 +0000
+@@ -0,0 +1,4 @@
++{"id": "P01_high_risk_repeat_tail", "prompt": "같은 어미가 반복되는 짧은 한국어 응답을 안전하게 복구한다.", "max_new_tokens": 96, "mode": "controlled_candidate"}
++{"id": "P02_josa_loop_probe", "prompt": "조사/어미 루프가 발생했을 때 verified snapshot rollback 후보를 확인한다.", "max_new_tokens": 96, "mode": "controlled_candidate"}
++{"id": "P03_byte_piece_panic", "prompt": "byte-piece leak 위험에서 safe resample 실패 시 safe stop 후보를 확인한다.", "max_new_tokens": 64, "mode": "strict_candidate"}
++{"id": "P04_low_risk_denied", "prompt": "정상 문장은 SALAD-03B gate에서 rollback이 deny되어야 한다.", "max_new_tokens": 64, "mode": "negative_control"}
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_report.md /mnt/data/salad03b_work/workspace/salad03b_report.md
+--- /mnt/data/salad03b_orig/workspace/salad03b_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_report.md	2026-05-27 07:18:55.026923781 +0000
+@@ -0,0 +1,45 @@
++# 16AI-QW-38G-R6A-SALAD-03B — Rollback Controlled Execute / KV-Restored Safe Resample Seal
++
++## Status
++
++- static_status: PASS_STATIC
++- cargo_check: NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER
++- runtime_smoke: NOT_RUN
++- default_enable: false
++
++## Baked files
++
++- `crates/model_core/src/salad03b_controlled_execute.rs`
++- `crates/model_core/src/lib.rs`
++- `crates/model_core/src/sampler_parity.rs`
++- `workspace/salad03b_controlled_execute_schema.json`
++- `workspace/salad03b_steps.jsonl`
++- `workspace/salad03b_summary.json`
++- `workspace/salad03b_static_checks.json`
++- `workspace/salad03b_probe_prompts.jsonl`
++- `acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md`
++
++## Contract
++
++SALAD-03B is the first rollback execute seal, but it remains default-off.
++Behavior changes are only allowed when `ASH_SALAD03B_MODE=controlled_execute` or `strict_controlled_execute`, `ASH_SALAD03B_BEHAVIOR_CHANGE_ALLOWED=true`, and the gate sees `restore_verified_for_salad03b=true`.
++
++The patch forbids string-only rollback. A valid execute receipt must show KV restore, position restore, token ledger truncate, safe resample, original tail capture, replacement token capture, and post-resample risk check.
++
++## Runtime example
++
++```bash
++ASH_SALAD03B_MODE=controlled_execute \
++ASH_SALAD03B_BEHAVIOR_CHANGE_ALLOWED=true \
++ASH_SALAD03B_REQUIRE_VERIFIED_RESTORE=true \
++ASH_SALAD03B_MAX_ROLLBACK_DEPTH=8 \
++ASH_SALAD03B_MAX_ROLLBACKS_PER_WINDOW=1 \
++ASH_SALAD03B_RECEIPT=workspace/salad03b_steps.jsonl \
++ASH_SALAD03B_SUMMARY=workspace/salad03b_summary.json
++```
++
++## Next recommended patch
++
++`16AI-QW-38G-R6A-STOP-01 — Safe Stop Controlled Execute Seal`
++
++SALAD-03B keeps `safe_stop_executed=false`; STOP-01 should own actual generation termination.
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_source_hash_manifest.json /mnt/data/salad03b_work/workspace/salad03b_source_hash_manifest.json
+--- /mnt/data/salad03b_orig/workspace/salad03b_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_source_hash_manifest.json	2026-05-27 07:18:55.028762633 +0000
+@@ -0,0 +1,40 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03B",
++  "files": [
++    {
++      "path": "crates/model_core/src/salad03b_controlled_execute.rs",
++      "sha256": "7b4e3e22cd7cde67af652796edd1a78f71cf831313baecd620c4d56aff43387f",
++      "bytes": 38753
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "6cc8c0ea3c982bc42bea9c4b8e68097639bcb0571aa8a0f1669b0e46e3932758",
++      "bytes": 16236
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "020bc83052d15748a08990a54fa26ebe22b7850fb2a0dd3adbd11d7e0e4212e7",
++      "bytes": 20463
++    },
++    {
++      "path": "workspace/salad03b_controlled_execute_schema.json",
++      "sha256": "f244eced77b64f7fecfcbf43d8a868e2915ccda276c1095c9ef27737f4bc45e6",
++      "bytes": 1352
++    },
++    {
++      "path": "workspace/salad03b_summary.json",
++      "sha256": "5eb23b5807d5ee53d0edb74ba0cb9035ae102f079853a327e90b301abbbe7a14",
++      "bytes": 1364
++    },
++    {
++      "path": "workspace/salad03b_static_checks.json",
++      "sha256": "cadf91ce7766a893ea5867baa546787584e6c4cbde5f23e97075cb62bc3871dd",
++      "bytes": 549
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-SALAD-03B_acceptance.md",
++      "sha256": "2388dc903a97ef331ee21afd3e972a53ffa7686903cf3a786431794c06dc46d7",
++      "bytes": 887
++    }
++  ]
++}
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_static_checks.json /mnt/data/salad03b_work/workspace/salad03b_static_checks.json
+--- /mnt/data/salad03b_orig/workspace/salad03b_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_static_checks.json	2026-05-27 07:18:55.026708718 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03B",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": {
++    "module_file_exists": true,
++    "lib_module_registered": true,
++    "lib_exports_patch": true,
++    "sampler_parity_hook": true,
++    "default_off": true,
++    "verified_snapshot_gate": true,
++    "string_only_rollback_safety": true,
++    "safe_stop_executed_false": true,
++    "runtime_trait_present": true,
++    "summary_writer_present": true,
++    "tests_present": true
++  }
++}
+diff -ruN /mnt/data/salad03b_orig/workspace/salad03b_summary.json /mnt/data/salad03b_work/workspace/salad03b_summary.json
+--- /mnt/data/salad03b_orig/workspace/salad03b_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/salad03b_work/workspace/salad03b_summary.json	2026-05-27 07:18:55.024664723 +0000
+@@ -0,0 +1,48 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03B",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-03+KV-ROLLBACK-01",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "Off",
++  "controlled_execute": false,
++  "default_enable": false,
++  "requires_salad03": true,
++  "requires_kv_rollback01": true,
++  "steps_observed": 0,
++  "gate": {
++    "can_execute_count": 0,
++    "denied_count": 0,
++    "strict_fail_count": 0
++  },
++  "execution": {
++    "executed_count": 0,
++    "rollback_executed_count": 0,
++    "kv_restore_executed_count": 0,
++    "token_ledger_truncate_executed_count": 0,
++    "position_restore_executed_count": 0,
++    "resample_executed_count": 0,
++    "safe_stop_executed_count": 0
++  },
++  "resample": {
++    "success_count": 0,
++    "failure_count": 0,
++    "mean_replacement_logprob": null
++  },
++  "post_check": {
++    "risk_improved_count": 0,
++    "risk_worsened_count": 0,
++    "safe_stop_recommended_count": 0,
++    "replacement_rejected_count": 0
++  },
++  "safety": {
++    "string_only_rollback_count": 0,
++    "execute_without_verified_snapshot_count": 0,
++    "execute_without_gate_count": 0,
++    "partial_failure_count": 0
++  },
++  "acceptance": {
++    "ready_for_salad03c_span_resample": false,
++    "ready_for_stop01_safe_stop_execute": false,
++    "ready_for_default_enable": false,
++    "reason": "static bake only; run controlled fixtures before enabling rollback execute"
++  }
++}

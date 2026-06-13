@@ -1,0 +1,44 @@
+{
+  "patch_id": "QW-52C-R1",
+  "title": "Shadow Rerank Dataset Replay / Top1 Diff Audit Seal",
+  "schema_version": "shadow_top1_diff_audit_v1",
+  "trace": "ShadowRerankTop1DiffAuditTrace",
+  "sample": "ShadowTop1DiffAuditSample",
+  "output_jsonl": "artifacts/qw52c_r1_shadow_top1_diff_audit.jsonl",
+  "manifest": "artifacts/qw52c_r1_shadow_rerank_audit_manifest.json",
+  "top1_diff_classes": [
+    "Unavailable",
+    "NoDiff",
+    "BeneficialDiff",
+    "RiskyDiff",
+    "NeutralDiff",
+    "ReviewOnly"
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_audit_language": "Rust",
+    "replay_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  }
+}

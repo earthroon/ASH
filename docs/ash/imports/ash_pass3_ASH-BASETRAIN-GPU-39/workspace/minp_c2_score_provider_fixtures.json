@@ -1,0 +1,38 @@
+{
+  "score_range_test": {
+    "expected": "all scores in [-1.0, 1.0]",
+    "status": "STATIC_FIXTURE_PASS"
+  },
+  "vocab_length_test": {
+    "expected": "qwave/deltak lengths equal vocab_size",
+    "status": "STATIC_FIXTURE_PASS"
+  },
+  "control_token_test": {
+    "tokens": [
+      "<pad>",
+      "<eos>"
+    ],
+    "expected": "qwave/deltak <= -0.8",
+    "status": "STATIC_FIXTURE_PASS"
+  },
+  "normal_korean_token_test": {
+    "tokens": [
+      "▁이어가고"
+    ],
+    "expected": "qwave/deltak >= 0.0",
+    "status": "STATIC_FIXTURE_PASS"
+  },
+  "byte_mojibake_token_test": {
+    "tokens": [
+      "<byte:EC>",
+      "?댁뼱媛怨?"
+    ],
+    "expected": "negative prior and mojibake count",
+    "status": "STATIC_FIXTURE_PASS"
+  },
+  "strict_not_ready_application_test": {
+    "snapshot_created": true,
+    "semantic_prior_effective": false,
+    "reason": "SAMPLER04_STRICT_NOT_READY when promotion is not ready"
+  }
+}

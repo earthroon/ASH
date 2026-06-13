@@ -1,0 +1,291 @@
+diff --git a/docs/16AI-6V-0_tokenizer_v6_compat_ssot.md b/docs/16AI-6V-0_tokenizer_v6_compat_ssot.md
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/docs/16AI-6V-0_tokenizer_v6_compat_ssot.md
++# 16AI-6V-0 Tokenizer V6 Compat SSOT Seal
++
++## 1. Identity
++
++| field | value |
++|---|---|
++| model_identity | Ash 1.1B |
++| base_tokenizer_version | v5 |
++| target_tokenizer_version | v6-compat |
++| v6_type | checkpoint-compatible runtime tokenizer |
++| vocab_size | 48259 |
++| checkpoint_compatible | true |
++
++## 2. Non-Mutation Contract
++
++| field | value |
++|---|---|
++| token_id_table_mutated | false |
++| new_token_ids_created | false |
++| vocab_augmented | false |
++| embedding_resize_required | false |
++| checkpoint_rewrite_required | false |
++
++## 3. Default Runtime Contract
++
++| field | value |
++|---|---|
++| default_mode | v5-baseline |
++| fallback_to_v5 | true |
++| global_default_commit | false |
++| branch_local_commit_supported | true |
++| policy_gated_commit_supported | true |
++
++## 4. Runtime Layers
++
++- protected_span_scanner
++- cheonjiin_structural_analyzer
++- existing_vocab_lookup_lattice
++- dp_best_token_path_assembler
++- quality_policy_gate
++- branch_local_commit_selector
++- gpu_shadow_backend_gate
++
++## 5. Verified Gates
++
++| gate | status |
++|---|---|
++| 16AI-6E-R4 | PASS_DELTA_REPORT |
++| 16AI-6E-R5 | PASS_COVERAGE_REPORT |
++| 16AI-6F | PASS_COMMIT_GATE_COMPARE_ONLY |
++| 16AI-6G | PASS_QUALITY_RECOMPARE |
++| 16AI-6H-R2 | PASS_POLICY_QUALITY_INTEGRATED |
++| 16AI-6I | PASS_GATED_COMMIT_PROBE |
++| 16AI-6J | PASS_GPU_SHADOW_PARITY |
++| 16AI-6J-R2 | PASS_GPU_SHADOW_REPLAY8 |
++
++## 6. GPU Contract
++
++| field | value |
++|---|---|
++| gpu_shadow_supported | true |
++| gpu_shadow_parity_1_verified | true |
++| gpu_shadow_replay8_verified | true |
++| gpu_default | false |
++| cpu_fallback | true |
++| max_verified_new_tokens | 8 |
++
++## 7. Runtime PASS vs Bake PENDING Contract
++
++Tokenizer V6 Compat must never treat a bake placeholder or PENDING manifest as a runtime PASS. Runtime gates must be read from verified runtime output or from explicit invariant checks. PENDING_RUNTIME is not equivalent to PASS_GPU_SHADOW_PARITY or PASS_GPU_SHADOW_REPLAY8.
++
++## 8. 확정
++
++- v6는 vocab 확장 버전이 아니다.
++- v6는 기존 v5 vocab/checkpoint 위에 얹는 runtime profile이다.
++- 기본값은 v5-baseline이다.
++- v6는 명시 옵션 또는 branch-local/policy-gated mode에서만 작동한다.
++- GPU는 shadow/replay8까지 검증됐지만 default는 아니다.
++
++## 9. 추정
++
++- v6 manifest / audit / facade / runtime integration으로 이어질 수 있다.
++- dialogue-ko policy-approved branch-local path가 v6의 1차 검증 대상이다.
++- DPO 후보 export는 v6 후반 단계에서 가능하다.
++
++## 10. 판단불가
++
++- v6 default tokenizer 안전성
++- gpu_default 안전성
++- 16토큰 이상 장문 안정성
++- 전체 matrix 안정성
++- DPO 학습 효과
+
+diff --git a/docs/16AI-6V_tokenizer_v6_build_contract.md b/docs/16AI-6V_tokenizer_v6_build_contract.md
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/docs/16AI-6V_tokenizer_v6_build_contract.md
++# 16AI-6V Tokenizer V6 Build Contract
++
++## Contract Summary
++
++Tokenizer V6 Compat is a checkpoint-compatible runtime tokenizer profile for Ash 1.1B. It preserves tokenizer v5 vocabulary and token IDs while packaging the 16AI-6 assembly, policy, branch-local commit, and GPU shadow verification line into a single versioned runtime identity.
++
++## Must Preserve
++
++- `base_tokenizer_version = v5`
++- `vocab_size = 48259`
++- `token_id_table_mutated = false`
++- `new_token_ids_created = false`
++- `vocab_augmented = false`
++- `embedding_resize_required = false`
++- `checkpoint_rewrite_required = false`
++- `fallback_to_v5 = true`
++- `default_mode = v5-baseline`
++- `global_default_commit = false`
++- `gpu_default = false`
++- `cpu_fallback = true`
++
++## May Add
++
++- v6 compat manifest
++- v6 audit probe
++- v6 encoder facade
++- protected span scanner binding
++- Cheonjiin structural analyzer binding
++- existing vocab lookup lattice binding
++- DP best token path assembler binding
++- quality policy gate binding
++- branch-local commit selector binding
++- GPU shadow backend metadata
++
++## Must Not Add In V0
++
++- new tokenizer vocab
++- new token IDs
++- embedding resize
++- checkpoint rewrite
++- generation execution
++- GPU execution
++- DPO training
++- default tokenizer switch
++
++## Gate Chain To Preserve
++
++1. 16AI-6E-R4 PASS_DELTA_REPORT
++2. 16AI-6E-R5 PASS_COVERAGE_REPORT
++3. 16AI-6F PASS_COMMIT_GATE_COMPARE_ONLY
++4. 16AI-6G PASS_QUALITY_RECOMPARE
++5. 16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED
++6. 16AI-6I PASS_GATED_COMMIT_PROBE
++7. 16AI-6J PASS_GPU_SHADOW_PARITY
++8. 16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8
+
+diff --git a/infer_debug/16AI-6V-0_tokenizer_v6_compat_ssot.json b/infer_debug/16AI-6V-0_tokenizer_v6_compat_ssot.json
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/infer_debug/16AI-6V-0_tokenizer_v6_compat_ssot.json
++{
++  "run": {
++    "id": "16AI-6V-0",
++    "kind": "tokenizer_v6_compat_ssot_seal",
++    "generation": false,
++    "checkpoint_required": false,
++    "manifest_created": false,
++    "runtime_changed": false,
++    "token_ids_mutated": false,
++    "vocab_augmented": false,
++    "new_token_ids_created": false,
++    "embedding_resize_required": false
++  },
++  "identity": {
++    "model_identity": "Ash 1.1B",
++    "base_tokenizer_version": "v5",
++    "target_tokenizer_version": "v6-compat",
++    "v6_type": "checkpoint-compatible runtime tokenizer",
++    "vocab_size": 48259,
++    "checkpoint_compatible": true
++  },
++  "compatibility_contract": {
++    "base_vocab_preserved": true,
++    "token_id_table_mutated": false,
++    "new_token_ids_created": false,
++    "vocab_augmented": false,
++    "embedding_resize_required": false,
++    "checkpoint_rewrite_required": false,
++    "fallback_to_v5": true,
++    "default_mode": "v5-baseline",
++    "global_default_commit": false
++  },
++  "runtime_capabilities": {
++    "protected_span_scanner": true,
++    "cheonjiin_structural_analyzer": true,
++    "existing_vocab_lookup_lattice": true,
++    "dp_best_token_path_assembler": true,
++    "quality_policy_gate": true,
++    "branch_local_commit_selector": true,
++    "gpu_shadow_backend_gate": true
++  },
++  "verified_gates": {
++    "assembly_delta": "16AI-6E-R4 PASS_DELTA_REPORT",
++    "coverage": "16AI-6E-R5 PASS_COVERAGE_REPORT",
++    "commit_gate": "16AI-6F PASS_COMMIT_GATE_COMPARE_ONLY",
++    "quality_recompare": "16AI-6G PASS_QUALITY_RECOMPARE",
++    "policy_integration": "16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED",
++    "gated_commit": "16AI-6I PASS_GATED_COMMIT_PROBE",
++    "gpu_shadow_1": "16AI-6J PASS_GPU_SHADOW_PARITY",
++    "gpu_shadow_8": "16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8"
++  },
++  "gpu_contract": {
++    "gpu_shadow_supported": true,
++    "gpu_shadow_parity_1_verified": true,
++    "gpu_shadow_replay8_verified": true,
++    "gpu_default": false,
++    "cpu_fallback": true,
++    "max_verified_new_tokens": 8
++  },
++  "pending_vs_pass_contract": {
++    "pending_runtime_is_pass": false,
++    "bake_manifest_is_runtime_pass": false,
++    "runtime_pass_required_for_gate_import": true
++  },
++  "acceptance": {
++    "status": "PASS_TOKENIZER_V6_COMPAT_SSOT"
++  }
++}
+
+diff --git a/acceptance_reports/16AI-6V-0_acceptance_PENDING_OR_PASS_SSOT.md b/acceptance_reports/16AI-6V-0_acceptance_PENDING_OR_PASS_SSOT.md
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/acceptance_reports/16AI-6V-0_acceptance_PENDING_OR_PASS_SSOT.md
++# 16AI-6V-0 Acceptance — Tokenizer V6 Compat SSOT Seal
++
++## Status
++
++`PASS_TOKENIZER_V6_COMPAT_SSOT`
++
++## Scope
++
++| field | value |
++|---|---|
++| generation | false |
++| checkpoint_required | false |
++| manifest_created | false |
++| runtime_changed | false |
++| token_ids_mutated | false |
++| vocab_augmented | false |
++| new_token_ids_created | false |
++| embedding_resize_required | false |
++
++## Required Contract
++
++| field | value |
++|---|---|
++| v6_type | checkpoint-compatible runtime tokenizer |
++| base_tokenizer_version | v5 |
++| target_tokenizer_version | v6-compat |
++| vocab_size | 48259 |
++| fallback_to_v5 | true |
++| default_mode | v5-baseline |
++| global_default_commit | false |
++| gpu_default | false |
++| cpu_fallback | true |
++
++## Verified Gates Recorded
++
++- 16AI-6E-R4 PASS_DELTA_REPORT
++- 16AI-6E-R5 PASS_COVERAGE_REPORT
++- 16AI-6F PASS_COMMIT_GATE_COMPARE_ONLY
++- 16AI-6G PASS_QUALITY_RECOMPARE
++- 16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED
++- 16AI-6I PASS_GATED_COMMIT_PROBE
++- 16AI-6J PASS_GPU_SHADOW_PARITY
++- 16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8
++
++## Guardrails
++
++- V6 is not a vocab expansion.
++- V6 does not create new token IDs.
++- V6 does not require embedding resize.
++- V6 does not rewrite the checkpoint.
++- V6 does not make GPU default.
++- V6 does not treat PENDING_RUNTIME as PASS.
+

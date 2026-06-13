@@ -1,0 +1,78 @@
+{
+  "patch_id": "QW-52A-R4-M0",
+  "title": "Root Manifest / Latest SSOT Pointer Rebase Seal",
+  "base_patch": "QW-52A-R4",
+  "status": "PASS_STATIC_MANIFEST_REBASE",
+  "timestamp_unix": 1780229433,
+  "manifest_before": {
+    "patch_id": "QW-50-R0V",
+    "patch_name": "Hard Negative Replay Buffer SSOT Test Import Split Fix",
+    "base_patch": "QW-50-R0T",
+    "status": "PENDING_LOCAL_CARGO_CHECK",
+    "next_recommended_patch": null
+  },
+  "manifest_after": {
+    "patch_id": "QW-52A-R4-M0",
+    "patch_name": "Root Manifest / Latest SSOT Pointer Rebase Seal",
+    "base_patch": "QW-52A-R4",
+    "status": "PASS_STATIC_MANIFEST_REBASE",
+    "latest_baked_patch": "QW-52A-R4",
+    "current_next_recommended_patch": "QW-52B",
+    "runtime_default_apply": false
+  },
+  "r4_contract": {
+    "formula": "h_candidate = h + alpha * gate * latent_delta",
+    "alpha_candidate": 0.01,
+    "gate_default": 0.0,
+    "gate_runtime_value": 0.0,
+    "runtime_default_apply": false,
+    "controlled_enable_required": true,
+    "operator_approval_required": true
+  },
+  "r4_receipt_source": {
+    "patch_id": "QW-52A-R4",
+    "title": "Cheonjiin Adapter Gated Fusion Candidate / No Default Apply Seal",
+    "status": "PASS",
+    "next_candidates": [
+      "QW-52B",
+      "QW-52A-R5"
+    ]
+  },
+  "r4_validation_source": {
+    "patch_id": "QW-52A-R4",
+    "status": "PASS",
+    "rust_owned": true,
+    "python_injector_only": true,
+    "cargo_check": "NOT RUN - cargo unavailable",
+    "runtime_probe": "NOT RUN - cargo unavailable"
+  },
+  "mutation_policy": {
+    "hidden_state_mutation": false,
+    "residual_stream_mutation": false,
+    "lm_head_input_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_selection_mutation": false,
+    "lora_scale_mutation": false,
+    "webgpu_shader_added": false,
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false
+  },
+  "next_patch": {
+    "patch_id": "QW-52B",
+    "title": "Decode Detector Registry / Word Salad Risk Seal",
+    "type": "trace_registry",
+    "runtime_apply": false
+  },
+  "rust_owned_validation": true,
+  "python_injector_only": true,
+  "cargo_check": "NOT RUN - cargo unavailable in bake container",
+  "runtime_probe": "NOT RUN - cargo unavailable in bake container",
+  "notes": [
+    "This patch only rebases root manifest pointers to QW-52A-R4.",
+    "No detector, decoder, sampler, hidden, logit, LoRA, model weight, or WebGPU behavior is changed.",
+    "QW-52B remains the next trace-only detector registry patch."
+  ]
+}

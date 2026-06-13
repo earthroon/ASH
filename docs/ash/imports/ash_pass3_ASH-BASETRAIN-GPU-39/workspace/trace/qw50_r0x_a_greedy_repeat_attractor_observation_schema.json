@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-50-R0X-A",
+  "title": "Greedy Repeat Attractor Observation / No Token Mutation Seal",
+  "type": "observation_only_schema",
+  "required_runtime_fields": [
+    "nativeDecodeR0wTrace.greedyRepeatAttractorObservation.enabled",
+    "nativeDecodeR0wTrace.greedyRepeatAttractorObservation.target_repeated_token_id",
+    "nativeDecodeR0wTrace.greedyRepeatAttractorObservation.topk_margin_matrix",
+    "nativeDecodeR0wTrace.greedyRepeatAttractorObservation.mutation_policy"
+  ],
+  "forbidden_state": {
+    "token_mutation": false,
+    "token_ban_added": false,
+    "hard_ban_added": false,
+    "blacklist_mutation": false,
+    "logit_mutation": false,
+    "logit_penalty_added": false,
+    "sampler_mutation": false,
+    "temperature_mutation": false,
+    "top_k_mutation": false,
+    "top_p_mutation": false,
+    "min_p_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "model_weight_mutation": false,
+    "lora_scale_mutation": false,
+    "crates_js_ts_added": false
+  }
+}

@@ -1,0 +1,18 @@
+PASS crates/runtime/src/ash_current_pointer.rs
+PASS crates/runtime/tests/ash_current_pointer.rs
+PASS crates/orchestrator_local/src/ash_runtime_pointer_integration.rs
+PASS crates/orchestrator_local/src/bin/ash_11_runtime_pointer_audit.rs
+PASS crates/orchestrator_local/tests/ash_runtime_pointer_integration.rs
+PASS crates/runtime/src/lib.rs contains ash_current_pointer
+PASS crates/orchestrator_local/src/lib.rs contains ash_runtime_pointer_integration
+PASS crates/runtime/src/ash_current_pointer.rs contains PASS_RUNTIME_CURRENT_POINTER_EXPLICIT_BASE_ONLY_GATE
+PASS crates/runtime/src/ash_current_pointer.rs contains RuntimeExplicitBaseOnlyRequest
+PASS crates/runtime/src/ash_current_pointer.rs contains silent_fallback_detected
+PASS crates/runtime/tests/ash_current_pointer.rs contains empty_current_without_explicit_base_only_rejects
+PASS crates/orchestrator_local/src/ash_runtime_pointer_integration.rs contains prepare_runtime_from_current_pointer
+PASS crates/orchestrator_local/src/bin/ash_11_runtime_pointer_audit.rs contains PASS_RUNTIME_CURRENT_POINTER_EXPLICIT_BASE_ONLY_GATE
+PASS acceptance_reports/ASH-11_runtime_current_pointer_explicit_base_only_gate.md
+PASS absent tools/validate_ash_11_static.py
+PASS ash_core has no runtime dependency
+PASS ash_core has no artifact_store dependency
+PASS_STATIC_SANITY ASH-11 checks=17 fail=0

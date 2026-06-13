@@ -1,0 +1,21 @@
+PASS crates/ash_core/src/runtime_attachment_plan.rs
+PASS crates/ash_core/src/bin/ash_runtime_attachment_plan_audit.rs
+PASS crates/ash_core/tests/ash_3_runtime_attachment_plan.rs
+PASS acceptance_reports/ASH-3_runtime_attachment_plan.md
+PASS crates/ash_core/src/lib.rs contains pub mod runtime_attachment_plan;
+PASS crates/ash_core/src/lib.rs contains pub use runtime_attachment_plan::\*;
+PASS crates/ash_core/src/runtime_attachment_plan.rs contains AshRuntimeAttachmentPlan
+PASS crates/ash_core/src/runtime_attachment_plan.rs contains forbid_silent_fallback
+PASS crates/ash_core/src/runtime_attachment_plan.rs contains forbid_target_auto_remap
+PASS crates/ash_core/src/runtime_attachment_plan.rs contains PASS_ASH_RUNTIME_ATTACHMENT_PLAN
+PASS crates/ash_core/src/bin/ash_runtime_attachment_plan_audit.rs contains PASS_ASH_RUNTIME_ATTACHMENT_PLAN
+PASS crates/ash_core/tests/ash_3_runtime_attachment_plan.rs contains ash_3_has_no_python_validator
+PASS no Python ASH-3 validator
+PASS no forbidden dependency runtime =
+PASS no forbidden dependency model_core
+PASS no forbidden dependency lora_train
+PASS no forbidden dependency artifact_store
+PASS no forbidden dependency orchestrator_local
+PASS no forbidden dependency burn
+PASS no forbidden dependency wgpu
+PASS no forbidden dependency safetensors

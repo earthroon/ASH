@@ -1,0 +1,29 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "behavior_change_contract": false,
+  "guard_overlay_only_contract": true,
+  "files_checked": [
+    "crates/model_core/src/salad04_korean_morph_guard.rs",
+    "crates/model_core/src/lib.rs",
+    "crates/model_core/src/sampler_parity.rs",
+    "workspace/salad04_korean_morph_guard_schema.json",
+    "workspace/salad04_summary.json"
+  ],
+  "static_assertions": [
+    "SALAD04_PATCH_ID present",
+    "KoreanMorphClass present",
+    "KoreanMorphLoopKind present",
+    "Salad04Detection.behavior_change=false by construction",
+    "Salad04Detection.guard_overlay_only=true by construction",
+    "append_salad04_receipt_from_sampler03 hook present"
+  ],
+  "text_checks": {
+    "patch_id": true,
+    "hook": true,
+    "lib_mod": true,
+    "lib_export": true
+  }
+}

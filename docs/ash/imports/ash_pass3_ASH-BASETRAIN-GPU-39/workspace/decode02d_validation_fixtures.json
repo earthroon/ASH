@@ -1,0 +1,69 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02D",
+  "fixtures": [
+    {
+      "name": "generic_continuation_eos",
+      "prev": "▁이어가고",
+      "candidate": "<eos>",
+      "mode": "probe",
+      "expected_action": "Penalize",
+      "expected_reason": "GenericContinuationImmediateEos",
+      "probe_integrity": "PASS"
+    },
+    {
+      "name": "eos_before_min_new_tokens",
+      "step": 2,
+      "min_new_tokens": 8,
+      "candidate": "<eos>",
+      "mode": "probe",
+      "expected_action": "HardBlock",
+      "expected_reason": "EosBeforeMinNewTokens",
+      "probe_integrity": "PASS"
+    },
+    {
+      "name": "pad_control_mojibake",
+      "candidates": [
+        "<pad>",
+        "<glossary:on>",
+        "?댁뼱媛怨?"
+      ],
+      "mode": "probe",
+      "expected_action": "HardBlock",
+      "probe_integrity": "PASS"
+    },
+    {
+      "name": "normal_korean_transition",
+      "prev": "사람",
+      "candidate": "은",
+      "mode": "probe",
+      "expected_action": "Allow",
+      "must_not_hardblock": true
+    },
+    {
+      "name": "emotional_repeat_safe",
+      "recent": [
+        "ㅠ",
+        "ㅠ"
+      ],
+      "candidate": "ㅠ",
+      "mode": "probe",
+      "must_not_hardblock": true
+    },
+    {
+      "name": "repeated_punctuation",
+      "recent": [
+        "!",
+        "!",
+        "!"
+      ],
+      "candidate": "!",
+      "mode": "probe",
+      "expected_action": "Penalize",
+      "expected_reason": "RepeatedPunctuation",
+      "allowed_status": [
+        "PASS",
+        "WARN_RISK_ONLY"
+      ]
+    }
+  ]
+}

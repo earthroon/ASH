@@ -1,0 +1,20 @@
+--- a/crates/model_core/src/lib.rs
++++ b/crates/model_core/src/lib.rs
+@@ -1418,6 +1418,17 @@
+ mod tokenizer_v5_forge01_embed_lmhead_bootstrap;
+ pub use tokenizer_v5_forge01_embed_lmhead_bootstrap::*;
+ 
++// ASH-WORKSPACE-CHECK-R6: legacy QW-TOK-FORGE-00 bin compatibility aliases.
++// The local bin `qw_tok_forge00_native_checkpoint_genesis` still imports the
++// pre-rebase forge00 root symbols, while the implementation SSOT now lives in
++// tokenizer_v5_forge01_embed_lmhead_bootstrap. Keep this as a root-level
++// compatibility bridge only; do not create a second forge runtime.
++pub use tokenizer_v5_forge01_embed_lmhead_bootstrap::{
++    qw_tok_forge01_s0_config_from_args as qw_tok_forge00_config_from_args,
++    run_qw_tok_forge01_s0_namespace_rebase as run_qw_tok_forge00_native_checkpoint_genesis,
++    write_qw_tok_forge01_s0_artifacts as write_qw_tok_forge00_artifacts,
++};
++
+ mod ash_ft01_atlas_group_memory_budget;
+ pub use ash_ft01_atlas_group_memory_budget::*;
+ 

@@ -1,0 +1,20 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
+  "profile": "static_safe_v1",
+  "default_enabled": false,
+  "controlled_enable_requires_opt_in": true,
+  "requires_sampler04_strict_ready": true,
+  "requires_minp_c2a_alignment_pass": true,
+  "weights": {
+    "qwave_weight": 0.05,
+    "deltak_weight": 0.05,
+    "cross_weight": 0.0,
+    "bias_cap": 0.2
+  },
+  "domination_guard": {
+    "enabled": true,
+    "strict": false,
+    "max_rank_flip_ratio": 0.25,
+    "max_bias_to_logit_margin_ratio": 0.5
+  }
+}

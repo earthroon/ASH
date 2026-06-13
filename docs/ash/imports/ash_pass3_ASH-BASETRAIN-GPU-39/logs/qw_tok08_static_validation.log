@@ -1,0 +1,39 @@
+QW-TOK-08 module exists: PASS
+lib module wired: PASS
+QwTok08SubtitleSurfaceRegressionMatrixConfig: PASS: PASS
+QwTok08SurfaceRegressionRow: PASS: PASS
+QwTok08SurfaceRegressionMatrix: PASS: PASS
+QwTok08SurfaceMetricSummary: PASS: PASS
+QwTok08ControlTokenLeakMatrix: PASS: PASS
+QwTok08SurfaceBaselineCandidateDescriptor: PASS: PASS
+QwTok08NoQualityClaimSeal: PASS: PASS
+QwTok08NoRewardTrainingMutationSeal: PASS: PASS
+QwTok08SubtitleSurfaceRegressionMatrixReport: PASS: PASS
+expected vocab const 48259: PASS
+expected max token id const 48258: PASS
+default blocks allow_baseline_promotion: false: PASS
+default blocks allow_semantic_quality_evaluation: false: PASS
+default blocks allow_quality_score: false: PASS
+default blocks allow_quality_claim: false: PASS
+default blocks allow_qw_selector_execution: false: PASS
+default blocks allow_mcts_execution: false: PASS
+default blocks allow_model_inference: false: PASS
+default blocks allow_token_generation: false: PASS
+default blocks allow_sampler_execution: false: PASS
+default blocks allow_training_mutation: false: PASS
+default blocks allow_dataset_export: false: PASS
+default blocks allow_checkpoint_write: false: PASS
+default blocks allow_runtime_spec_write: false: PASS
+default blocks allow_tokenizer_rewrite: false: PASS
+test qw_tok08_subtitle_surface_regression_matrix.rs present: PASS
+test qw_tok08_surface_metric_classification.rs present: PASS
+test qw_tok08_no_quality_claim.rs present: PASS
+test qw_tok08_no_reward_training_mutation.rs present: PASS
+artifacts/qw_tok08_subtitle_surface_regression_matrix_report.json exists: PASS
+artifacts/qw_tok08_surface_regression_matrix.json exists: PASS
+artifacts/qw_tok08_surface_metric_summary.json exists: PASS
+artifacts/qw_tok08_control_token_leak_matrix.json exists: PASS
+workspace/runtime_traces/qw_tok08_subtitle_surface_regression_matrix_trace.jsonl exists: PASS
+workspace/trace/qw_tok08_subtitle_surface_regression_matrix_receipt.json exists: PASS
+no tokenizer/model/checkpoint weight files in qw_tok08 artifacts: PASS
+overall: PASS

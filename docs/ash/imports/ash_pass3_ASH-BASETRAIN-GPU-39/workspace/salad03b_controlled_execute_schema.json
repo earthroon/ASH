@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SALAD-03B Rollback Controlled Execute / KV-Restored Safe Resample Seal Receipt",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "schema_version",
+    "mode",
+    "behavior_change",
+    "controlled_execute",
+    "input",
+    "gate",
+    "execution",
+    "post_check"
+  ],
+  "properties": {
+    "patch_id": {
+      "const": "16AI-QW-38G-R6A-SALAD-03B"
+    },
+    "input_patch": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "prompt_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "step": {
+      "type": "integer"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "sampler_ssot": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "Off",
+        "PlanOnly",
+        "ControlledExecute",
+        "StrictControlledExecute"
+      ]
+    },
+    "behavior_change": {
+      "type": "boolean"
+    },
+    "controlled_execute": {
+      "type": "boolean"
+    },
+    "input": {
+      "type": "object"
+    },
+    "gate": {
+      "type": "object"
+    },
+    "execution": {
+      "type": "object"
+    },
+    "post_check": {
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+# SFT-DATA-01 Static Validation Result
+
+Passed: 47/47
+
+- [x] exists crates/ash_core/src/sft_dataset_pack.rs
+- [x] exists crates/ash_core/tests/sft_data_01_dataset_pack_seal.rs
+- [x] exists acceptance_reports/SFT-DATA-01_dataset_source_manifest_canonical_jsonl_pack_seal.md
+- [x] exists crates/ash_core/src/lib.rs
+- [x] lib.rs pub mod sft_dataset_pack
+- [x] lib.rs pub use sft_dataset_pack
+- [x] source contains AshSftDatasetSourceKind
+- [x] source contains AshSftDatasetSplit
+- [x] source contains AshSftDatasetPackConfig
+- [x] source contains AshSftDatasetSourceInput
+- [x] source contains AshSftCanonicalExample
+- [x] source contains AshSftDatasetManifest
+- [x] source contains AshSftDatasetValidationIssue
+- [x] source contains AshSftDatasetValidationReport
+- [x] source contains AshSftDatasetLock
+- [x] source contains AshSftCanonicalDatasetPack
+- [x] source contains AshSftDatasetPackSealReport
+- [x] source contains build_sft_dataset_canonical_pack
+- [x] source contains allow_canonical_pack_filesystem_write: false
+- [x] source contains allow_sft_training_execution: false
+- [x] source contains allow_gradient_write: false
+- [x] source contains allow_optimizer_step: false
+- [x] source contains allow_lora_artifact_write: false
+- [x] source contains allow_sft_slot_ready: false
+- [x] source contains allow_synapse_binding: false
+- [x] source contains allow_runtime_attach: false
+- [x] source contains row schema normalized from prompt/completion
+- [x] source contains row schema normalized from messages
+- [x] source contains duplicate row quarantined
+- [x] source contains sft_dataset_lock
+- [x] source contains sft_dataset_fp
+- [x] source contains sft_row_
+- [x] test contains single_jsonl_pack_seal
+- [x] test contains prompt_completion_normalizes
+- [x] test contains messages_normalizes
+- [x] test contains invalid_json_rejected
+- [x] test contains duplicate_row_quarantined
+- [x] test contains same_input_same_fingerprint
+- [x] test contains changed_row_changes_fingerprint
+- [x] test contains config_execution_flag_rejected
+- [x] test contains filesystem_write_flag_rejected
+- [x] crates/ash_core/src/sft_dataset_pack.rs balanced {} — {:176 }:176
+- [x] crates/ash_core/src/sft_dataset_pack.rs balanced () — (:415 ):415
+- [x] crates/ash_core/src/sft_dataset_pack.rs balanced [] — [:21 ]:21
+- [x] crates/ash_core/src/lib.rs balanced {} — {:13 }:13
+- [x] crates/ash_core/src/lib.rs balanced () — (:0 ):0
+- [x] crates/ash_core/src/lib.rs balanced [] — [:0 ]:0

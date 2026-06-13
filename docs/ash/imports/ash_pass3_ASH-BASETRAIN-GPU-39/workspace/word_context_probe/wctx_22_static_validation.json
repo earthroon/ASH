@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-22",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "status": "PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE",
+  "rust_toolchain_available": false,
+  "files_added": [
+    "crates/ash_core/src/word_context_commit_ledger_export_inspector.rs",
+    "crates/ash_core/src/bin/ash_word_context_commit_ledger_export_inspector.rs",
+    "workspace/word_context_probe/wctx_22_enko_audit_packet_inspector_cases.json",
+    "workspace/word_context_probe/wctx_22_enko_audit_packet_inspector_matrix.json",
+    "workspace/word_context_probe/wctx_22_enko_audit_packet_inspector_summary.json",
+    "workspace/word_context_probe/wctx_22_enko_audit_packet_inspector_sample_receipt.json",
+    "workspace/word_context_probe/wctx_22_static_validation.json"
+  ],
+  "files_modified": [
+    "crates/ash_core/src/lib.rs"
+  ],
+  "expected_summary": {
+    "patch_id": "16AI-QW-38G-R6A-WCTX-22",
+    "domain_ssot": "en_to_ko_translation_subtitle_machine",
+    "total_cases": 1,
+    "pass_cases": 1,
+    "fail_cases": 0,
+    "deterministic_failures": 0,
+    "risk_failures": 0,
+    "inspection_pass_count": 0,
+    "inspection_pass_empty_ledger_count": 1,
+    "blocked_missing_audit_packet_count": 0,
+    "blocked_missing_manifest_count": 0,
+    "blocked_missing_required_section_count": 0,
+    "blocked_hash_mismatch_count": 0,
+    "blocked_inconsistent_manifest_count": 0,
+    "blocked_source_receipt_index_mismatch_count": 0,
+    "empty_ledger_packet_verified_count": 1,
+    "missing_required_section_count": 0,
+    "hash_mismatch_detected_count": 0,
+    "inconsistent_manifest_detected_count": 0,
+    "ledger_mutation_count": 0,
+    "audit_packet_mutation_count": 0,
+    "revision_event_created_count": 0,
+    "target_text_mutation_count": 0,
+    "commit_executed_in_inspector_count": 0,
+    "rollback_executed_in_inspector_count": 0,
+    "runtime_default_apply_count": 0,
+    "runtime_apply_gate_open_count": 0,
+    "rerank_applied_count": 0,
+    "decode_executed_in_inspector_count": 0,
+    "generation_executed_in_inspector_count": 0,
+    "model_forward_executed_in_inspector_count": 0,
+    "sampling_executed_in_inspector_count": 0
+  },
+  "note": "cargo/rustc unavailable in container; static receipts generated deterministically from WCTX-21 audit packet."
+}

@@ -1,0 +1,27 @@
+{
+  "patch_id": "QW-52A-R4",
+  "status": "PASS",
+  "rust_owned": true,
+  "python_injector_only": true,
+  "cargo_check": "NOT RUN - cargo unavailable",
+  "runtime_probe": "NOT RUN - cargo unavailable",
+  "checks": {
+    "crates/model_core/src/cheonjiin_adapter_gated_fusion_candidate.rs_present": true,
+    "crates/model_core/src/bin/qw52a_r4_gated_fusion_candidate_validate.rs_present": true,
+    "crates/model_core/src/lib.rs_present": true,
+    "crates/model_core/src/hangul_qwave_candidate_awareness.rs_present": true,
+    "crates/runtime/src/infer/qw52a_candidate_awareness_trace.rs_present": true,
+    "gate_default_zero_literal": true,
+    "runtime_default_apply_false_literal": true,
+    "hidden_state_fusion_false_literal": true,
+    "residual_stream_mutation_false_literal": true,
+    "lm_head_input_mutation_false_literal": true,
+    "logit_mutation_false_literal": true,
+    "sampler_mutation_false_literal": true,
+    "module_exported_in_lib": true,
+    "candidate_attach_called": true,
+    "candidate_field_present": true,
+    "no_python_validator_added": true,
+    "no_webgpu_shader_added": true
+  }
+}

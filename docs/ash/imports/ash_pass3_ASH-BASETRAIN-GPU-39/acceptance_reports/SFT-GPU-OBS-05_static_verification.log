@@ -1,0 +1,28 @@
+SFT-GPU-OBS-05 static verification
+======================================
+Runtime Rust toolchain available: false
+cargo/rustc/rustfmt: not found in container
+
+Required file presence:
+- crates/ash_core/src/sft_gpu_decision_action_candidate.rs: PASS
+- crates/ash_core/tests/sft_gpu_obs_05_decision_action_candidate.rs: PASS
+- crates/lora_train/src/gpu_decision_action_candidate.rs: PASS
+- crates/lora_train/tests/gpu_decision_action_candidate.rs: PASS
+- crates/burn_webgpu_backend/src/gpu_decision_action_candidate_signals.rs: PASS
+- crates/burn_webgpu_backend/tests/gpu_decision_action_candidate_signals.rs: PASS
+- acceptance_reports/SFT-GPU-OBS-05_decision_action_candidate.md: PASS
+- docs/roadmap/SFT-GPU-OBS-05_after_bake.md: PASS
+- patch_reports/SFT-GPU-OBS-05_bake_report.md: PASS
+
+Export wiring:
+- crates/ash_core/src/lib.rs module export: PASS
+- crates/lora_train/src/lib.rs module export: PASS
+- crates/burn_webgpu_backend/src/lib.rs module export: PASS
+
+Delimiter balance:
+- crates/ash_core/src/sft_gpu_decision_action_candidate.rs: PASS
+- crates/ash_core/tests/sft_gpu_obs_05_decision_action_candidate.rs: PASS
+- crates/lora_train/src/gpu_decision_action_candidate.rs: PASS
+- crates/lora_train/tests/gpu_decision_action_candidate.rs: PASS
+- crates/burn_webgpu_backend/src/gpu_decision_action_candidate_signals.rs: PASS
+- crates/burn_webgpu_backend/tests/gpu_decision_action_candidate_signals.rs: PASS

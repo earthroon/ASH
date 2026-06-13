@@ -1,0 +1,54 @@
+{
+  "build_gate": "pass_by_user_reported_local_cargo_check",
+  "commit": "16AF-R",
+  "elapsed_ms": 40604.0776,
+  "generation_connected": false,
+  "report": {
+    "burn_cubecl_ffn_matmul_disabled": true,
+    "commit": "16AF",
+    "dispatch_log": [
+      "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+      "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+      "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+      "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3"
+    ],
+    "forbidden_paths_used": [],
+    "generation_connected": false,
+    "hidden": 2048,
+    "inf_count": 0,
+    "intermediate": 5632,
+    "layer_idx": 0,
+    "max_abs_delta": 2.60770320892334e-8,
+    "mean_abs_delta": 2.0633399433478417e-9,
+    "nan_count": 0,
+    "parity_pass": true,
+    "resolved_backend": "native_atlas_ffn_16AF_R1+storage3_split_passes+owned_wgpu_buffers",
+    "shape_match": true,
+    "threshold": 0.0010000000474974513,
+    "top_index_match": true,
+    "top_k": 8,
+    "top_k_overlap": 8,
+    "weight_layout": {
+      "down_bias_present": false,
+      "down_shape": [
+        2048,
+        5632
+      ],
+      "gate_bias_present": false,
+      "gate_shape": [
+        5632,
+        2048
+      ],
+      "hidden": 2048,
+      "intermediate": 5632,
+      "layer_idx": 0,
+      "row_major_weight_layout": true,
+      "up_bias_present": false,
+      "up_shape": [
+        5632,
+        2048
+      ]
+    }
+  },
+  "runtime_gate": "layer0_native_atlas_ffn_parity_probe"
+}

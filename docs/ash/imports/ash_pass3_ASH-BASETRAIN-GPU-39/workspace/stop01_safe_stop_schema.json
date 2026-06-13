@@ -1,0 +1,61 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-STOP-01",
+  "title": "Safe Stop Controlled Execute Seal",
+  "schema_version": 1,
+  "ssot": "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability",
+  "default_mode": "Off",
+  "contracts": {
+    "default_enable": false,
+    "controlled_execute_only": true,
+    "receipt_required": true,
+    "no_silent_stop": true,
+    "output_tail_truncated": false,
+    "eos_bias_stop_executed_default": false
+  },
+  "receipt": {
+    "path_env": "ASH_STOP01_RECEIPT",
+    "default_path": "workspace/stop01_steps.jsonl",
+    "required_fields": [
+      "patch_id",
+      "input_patch",
+      "schema_version",
+      "run_id",
+      "step",
+      "backend",
+      "sampler_ssot",
+      "mode",
+      "behavior_change",
+      "controlled_execute",
+      "input",
+      "gate",
+      "execution",
+      "pre_fingerprint",
+      "post_fingerprint"
+    ]
+  },
+  "summary": {
+    "path_env": "ASH_STOP01_SUMMARY",
+    "default_path": "workspace/stop01_summary.json"
+  },
+  "safe_stop_reasons": [
+    "SaladCritical",
+    "SaladHighPersistent",
+    "PostResampleCritical",
+    "PostResampleHighUnimproved",
+    "ResampleFailed",
+    "RollbackDenied",
+    "RollbackWindowLimitReached",
+    "NumericRisk",
+    "GlobalFiniteFallback",
+    "EmptyActiveSet"
+  ],
+  "fail_conditions": [
+    "Off or PlanOnly emits runtime_stop_executed=true",
+    "behavior_change_allowed=false but stop executes",
+    "generation loop stops without receipt",
+    "output_tail_truncated=true",
+    "eos_bias_stop_executed=true",
+    "runtime_supports_stop=false but stop executes",
+    "executed=true with Stop01Reason::None"
+  ]
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "case_id": "commit_candidate_sealed_from_passed_dry_run",
+    "profile_id": "reduced_dream_weight_v1",
+    "dry_run_pass": true,
+    "approval_status": "ApprovedButNotApplied",
+    "dry_run_result": {
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 0,
+      "stable_broken_count": 0
+    },
+    "expected": {
+      "commit_candidate_status": "CandidateSealed",
+      "commit_candidate_sealed": true,
+      "commit_candidate_applied": false,
+      "runtime_default_apply": false,
+      "recommended_next_patch": "QW-52C-R9"
+    }
+  },
+  {
+    "case_id": "no_runtime_default_apply_even_when_candidate_sealed",
+    "profile_id": "reduced_dream_weight_v1",
+    "commit_candidate_sealed": true,
+    "expected": {
+      "runtime_default_apply": false,
+      "runtime_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "safe_profile_apply_allowed": false,
+      "requires_explicit_enable": true
+    }
+  },
+  {
+    "case_id": "failed_dry_run_no_commit_candidate",
+    "profile_id": "reduced_dream_weight_v1",
+    "dry_run_pass": false,
+    "dry_run_result": {
+      "risky_diff_count": 1
+    },
+    "expected": {
+      "commit_candidate_status": "NoEligibleProfile",
+      "commit_candidate_sealed": false,
+      "runtime_default_apply": false
+    }
+  },
+  {
+    "case_id": "explicit_enable_receipt_missing_blocks_apply",
+    "commit_candidate_sealed": true,
+    "explicit_enable_receipt_available": false,
+    "expected": {
+      "runtime_default_apply": false,
+      "runtime_apply_allowed": false,
+      "default_apply_block_reason_contains": [
+        "ExplicitEnableReceiptMissing"
+      ]
+    }
+  },
+  {
+    "case_id": "missing_r7_dry_run_unavailable",
+    "dry_run_report_available": false,
+    "expected": {
+      "commit_candidate_status": "Unavailable",
+      "candidate_count": 0,
+      "runtime_default_apply": false
+    }
+  }
+]

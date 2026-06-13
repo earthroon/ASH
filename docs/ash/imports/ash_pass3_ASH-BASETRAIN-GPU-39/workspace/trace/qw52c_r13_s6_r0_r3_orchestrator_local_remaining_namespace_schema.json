@@ -1,0 +1,21 @@
+{
+  "schema_id": "qw52c_r13_s6_r0_r3_orchestrator_local_remaining_namespace_schema",
+  "patch_id": "QW-52C-R13-S6-R0-R3",
+  "base_patch": "QW-52C-R13-S6-R0-R2",
+  "required_resolution": "qualified_orchestrator_local_builder_call",
+  "required_forbidden_state_false": [
+    "runtime_apply_allowed",
+    "runtime_default_apply_allowed",
+    "promotion_eligible",
+    "weight_commit_allowed",
+    "safe_profile_apply_allowed",
+    "policy_promotion_allowed",
+    "token_selection_mutation_allowed",
+    "token_rank_mutation_allowed",
+    "logit_mutation_allowed",
+    "sampler_mutation_allowed",
+    "real_trace_fabricated",
+    "fixture_as_real_runtime_trace",
+    "crates_js_ts_added"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12I-R2-R1C",
+  "status": "PASS_STATIC_VALIDATION",
+  "checks": {
+    "rust_runner_source_present": true,
+    "wrapper_present": true,
+    "r12i_r2_r1c_script_present": true,
+    "r12i_r2_r1b_partial_runtime_hook_patch_present": true,
+    "mock_positive_forbidden": true,
+    "fixture_mode_false_declared": true,
+    "runtime_default_apply_false_declared": true
+  },
+  "changed_files": [
+    "crates/runtime/src/bin/inference_logit_snapshot.rs",
+    "scripts/run_inference_logit_snapshot.ps1",
+    "scripts/run_16AI_QW_38G_R6A_R12A_R12I_R2_R1C_inference_snapshot_command_implementation.ps1",
+    "scripts/run_16AI_QW_38G_R6A_R12A_R12I_R2_R1B_inference_snapshot_command_wiring.ps1"
+  ],
+  "cargo_check": {
+    "attempted": true,
+    "status": "ERROR",
+    "error": "[Errno 2] No such file or directory: 'cargo'"
+  }
+}

@@ -1,0 +1,31 @@
+SFT-GPU-RUN-07 STATIC SCAN
+
+cargo: unavailable in current environment
+rustc: unavailable in current environment
+rustfmt: unavailable in current environment
+
+New RUN-07 ash_core module exports:
+- pub mod sft_gpu_promotion_apply_candidate;
+- pub use sft_gpu_promotion_apply_candidate::*;
+
+New lora_train helper exports:
+- pub mod gpu_trained_promotion_apply_candidate;
+- pub use gpu_trained_promotion_apply_candidate::*;
+
+New burn_webgpu_backend boundary exports:
+- pub mod gpu_trained_promotion_apply_candidate;
+- pub use gpu_trained_promotion_apply_candidate::*;
+
+Boundary defaults:
+- promotion apply candidate allowed: true
+- rollback ledger candidate allowed: true
+- apply preflight allowed: true
+- actual promotion apply allowed: false
+- runtime current pointer update allowed: false
+- current pointer switch allowed: false
+- slot ready mark allowed: false
+- lifecycle mutation allowed: false
+- slot action apply allowed: false
+- rollback execution allowed: false
+- ASH binding allowed: false
+- runtime SFT training / gradient / optimizer allowed: false

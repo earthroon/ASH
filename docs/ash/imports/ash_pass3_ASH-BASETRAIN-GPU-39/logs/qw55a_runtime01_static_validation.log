@@ -1,0 +1,17 @@
+RUNTIME01 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+failure reason enum: PASS
+failure stop receipt: PASS
+silent recovery detector: PASS
+failure stop emitter: PASS
+generation_sampling runtime01 failure stop hook: PASS
+generation_sampling emits runtime01 report: PASS
+no GreedyFallback enum variant exact: PASS
+no UseOriginalArgmax enum variant exact: PASS
+test failure receipt present: PASS
+test no silent recovery present: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+overall: PASS

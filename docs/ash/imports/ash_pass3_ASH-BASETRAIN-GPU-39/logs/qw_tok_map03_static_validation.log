@@ -1,0 +1,39 @@
+QW-TOK-MAP-03 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTokMap03ArtifactPromotionConfig: PASS
+QwTokMap03TokenizerArtifactHashSeal: PASS
+QwTokMap03ArtifactPromotionReceipt: PASS
+QwTokMap03CheckpointFingerprintSourceProbe: PASS
+QwTokMap03EmbeddingLmHeadRowParityReceipt: PASS
+QwTokMap03CheckpointFingerprintRebindReceipt: PASS
+QwTokMap03HotTokenCacheInvalidationReceipt: PASS
+QwTokMap03LegacyByteTailQuarantineReceipt: PASS
+QwTokMap03RuntimeBindCandidate: PASS
+QwTokMap03NoRuntimeBindSeal: PASS
+QwTokMap03NoWeightMutationSeal: PASS
+QwTokMap03ArtifactPromotionReport: PASS
+build_qw_tok_map03_tokenizer_artifact_hash_seal: PASS
+build_qw_tok_map03_artifact_promotion_receipt: PASS
+build_qw_tok_map03_checkpoint_fingerprint_rebind_receipt: PASS
+build_qw_tok_map03_artifact_promotion_report: PASS
+target vocab const 48259: PASS
+byte fallback const 72..327: PASS
+default blocks tokenizer rebuild: PASS
+default blocks runtime bind: PASS
+default blocks model inference: PASS
+default blocks checkpoint weight write: PASS
+test qw_tok_map03_artifact_promotion.rs: PASS
+test qw_tok_map03_checkpoint_fingerprint_rebind.rs: PASS
+test qw_tok_map03_hotcache_invalidation.rs: PASS
+test qw_tok_map03_legacy_byte_tail_quarantine.rs: PASS
+test qw_tok_map03_no_runtime_bind_no_weight_mutation.rs: PASS
+artifacts/qw_tok_map03_artifact_promotion_report.json exists: PASS
+artifacts/qw_tok_map03_tokenizer_artifact_hash_seal.json exists: PASS
+artifacts/qw_tok_map03_checkpoint_fingerprint_rebind_receipt.json exists: PASS
+workspace/trace/qw_tok_map03_artifact_promotion_receipt.json exists: PASS
+tokenizer model remains included: PASS
+tokenizer vocab remains included: PASS
+tokenizer manifest remains included: PASS
+no checkpoint safetensors packaged in map03 artifacts: PASS
+overall: PASS

@@ -1,0 +1,44 @@
+{
+  "patch_id": "QW-50-R0X-A",
+  "title": "Greedy Repeat Attractor Observation / No Token Mutation Seal",
+  "base_patch": "QW-50-R0W-C",
+  "status": "PATCH_APPLIED_CARGO_UNVERIFIED_IN_BAKE_ENV",
+  "changed_files": [
+    "crates/runtime/src/infer/qw50_r0w_trace.rs",
+    "crates/runtime/examples/infer_only.rs",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.py",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.ps1",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.cmd"
+  ],
+  "sha256": {
+    "crates/runtime/src/infer/qw50_r0w_trace.rs": "1211ee3b0483c20311728d00c5db47bf5e9e71e570fb50813273f1775634d955",
+    "crates/runtime/examples/infer_only.rs": "acc3ab36e7530717eccce2a85bc005e1aabcb00ab6f3d73a2de9cf6f5fc27f41",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.py": "fecd417e20dc2cf6bd6161735065fe20b37d4e279c304d1034295507f950a63e",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.ps1": "2aed6524ea78b5c4811123056bad876d16e73654a4d72f54e06450c0b5067535",
+    "scripts/run_qw50_r0x_a_vulkan_infer_wrapper.cmd": "86fb67e31048d53d70de6df62e95d73b0557a9c8f336c04335b0e2b802f27d6c"
+  },
+  "runtime_paths": {
+    "checkpoint_path": "D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors",
+    "tokenizer_manifest_path": "D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/tokenizer_manifest_v5_final.json"
+  },
+  "forbidden_state": {
+    "token_mutation": false,
+    "token_ban_added": false,
+    "hard_ban_added": false,
+    "blacklist_mutation": false,
+    "logit_mutation": false,
+    "logit_penalty_added": false,
+    "sampler_mutation": false,
+    "temperature_mutation": false,
+    "top_k_mutation": false,
+    "top_p_mutation": false,
+    "min_p_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "model_weight_mutation": false,
+    "lora_scale_mutation": false,
+    "crates_js_ts_added": false
+  }
+}

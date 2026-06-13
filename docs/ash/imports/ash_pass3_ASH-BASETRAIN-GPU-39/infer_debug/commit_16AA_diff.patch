@@ -1,0 +1,85 @@
+--- /dev/fd/63	2026-05-06 00:52:27.710262204 +0000
++++ crates/burn_webgpu_backend/src/existing_device_bootstrap.rs	2026-05-06 00:51:35.318851397 +0000
+@@ -37,6 +37,58 @@
+     }
+ }
+ 
++fn env_flag_enabled(name: &str) -> bool {
++    std::env::var(name)
++        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(false)
++}
++
++fn timestamp_query_disabled_by_env() -> bool {
++    env_flag_enabled("ASH_DISABLE_TIMESTAMP_QUERY")
++        || env_flag_enabled("ASH_NATIVE_DISABLE_TIMESTAMP_QUERY")
++        || env_flag_enabled("ASH_DISABLE_NATIVE_TIMESTAMP_QUERY")
++}
++
++fn native_required_features_for_adapter(adapter: &backend_wgpu::Adapter, source: &'static str) -> backend_wgpu::Features {
++    let adapter_features = adapter.features();
++    let timestamp_supported = adapter_features.contains(backend_wgpu::Features::TIMESTAMP_QUERY);
++    let timestamp_disabled = timestamp_query_disabled_by_env();
++    let timestamp_requested = timestamp_supported && !timestamp_disabled;
++
++    let mut required_features = backend_wgpu::Features::empty();
++    if timestamp_requested {
++        required_features |= backend_wgpu::Features::TIMESTAMP_QUERY;
++    }
++
++    eprintln!(
++        "[16AA][timestamp-query] source={} adapter_supported={} requested={} disabled_by_env={} required_features={:?}",
++        source,
++        timestamp_supported,
++        timestamp_requested,
++        timestamp_disabled,
++        required_features,
++    );
++
++    if !timestamp_supported {
++        eprintln!(
++            "[16AA][timestamp-query] source={} action=profiler_risk reason=adapter_does_not_support_timestamp_query",
++            source,
++        );
++    } else if timestamp_disabled {
++        eprintln!(
++            "[16AA][timestamp-query] source={} action=profiler_risk reason=timestamp_query_disabled_by_env",
++            source,
++        );
++    } else {
++        eprintln!(
++            "[16AA][timestamp-query] source={} action=request_feature reason=cubecl_query_profiler_requires_timestamp_query",
++            source,
++        );
++    }
++
++    required_features
++}
++
+ pub fn bootstrap_existing_device(source: &'static str) -> Result<ExistingDeviceBootstrap> {
+     let instance = backend_wgpu::Instance::default();
+     let adapter = pollster::block_on(instance.request_adapter(
+@@ -48,9 +100,10 @@
+     ))
+     .context("existing-device bootstrap could not find a GPU adapter")?;
+ 
++    let required_features = native_required_features_for_adapter(&adapter, source);
+     let device_descriptor = backend_wgpu::DeviceDescriptor {
+         label: Some(source),
+-        required_features: backend_wgpu::Features::empty(),
++        required_features,
+         required_limits: backend_wgpu::Limits::default(),
+         memory_hints: backend_wgpu::MemoryHints::Performance,
+         trace: backend_wgpu::Trace::default(),
+@@ -71,6 +124,11 @@
+         backend,
+     };
+ 
++    eprintln!(
++        "[16AA][runtime-options] source={} runtime_options=default timestamp_query_feature_requested={}",
++        source,
++        required_features.contains(backend_wgpu::Features::TIMESTAMP_QUERY),
++    );
+     let burn_device = init_device(setup, RuntimeOptions::default());
+     let existing_id = match burn_device {
+         WgpuDevice::Existing(id) => id,

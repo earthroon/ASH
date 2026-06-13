@@ -1,0 +1,349 @@
+--- /mnt/data/qw38g_pristine/crates/model_core/src/native_wgpu.rs	2026-05-22 09:07:52.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 09:26:46.828027558 +0000
+@@ -830,6 +830,220 @@
+     }
+ }
+ 
++
++// 16AI-QW-38G — Reserved Direction Hidden Activation Source Trace / Layerwise Residual Seal
++static QW38G_LAYERWISE_FORWARD_STEP: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_env_string(name: &str, default: &str) -> String {
++    std::env::var(name).unwrap_or_else(|_| default.to_string())
++}
++
++fn qw38g_parse_csv(raw: &str) -> Vec<String> {
++    raw.split(',')
++        .map(|s| s.trim())
++        .filter(|s| !s.is_empty())
++        .map(|s| s.to_string())
++        .collect()
++}
++
++fn qw38g_stage_enabled(stage: &str) -> bool {
++    let raw = qw38g_env_string(
++        "ASH_LAYERWISE_RESERVED_TRACE_STAGES",
++        "embed,post_attn,post_mlp,pre_final_norm,post_final_norm",
++    );
++    let stages = qw38g_parse_csv(&raw);
++    stages.iter().any(|s| s == "all" || s == stage)
++}
++
++fn qw38g_layer_enabled(layer_id: usize, total_layers: usize) -> bool {
++    let raw = qw38g_env_string("ASH_LAYERWISE_RESERVED_TRACE_LAYERS", "0,mid,last");
++    let items = qw38g_parse_csv(&raw);
++    if items.iter().any(|s| s == "all") {
++        return true;
++    }
++    let mid = total_layers.saturating_sub(1) / 2;
++    let last = total_layers.saturating_sub(1);
++    items.iter().any(|item| match item.as_str() {
++        "mid" => layer_id == mid,
++        "last" => layer_id == last,
++        _ => item.parse::<usize>().map(|v| v == layer_id).unwrap_or(false),
++    })
++}
++
++fn qw38g_compare_token_ids() -> Vec<usize> {
++    let raw = qw38g_env_string("ASH_LAYERWISE_RESERVED_COMPARE_IDS", "29892,30004,392,29889,2");
++    let mut ids = qw38g_parse_csv(&raw)
++        .into_iter()
++        .filter_map(|s| s.parse::<usize>().ok())
++        .collect::<Vec<_>>();
++    if ids.is_empty() {
++        ids.extend([29892usize, 30004, 392, 29889, 2]);
++    }
++    ids
++}
++
++fn qw38g_last_vector_from_hidden(
++    hidden: &Tensor<NativeInferenceBackend, 3>,
++) -> Option<Vec<f32>> {
++    let [batch, seq_len, hidden_size] = hidden.dims();
++    if batch == 0 || seq_len == 0 || hidden_size == 0 {
++        return None;
++    }
++    hidden
++        .clone()
++        .slice([0..1, (seq_len - 1)..seq_len, 0..hidden_size])
++        .reshape([hidden_size])
++        .into_data()
++        .to_vec::<f32>()
++        .ok()
++}
++
++fn qw38g_projection_value(
++    token_id: usize,
++    vector: &[f32],
++    vector_norm: f32,
++    atlas: &NativeVocabAtlas,
++    meta: &Qw38ATokenMeta,
++) -> Option<(f32, Option<f32>, f32, String, bool)> {
++    let row = qw38d_token_row_from_atlas(atlas, token_id)?;
++    let row_norm = qw38d_l2_norm(&row);
++    let dot = qw38d_dot(vector, &row);
++    let cosine = qw38d_cosine(dot, vector_norm, row_norm);
++    Some((dot, cosine, row_norm, qw38a_piece(meta, token_id), qw38a_is_reserved(meta, token_id)))
++}
++
++fn qw38g_log_layerwise_reserved_direction_trace(
++    step: usize,
++    layer_id: Option<usize>,
++    layer_label: &str,
++    stage: &str,
++    hidden: &Tensor<NativeInferenceBackend, 3>,
++    atlas: &NativeVocabAtlas,
++    total_layers: usize,
++) {
++    if !env_flag("ASH_LAYERWISE_RESERVED_TRACE") {
++        return;
++    }
++    let max_steps = qw38a_env_usize("ASH_LAYERWISE_RESERVED_TRACE_MAX_STEPS", 4);
++    if step >= max_steps {
++        return;
++    }
++    if !qw38g_stage_enabled(stage) {
++        return;
++    }
++    if let Some(layer_idx) = layer_id {
++        if !qw38g_layer_enabled(layer_idx, total_layers) {
++            return;
++        }
++    }
++    let target_id = qw38a_env_usize("ASH_LAYERWISE_RESERVED_TARGET_ID", 13);
++    let meta = qw38a_token_meta();
++    let Some(vector) = qw38g_last_vector_from_hidden(hidden) else {
++        eprintln!("[16AI-QW-38G][layer_trace_error] step={} layer={} stage={} warning=LAYERWISE_VECTOR_MATERIALIZE_FAILED", step, layer_label, stage);
++        return;
++    };
++    let vector_norm = qw38d_l2_norm(&vector);
++    let Some((target_dot, target_cosine, target_row_norm, target_piece, target_reserved)) =
++        qw38g_projection_value(target_id, &vector, vector_norm, atlas, meta)
++    else {
++        eprintln!("[16AI-QW-38G][layer_trace_error] step={} layer={} stage={} target={} warning=TARGET_ROW_UNAVAILABLE", step, layer_label, stage, target_id);
++        return;
++    };
++
++    let mut best_compare: Option<(usize, f32, Option<f32>, f32, String, bool)> = None;
++    for id in qw38g_compare_token_ids() {
++        if id == target_id {
++            continue;
++        }
++        if let Some((dot, cosine, row_norm, piece, reserved)) =
++            qw38g_projection_value(id, &vector, vector_norm, atlas, meta)
++        {
++            let replace = best_compare.as_ref().map(|(_, best_dot, _, _, _, _)| dot > *best_dot).unwrap_or(true);
++            if replace {
++                best_compare = Some((id, dot, cosine, row_norm, piece, reserved));
++            }
++        }
++    }
++
++    let (compare_id, compare_dot, compare_cosine, compare_row_norm, compare_piece, compare_reserved) =
++        best_compare.unwrap_or((0usize, f32::NEG_INFINITY, None, 0.0, "<none>".to_string(), false));
++    let margin = if compare_dot.is_finite() { Some(target_dot - compare_dot) } else { None };
++    let cosine_margin = target_cosine.zip(compare_cosine).map(|(a, b)| a - b);
++    let reserved_direction_spike = margin.map(|m| m >= 1.0).unwrap_or(false)
++        || cosine_margin.map(|m| m >= 0.02).unwrap_or(false);
++    let mut warning_codes = Vec::new();
++    if reserved_direction_spike {
++        warning_codes.push("RESERVED_DIRECTION_SPIKE");
++    }
++    if stage == "embed" && reserved_direction_spike {
++        warning_codes.push("EMBED_RESERVED_DIRECTION_HIGH");
++    }
++    if stage == "post_attn" && reserved_direction_spike {
++        warning_codes.push("ATTENTION_RESERVED_DIRECTION_SPIKE");
++    }
++    if stage == "post_mlp" && reserved_direction_spike {
++        warning_codes.push("MLP_RESERVED_DIRECTION_SPIKE");
++    }
++    if stage == "post_final_norm" && reserved_direction_spike {
++        warning_codes.push("FINAL_NORM_RESERVED_DIRECTION_SPIKE");
++    }
++
++    eprintln!(
++        "[16AI-QW-38G][layer_trace] step={} layer={} stage={} target={} piece={:?} norm={} dot_target={} cos_target={:?} compare={} compare_piece={:?} dot_compare={} cos_compare={:?} margin={:?} spike={} warnings={:?}",
++        step,
++        layer_label,
++        stage,
++        target_id,
++        target_piece,
++        vector_norm,
++        target_dot,
++        target_cosine,
++        compare_id,
++        compare_piece,
++        compare_dot,
++        compare_cosine,
++        margin,
++        reserved_direction_spike,
++        warning_codes,
++    );
++
++    let record = serde_json::json!({
++        "patch_id": "16AI-QW-38G",
++        "decode_step": step,
++        "layer_id": layer_id,
++        "layer_label": layer_label,
++        "stage": stage,
++        "target_token_id": target_id,
++        "target_piece": target_piece,
++        "target_is_reserved": target_reserved,
++        "vector_norm": vector_norm,
++        "dot_to_target": target_dot,
++        "cosine_to_target": target_cosine,
++        "target_lm_head_row_norm": target_row_norm,
++        "compare_token_id": compare_id,
++        "compare_piece": compare_piece,
++        "compare_is_reserved": compare_reserved,
++        "compare_lm_head_row_norm": compare_row_norm,
++        "dot_to_compare": if compare_dot.is_finite() { Some(compare_dot) } else { None },
++        "cosine_to_compare": compare_cosine,
++        "target_minus_compare_margin": margin,
++        "cosine_margin": cosine_margin,
++        "stage_delta_from_previous": null,
++        "target_direction_gain_from_previous": null,
++        "reserved_direction_spike": reserved_direction_spike,
++        "warning_codes": warning_codes,
++    });
++
++    let jsonl_path = std::env::var("ASH_LAYERWISE_RESERVED_TRACE_JSONL")
++        .unwrap_or_else(|_| "workspace/qw38g_layerwise_reserved_direction_trace.jsonl".to_string());
++    if let Some(parent) = std::path::Path::new(&jsonl_path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
++        let _ = writeln!(file, "{}", record);
++    }
++}
++
+ fn build_native_vocab_atlas(
+     lm_head_cpu: &[f32],
+     vocab_size: usize,
+@@ -2254,21 +2468,118 @@
+         // AshLinear::forward(), because that intentionally trips the raw hot-path guard.
+         // Prepare once per forward input and then use bound per-target slices inside layers.
+         let device = input.device();
++        let trace_layerwise_reserved = env_flag("ASH_LAYERWISE_RESERVED_TRACE");
++        let trace_step = if trace_layerwise_reserved {
++            Some(QW38G_LAYERWISE_FORWARD_STEP.fetch_add(1, Ordering::SeqCst))
++        } else {
++            None
++        };
++        let total_layers = self.model.layers.len();
+         let mut x = self.embed_tokens_for_generation_input(input);
+ 
+-        if active_loras.is_empty() {
+-            let empty_runtime_loras = PreparedRuntimeLoraSet::empty();
++        let prepared_runtime_loras: PreparedRuntimeLoraSet<NativeInferenceBackend> = if active_loras.is_empty() {
++            PreparedRuntimeLoraSet::empty()
++        } else {
++            prepare_runtime_lora_attachment_set(active_loras, &device)
++        };
++
++        if !trace_layerwise_reserved {
+             for layer in &self.model.layers {
+-                x = layer.forward_prepared_set(x, &empty_runtime_loras, &[]);
++                x = layer.forward_prepared_set(x, &prepared_runtime_loras, &[]);
+             }
+             return self.model.final_norm.forward(x);
+         }
+ 
+-        let prepared_runtime_loras = prepare_runtime_lora_attachment_set(active_loras, &device);
+-        for layer in &self.model.layers {
+-            x = layer.forward_prepared_set(x, &prepared_runtime_loras, &[]);
++        if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
++            qw38g_log_layerwise_reserved_direction_trace(
++                step,
++                None,
++                "embed",
++                "embed",
++                &x,
++                atlas,
++                total_layers,
++            );
++        }
++
++        for (idx, layer) in self.model.layers.iter().enumerate() {
++            let residual = x.clone();
++            let normed = layer.input_norm.forward(x);
++            let q = layer.q_proj.forward_prepared_set(normed.clone(), &prepared_runtime_loras, &[]);
++            let k = layer.k_proj.forward_prepared_set(normed.clone(), &prepared_runtime_loras, &[]);
++            let v = layer.v_proj.forward_prepared_set(normed, &prepared_runtime_loras, &[]);
++            let [batch, seq, hidden] = q.dims();
++            let heads = layer.num_heads.max(1);
++            let head_dim = layer.head_dim.max(1);
++            let kv_hidden = k.dims()[2];
++            let kv_heads = if kv_hidden >= head_dim {
++                (kv_hidden / head_dim).max(1)
++            } else {
++                layer.num_kv_heads.max(1)
++            };
++            let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
++            let k = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
++            let v = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
++            let ctx = grouped_query_attention(q, k, v, heads, kv_heads, head_dim)
++                .swap_dims(1, 2)
++                .reshape([batch, seq, hidden]);
++            let attn_out = layer.o_proj.forward_prepared_set(ctx, &prepared_runtime_loras, &[]);
++            let after_attn = residual + attn_out;
++            if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
++                qw38g_log_layerwise_reserved_direction_trace(
++                    step,
++                    Some(idx),
++                    &format!("layer_{}", idx),
++                    "post_attn",
++                    &after_attn,
++                    atlas,
++                    total_layers,
++                );
++            }
++
++            let residual = after_attn.clone();
++            let normed_ffn = layer.post_attn_norm.forward(after_attn);
++            let gate = silu_tensor(layer.gate_proj.forward_prepared_set(normed_ffn.clone(), &prepared_runtime_loras, &[]));
++            let up = layer.up_proj.forward_prepared_set(normed_ffn, &prepared_runtime_loras, &[]);
++            let ff = layer.down_proj.forward_prepared_set(gate * up, &prepared_runtime_loras, &[]);
++            x = residual + ff;
++            if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
++                qw38g_log_layerwise_reserved_direction_trace(
++                    step,
++                    Some(idx),
++                    &format!("layer_{}", idx),
++                    "post_mlp",
++                    &x,
++                    atlas,
++                    total_layers,
++                );
++            }
++        }
++
++        if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
++            qw38g_log_layerwise_reserved_direction_trace(
++                step,
++                None,
++                "pre_final_norm",
++                "pre_final_norm",
++                &x,
++                atlas,
++                total_layers,
++            );
++        }
++        let out = self.model.final_norm.forward(x);
++        if let (Some(step), Some(atlas)) = (trace_step, self.vocab_atlas.as_ref()) {
++            qw38g_log_layerwise_reserved_direction_trace(
++                step,
++                None,
++                "post_final_norm",
++                "post_final_norm",
++                &out,
++                atlas,
++                total_layers,
++            );
+         }
+-        self.model.final_norm.forward(x)
++        out
+     }
+ 
+     pub(crate) fn embed_tokens_for_decode(

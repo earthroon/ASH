@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
+  "schema_version": 1,
+  "candidate_replay_only": true,
+  "base_config_mutation_allowed": false,
+  "runtime_promotion_allowed": false,
+  "files": {
+    "matrix": "workspace/eval03_candidate_matrix.json",
+    "runs": "workspace/eval03_candidate_runs.jsonl",
+    "backend_diffs": "workspace/eval03_backend_diffs.jsonl",
+    "summary": "workspace/eval03_summary.json"
+  },
+  "hard_fail_metrics": [
+    "global_finite_fallback_count > 0",
+    "active_set_empty_count > 0",
+    "salad02_critical_count > 0",
+    "salad04_critical_count > 0",
+    "backend_semantic_parity_fail",
+    "threshold_kind_mismatch_count > 0",
+    "output_too_short in normal prompt",
+    "base_config_mutation"
+  ]
+}

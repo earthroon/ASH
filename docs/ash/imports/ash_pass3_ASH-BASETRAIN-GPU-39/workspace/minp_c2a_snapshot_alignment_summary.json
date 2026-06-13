@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
+  "status": "SEMANTIC_SCORE_PROVIDER_BUILD_AND_SNAPSHOT_ALIGNMENT_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-MINP-C2",
+  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
+  "alignment_validator": "model_core::minp_c2a_snapshot_alignment::validate_semantic_score_snapshot_alignment",
+  "score_basis": "token_static_prior_v1",
+  "semantic_prior_default_enabled": false,
+  "requires_sampler04_strict_ready": true,
+  "requires_snapshot_alignment_pass": true,
+  "runtime_gate_env": [
+    "ASH_SAMPLER04_PROMOTION_STATUS=STRICT_CANDIDATE_READY",
+    "ASH_MINP_C2A_ALIGNMENT_STATUS=PASS"
+  ],
+  "alignment_status": "NOT_RUN",
+  "non_scope": [
+    "dynamic_context_qwave",
+    "dynamic_context_deltak",
+    "weighted_minp_formula_change",
+    "shader_algorithm_change",
+    "semantic_prior_default_enable"
+  ]
+}

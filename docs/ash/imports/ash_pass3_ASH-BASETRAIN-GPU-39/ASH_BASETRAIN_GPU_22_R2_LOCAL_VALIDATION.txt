@@ -1,0 +1,10 @@
+ASH-BASETRAIN-GPU-22-R2 LOCAL VALIDATION
+
+Container cargo build/run was not executed here.
+Operator must validate locally:
+
+cargo build -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit --jobs 1
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit
+
+Expected next runtime verdict:
+PASS_ASH_BASETRAIN_GPU_22_LOSS_SCALAR_AUDIT_LOCAL_WINDOW_TARGET_1_LOSS_NUMERIC_STABILITY_RECEIPT_NO_BACKWARD_NO_OPTIMIZER

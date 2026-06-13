@@ -1,0 +1,34 @@
+{
+  "patch_id": "QW-52C-R3",
+  "title": "Shadow Rerank Weight Sensitivity Sweep / No Apply Seal",
+  "base_patch": "QW-52C-R2",
+  "sweep_policy_version": "shadow_rerank_weight_sensitivity_sweep_v1",
+  "attribution_policy_version": "riskydiff_feature_attribution_v1",
+  "no_apply_policy_version": "no_apply_no_weight_commit_v1",
+  "trace": {
+    "type": "ShadowRerankWeightSensitivityTrace",
+    "tested_profiles": "Vec<SoftRerankWeightProfileResult>",
+    "risky_diff_attribution": "Vec<RiskyDiffFeatureAttribution>",
+    "summary": "WeightSensitivitySweepSummary",
+    "decision": "WeightSensitivityDecision"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

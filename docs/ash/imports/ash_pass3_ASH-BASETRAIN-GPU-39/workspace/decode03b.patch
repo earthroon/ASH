@@ -1,0 +1,997 @@
+--- /mnt/data/decode03b_orig/crates/model_core/src/lib.rs	2026-05-27 05:58:56.000000000 +0000
++++ /mnt/data/decode03b_work/crates/model_core/src/lib.rs	2026-05-27 06:07:54.127774789 +0000
+@@ -17,6 +17,7 @@
+ mod sampler_parity_validation;
+ mod sampler05_parity;
+ mod decode03a_entropy;
++mod decode03b_pci;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -91,6 +92,13 @@
+     Decode03AEntropySummary, logsumexp_entropy as decode03a_logsumexp_entropy,
+     append_decode03a_receipt_from_sampler03, write_decode03a_summary_from_receipt_file,
+ };
++pub use decode03b_pci::{
++    DECODE03B_PATCH_ID, DECODE03B_INPUT_PATCH_ID, Decode03BMode, PciBucket,
++    PciInput, PciConfig, PciComponents, PciBucketTransition, PciRiskFlags,
++    Decode03BPciStepReceipt, Decode03BPciSummary, compute_pci, bucket_from_pci,
++    apply_pci_hysteresis, append_decode03b_receipt_from_sampler03,
++    write_decode03b_summary_from_receipt_file,
++};
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+--- /mnt/data/decode03b_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:01:09.000000000 +0000
++++ /mnt/data/decode03b_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:07:54.128460580 +0000
+@@ -450,5 +450,6 @@
+     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
+     crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
+     crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
++    crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+--- /dev/null	2026-05-27 05:26:39.014199516 +0000
++++ /mnt/data/decode03b_work/crates/model_core/src/decode03b_pci.rs	2026-05-27 06:08:14.977429059 +0000
+@@ -0,0 +1,807 @@
++use serde::{Deserialize, Serialize};
++use std::{cmp::Ordering, env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{
++    receipt_from_sampler03, Decode03AEntropyStepReceipt, Decode03AMode,
++};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const DECODE03B_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03B";
++pub const DECODE03B_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03A";
++pub const DECODE03B_SAMPLER_SSOT: &str = "model_core::decode03a_entropy";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum Decode03BMode {
++    Off,
++    Receipt,
++    Strict,
++}
++
++impl Decode03BMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_DECODE03B_PCI")
++            .or_else(|_| env::var("ASH_DECODE03B_RECEIPT_MODE"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "observe" => Self::Receipt,
++            "strict" => Self::Strict,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn enabled(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::Receipt => "Receipt",
++            Self::Strict => "Strict",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub enum PciBucket {
++    Collapsing,
++    Unstable,
++    Uncertain,
++    Stable,
++    Confident,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct PciConfig {
++    pub margin_scale: f32,
++    pub margin_center: f32,
++    pub logprob_scale: f32,
++    pub logprob_center: f32,
++    pub entropy_weight: f32,
++    pub margin_weight: f32,
++    pub rank_weight: f32,
++    pub logprob_weight: f32,
++    pub active_weight: f32,
++    pub enable_hysteresis: bool,
++}
++
++impl Default for PciConfig {
++    fn default() -> Self {
++        Self {
++            margin_scale: 2.2,
++            margin_center: 0.75,
++            logprob_scale: 1.4,
++            logprob_center: -2.5,
++            entropy_weight: 0.24,
++            margin_weight: 0.24,
++            rank_weight: 0.18,
++            logprob_weight: 0.16,
++            active_weight: 0.18,
++            enable_hysteresis: env_bool("ASH_DECODE03B_ENABLE_HYSTERESIS", true),
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct PciInput {
++    pub h_raw_norm: Option<f32>,
++    pub h_final_norm: Option<f32>,
++    pub top1_top2_margin: Option<f32>,
++    pub top1_top5_margin: Option<f32>,
++    pub selected_rank: Option<usize>,
++    pub selected_prob: Option<f32>,
++    pub selected_logprob: Option<f32>,
++    pub active_count_final: usize,
++    pub compression_ratio_total: Option<f32>,
++    pub fallback_count_window: usize,
++    pub cpu_oracle_fallback_count_window: usize,
++    pub eos_fallback_count_window: usize,
++    pub global_finite_fallback_count_window: usize,
++    pub entropy_spike: bool,
++    pub guard_entropy_inversion: bool,
++    pub min_p_overcompression: bool,
++    pub top_p_overcompression: bool,
++    pub empty_active_set_seen: bool,
++    pub global_finite_fallback_seen: bool,
++    pub nan_seen: bool,
++    pub inf_seen: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct PciComponents {
++    pub entropy_component: f32,
++    pub margin_component: f32,
++    pub rank_component: f32,
++    pub logprob_component: f32,
++    pub active_component: f32,
++    pub fallback_penalty: f32,
++    pub risk_penalty: f32,
++    pub base_pci: f32,
++    pub final_pci: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct PciBucketTransition {
++    pub previous_bucket: Option<PciBucket>,
++    pub raw_bucket: PciBucket,
++    pub stable_bucket: PciBucket,
++    pub direction: String,
++    pub required_confirm_steps: usize,
++    pub observed_confirm_steps: usize,
++    pub transition_applied: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct PciRiskFlags {
++    pub low_confidence: bool,
++    pub collapsing: bool,
++    pub entropy_conflict: bool,
++    pub margin_collapse: bool,
++    pub selected_rank_risk: bool,
++    pub fallback_risk: bool,
++    pub overcompression_risk: bool,
++    pub numeric_risk: bool,
++    pub ready_for_dynamic_shadow: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03BPciStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub behavior_change: bool,
++    pub mode: String,
++    pub decode03a_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub input: PciInput,
++    pub config: PciConfig,
++    pub components: PciComponents,
++    pub pci_raw: f32,
++    pub pci_smoothed: Option<f32>,
++    pub bucket_raw: PciBucket,
++    pub bucket_stable: PciBucket,
++    pub bucket_transition: PciBucketTransition,
++    pub selected_id: u32,
++    pub selected_piece_preview: Option<String>,
++    pub risk_flags: PciRiskFlags,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03BPciSummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub behavior_change: bool,
++    pub requires_decode03a: bool,
++    pub decode03a_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub pci: Decode03BPciStats,
++    pub buckets: Decode03BBucketCounts,
++    pub transitions: Decode03BTransitionCounts,
++    pub risk: Decode03BRiskCounts,
++    pub ready_for_decode03c_shadow_policy: bool,
++    pub ready_for_decode03d_controlled_enable: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03BPciStats {
++    pub mean: Option<f32>,
++    pub min: Option<f32>,
++    pub max: Option<f32>,
++    pub p10: Option<f32>,
++    pub p50: Option<f32>,
++    pub p90: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03BBucketCounts {
++    pub confident_count: usize,
++    pub stable_count: usize,
++    pub uncertain_count: usize,
++    pub unstable_count: usize,
++    pub collapsing_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03BTransitionCounts {
++    pub downshift_count: usize,
++    pub upshift_count: usize,
++    pub hysteresis_hold_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03BRiskCounts {
++    pub low_confidence_count: usize,
++    pub collapsing_count: usize,
++    pub entropy_conflict_count: usize,
++    pub margin_collapse_count: usize,
++    pub selected_rank_risk_count: usize,
++    pub fallback_risk_count: usize,
++    pub overcompression_risk_count: usize,
++    pub numeric_risk_count: usize,
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_DECODE03B_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03b_pci_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_DECODE03B_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03b_summary.json"))
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_DECODE03B_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "decode03b_sampler03_bridge".to_string())
++}
++
++fn require_decode03a() -> bool {
++    env_bool("ASH_DECODE03B_REQUIRE_DECODE03A", true)
++}
++
++pub fn sigmoid(x: f32) -> f32 {
++    if !x.is_finite() {
++        return 0.0;
++    }
++    1.0 / (1.0 + (-x).exp())
++}
++
++fn clamp01(value: f32) -> f32 {
++    if !value.is_finite() {
++        0.0
++    } else {
++        value.clamp(0.0, 1.0)
++    }
++}
++
++fn finite_or_default(value: Option<f32>, default: f32) -> f32 {
++    value.filter(|v| v.is_finite()).unwrap_or(default)
++}
++
++pub fn compute_active_component(active_count: usize) -> f32 {
++    match active_count {
++        0 => 0.0,
++        1 | 2 => 0.35,
++        3..=7 => 0.70,
++        8..=96 => 1.0,
++        97..=256 => 0.70,
++        _ => 0.45,
++    }
++}
++
++fn bool_f32(value: bool) -> f32 {
++    if value { 1.0 } else { 0.0 }
++}
++
++fn fallback_kind_counts(fallback_mode: &str, fallback_count_window: usize) -> (usize, usize, usize) {
++    let mode = fallback_mode.trim().to_ascii_lowercase();
++    if mode == "none" || mode.is_empty() {
++        (0, 0, 0)
++    } else if mode.contains("global") || mode.contains("finite") || mode.contains("valid_global_top1") {
++        (0, 0, fallback_count_window.max(1))
++    } else if mode.contains("eos") {
++        (0, fallback_count_window.max(1), 0)
++    } else {
++        (fallback_count_window.max(1), 0, 0)
++    }
++}
++
++pub fn compute_pci(input: &PciInput, config: &PciConfig) -> PciComponents {
++    let raw_entropy_confidence = 1.0 - clamp01(finite_or_default(input.h_raw_norm, input.h_final_norm.unwrap_or(0.5)));
++    let final_entropy_confidence = 1.0 - clamp01(finite_or_default(input.h_final_norm, 0.5));
++    let entropy_component = clamp01(0.35 * raw_entropy_confidence + 0.65 * final_entropy_confidence);
++
++    let margin = finite_or_default(input.top1_top2_margin, 0.0);
++    let margin_component = clamp01(sigmoid(config.margin_scale * (margin - config.margin_center)));
++
++    let rank_component = match input.selected_rank {
++        Some(rank) if rank > 0 => clamp01(1.0 / (rank as f32).sqrt()),
++        _ => 0.5,
++    };
++
++    let selected_logprob = finite_or_default(input.selected_logprob, config.logprob_center);
++    let logprob_component = clamp01(sigmoid(config.logprob_scale * (selected_logprob - config.logprob_center)));
++
++    let active_component = clamp01(compute_active_component(input.active_count_final));
++
++    let fallback_penalty = clamp01(
++        0.10 * input.cpu_oracle_fallback_count_window as f32
++            + 0.20 * input.eos_fallback_count_window as f32
++            + 0.35 * input.global_finite_fallback_count_window as f32,
++    )
++    .min(0.85);
++
++    let numeric_risk = input.nan_seen || input.inf_seen;
++    let risk_penalty = clamp01(
++        0.12 * bool_f32(input.entropy_spike)
++            + 0.18 * bool_f32(input.guard_entropy_inversion)
++            + 0.16 * bool_f32(input.min_p_overcompression)
++            + 0.12 * bool_f32(input.top_p_overcompression)
++            + 0.35 * bool_f32(input.empty_active_set_seen)
++            + 0.60 * bool_f32(numeric_risk),
++    )
++    .min(0.90);
++
++    let weight_sum = config.entropy_weight
++        + config.margin_weight
++        + config.rank_weight
++        + config.logprob_weight
++        + config.active_weight;
++    let base_unscaled = config.entropy_weight * entropy_component
++        + config.margin_weight * margin_component
++        + config.rank_weight * rank_component
++        + config.logprob_weight * logprob_component
++        + config.active_weight * active_component;
++    let mut base_pci = if weight_sum > 0.0 { base_unscaled / weight_sum } else { 0.0 };
++    base_pci = clamp01(base_pci);
++
++    let mut final_pci = clamp01(base_pci - fallback_penalty - risk_penalty);
++    if numeric_risk {
++        final_pci = 0.0;
++    }
++    if input.empty_active_set_seen {
++        final_pci = final_pci.min(0.20);
++    }
++    if input.global_finite_fallback_seen {
++        final_pci = final_pci.min(0.35);
++    }
++    if input.guard_entropy_inversion && input.selected_rank.map(|r| r > 5).unwrap_or(false) {
++        final_pci = final_pci.min(0.45);
++    }
++    if input.min_p_overcompression && input.active_count_final <= 2 {
++        final_pci = final_pci.min(0.50);
++    }
++
++    PciComponents {
++        entropy_component,
++        margin_component,
++        rank_component,
++        logprob_component,
++        active_component,
++        fallback_penalty,
++        risk_penalty,
++        base_pci,
++        final_pci,
++    }
++}
++
++pub fn bucket_from_pci(pci: f32) -> PciBucket {
++    let pci = clamp01(pci);
++    if pci >= 0.88 {
++        PciBucket::Confident
++    } else if pci >= 0.70 {
++        PciBucket::Stable
++    } else if pci >= 0.45 {
++        PciBucket::Uncertain
++    } else if pci >= 0.20 {
++        PciBucket::Unstable
++    } else {
++        PciBucket::Collapsing
++    }
++}
++
++fn bucket_score(bucket: PciBucket) -> i32 {
++    match bucket {
++        PciBucket::Collapsing => 0,
++        PciBucket::Unstable => 1,
++        PciBucket::Uncertain => 2,
++        PciBucket::Stable => 3,
++        PciBucket::Confident => 4,
++    }
++}
++
++fn required_upshift_confirm_steps(previous: PciBucket, raw: PciBucket) -> usize {
++    match (previous, raw) {
++        (PciBucket::Collapsing, PciBucket::Unstable) => 2,
++        (PciBucket::Unstable, PciBucket::Uncertain) => 2,
++        (PciBucket::Uncertain, PciBucket::Stable) => 3,
++        (PciBucket::Stable, PciBucket::Confident) => 4,
++        _ => 2,
++    }
++}
++
++pub fn apply_pci_hysteresis(
++    previous: Option<PciBucket>,
++    raw: PciBucket,
++    confirm_counter: usize,
++) -> (PciBucket, PciBucketTransition) {
++    let Some(previous_bucket) = previous else {
++        return (
++            raw,
++            PciBucketTransition {
++                previous_bucket: None,
++                raw_bucket: raw,
++                stable_bucket: raw,
++                direction: "initial".to_string(),
++                required_confirm_steps: 0,
++                observed_confirm_steps: confirm_counter,
++                transition_applied: true,
++            },
++        );
++    };
++    let previous_score = bucket_score(previous_bucket);
++    let raw_score = bucket_score(raw);
++    if raw_score == previous_score {
++        return (
++            previous_bucket,
++            PciBucketTransition {
++                previous_bucket: Some(previous_bucket),
++                raw_bucket: raw,
++                stable_bucket: previous_bucket,
++                direction: "same".to_string(),
++                required_confirm_steps: 0,
++                observed_confirm_steps: confirm_counter,
++                transition_applied: false,
++            },
++        );
++    }
++    if raw_score < previous_score {
++        return (
++            raw,
++            PciBucketTransition {
++                previous_bucket: Some(previous_bucket),
++                raw_bucket: raw,
++                stable_bucket: raw,
++                direction: "downshift".to_string(),
++                required_confirm_steps: 0,
++                observed_confirm_steps: confirm_counter,
++                transition_applied: true,
++            },
++        );
++    }
++    let required = required_upshift_confirm_steps(previous_bucket, raw);
++    let applied = confirm_counter >= required;
++    let stable = if applied { raw } else { previous_bucket };
++    (
++        stable,
++        PciBucketTransition {
++            previous_bucket: Some(previous_bucket),
++            raw_bucket: raw,
++            stable_bucket: stable,
++            direction: "upshift".to_string(),
++            required_confirm_steps: required,
++            observed_confirm_steps: confirm_counter,
++            transition_applied: applied,
++        },
++    )
++}
++
++fn normalized_entropy_for_stage(receipt: &Decode03AEntropyStepReceipt, stage_name: &str) -> Option<f32> {
++    receipt
++        .entropy_metrics
++        .iter()
++        .find(|metric| format!("{:?}", metric.stage) == stage_name)
++        .and_then(|metric| metric.normalized_entropy)
++}
++
++pub fn input_from_decode03a(receipt: &Decode03AEntropyStepReceipt) -> PciInput {
++    let fallback_count_window = receipt.confidence_seed_metrics.fallback_count_window;
++    let (cpu_oracle_fallback_count_window, eos_fallback_count_window, global_finite_fallback_count_window) =
++        fallback_kind_counts(&receipt.fallback_mode, fallback_count_window);
++    PciInput {
++        h_raw_norm: normalized_entropy_for_stage(receipt, "Raw"),
++        h_final_norm: normalized_entropy_for_stage(receipt, "FinalActive")
++            .or_else(|| normalized_entropy_for_stage(receipt, "AfterTopP")),
++        top1_top2_margin: receipt.confidence_seed_metrics.top1_top2_margin,
++        top1_top5_margin: None,
++        selected_rank: receipt.confidence_seed_metrics.selected_token_rank,
++        selected_prob: receipt.confidence_seed_metrics.selected_token_prob,
++        selected_logprob: receipt.confidence_seed_metrics.selected_token_logprob,
++        active_count_final: receipt.active_set_metrics.active_count_final,
++        compression_ratio_total: receipt.active_set_metrics.compression_ratio_total,
++        fallback_count_window,
++        cpu_oracle_fallback_count_window,
++        eos_fallback_count_window,
++        global_finite_fallback_count_window,
++        entropy_spike: receipt.risk_flags.entropy_spike,
++        guard_entropy_inversion: receipt.risk_flags.guard_entropy_inversion,
++        min_p_overcompression: receipt.risk_flags.min_p_overcompression,
++        top_p_overcompression: receipt.risk_flags.top_p_overcompression,
++        empty_active_set_seen: receipt.risk_flags.empty_active_set_seen,
++        global_finite_fallback_seen: receipt.risk_flags.global_finite_fallback_seen,
++        nan_seen: receipt.risk_flags.nan_seen,
++        inf_seen: receipt.risk_flags.inf_seen,
++    }
++}
++
++fn risk_flags_from_input(input: &PciInput, pci: f32) -> PciRiskFlags {
++    let entropy_conflict = input.h_raw_norm.map(|h| h <= 0.35).unwrap_or(false)
++        && input.h_final_norm.map(|h| h >= 0.65).unwrap_or(false);
++    let margin_collapse = input.top1_top2_margin.map(|m| m < 0.20).unwrap_or(false);
++    let selected_rank_risk = input.selected_rank.map(|rank| rank >= 6).unwrap_or(false);
++    let fallback_risk = input.fallback_count_window > 0 || input.global_finite_fallback_seen;
++    let overcompression_risk = input.min_p_overcompression
++        || input.top_p_overcompression
++        || input.active_count_final <= 2;
++    let numeric_risk = input.nan_seen || input.inf_seen;
++    PciRiskFlags {
++        low_confidence: pci < 0.45,
++        collapsing: pci < 0.20,
++        entropy_conflict,
++        margin_collapse,
++        selected_rank_risk,
++        fallback_risk,
++        overcompression_risk,
++        numeric_risk,
++        ready_for_dynamic_shadow: !numeric_risk,
++    }
++}
++
++pub fn receipt_from_decode03a(
++    mode: Decode03BMode,
++    entropy_receipt: &Decode03AEntropyStepReceipt,
++    previous_bucket: Option<PciBucket>,
++    confirm_counter: usize,
++) -> Decode03BPciStepReceipt {
++    let config = PciConfig::default();
++    let input = input_from_decode03a(entropy_receipt);
++    let components = compute_pci(&input, &config);
++    let pci_raw = components.final_pci;
++    let bucket_raw = bucket_from_pci(pci_raw);
++    let (bucket_stable, bucket_transition) = if config.enable_hysteresis {
++        apply_pci_hysteresis(previous_bucket, bucket_raw, confirm_counter)
++    } else {
++        (
++            bucket_raw,
++            PciBucketTransition {
++                previous_bucket,
++                raw_bucket: bucket_raw,
++                stable_bucket: bucket_raw,
++                direction: "disabled".to_string(),
++                required_confirm_steps: 0,
++                observed_confirm_steps: confirm_counter,
++                transition_applied: true,
++            },
++        )
++    };
++    let risk_flags = risk_flags_from_input(&input, pci_raw);
++    Decode03BPciStepReceipt {
++        patch_id: DECODE03B_PATCH_ID.to_string(),
++        input_patch: DECODE03B_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: None,
++        seed: entropy_receipt.seed,
++        step: entropy_receipt.step,
++        backend: "decode03a_entropy_bridge".to_string(),
++        sampler_ssot: DECODE03B_SAMPLER_SSOT.to_string(),
++        behavior_change: false,
++        mode: mode.as_str().to_string(),
++        decode03a_status_seen: Some("DERIVED_IN_MEMORY_FROM_DECODE03A_RECEIPT".to_string()),
++        sampler05_status_seen: entropy_receipt.sampler05_parity_status.clone(),
++        input,
++        config,
++        components,
++        pci_raw,
++        pci_smoothed: None,
++        bucket_raw,
++        bucket_stable,
++        bucket_transition,
++        selected_id: entropy_receipt.selected_id,
++        selected_piece_preview: entropy_receipt.selected_piece_preview.clone(),
++        risk_flags,
++    }
++}
++
++pub fn append_decode03b_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Decode03BMode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    if env_bool("ASH_DECODE03B_FAIL_ON_BEHAVIOR_CHANGE", true) {
++        // DECODE-03B is observe-only by contract. There is no mutation path here.
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let receipt = receipt_from_decode03a(mode, &entropy_receipt, None, 0);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn percentile(sorted: &[f32], q: f32) -> Option<f32> {
++    if sorted.is_empty() {
++        return None;
++    }
++    let q = q.clamp(0.0, 1.0);
++    let idx = ((sorted.len() - 1) as f32 * q).round() as usize;
++    sorted.get(idx).copied()
++}
++
++pub fn summary_from_receipts(receipts: &[Decode03BPciStepReceipt]) -> Decode03BPciSummary {
++    let steps_observed = receipts.len();
++    let mut values = receipts.iter().map(|r| r.pci_raw).filter(|v| v.is_finite()).collect::<Vec<_>>();
++    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
++    let mean = if values.is_empty() {
++        None
++    } else {
++        Some(values.iter().sum::<f32>() / values.len() as f32)
++    };
++    let pci = Decode03BPciStats {
++        mean,
++        min: values.first().copied(),
++        max: values.last().copied(),
++        p10: percentile(&values, 0.10),
++        p50: percentile(&values, 0.50),
++        p90: percentile(&values, 0.90),
++    };
++    let mut buckets = Decode03BBucketCounts::default();
++    let mut transitions = Decode03BTransitionCounts::default();
++    let mut risk = Decode03BRiskCounts::default();
++    for receipt in receipts {
++        match receipt.bucket_stable {
++            PciBucket::Confident => buckets.confident_count += 1,
++            PciBucket::Stable => buckets.stable_count += 1,
++            PciBucket::Uncertain => buckets.uncertain_count += 1,
++            PciBucket::Unstable => buckets.unstable_count += 1,
++            PciBucket::Collapsing => buckets.collapsing_count += 1,
++        }
++        match receipt.bucket_transition.direction.as_str() {
++            "downshift" => transitions.downshift_count += 1,
++            "upshift" if receipt.bucket_transition.transition_applied => transitions.upshift_count += 1,
++            "upshift" => transitions.hysteresis_hold_count += 1,
++            _ => {}
++        }
++        if receipt.risk_flags.low_confidence { risk.low_confidence_count += 1; }
++        if receipt.risk_flags.collapsing { risk.collapsing_count += 1; }
++        if receipt.risk_flags.entropy_conflict { risk.entropy_conflict_count += 1; }
++        if receipt.risk_flags.margin_collapse { risk.margin_collapse_count += 1; }
++        if receipt.risk_flags.selected_rank_risk { risk.selected_rank_risk_count += 1; }
++        if receipt.risk_flags.fallback_risk { risk.fallback_risk_count += 1; }
++        if receipt.risk_flags.overcompression_risk { risk.overcompression_risk_count += 1; }
++        if receipt.risk_flags.numeric_risk { risk.numeric_risk_count += 1; }
++    }
++    let numeric_clean = risk.numeric_risk_count == 0;
++    let ready_for_decode03c_shadow_policy = steps_observed > 0 && numeric_clean;
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if !numeric_clean {
++        "FAIL_NUMERIC_RISK"
++    } else if risk.low_confidence_count > 0 || risk.overcompression_risk_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }
++    .to_string();
++
++    Decode03BPciSummary {
++        patch_id: DECODE03B_PATCH_ID.to_string(),
++        input_patch: DECODE03B_INPUT_PATCH_ID.to_string(),
++        status,
++        behavior_change: false,
++        requires_decode03a: require_decode03a(),
++        decode03a_status_seen: if steps_observed > 0 { Some("OBSERVED_OR_DERIVED".to_string()) } else { None },
++        sampler05_status_seen: receipts.iter().find_map(|r| r.sampler05_status_seen.clone()),
++        steps_observed,
++        pci,
++        buckets,
++        transitions,
++        risk,
++        ready_for_decode03c_shadow_policy,
++        ready_for_decode03d_controlled_enable: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run ASH_DECODE03B_PCI=receipt with DECODE-03A/SAMPLER-05 to produce PCI evidence".to_string()
++        } else if ready_for_decode03c_shadow_policy {
++            "PCI receipt sealed; DECODE-03C shadow policy may consume bucket_stable and risk flags without changing decode behavior".to_string()
++        } else {
++            "numeric or missing-input risk blocks dynamic sampler shadow promotion".to_string()
++        },
++    }
++}
++
++pub fn write_decode03b_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() {
++                continue;
++            }
++            if let Ok(receipt) = serde_json::from_str::<Decode03BPciStepReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn decode03b_pci_bounds() {
++        let input = PciInput {
++            h_raw_norm: Some(0.2),
++            h_final_norm: Some(0.3),
++            top1_top2_margin: Some(1.0),
++            top1_top5_margin: None,
++            selected_rank: Some(1),
++            selected_prob: Some(0.5),
++            selected_logprob: Some(-0.7),
++            active_count_final: 16,
++            compression_ratio_total: Some(0.01),
++            fallback_count_window: 0,
++            cpu_oracle_fallback_count_window: 0,
++            eos_fallback_count_window: 0,
++            global_finite_fallback_count_window: 0,
++            entropy_spike: false,
++            guard_entropy_inversion: false,
++            min_p_overcompression: false,
++            top_p_overcompression: false,
++            empty_active_set_seen: false,
++            global_finite_fallback_seen: false,
++            nan_seen: false,
++            inf_seen: false,
++        };
++        let components = compute_pci(&input, &PciConfig::default());
++        assert!((0.0..=1.0).contains(&components.final_pci));
++    }
++
++    #[test]
++    fn decode03b_global_fallback_caps_pci() {
++        let mut input = PciInput {
++            h_raw_norm: Some(0.1),
++            h_final_norm: Some(0.1),
++            top1_top2_margin: Some(3.0),
++            top1_top5_margin: None,
++            selected_rank: Some(1),
++            selected_prob: Some(0.9),
++            selected_logprob: Some(-0.1),
++            active_count_final: 16,
++            compression_ratio_total: Some(0.01),
++            fallback_count_window: 1,
++            cpu_oracle_fallback_count_window: 0,
++            eos_fallback_count_window: 0,
++            global_finite_fallback_count_window: 1,
++            entropy_spike: false,
++            guard_entropy_inversion: false,
++            min_p_overcompression: false,
++            top_p_overcompression: false,
++            empty_active_set_seen: false,
++            global_finite_fallback_seen: true,
++            nan_seen: false,
++            inf_seen: false,
++        };
++        let components = compute_pci(&input, &PciConfig::default());
++        assert!(components.final_pci <= 0.35);
++        input.nan_seen = true;
++        let components = compute_pci(&input, &PciConfig::default());
++        assert_eq!(components.final_pci, 0.0);
++    }
++}
+--- /dev/null	2026-05-27 05:26:39.014199516 +0000
++++ /mnt/data/decode03b_work/workspace/decode03b_pci_receipt_schema.json	2026-05-27 06:08:38.757327537 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
++  "title": "Path Confidence Index / PCI Receipt Seal",
++  "schema_version": 1,
++  "behavior_change": false,
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03A",
++  "required_fields": [
++    "patch_id",
++    "input_patch",
++    "schema_version",
++    "run_id",
++    "step",
++    "backend",
++    "sampler_ssot",
++    "behavior_change",
++    "input",
++    "config",
++    "components",
++    "pci_raw",
++    "bucket_raw",
++    "bucket_stable",
++    "bucket_transition",
++    "risk_flags"
++  ],
++  "pci_contract": {
++    "range": [0.0, 1.0],
++    "buckets": {
++      "Confident": "pci >= 0.88",
++      "Stable": "0.70 <= pci < 0.88",
++      "Uncertain": "0.45 <= pci < 0.70",
++      "Unstable": "0.20 <= pci < 0.45",
++      "Collapsing": "pci < 0.20"
++    },
++    "hard_caps": [
++      "nan_seen or inf_seen => pci = 0.0",
++      "empty_active_set_seen => pci <= 0.20",
++      "global_finite_fallback_seen => pci <= 0.35",
++      "guard_entropy_inversion and selected_rank > 5 => pci <= 0.45",
++      "min_p_overcompression and active_count_final <= 2 => pci <= 0.50"
++    ]
++  },
++  "ssot": "DECODE-03A entropy/confidence metric receipt",
++  "next_patch": "16AI-QW-38G-R6A-DECODE-03C Dynamic Sampler Shadow Policy Seal"
++}
+--- /dev/null	2026-05-27 05:26:39.014199516 +0000
++++ /mnt/data/decode03b_work/workspace/decode03b_summary.json	2026-05-27 06:08:38.768181078 +0000
+@@ -0,0 +1,43 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03A",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "behavior_change": false,
++  "requires_decode03a": true,
++  "decode03a_status_seen": null,
++  "sampler05_status_seen": null,
++  "steps_observed": 0,
++  "pci": {
++    "mean": null,
++    "min": null,
++    "max": null,
++    "p10": null,
++    "p50": null,
++    "p90": null
++  },
++  "buckets": {
++    "confident_count": 0,
++    "stable_count": 0,
++    "uncertain_count": 0,
++    "unstable_count": 0,
++    "collapsing_count": 0
++  },
++  "transitions": {
++    "downshift_count": 0,
++    "upshift_count": 0,
++    "hysteresis_hold_count": 0
++  },
++  "risk": {
++    "low_confidence_count": 0,
++    "collapsing_count": 0,
++    "entropy_conflict_count": 0,
++    "margin_collapse_count": 0,
++    "selected_rank_risk_count": 0,
++    "fallback_risk_count": 0,
++    "overcompression_risk_count": 0,
++    "numeric_risk_count": 0
++  },
++  "ready_for_decode03c_shadow_policy": false,
++  "ready_for_decode03d_controlled_enable": false,
++  "reason": "static bake only; run ASH_DECODE03B_PCI=receipt with DECODE-03A/SAMPLER-05 to produce PCI evidence"
++}
+--- /dev/null	2026-05-27 05:26:39.014199516 +0000
++++ /mnt/data/decode03b_work/workspace/decode03b_static_checks.json	2026-05-27 06:08:50.483837903 +0000
+@@ -0,0 +1,58 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "name": "decode03b_module_exists",
++      "status": "PASS",
++      "detail": "crates/model_core/src/decode03b_pci.rs"
++    },
++    {
++      "name": "lib_module_registered",
++      "status": "PASS",
++      "detail": "lib.rs has mod decode03b_pci"
++    },
++    {
++      "name": "lib_exports_registered",
++      "status": "PASS",
++      "detail": "lib.rs reexports DECODE-03B API"
++    },
++    {
++      "name": "sampler_hook_registered",
++      "status": "PASS",
++      "detail": "sampler_parity append_receipt calls DECODE-03B hook"
++    },
++    {
++      "name": "behavior_change_false_contract",
++      "status": "PASS",
++      "detail": "receipt writes behavior_change=false"
++    },
++    {
++      "name": "pci_bounds_function",
++      "status": "PASS",
++      "detail": "PCI clamp/bucket functions present"
++    },
++    {
++      "name": "hard_caps_present",
++      "status": "PASS",
++      "detail": "numeric/empty/global fallback caps present"
++    },
++    {
++      "name": "summary_writer_present",
++      "status": "PASS",
++      "detail": "summary writer present"
++    },
++    {
++      "name": "workspace_schema_present",
++      "status": "PASS",
++      "detail": "receipt schema present"
++    },
++    {
++      "name": "workspace_summary_present",
++      "status": "PASS",
++      "detail": "static summary present"
++    }
++  ]
++}

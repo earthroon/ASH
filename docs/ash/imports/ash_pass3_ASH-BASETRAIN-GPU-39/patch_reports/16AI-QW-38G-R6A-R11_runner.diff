@@ -1,0 +1,141 @@
+--- /mnt/data/r6a_r11_base/scripts/run_16AI_QW_38G_R6A_R10_final_boundary_confirm.ps1	2026-05-23 05:08:27.000000000 +0000
++++ scripts/run_16AI_QW_38G_R6A_R11_projection_margin_audit.ps1	2026-05-23 05:43:25.257234078 +0000
+@@ -3,9 +3,9 @@
+   [int]$MaxNewTokens = 1,
+   [string]$InputTextFile = ".\workspace\qw38g_r6a_r2_input.txt",
+   [string]$TargetIds = "13",
+-  [string]$Seeds = "42,43,44",
++  [int]$TopN = 8,
++  [double]$MinMargin = 1.0,
+   [int]$CurrentSeed = 42,
+-  [string]$PromptSet = "default",
+   [int]$MaxBytes = 4096
+ )
+ 
+@@ -23,84 +23,82 @@
+ }
+ 
+ if ($Build) {
+-  Write-Host "[16AI-QW-38G-R6A-R10][build] cargo build --release example infer_only"
++  Write-Host "[16AI-QW-38G-R6A-R11][build] cargo build --release example infer_only"
+   cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" |
+-    Tee-Object ".\workspace\build_qw38g_r6a_r10_live.log"
++    Tee-Object ".\workspace\build_qw38g_r6a_r11_live.log"
+   if ($LASTEXITCODE -ne 0) {
+-    Write-Host "[16AI-QW-38G-R6A-R10][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r10_live.log"
++    Write-Host "[16AI-QW-38G-R6A-R11][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r11_live.log"
+     exit $LASTEXITCODE
+   }
+-  Write-Host "[16AI-QW-38G-R6A-R10][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r10_live.log"
++  Write-Host "[16AI-QW-38G-R6A-R11][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r11_live.log"
+ }
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
+ 
+-$env:ASH_FINAL_BOUNDARY_CONFIRM = "1"
+-$env:ASH_FINAL_BOUNDARY_CONFIRM_MODE = "projection_repro"
++$env:ASH_PROJECTION_MARGIN_AUDIT = "1"
++$env:ASH_PROJECTION_MARGIN_AUDIT_MODE = "masked_top1_compare"
+ 
+ $env:ASH_R8_SCALAR_SOURCE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json"
+ $env:ASH_R8_SCALAR_RECEIPT = "workspace/qw38g_r6a_r8_debug_buffer_scalar_receipt.json"
+ $env:ASH_R8_SCALAR_TRACE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_trace.jsonl"
+ 
+-$env:ASH_R9_COMPARE_SOURCE = "workspace/qw38g_r6a_r9_scalar_tap_compare_summary.json"
+-$env:ASH_R9_COMPARE_RECEIPT = "workspace/qw38g_r6a_r9_scalar_tap_compare_receipt.json"
+-$env:ASH_R9_COMPARE_TRACE = "workspace/qw38g_r6a_r9_scalar_tap_compare_trace.jsonl"
+-
+-$env:ASH_FINAL_BOUNDARY_TARGET_IDS = $TargetIds
+-$env:ASH_FINAL_BOUNDARY_SEEDS = $Seeds
+-$env:ASH_FINAL_BOUNDARY_CURRENT_SEED = "$CurrentSeed"
++$env:ASH_R10_FINAL_BOUNDARY_SOURCE = "workspace/qw38g_r6a_r10_final_boundary_confirm_summary.json"
++$env:ASH_R10_FINAL_BOUNDARY_RECEIPT = "workspace/qw38g_r6a_r10_final_boundary_confirm_receipt.json"
++$env:ASH_R10_FINAL_BOUNDARY_TRACE = "workspace/qw38g_r6a_r10_final_boundary_confirm_trace.jsonl"
++
++$env:ASH_RAW_TOPK_TRACE_SOURCE = "workspace/qw38a_raw_topk_trace.jsonl"
++
++$env:ASH_PROJECTION_MARGIN_TARGET_IDS = $TargetIds
++$env:ASH_PROJECTION_MARGIN_TOP_N = "$TopN"
++$env:ASH_PROJECTION_MARGIN_MIN_MARGIN = "$MinMargin"
++$env:ASH_PROJECTION_MARGIN_SCALAR_ONLY = "1"
++$env:ASH_PROJECTION_MARGIN_MAX_BYTES = "$MaxBytes"
+ $env:ASH_SEED = "$CurrentSeed"
+-$env:ASH_FINAL_BOUNDARY_PROMPT_SET = $PromptSet
+-$env:ASH_FINAL_BOUNDARY_MAX_STEPS = "1"
+-$env:ASH_FINAL_BOUNDARY_LAYER = "last"
+-$env:ASH_FINAL_BOUNDARY_STAGE = "post_final_norm"
+-$env:ASH_FINAL_BOUNDARY_SCALAR_ONLY = "1"
+-$env:ASH_FINAL_BOUNDARY_MAX_BYTES = "$MaxBytes"
+-
+-$env:ASH_FINAL_BOUNDARY_TRACE = "workspace/qw38g_r6a_r10_final_boundary_confirm_trace.jsonl"
+-$env:ASH_FINAL_BOUNDARY_SUMMARY = "workspace/qw38g_r6a_r10_final_boundary_confirm_summary.json"
+-$env:ASH_FINAL_BOUNDARY_RECEIPT = "workspace/qw38g_r6a_r10_final_boundary_confirm_receipt.json"
+-$env:ASH_FINAL_BOUNDARY_ROLLBACK = "workspace/qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json"
++
++$env:ASH_PROJECTION_MARGIN_TRACE = "workspace/qw38g_r6a_r11_projection_margin_trace.jsonl"
++$env:ASH_PROJECTION_MARGIN_SUMMARY = "workspace/qw38g_r6a_r11_projection_margin_summary.json"
++$env:ASH_PROJECTION_MARGIN_RECEIPT = "workspace/qw38g_r6a_r11_projection_margin_receipt.json"
++$env:ASH_PROJECTION_MARGIN_ROLLBACK = "workspace/qw38g_r6a_r11_projection_margin_rollback_receipt.json"
+ 
+ $exe = ".\target\release\examples\infer_only.exe"
+ if (!(Test-Path $exe)) {
+-  Write-Host "[16AI-QW-38G-R6A-R10][error] infer_only.exe missing; rerun with -Build"
++  Write-Host "[16AI-QW-38G-R6A-R11][error] infer_only.exe missing; rerun with -Build"
+   exit 1
+ }
+ 
+-Write-Host "[16AI-QW-38G-R6A-R10][run] confirm=1 mode=projection_repro targets=$TargetIds requested_seeds=$Seeds current_seed=$CurrentSeed max_new_tokens=$MaxNewTokens"
++Write-Host "[16AI-QW-38G-R6A-R11][run] margin_audit=1 mode=masked_top1_compare targets=$TargetIds top_n=$TopN min_margin=$MinMargin max_new_tokens=$MaxNewTokens"
+ $cmd = "$exe --model-spec .\specs\model_spec_v5_48259.toml --tokenizer .\artifacts\tokenizer_manifest_v5_final.json --checkpoint .\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors --task freeform --max-new-tokens $MaxNewTokens --seed $CurrentSeed --text-file $InputTextFile --json 2>&1"
+-cmd /c $cmd | Tee-Object ".\workspace\infer_qw38g_r6a_r10_final_boundary_confirm_live.log"
++cmd /c $cmd | Tee-Object ".\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+ $code = $LASTEXITCODE
+-Write-Host "[16AI-QW-38G-R6A-R10][run_done] exit_code=$code live=.\workspace\infer_qw38g_r6a_r10_final_boundary_confirm_live.log"
++Write-Host "[16AI-QW-38G-R6A-R11][run_done] exit_code=$code live=.\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+ 
+-if (Test-Path ".\workspace\qw38g_r6a_r10_final_boundary_confirm_receipt.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R10][receipt] .\workspace\qw38g_r6a_r10_final_boundary_confirm_receipt.json"
+-  Get-Content ".\workspace\qw38g_r6a_r10_final_boundary_confirm_receipt.json" -Encoding UTF8
++if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json") {
++  Write-Host "[16AI-QW-38G-R6A-R11][receipt] .\workspace\qw38g_r6a_r11_projection_margin_receipt.json"
++  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json" -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R10][warn] receipt missing: .\workspace\qw38g_r6a_r10_final_boundary_confirm_receipt.json"
++  Write-Host "[16AI-QW-38G-R6A-R11][warn] receipt missing: .\workspace\qw38g_r6a_r11_projection_margin_receipt.json"
+ }
+ 
+-if (Test-Path ".\workspace\qw38g_r6a_r10_final_boundary_confirm_summary.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R10][summary] .\workspace\qw38g_r6a_r10_final_boundary_confirm_summary.json"
+-  Get-Content ".\workspace\qw38g_r6a_r10_final_boundary_confirm_summary.json" -Encoding UTF8
++if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_summary.json") {
++  Write-Host "[16AI-QW-38G-R6A-R11][summary] .\workspace\qw38g_r6a_r11_projection_margin_summary.json"
++  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_summary.json" -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R10][warn] summary missing: .\workspace\qw38g_r6a_r10_final_boundary_confirm_summary.json"
++  Write-Host "[16AI-QW-38G-R6A-R11][warn] summary missing: .\workspace\qw38g_r6a_r11_projection_margin_summary.json"
+ }
+ 
+-if (Test-Path ".\workspace\qw38g_r6a_r10_final_boundary_confirm_trace.jsonl") {
+-  Write-Host "[16AI-QW-38G-R6A-R10][trace] .\workspace\qw38g_r6a_r10_final_boundary_confirm_trace.jsonl"
+-  Get-Content ".\workspace\qw38g_r6a_r10_final_boundary_confirm_trace.jsonl" -Encoding UTF8
++if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl") {
++  Write-Host "[16AI-QW-38G-R6A-R11][trace] .\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl"
++  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl" -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R10][warn] trace missing: .\workspace\qw38g_r6a_r10_final_boundary_confirm_trace.jsonl"
++  Write-Host "[16AI-QW-38G-R6A-R11][warn] trace missing: .\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl"
+ }
+ 
+-if (Test-Path ".\workspace\qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R10][rollback] .\workspace\qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json"
+-  Get-Content ".\workspace\qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json" -Encoding UTF8
++if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json") {
++  Write-Host "[16AI-QW-38G-R6A-R11][rollback] .\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json"
++  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json" -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R10][warn] rollback receipt missing: .\workspace\qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json"
++  Write-Host "[16AI-QW-38G-R6A-R11][warn] rollback receipt missing: .\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json"
+ }
+ 
+ exit $code

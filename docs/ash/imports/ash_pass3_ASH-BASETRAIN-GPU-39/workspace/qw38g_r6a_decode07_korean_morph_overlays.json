@@ -1,0 +1,104 @@
+[
+  {
+    "combined_with_transition_penalty_delta": 0.0,
+    "contributes_to_decode_quality_risk": false,
+    "contributes_to_salad_risk": false,
+    "decision": "allow",
+    "generation_step": 6,
+    "morph_loop_score": 0.0,
+    "morph_salad_score": 0.0,
+    "penalty_delta": 0.0,
+    "reasons": [],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": false,
+    "token_id": 303
+  },
+  {
+    "combined_with_transition_penalty_delta": -6.0,
+    "contributes_to_decode_quality_risk": true,
+    "contributes_to_salad_risk": true,
+    "decision": "strong_penalty",
+    "generation_step": 7,
+    "morph_loop_score": 0.7,
+    "morph_salad_score": 0.68,
+    "penalty_delta": -4.0,
+    "reasons": [
+      "josa_loop",
+      "repeated_case_particle"
+    ],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": false,
+    "token_id": 410
+  },
+  {
+    "combined_with_transition_penalty_delta": -7.0,
+    "contributes_to_decode_quality_risk": true,
+    "contributes_to_salad_risk": true,
+    "decision": "recommend_rollback",
+    "generation_step": 8,
+    "morph_loop_score": 0.76,
+    "morph_salad_score": 0.8,
+    "penalty_delta": -5.0,
+    "reasons": [
+      "eomi_loop",
+      "repeated_final_ending"
+    ],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": true,
+    "token_id": 511
+  },
+  {
+    "combined_with_transition_penalty_delta": -6.0,
+    "contributes_to_decode_quality_risk": true,
+    "contributes_to_salad_risk": true,
+    "decision": "recommend_rollback",
+    "generation_step": 9,
+    "morph_loop_score": 0.78,
+    "morph_salad_score": 0.82,
+    "penalty_delta": -6.0,
+    "reasons": [
+      "jamo_leak"
+    ],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": true,
+    "token_id": 612
+  },
+  {
+    "combined_with_transition_penalty_delta": -6.5,
+    "contributes_to_decode_quality_risk": true,
+    "contributes_to_salad_risk": true,
+    "decision": "strong_penalty",
+    "generation_step": 10,
+    "morph_loop_score": 0.68,
+    "morph_salad_score": 0.66,
+    "penalty_delta": -4.5,
+    "reasons": [
+      "syllable_fragment_loop"
+    ],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": false,
+    "token_id": 713
+  },
+  {
+    "combined_with_transition_penalty_delta": 0.0,
+    "contributes_to_decode_quality_risk": false,
+    "contributes_to_salad_risk": false,
+    "decision": "skipped_step_integrity_failed",
+    "generation_step": 11,
+    "morph_loop_score": 0.0,
+    "morph_salad_score": 0.0,
+    "penalty_delta": 0.0,
+    "reasons": [
+      "step_integrity_mismatch"
+    ],
+    "reject_recommended": false,
+    "review_required": false,
+    "rollback_recommended": false,
+    "token_id": 511
+  }
+]

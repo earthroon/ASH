@@ -1,0 +1,794 @@
+diff -ruN run00_orig/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md run00_work/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md
+--- run00_orig/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md	2026-05-27 01:19:32.636010296 +0000
+@@ -0,0 +1,25 @@
++# 16AI-QW-38G-R6A-RUN-00 Acceptance
++
++## Result
++STATIC PASS / EXECUTION NOT_RUN
++
++## Confirmed
++- RUN-00 consolidated smoke module exists.
++- Cargo check/test receipts exist and correctly record NOT_RUN.
++- WGSL compile receipt exists and correctly records NOT_RUN.
++- Runtime smoke receipt exists and correctly records NOT_RUN.
++- Artifact inventory found all required prior summary artifacts.
++- Promotion gates remain false because cargo/WGSL/runtime were not executed.
++- Default modes were not changed.
++
++## Not run
++- cargo check
++- cargo test
++- rustfmt
++- WGSL compile validation
++- runtime inference smoke
++
++## Blocking reasons
++- NO_CARGO_IN_BAKE_ENVIRONMENT
++- NO_WGPU_VALIDATOR_OR_RUNTIME
++- RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT
+diff -ruN run00_orig/crates/model_core/src/lib.rs run00_work/crates/model_core/src/lib.rs
+--- run00_orig/crates/model_core/src/lib.rs	2026-05-27 01:06:16.000000000 +0000
++++ run00_work/crates/model_core/src/lib.rs	2026-05-27 01:19:32.630133216 +0000
+@@ -19,6 +19,7 @@
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+ mod minp_c2a_snapshot_alignment;
++mod run00_consolidated_smoke;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -83,6 +84,13 @@
+ };
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
++pub use run00_consolidated_smoke::{
++    RUN00_PATCH_ID, Run00CheckStatus, Run00CommandReceipt, Run00CargoCheckReceipt,
++    Run00CargoTestReceipt, Run00WgslShaderReceipt, Run00WgslCompileReceipt,
++    Run00RuntimeSmokeCaseReceipt, Run00ArtifactInventory, Run00ArtifactInventoryItem,
++    Run00PromotionGates, Run00ConsolidatedSmokeSummary,
++    run00_evaluate_promotion_gates, run00_not_run_command_receipts,
++};
+ pub use minp_c2a_snapshot_alignment::{
+     SemanticScoreAlignmentStatus, SemanticScoreBufferAlignmentReceipt,
+     SemanticScoreFixtureResult, SemanticScoreFixtureStatus,
+diff -ruN run00_orig/crates/model_core/src/run00_consolidated_smoke.rs run00_work/crates/model_core/src/run00_consolidated_smoke.rs
+--- run00_orig/crates/model_core/src/run00_consolidated_smoke.rs	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/crates/model_core/src/run00_consolidated_smoke.rs	2026-05-27 01:19:32.629368817 +0000
+@@ -0,0 +1,189 @@
++use serde::{Deserialize, Serialize};
++use std::collections::BTreeMap;
++
++pub const RUN00_PATCH_ID: &str = "16AI-QW-38G-R6A-RUN-00";
++
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Run00CheckStatus {
++    Pass,
++    Fail,
++    Blocked,
++    NotRun,
++}
++
++impl Run00CheckStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::Fail => "FAIL",
++            Self::Blocked => "BLOCKED",
++            Self::NotRun => "NOT_RUN",
++        }
++    }
++
++    pub fn is_pass(&self) -> bool {
++        matches!(self, Self::Pass)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00CommandReceipt {
++    pub command: String,
++    pub status: Run00CheckStatus,
++    pub exit_code: Option<i32>,
++    pub stdout_tail: Vec<String>,
++    pub stderr_tail: Vec<String>,
++    pub reason: Option<String>,
++}
++
++impl Run00CommandReceipt {
++    pub fn not_run(command: impl Into<String>, reason: impl Into<String>) -> Self {
++        Self {
++            command: command.into(),
++            status: Run00CheckStatus::NotRun,
++            exit_code: None,
++            stdout_tail: Vec::new(),
++            stderr_tail: Vec::new(),
++            reason: Some(reason.into()),
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00CargoCheckReceipt {
++    pub patch_id: String,
++    pub workspace: Run00CommandReceipt,
++    pub crates: BTreeMap<String, Run00CommandReceipt>,
++    pub status: Run00CheckStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00CargoTestReceipt {
++    pub patch_id: String,
++    pub tests: BTreeMap<String, Run00CommandReceipt>,
++    pub status: Run00CheckStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00WgslShaderReceipt {
++    pub shader_path: String,
++    pub file_exists: bool,
++    pub static_fields_checked: bool,
++    pub compile_status: Run00CheckStatus,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00WgslCompileReceipt {
++    pub patch_id: String,
++    pub shaders: Vec<Run00WgslShaderReceipt>,
++    pub binding_layout_status: Run00CheckStatus,
++    pub status: Run00CheckStatus,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00RuntimeSmokeCaseReceipt {
++    pub case: String,
++    pub prompt: String,
++    pub status: Run00CheckStatus,
++    pub receipts_expected: Vec<String>,
++    pub receipts_found: Vec<String>,
++    pub blocking_reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00ArtifactInventoryItem {
++    pub path: String,
++    pub found: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00ArtifactInventory {
++    pub patch_id: String,
++    pub required_artifacts: usize,
++    pub found_artifacts: usize,
++    pub missing: Vec<String>,
++    pub items: Vec<Run00ArtifactInventoryItem>,
++    pub status: Run00CheckStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Run00PromotionGates {
++    pub sampler_strict_ready: bool,
++    pub transition_on_candidate_ready: bool,
++    pub semantic_prior_enable_ready: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run00ConsolidatedSmokeSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub cargo_check_status: Run00CheckStatus,
++    pub cargo_test_status: Run00CheckStatus,
++    pub wgsl_compile_status: Run00CheckStatus,
++    pub runtime_smoke_status: Run00CheckStatus,
++    pub artifact_inventory_status: Run00CheckStatus,
++    pub promotion_gates: Run00PromotionGates,
++    pub default_modes_changed: bool,
++    pub blocking_reasons: Vec<String>,
++    pub non_scope: Vec<String>,
++}
++
++pub fn run00_evaluate_promotion_gates(
++    sampler04_status: &str,
++    decode02d_status: &str,
++    minp_c2a_status: &str,
++    cargo_check: Run00CheckStatus,
++    wgsl_compile: Run00CheckStatus,
++    runtime_smoke: Run00CheckStatus,
++) -> Run00PromotionGates {
++    let build_ready = cargo_check.is_pass() && wgsl_compile.is_pass();
++    let runtime_ready = runtime_smoke.is_pass();
++    Run00PromotionGates {
++        sampler_strict_ready: sampler04_status == "STRICT_CANDIDATE_READY" && build_ready && runtime_ready,
++        transition_on_candidate_ready: decode02d_status == "TRANSITION_ON_CANDIDATE_READY" && build_ready && runtime_ready,
++        semantic_prior_enable_ready: minp_c2a_status == "PASS" && sampler04_status == "STRICT_CANDIDATE_READY" && build_ready,
++    }
++}
++
++pub fn run00_not_run_command_receipts() -> (Run00CargoCheckReceipt, Run00CargoTestReceipt, Run00WgslCompileReceipt) {
++    let reason = "RUN00_BAKE_ENVIRONMENT_HAS_NO_CARGO_OR_WGSL_RUNTIME";
++    let mut crates = BTreeMap::new();
++    for name in ["model_core", "runtime", "burn_webgpu_backend", "orchestrator_local"] {
++        crates.insert(name.to_string(), Run00CommandReceipt::not_run(format!("cargo check -p {name}"), reason));
++    }
++    let check = Run00CargoCheckReceipt {
++        patch_id: RUN00_PATCH_ID.to_string(),
++        workspace: Run00CommandReceipt::not_run("cargo check --workspace", reason),
++        crates,
++        status: Run00CheckStatus::NotRun,
++    };
++
++    let mut tests = BTreeMap::new();
++    for (name, cmd) in [
++        ("model_core_decode", "cargo test -p model_core decode"),
++        ("model_core_sampler", "cargo test -p model_core sampler"),
++        ("model_core_minp", "cargo test -p model_core minp"),
++        ("model_core_transition", "cargo test -p model_core transition"),
++        ("burn_webgpu_backend_gpu_sampling", "cargo test -p burn_webgpu_backend gpu_sampling"),
++    ] {
++        tests.insert(name.to_string(), Run00CommandReceipt::not_run(cmd, reason));
++    }
++    let test = Run00CargoTestReceipt {
++        patch_id: RUN00_PATCH_ID.to_string(),
++        tests,
++        status: Run00CheckStatus::NotRun,
++    };
++
++    let wgsl = Run00WgslCompileReceipt {
++        patch_id: RUN00_PATCH_ID.to_string(),
++        shaders: Vec::new(),
++        binding_layout_status: Run00CheckStatus::NotRun,
++        status: Run00CheckStatus::NotRun,
++        reason: Some("NO_WGPU_VALIDATOR_OR_RUNTIME".to_string()),
++    };
++
++    (check, test, wgsl)
++}
+diff -ruN run00_orig/workspace/run00.patch run00_work/workspace/run00.patch
+--- run00_orig/workspace/run00.patch	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00.patch	2026-05-27 01:19:33.089168142 +0000
+@@ -0,0 +1,247 @@
++diff -ruN run00_orig/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md run00_work/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md
++--- run00_orig/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ run00_work/acceptance_reports/16AI-QW-38G-R6A-RUN-00_acceptance.md	2026-05-27 01:19:32.636010296 +0000
++@@ -0,0 +1,25 @@
+++# 16AI-QW-38G-R6A-RUN-00 Acceptance
+++
+++## Result
+++STATIC PASS / EXECUTION NOT_RUN
+++
+++## Confirmed
+++- RUN-00 consolidated smoke module exists.
+++- Cargo check/test receipts exist and correctly record NOT_RUN.
+++- WGSL compile receipt exists and correctly records NOT_RUN.
+++- Runtime smoke receipt exists and correctly records NOT_RUN.
+++- Artifact inventory found all required prior summary artifacts.
+++- Promotion gates remain false because cargo/WGSL/runtime were not executed.
+++- Default modes were not changed.
+++
+++## Not run
+++- cargo check
+++- cargo test
+++- rustfmt
+++- WGSL compile validation
+++- runtime inference smoke
+++
+++## Blocking reasons
+++- NO_CARGO_IN_BAKE_ENVIRONMENT
+++- NO_WGPU_VALIDATOR_OR_RUNTIME
+++- RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT
++diff -ruN run00_orig/crates/model_core/src/lib.rs run00_work/crates/model_core/src/lib.rs
++--- run00_orig/crates/model_core/src/lib.rs	2026-05-27 01:06:16.000000000 +0000
+++++ run00_work/crates/model_core/src/lib.rs	2026-05-27 01:19:32.630133216 +0000
++@@ -19,6 +19,7 @@
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++ mod minp_c2a_snapshot_alignment;
+++mod run00_consolidated_smoke;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -83,6 +84,13 @@
++ };
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
+++pub use run00_consolidated_smoke::{
+++    RUN00_PATCH_ID, Run00CheckStatus, Run00CommandReceipt, Run00CargoCheckReceipt,
+++    Run00CargoTestReceipt, Run00WgslShaderReceipt, Run00WgslCompileReceipt,
+++    Run00RuntimeSmokeCaseReceipt, Run00ArtifactInventory, Run00ArtifactInventoryItem,
+++    Run00PromotionGates, Run00ConsolidatedSmokeSummary,
+++    run00_evaluate_promotion_gates, run00_not_run_command_receipts,
+++};
++ pub use minp_c2a_snapshot_alignment::{
++     SemanticScoreAlignmentStatus, SemanticScoreBufferAlignmentReceipt,
++     SemanticScoreFixtureResult, SemanticScoreFixtureStatus,
++diff -ruN run00_orig/crates/model_core/src/run00_consolidated_smoke.rs run00_work/crates/model_core/src/run00_consolidated_smoke.rs
++--- run00_orig/crates/model_core/src/run00_consolidated_smoke.rs	1970-01-01 00:00:00.000000000 +0000
+++++ run00_work/crates/model_core/src/run00_consolidated_smoke.rs	2026-05-27 01:19:32.629368817 +0000
++@@ -0,0 +1,189 @@
+++use serde::{Deserialize, Serialize};
+++use std::collections::BTreeMap;
+++
+++pub const RUN00_PATCH_ID: &str = "16AI-QW-38G-R6A-RUN-00";
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Run00CheckStatus {
+++    Pass,
+++    Fail,
+++    Blocked,
+++    NotRun,
+++}
+++
+++impl Run00CheckStatus {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Pass => "PASS",
+++            Self::Fail => "FAIL",
+++            Self::Blocked => "BLOCKED",
+++            Self::NotRun => "NOT_RUN",
+++        }
+++    }
+++
+++    pub fn is_pass(&self) -> bool {
+++        matches!(self, Self::Pass)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00CommandReceipt {
+++    pub command: String,
+++    pub status: Run00CheckStatus,
+++    pub exit_code: Option<i32>,
+++    pub stdout_tail: Vec<String>,
+++    pub stderr_tail: Vec<String>,
+++    pub reason: Option<String>,
+++}
+++
+++impl Run00CommandReceipt {
+++    pub fn not_run(command: impl Into<String>, reason: impl Into<String>) -> Self {
+++        Self {
+++            command: command.into(),
+++            status: Run00CheckStatus::NotRun,
+++            exit_code: None,
+++            stdout_tail: Vec::new(),
+++            stderr_tail: Vec::new(),
+++            reason: Some(reason.into()),
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00CargoCheckReceipt {
+++    pub patch_id: String,
+++    pub workspace: Run00CommandReceipt,
+++    pub crates: BTreeMap<String, Run00CommandReceipt>,
+++    pub status: Run00CheckStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00CargoTestReceipt {
+++    pub patch_id: String,
+++    pub tests: BTreeMap<String, Run00CommandReceipt>,
+++    pub status: Run00CheckStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00WgslShaderReceipt {
+++    pub shader_path: String,
+++    pub file_exists: bool,
+++    pub static_fields_checked: bool,
+++    pub compile_status: Run00CheckStatus,
+++    pub reason: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00WgslCompileReceipt {
+++    pub patch_id: String,
+++    pub shaders: Vec<Run00WgslShaderReceipt>,
+++    pub binding_layout_status: Run00CheckStatus,
+++    pub status: Run00CheckStatus,
+++    pub reason: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00RuntimeSmokeCaseReceipt {
+++    pub case: String,
+++    pub prompt: String,
+++    pub status: Run00CheckStatus,
+++    pub receipts_expected: Vec<String>,
+++    pub receipts_found: Vec<String>,
+++    pub blocking_reason: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00ArtifactInventoryItem {
+++    pub path: String,
+++    pub found: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00ArtifactInventory {
+++    pub patch_id: String,
+++    pub required_artifacts: usize,
+++    pub found_artifacts: usize,
+++    pub missing: Vec<String>,
+++    pub items: Vec<Run00ArtifactInventoryItem>,
+++    pub status: Run00CheckStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Run00PromotionGates {
+++    pub sampler_strict_ready: bool,
+++    pub transition_on_candidate_ready: bool,
+++    pub semantic_prior_enable_ready: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Run00ConsolidatedSmokeSummary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub input_patch: String,
+++    pub cargo_check_status: Run00CheckStatus,
+++    pub cargo_test_status: Run00CheckStatus,
+++    pub wgsl_compile_status: Run00CheckStatus,
+++    pub runtime_smoke_status: Run00CheckStatus,
+++    pub artifact_inventory_status: Run00CheckStatus,
+++    pub promotion_gates: Run00PromotionGates,
+++    pub default_modes_changed: bool,
+++    pub blocking_reasons: Vec<String>,
+++    pub non_scope: Vec<String>,
+++}
+++
+++pub fn run00_evaluate_promotion_gates(
+++    sampler04_status: &str,
+++    decode02d_status: &str,
+++    minp_c2a_status: &str,
+++    cargo_check: Run00CheckStatus,
+++    wgsl_compile: Run00CheckStatus,
+++    runtime_smoke: Run00CheckStatus,
+++) -> Run00PromotionGates {
+++    let build_ready = cargo_check.is_pass() && wgsl_compile.is_pass();
+++    let runtime_ready = runtime_smoke.is_pass();
+++    Run00PromotionGates {
+++        sampler_strict_ready: sampler04_status == "STRICT_CANDIDATE_READY" && build_ready && runtime_ready,
+++        transition_on_candidate_ready: decode02d_status == "TRANSITION_ON_CANDIDATE_READY" && build_ready && runtime_ready,
+++        semantic_prior_enable_ready: minp_c2a_status == "PASS" && sampler04_status == "STRICT_CANDIDATE_READY" && build_ready,
+++    }
+++}
+++
+++pub fn run00_not_run_command_receipts() -> (Run00CargoCheckReceipt, Run00CargoTestReceipt, Run00WgslCompileReceipt) {
+++    let reason = "RUN00_BAKE_ENVIRONMENT_HAS_NO_CARGO_OR_WGSL_RUNTIME";
+++    let mut crates = BTreeMap::new();
+++    for name in ["model_core", "runtime", "burn_webgpu_backend", "orchestrator_local"] {
+++        crates.insert(name.to_string(), Run00CommandReceipt::not_run(format!("cargo check -p {name}"), reason));
+++    }
+++    let check = Run00CargoCheckReceipt {
+++        patch_id: RUN00_PATCH_ID.to_string(),
+++        workspace: Run00CommandReceipt::not_run("cargo check --workspace", reason),
+++        crates,
+++        status: Run00CheckStatus::NotRun,
+++    };
+++
+++    let mut tests = BTreeMap::new();
+++    for (name, cmd) in [
+++        ("model_core_decode", "cargo test -p model_core decode"),
+++        ("model_core_sampler", "cargo test -p model_core sampler"),
+++        ("model_core_minp", "cargo test -p model_core minp"),
+++        ("model_core_transition", "cargo test -p model_core transition"),
+++        ("burn_webgpu_backend_gpu_sampling", "cargo test -p burn_webgpu_backend gpu_sampling"),
+++    ] {
+++        tests.insert(name.to_string(), Run00CommandReceipt::not_run(cmd, reason));
+++    }
+++    let test = Run00CargoTestReceipt {
+++        patch_id: RUN00_PATCH_ID.to_string(),
+++        tests,
+++        status: Run00CheckStatus::NotRun,
+++    };
+++
+++    let wgsl = Run00WgslCompileReceipt {
+++        patch_id: RUN00_PATCH_ID.to_string(),
+++        shaders: Vec::new(),
+++        binding_layout_status: Run00CheckStatus::NotRun,
+++        status: Run00CheckStatus::NotRun,
+++        reason: Some("NO_WGPU_VALIDATOR_OR_RUNTIME".to_string()),
+++    };
+++
+++    (check, test, wgsl)
+++}
+diff -ruN run00_orig/workspace/run00_artifact_inventory.json run00_work/workspace/run00_artifact_inventory.json
+--- run00_orig/workspace/run00_artifact_inventory.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_artifact_inventory.json	2026-05-27 01:19:32.631374715 +0000
+@@ -0,0 +1,69 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "required_artifacts": 15,
++  "found_artifacts": 15,
++  "missing": [],
++  "items": [
++    {
++      "path": "workspace/decode00_decode_ssot_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode01_cpu_oracle_sampler_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/sampler01_gpu_active_set_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/sampler02_runtime_parity_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/sampler03_full_candidate_parity_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/sampler04_runtime_validation_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/minp_c1_weighted_minp_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/minp_c1a_build_smoke_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/minp_c2_semantic_score_source_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/minp_c2a_snapshot_alignment_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode02_transition_guard_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode02a_gpu_transition_parity_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode02b_transition_probe_to_on_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode02c_safe_on_enable_summary.json",
++      "found": true
++    },
++    {
++      "path": "workspace/decode02d_controlled_on_candidate_summary.json",
++      "found": true
++    }
++  ],
++  "status": "PASS"
++}
+\ No newline at end of file
+diff -ruN run00_orig/workspace/run00_cargo_check_receipt.json run00_work/workspace/run00_cargo_check_receipt.json
+--- run00_orig/workspace/run00_cargo_check_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_cargo_check_receipt.json	2026-05-27 01:19:32.633575779 +0000
+@@ -0,0 +1,20 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "cargo_check": {
++    "workspace": "NOT_RUN",
++    "model_core": "NOT_RUN",
++    "runtime": "NOT_RUN",
++    "burn_webgpu_backend": "NOT_RUN",
++    "orchestrator_local": "NOT_RUN"
++  },
++  "commands": {
++    "workspace": "cargo check --workspace",
++    "model_core": "cargo check -p model_core",
++    "runtime": "cargo check -p runtime",
++    "burn_webgpu_backend": "cargo check -p burn_webgpu_backend",
++    "orchestrator_local": "cargo check -p orchestrator_local"
++  },
++  "failures": [],
++  "status": "NOT_RUN",
++  "reason": "NO_CARGO_IN_BAKE_ENVIRONMENT"
++}
+\ No newline at end of file
+diff -ruN run00_orig/workspace/run00_cargo_test_receipt.json run00_work/workspace/run00_cargo_test_receipt.json
+--- run00_orig/workspace/run00_cargo_test_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_cargo_test_receipt.json	2026-05-27 01:19:32.633861191 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "cargo_test": {
++    "model_core_decode": "NOT_RUN",
++    "model_core_sampler": "NOT_RUN",
++    "model_core_minp": "NOT_RUN",
++    "model_core_transition": "NOT_RUN",
++    "burn_webgpu_backend_gpu_sampling": "NOT_RUN"
++  },
++  "commands": {
++    "model_core_decode": "cargo test -p model_core decode",
++    "model_core_sampler": "cargo test -p model_core sampler",
++    "model_core_minp": "cargo test -p model_core minp",
++    "model_core_transition": "cargo test -p model_core transition",
++    "burn_webgpu_backend_gpu_sampling": "cargo test -p burn_webgpu_backend gpu_sampling"
++  },
++  "status": "NOT_RUN",
++  "reason": "NO_CARGO_IN_BAKE_ENVIRONMENT"
++}
+\ No newline at end of file
+diff -ruN run00_orig/workspace/run00_consolidated_smoke_summary.json run00_work/workspace/run00_consolidated_smoke_summary.json
+--- run00_orig/workspace/run00_consolidated_smoke_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_consolidated_smoke_summary.json	2026-05-27 01:19:32.635198661 +0000
+@@ -0,0 +1,50 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "status": "CONSOLIDATED_SMOKE_DEFINED_EXECUTION_NOT_RUN",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02D",
++  "cargo": {
++    "check_status": "NOT_RUN",
++    "test_status": "NOT_RUN"
++  },
++  "wgsl": {
++    "compile_status": "NOT_RUN",
++    "binding_layout_status": "STATIC_CHECKED_NO_COMPILE"
++  },
++  "runtime": {
++    "smoke_status": "NOT_RUN",
++    "sampler04_status": "NOT_RUN",
++    "decode02d_status": "NOT_RUN",
++    "minp_c2a_status": "NOT_RUN"
++  },
++  "artifact_inventory": {
++    "status": "PASS",
++    "missing_count": 0
++  },
++  "promotion_gates": {
++    "sampler_strict_ready": false,
++    "transition_on_candidate_ready": false,
++    "semantic_prior_enable_ready": false,
++    "gate_inputs": {
++      "sampler04_status": "NOT_RUN",
++      "decode02d_status": "NOT_RUN",
++      "minp_c2a_status": "NOT_RUN",
++      "cargo_check": "NOT_RUN",
++      "wgsl_compile": "NOT_RUN",
++      "runtime_smoke": "NOT_RUN"
++    }
++  },
++  "default_modes_changed": false,
++  "blocking_reasons": [
++    "NO_CARGO_IN_BAKE_ENVIRONMENT",
++    "NO_WGPU_VALIDATOR_OR_RUNTIME",
++    "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"
++  ],
++  "non_scope": [
++    "new_sampler_feature",
++    "dynamic_qwave_deltak",
++    "transition_default_on",
++    "semantic_prior_default_on",
++    "lora_training",
++    "context_router"
++  ]
++}
+\ No newline at end of file
+diff -ruN run00_orig/workspace/run00_report.md run00_work/workspace/run00_report.md
+--- run00_orig/workspace/run00_report.md	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_report.md	2026-05-27 01:19:32.635909445 +0000
+@@ -0,0 +1,35 @@
++# 16AI-QW-38G-R6A-RUN-00 — Consolidated Cargo / WGSL / Runtime Smoke Evidence Seal
++
++## Scope
++RUN-00 adds a consolidated smoke evidence layer without changing sampler, transition, semantic prior, or runtime default behavior.
++
++## Added
++- `model_core::run00_consolidated_smoke`
++- cargo check receipt: `workspace/run00_cargo_check_receipt.json`
++- cargo test receipt: `workspace/run00_cargo_test_receipt.json`
++- WGSL compile receipt: `workspace/run00_wgsl_compile_receipt.json`
++- runtime smoke receipt: `workspace/run00_runtime_smoke_receipt.jsonl`
++- artifact inventory: `workspace/run00_artifact_inventory.json`
++- consolidated summary: `workspace/run00_consolidated_smoke_summary.json`
++
++## Execution status
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WGSL compile: NOT_RUN
++- runtime smoke: NOT_RUN
++
++Reason: this bake environment has no cargo/rustc/wgpu runtime. RUN-00 records NOT_RUN explicitly and does not promote any gate.
++
++## Artifact inventory
++Required artifacts: 15
++Found artifacts: 15
++Missing artifacts: 0
++
++## Promotion gates
++- sampler_strict_ready: false
++- transition_on_candidate_ready: false
++- semantic_prior_enable_ready: false
++
++## Default modes
++No default mode was changed. Transition guard remains off unless explicitly enabled. Semantic prior remains off unless explicitly enabled.
+diff -ruN run00_orig/workspace/run00_runtime_smoke_receipt.jsonl run00_work/workspace/run00_runtime_smoke_receipt.jsonl
+--- run00_orig/workspace/run00_runtime_smoke_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_runtime_smoke_receipt.jsonl	2026-05-27 01:19:32.634576906 +0000
+@@ -0,0 +1,4 @@
++{"patch_id": "16AI-QW-38G-R6A-RUN-00", "case": "short_math", "prompt": "1+1=", "status": "NOT_RUN", "receipts_expected": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "receipts_found": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "blocking_reason": "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"}
++{"patch_id": "16AI-QW-38G-R6A-RUN-00", "case": "short_korean", "prompt": "안녕하세요. 저는 애쉬입니다.", "status": "NOT_RUN", "receipts_expected": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "receipts_found": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "blocking_reason": "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"}
++{"patch_id": "16AI-QW-38G-R6A-RUN-00", "case": "generic_continuation", "prompt": "이어가고", "status": "NOT_RUN", "receipts_expected": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "receipts_found": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "blocking_reason": "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"}
++{"patch_id": "16AI-QW-38G-R6A-RUN-00", "case": "task_layer", "prompt": "프론트 말고 WebGPU 코어 쪽을 봐.", "status": "NOT_RUN", "receipts_expected": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "receipts_found": ["workspace/decode02d_controlled_on_candidate_summary.json", "workspace/sampler04_runtime_validation_summary.json", "workspace/minp_c2a_snapshot_alignment_summary.json"], "blocking_reason": "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"}
+diff -ruN run00_orig/workspace/run00_static_checks.json run00_work/workspace/run00_static_checks.json
+--- run00_orig/workspace/run00_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_static_checks.json	2026-05-27 01:19:32.635733658 +0000
+@@ -0,0 +1,15 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "run00_module_exists": true,
++  "lib_declares_run00_module": true,
++  "lib_exports_run00_types": true,
++  "cargo_check_receipt_exists": true,
++  "cargo_test_receipt_exists": true,
++  "wgsl_receipt_exists": true,
++  "runtime_smoke_receipt_exists": true,
++  "artifact_inventory_exists": true,
++  "required_artifacts_found": true,
++  "default_modes_changed_false": true,
++  "not_run_not_marked_pass": true,
++  "status": "PASS_STATIC_STRUCTURE"
++}
+\ No newline at end of file
+diff -ruN run00_orig/workspace/run00_wgsl_compile_receipt.json run00_work/workspace/run00_wgsl_compile_receipt.json
+--- run00_orig/workspace/run00_wgsl_compile_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ run00_work/workspace/run00_wgsl_compile_receipt.json	2026-05-27 01:19:32.633310712 +0000
+@@ -0,0 +1,46 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-RUN-00",
++  "wgsl_compile": {
++    "gpu_sampling_topk.wgsl": "NOT_RUN",
++    "gpu_sampling_topp_scan.wgsl": "NOT_RUN",
++    "gpu_sampling_select.wgsl": "NOT_RUN",
++    "gpu_sampling_select_legacy.wgsl": "NOT_RUN"
++  },
++  "shaders": [
++    {
++      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl",
++      "file_exists": true,
++      "static_fields_checked": true,
++      "compile_status": "NOT_RUN",
++      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
++    },
++    {
++      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl",
++      "file_exists": true,
++      "static_fields_checked": true,
++      "compile_status": "NOT_RUN",
++      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
++    },
++    {
++      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl",
++      "file_exists": true,
++      "static_fields_checked": true,
++      "compile_status": "NOT_RUN",
++      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
++    },
++    {
++      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl",
++      "file_exists": true,
++      "static_fields_checked": true,
++      "compile_status": "NOT_RUN",
++      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
++    }
++  ],
++  "binding_layout": {
++    "semantic_prior_buffers": "STATIC_CHECKED",
++    "candidate_trace_v4": "STATIC_CHECKED",
++    "transition_hint_buffer": "STATIC_CHECKED"
++  },
++  "status": "NOT_RUN",
++  "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
++}
+\ No newline at end of file

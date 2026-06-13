@@ -1,0 +1,34 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-03",
+  "fixture": "candidate_trace_basic_minp",
+  "logits": [
+    10.0,
+    9.0,
+    8.0,
+    2.0,
+    -1.0
+  ],
+  "config": {
+    "temperature": 1.0,
+    "top_k": 0,
+    "min_p": 0.1,
+    "top_p": 1.0
+  },
+  "expected": {
+    "min_p_threshold": 7.6974149,
+    "active_ids": [
+      0,
+      1,
+      2
+    ],
+    "final_ids": [
+      0,
+      1,
+      2
+    ],
+    "active_count": 3,
+    "final_count": 3,
+    "overflow": false,
+    "status": "PASS_if_gpu_trace_matches_cpu_oracle"
+  }
+}

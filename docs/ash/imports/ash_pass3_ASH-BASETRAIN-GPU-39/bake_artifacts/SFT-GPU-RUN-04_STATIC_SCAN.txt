@@ -1,0 +1,31 @@
+# SFT-GPU-RUN-04 static scan
+
+## module exports
+422:pub mod sft_gpu_promotion_bridge;
+423:pub use sft_gpu_promotion_bridge::*;
+295:pub mod gpu_trained_promotion_bridge;
+296:pub use gpu_trained_promotion_bridge::*;
+255:pub mod gpu_trained_promotion_bridge;
+256:pub use gpu_trained_promotion_bridge::*;
+
+## closed mutation defaults
+301:            allow_operator_approval: false,
+302:            allow_promotion_apply: false,
+303:            allow_runtime_current_pointer_update: false,
+304:            allow_lifecycle_mutation: false,
+305:            allow_slot_action_apply: false,
+306:            allow_ash_binding: false,
+
+## bridge opened-only fields
+297:            allow_promotion_bridge: true,
+298:            allow_review_queue_write: true,
+299:            allow_review_packet_creation: true,
+300:            allow_operator_review_request_candidate: true,
+
+## boundary fail-closed flags
+34:            operator_approval_allowed: false,
+35:            promotion_apply_allowed: false,
+36:            runtime_current_pointer_update_allowed: false,
+37:            lifecycle_mutation_allowed: false,
+38:            slot_action_apply_allowed: false,
+40:            ash_binding_allowed: false,

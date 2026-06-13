@@ -1,0 +1,7 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-28",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_28_gradient_buffer_allocation_candidate --jobs 1",
+  "recommended_allocation_candidate_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_28_gradient_buffer_allocation_candidate",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-29",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-28A"
+}

@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-52C-R5",
+  "title": "Safe Profile Review Gate / Operator Approval Queue Seal",
+  "base_patch": "QW-52C-R4",
+  "schema": "SafeProfileReviewGateTrace",
+  "queue_entry_schema": "OperatorApprovalQueueEntry",
+  "operator_decision_initial": "Pending",
+  "approval_status_initial": "AwaitingOperatorReview",
+  "mutation_policy_required_false": [
+    "runtime_apply",
+    "hidden_state_mutation",
+    "logit_mutation",
+    "sampler_mutation",
+    "token_rank_mutation",
+    "token_selection_mutation",
+    "token_ban",
+    "hard_ban",
+    "blacklist_mutation",
+    "rerank_execution",
+    "retry_execution",
+    "policy_promotion",
+    "threshold_autotune",
+    "weight_commit",
+    "safe_profile_apply",
+    "operator_auto_approval",
+    "approval_granted",
+    "memory_mutation",
+    "training_mutation",
+    "lora_mutation"
+  ]
+}

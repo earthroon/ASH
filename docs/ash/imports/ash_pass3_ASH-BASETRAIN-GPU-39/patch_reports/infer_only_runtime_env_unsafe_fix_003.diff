@@ -1,0 +1,31 @@
+--- /mnt/data/ash_runtime_envfix_orig/crates/runtime/examples/infer_only.rs	2026-06-02 15:19:48.000000000 +0000
++++ /mnt/data/ash_logfix_work/crates/runtime/examples/infer_only.rs	2026-06-03 06:36:26.205171073 +0000
+@@ -316,21 +316,21 @@
+ 
+ fn apply_qw55a_cli_env(cli: &Cli) {
+     if cli.enable_qw55a {
+-        env::set_var("ASH_QW55A_ENABLE", "1");
+-        env::set_var("ASH_QW55A_FORBID_GREEDY_FALLBACK", "1");
+-        env::set_var("ASH_QW55A_EXPLICIT_ENABLE_REQUIRED", "1");
++        unsafe { env::set_var("ASH_QW55A_ENABLE", "1") };
++        unsafe { env::set_var("ASH_QW55A_FORBID_GREEDY_FALLBACK", "1") };
++        unsafe { env::set_var("ASH_QW55A_EXPLICIT_ENABLE_REQUIRED", "1") };
+     }
+     if cli.qw55a_trace || cli.enable_qw55a {
+-        env::set_var("ASH_QW55A_TRACE", "1");
++        unsafe { env::set_var("ASH_QW55A_TRACE", "1") };
+     }
+     if let Some(value) = cli.qw55a_root_topk {
+-        env::set_var("ASH_QW55A_ROOT_TOPK", value.to_string());
++        unsafe { env::set_var("ASH_QW55A_ROOT_TOPK", value.to_string()) };
+     }
+     if cli.qw55a_no_greedy_fallback {
+-        env::set_var("ASH_QW55A_FORBID_GREEDY_FALLBACK", "1");
++        unsafe { env::set_var("ASH_QW55A_FORBID_GREEDY_FALLBACK", "1") };
+     }
+     if cli.qw55a_explicit_enable_required {
+-        env::set_var("ASH_QW55A_EXPLICIT_ENABLE_REQUIRED", "1");
++        unsafe { env::set_var("ASH_QW55A_EXPLICIT_ENABLE_REQUIRED", "1") };
+     }
+ }
+ 

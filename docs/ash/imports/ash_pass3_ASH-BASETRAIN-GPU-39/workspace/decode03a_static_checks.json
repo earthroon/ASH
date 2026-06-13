@@ -1,0 +1,20 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03A",
+  "status": "PASS_STATIC",
+  "checks": {
+    "decode03a_module_exists": true,
+    "decode03a_module_registered": true,
+    "decode03a_exports_registered": true,
+    "decode03a_append_hook_registered": true,
+    "cpu_trace_entropy_fields": true,
+    "cpu_trace_semantic_prior_fields": true,
+    "gpu_trace_entropy_fields": true,
+    "cpu_oracle_entropy_fields": true,
+    "observe_only_contract": true,
+    "logsumexp_helper": true,
+    "cargo_available": false
+  },
+  "runtime": "NOT_RUN",
+  "cargo_check": "NOT_RUN",
+  "reason": "rustc/cargo unavailable in bake container; static source checks only"
+}

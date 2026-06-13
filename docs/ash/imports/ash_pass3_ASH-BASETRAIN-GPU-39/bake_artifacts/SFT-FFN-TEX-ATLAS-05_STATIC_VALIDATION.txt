@@ -1,0 +1,26 @@
+SFT-FFN-TEX-ATLAS-05 static validation
+
+Checked:
+- Added ash_core timing probe module.
+- Added ash_core timing probe tests.
+- Added burn_webgpu_backend timing probe shell.
+- Linked ash_core lib.rs module/export.
+- Linked burn_webgpu_backend lib.rs module/export.
+- Added acceptance report.
+- Kept texture path promotion/default/training/production closed.
+- Kept runtime attach / promotion / current pointer update closed.
+
+Not performed:
+- cargo test
+- rustfmt
+- GPU timestamp query runtime collection
+
+Reason:
+- cargo/rustc/rustfmt are unavailable in this container.
+
+Static inspection result:
+- sft_ffn_texture_atlas_timing_probe.rs bracket balance: OK
+- sft_ffn_tex_atlas_05_timing_probe.rs bracket balance: OK
+- ffn_texture_atlas_timing_probe.rs bracket balance: OK
+- ash_core lib.rs export: present
+- burn_webgpu_backend lib.rs export: present

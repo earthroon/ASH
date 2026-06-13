@@ -1,0 +1,41 @@
+SFT-FFN-LORA-08 STATIC VALIDATION
+
+Status: PASS_STATIC / COMPILE_NOT_RUN
+
+Checks performed:
+- Added ash_core operator approval module.
+- Added ash_core operator approval tests.
+- Added burn_webgpu_backend operator approval boundary shell.
+- Updated ash_core lib.rs module/export list.
+- Updated burn_webgpu_backend lib.rs module/export list.
+- Added acceptance report.
+- Added bake report.
+- Verified file presence.
+- Verified brace balance for added Rust files.
+- Verified module/export string presence in lib.rs files.
+
+Opened:
+- operator_approval_record
+- promotion_intent_record
+- operator_identity_digest
+- operator_signature_digest
+- approval_receipt_digest
+- approval_count_evidence
+- review_packet_digest_match
+- artifact_digest_match
+- eval_digest_match
+- no_runtime_mutation_guard
+
+Closed:
+- runtime_attach
+- promotion_apply
+- current_pointer_update
+- slot_ready_mark
+- ASH_binding
+- SFT_training_execution_in_core
+- gradient_write_in_core
+- optimizer_step_in_core
+
+Not run:
+- cargo test (cargo/rustc unavailable in current environment)
+- rustfmt (rustfmt unavailable in current environment)

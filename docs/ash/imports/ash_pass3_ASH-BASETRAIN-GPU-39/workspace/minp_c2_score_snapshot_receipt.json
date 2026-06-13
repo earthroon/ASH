@@ -1,0 +1,50 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2",
+  "vocab_size": 5,
+  "qwave_len": 5,
+  "deltak_len": 5,
+  "qwave_min": -1.0,
+  "qwave_max": 0.7,
+  "qwave_mean": -0.5,
+  "deltak_min": -1.0,
+  "deltak_max": 0.4,
+  "deltak_mean": -0.58,
+  "nan_count": 0,
+  "inf_count": 0,
+  "control_token_count": 2,
+  "byte_token_count": 1,
+  "mojibake_suspect_count": 1,
+  "fixture_vocab": [
+    {
+      "id": 0,
+      "piece": "<pad>",
+      "qwave": -1.0,
+      "deltak": -1.0
+    },
+    {
+      "id": 1,
+      "piece": "▁이어가고",
+      "qwave": 0.7,
+      "deltak": 0.4
+    },
+    {
+      "id": 2,
+      "piece": "<eos>",
+      "qwave": -1.0,
+      "deltak": -1.0
+    },
+    {
+      "id": 3,
+      "piece": "<byte:EC>",
+      "qwave": -0.4,
+      "deltak": -0.5
+    },
+    {
+      "id": 4,
+      "piece": "?댁뼱媛怨?",
+      "qwave": -0.8,
+      "deltak": -0.8
+    }
+  ],
+  "note": "Fixture receipt only; full runtime vocab snapshot generation requires loading the production tokenizer manifest."
+}

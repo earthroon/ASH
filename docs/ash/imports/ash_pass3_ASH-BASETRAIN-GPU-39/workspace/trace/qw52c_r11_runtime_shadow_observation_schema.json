@@ -1,0 +1,17 @@
+{
+  "patch_id": "QW-52C-R11",
+  "title": "Runtime Shadow Apply Observation / No Token Selection Mutation Seal",
+  "trace_type": "RuntimeShadowApplyObservationTraceR11",
+  "required_outputs": [
+    "artifacts/qw52c_r11_runtime_shadow_observation.jsonl",
+    "artifacts/qw52c_r11_runtime_shadow_observation_report.json",
+    "artifacts/qw52c_r11_runtime_shadow_observation_manifest.json",
+    "workspace/trace/qw52c_r11_runtime_shadow_observation_receipt.json"
+  ],
+  "invariants": {
+    "runtime_apply": false,
+    "token_selection_mutation_count": 0,
+    "shadow_result_applied_count": 0,
+    "crate_js_ts_allowed": false
+  }
+}

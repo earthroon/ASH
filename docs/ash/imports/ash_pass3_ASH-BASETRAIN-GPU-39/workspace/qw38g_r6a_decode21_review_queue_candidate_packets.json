@@ -1,0 +1,172 @@
+[
+  {
+    "queue_candidate_id": "queue-candidate-auto_accept_no_queue",
+    "decode_session_id": "mock-decode-session-auto-accept-no-queue",
+    "cue_id": "mock-cue-0001",
+    "candidate_id": "candidate-auto-accept",
+    "final_quality_score": 0.94,
+    "human_review_band_hash": "6ad6c35bfc0cedf677fbfb4ac5e3281221edb7ecb8bcf447dbbbe430eddc882c",
+    "review_queue_target": "None",
+    "review_queue_priority": "None",
+    "reasons": [
+      "AutoAcceptBandNoQueueRequired"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": false,
+    "enqueue_required": false,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-human_review_queue_candidate",
+    "decode_session_id": "mock-decode-session-human-review-queue",
+    "cue_id": "mock-cue-0002",
+    "candidate_id": "candidate-human-review",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "67ccf769012eac822da9660f40a6d712f6bd61432843a0f0c70e78097f2778b5",
+    "review_queue_target": "HumanReview",
+    "review_queue_priority": "Normal",
+    "reasons": [
+      "HumanReviewBandRequired"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-rewrite_hold_queue_candidate",
+    "decode_session_id": "mock-decode-session-rewrite-hold-queue",
+    "cue_id": "mock-cue-0003",
+    "candidate_id": "candidate-rewrite-hold",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "0a2f1b1e78c2568828865774a738cfa134332dacf9af43530258ae507aace137",
+    "review_queue_target": "RewriteHold",
+    "review_queue_priority": "High",
+    "reasons": [
+      "RewriteHoldRequired"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-reject_rework_queue_candidate",
+    "decode_session_id": "mock-decode-session-reject-rework-queue",
+    "cue_id": "mock-cue-0004",
+    "candidate_id": "candidate-reject-rework",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "198ae4046c6e16211a48bd1a0bb9fe9f5f16c33c16a23979f52135de98af2787",
+    "review_queue_target": "RejectOrRework",
+    "review_queue_priority": "Critical",
+    "reasons": [
+      "RejectOrReworkRequired"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-repair_required_queue_candidate",
+    "decode_session_id": "mock-decode-session-repair-required-queue",
+    "cue_id": "mock-cue-0005",
+    "candidate_id": "candidate-repair-required",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "ec08c93681cb328e61d75473fdc164495580fe6f7f94442cef8a2f2aab508db4",
+    "review_queue_target": "RepairRequired",
+    "review_queue_priority": "Critical",
+    "reasons": [
+      "RepairRequired",
+      "CandidateIdMismatch"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-calibration_insufficient_queue_candidate",
+    "decode_session_id": "mock-decode-session-calibration-insufficient-queue",
+    "cue_id": "mock-cue-0006",
+    "candidate_id": "candidate-calibration-insufficient",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "24d7577c04945b4adddad8b60dab515c90e9f7c1f62723725110779d8efdfe05",
+    "review_queue_target": "CalibrationInsufficient",
+    "review_queue_priority": "High",
+    "reasons": [
+      "CalibrationInsufficient",
+      "MissingScoreReceipt"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-missing_calibration_receipt",
+    "decode_session_id": "mock-decode-session-missing-calibration",
+    "cue_id": "mock-cue-0007",
+    "candidate_id": "candidate-missing-calibration",
+    "final_quality_score": null,
+    "human_review_band_hash": null,
+    "review_queue_target": "None",
+    "review_queue_priority": "None",
+    "reasons": [
+      "MissingCalibrationReceipt"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": null,
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": false,
+    "enqueue_required": false,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  },
+  {
+    "queue_candidate_id": "queue-candidate-approval_gate_pending",
+    "decode_session_id": "mock-decode-session-approval-pending",
+    "cue_id": "mock-cue-0008",
+    "candidate_id": "candidate-approval-pending",
+    "final_quality_score": 0.76,
+    "human_review_band_hash": "67ccf769012eac822da9660f40a6d712f6bd61432843a0f0c70e78097f2778b5",
+    "review_queue_target": "HumanReview",
+    "review_queue_priority": "Normal",
+    "reasons": [
+      "HumanReviewBandRequired"
+    ],
+    "final_quality_score_receipt_hash": "mock-final-quality-score-receipt-hash",
+    "final_commit_receipt_hash": "mock-final-commit-receipt-hash",
+    "score_threshold_calibration_receipt_hash": "mock-score-threshold-calibration-receipt-hash",
+    "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+    "queue_candidate_created": true,
+    "enqueue_required": true,
+    "enqueue_allowed": false,
+    "enqueue_executed": false
+  }
+]

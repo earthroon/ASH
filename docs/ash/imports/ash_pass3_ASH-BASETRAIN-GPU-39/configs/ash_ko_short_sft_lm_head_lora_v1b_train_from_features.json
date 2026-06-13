@@ -1,0 +1,336 @@
+{
+  "run_name": "ash_ko_short_sft_lm_head_lora_v1b_train_from_features",
+  "family": "sft_lora",
+  "mode": "train",
+  "model_id": "model_tinyllama_1p1b_v4",
+  "model_path": "specs/model_spec_v5_48259.toml",
+  "dataset": {
+    "train_jsonl": "",
+    "train_jsonl_paths": [],
+    "eval_jsonl": null,
+    "system_field": null,
+    "prompt_field": "prompt",
+    "response_field": "response",
+    "max_samples": 64,
+    "max_seq_len": 192,
+    "pack_turns": false,
+    "feature_jsonl": null,
+    "feature_store_manifest": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_native_dump/feature_store_work/feature_store_manifest.json",
+    "max_feature_batches": 64,
+    "format": "prompt_response",
+    "template": "사용자: {prompt}\n애쉬: {response}",
+    "loss_on": "response_only",
+    "prompt_max_tokens": 96,
+    "response_max_tokens": 64,
+    "append_eos": true
+  },
+  "optimizer": {
+    "optimizer": "adamw",
+    "learning_rate": 0.0001,
+    "weight_decay": 0,
+    "warmup_steps": 0,
+    "gradient_accumulation": 1,
+    "max_steps": 20
+  },
+  "hyper": {
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0,
+    "preset": "custom",
+    "target_modules": [
+      "lm_head"
+    ],
+    "bias_mode": "none",
+    "hidden_size": 2048,
+    "vocab_size": 48259,
+    "init_std": 0.02
+  },
+  "lora": {
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0,
+    "targets": [
+      "lm_head"
+    ],
+    "merge_mode": "runtime_attach",
+    "artifact_family": "module_lora"
+  },
+  "checkpoints": {
+    "output_dir": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/lm_head_lora",
+    "save_every_steps": 5,
+    "keep_last": 3,
+    "manifest_name": "adapter_manifest.json",
+    "adapter_name": "ash_ko_short_sft_lm_head_lora_v1b_train_from_features.adapter.safetensors"
+  },
+  "logging": {
+    "log_every_steps": 1,
+    "report_loss": true,
+    "report_tokens_per_sec": true
+  },
+  "training": {
+    "planned_layers": 1,
+    "pad_token_id": 0,
+    "label_smoothing": null,
+    "save_adapter_checkpoint": true,
+    "plan_kind": "module_lora"
+  },
+  "bridge": null,
+  "guards": {
+    "intent": "A-SFT response-token LM-head LoRA train from features",
+    "do_not_reuse_module_local_q_proj_reconstruction": true,
+    "expect_lora_b_nonzero_after_train": true,
+    "expect_target_key": "lm_head",
+    "forbid_byte_markers": true,
+    "forbid_replacement_char": true,
+    "forbid_prompt_loss": true,
+    "require_response_loss_tokens": true
+  },
+  "a_sft_native_contract": {
+    "phase": "train_from_features",
+    "backend": "feature_store",
+    "forbid_direct_jsonl_train": true,
+    "forbid_teacher_full_model_in_train": true,
+    "require_feature_store_manifest": true,
+    "expected_target_key": "lm_head",
+    "allow_teacher_full_model_only_in_dump": true,
+    "expected_manifest_glob": "workspace/lora_runs/*/feature_store_work/feature_store_manifest.json"
+  },
+  "lm_head_vocab_atlas": {
+    "enabled": true,
+    "projection": "gpu_parallel_vocab_atlas",
+    "vocab_tile_size": 1024,
+    "parallel_tile_groups": 4,
+    "streaming_cross_entropy": true,
+    "forbid_full_vocab_buffer": true,
+    "forbid_full_logits_buffer": true,
+    "forbid_trainable_module_from_base_for_lm_head": true,
+    "report_tile_timing": true,
+    "report_memory_policy": true,
+    "forbid_cpu_serial_tile_loop": true,
+    "gpu_parallel": {
+      "enabled": true,
+      "required": true,
+      "dispatch_mode": "tile_group_parallel",
+      "ce_reduce_mode": "gpu_partial_logsumexp",
+      "grad_reduce_mode": "gpu_partial_grad_reduce",
+      "update_mode": "gpu_reduce_update",
+      "tokens_per_workgroup": 1,
+      "vocab_lanes_per_workgroup": 128,
+      "hidden_chunk_size": 256,
+      "max_parallel_tiles": 4,
+      "max_group_weight_bytes": 33554432,
+      "readback_policy": "loss_and_report_only",
+      "forbid_logits_readback": true,
+      "forbid_cpu_token_vocab_loop": true,
+      "update": {
+        "enabled": true,
+        "mode": "sgd_smoke",
+        "learning_rate": 0.0001,
+        "gradient_clip_norm": 1.0,
+        "apply_gradient_clip": true,
+        "require_a_norm_change": true,
+        "require_b_norm_change": true,
+        "forbid_nan_update": true,
+        "report_update_norms": true
+      },
+      "export": {
+        "enabled": true,
+        "artifact_family": "module_lora",
+        "target_key": "lm_head",
+        "target": "lm_head",
+        "adapter_format": "safetensors",
+        "write_adapter_manifest": true,
+        "write_adapter_model": true,
+        "write_training_seal_report": true,
+        "require_update_applied": true,
+        "require_a_delta_norm_positive": true,
+        "require_b_delta_norm_positive": true
+      },
+      "readback_discipline": {
+        "enabled": true,
+        "policy": "loss_report_and_adapter_only",
+        "forbid_full_logits_readback": true,
+        "forbid_tile_logits_readback": true,
+        "forbid_full_weight_readback": true,
+        "allow_loss_scalar_readback": true,
+        "allow_norm_scalar_readback": true,
+        "allow_adapter_export_readback": true,
+        "max_scalar_report_bytes": 4096
+      },
+      "gpu_timing_profiler": {
+        "enabled": true,
+        "profile_bridge": true,
+        "profile_pass1": true,
+        "profile_reduce": true,
+        "profile_pass2_grad": true,
+        "profile_update": true,
+        "profile_export": true,
+        "report_readback_bytes": true,
+        "report_gpu_dispatch_count": true,
+        "report_step_total_ms": true
+      }
+    },
+    "timing_profiler": {
+      "enabled": true,
+      "report_dispatch_timing": true,
+      "report_gpu_reduce_timing": true,
+      "report_readback_bytes": true,
+      "progress_every_steps": 1
+    },
+    "multi_step_train": {
+      "enabled": true,
+      "optimizer": "adamw",
+      "max_steps": 20,
+      "save_every_steps": 10,
+      "eval_every_steps": 10,
+      "report_every_steps": 1,
+      "resume": true,
+      "adamw": {
+        "learning_rate": 0.0001,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-08,
+        "weight_decay": 0.01,
+        "bias_correction": true
+      },
+      "guards": {
+        "forbid_nan_loss": true,
+        "forbid_inf_loss": true,
+        "forbid_nan_update": true,
+        "max_loss": 100.0,
+        "max_grad_norm": 10.0,
+        "require_loss_finite": true,
+        "require_delta_norm_positive": true,
+        "stop_on_loss_explosion": true,
+        "loss_explosion_warmup_steps": 3,
+        "loss_explosion_factor": 3.0
+      },
+      "checkpoint": {
+        "enabled": true,
+        "write_optimizer_state": true,
+        "write_lora_state": true,
+        "write_loss_trace": true,
+        "write_runtime_delta_every_eval": true,
+        "write_step_buffer_hygiene_report": true
+      },
+      "mode": "all_step_gpu_redispatch",
+      "redispatch": {
+        "enabled": true,
+        "require_all_group_pass1_each_step": true,
+        "require_all_group_pass2_each_step": true,
+        "require_global_reduce_each_step": true,
+        "require_update_each_step": true,
+        "forbid_reuse_previous_step_partials": true,
+        "forbid_stale_loss_state": true,
+        "forbid_stale_grad_state": true
+      },
+      "buffer_clear": {
+        "enabled": true,
+        "clear_partial_ce": true,
+        "clear_global_ce": true,
+        "clear_pass2_grad": true,
+        "clear_update_grad": true,
+        "clear_target_seen": true,
+        "verify_zeroed_before_dispatch": true,
+        "verify_written_after_dispatch": true
+      }
+    },
+    "quality_eval": {
+      "enabled": false,
+      "phase": "quality_eval",
+      "eval_prompt_set": "configs/eval_prompts/ash_sft_lm_head_quality_eval_ko.jsonl",
+      "max_eval_prompts": 16,
+      "max_seq_len": 64,
+      "compare_mode": "base_vs_lora",
+      "metrics": {
+        "require_runtime_delta": true,
+        "min_delta_norm": 1e-06,
+        "max_delta_norm": 100.0,
+        "min_max_abs_delta": 1e-07,
+        "max_max_abs_delta": 10.0,
+        "require_loss_finite": true,
+        "require_final_loss_finite": true,
+        "max_final_loss": 100.0,
+        "require_no_loss_explosion": true,
+        "require_non_empty_generation": true,
+        "forbid_repeated_special_tokens": true,
+        "forbid_excessive_unknown_tokens": true,
+        "max_unk_ratio": 0.15,
+        "max_repetition_ratio": 0.45,
+        "require_tokenizer_roundtrip_safe": true,
+        "require_logits_finite": true
+      },
+      "promotion_gate": {
+        "enabled": true,
+        "mode": "strict_candidate_promotion",
+        "promote_on_pass": true,
+        "demote_on_fail": true,
+        "write_promoted_copy": true,
+        "promotion_status_file": "promotion_status.json",
+        "promoted_dir": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/promoted_lm_head_lora"
+      }
+    }
+  },
+  "runtime_delta_verify": {
+    "enabled": true,
+    "phase": "runtime_delta_verify",
+    "target_key": "lm_head",
+    "artifact_family": "module_lora",
+    "adapter_manifest_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/lm_head_lora/adapter_manifest.json",
+    "adapter_model_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/lm_head_lora/adapter_model.safetensors",
+    "verify_mode": "last_token_logits",
+    "prompt_text": "선배, 애쉬 테스트 문장입니다.",
+    "max_seq_len": 64,
+    "max_positions": 4,
+    "delta_norm_min": 1e-06,
+    "max_abs_delta_min": 1e-07,
+    "mean_abs_delta_min": 0.0,
+    "require_target_key_match": true,
+    "require_artifact_family_match": true,
+    "require_nonzero_delta": true,
+    "require_runtime_attachment_sidecar": true,
+    "write_report": true
+  },
+  "runtime_integration": {
+    "enabled": true,
+    "phase": "runtime_integration_hardening",
+    "adapter_registry_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/runtime_adapter_registry.json",
+    "promoted_adapter_dir": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/promoted_lm_head_lora",
+    "adapter_manifest_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/promoted_lm_head_lora/adapter_manifest.json",
+    "adapter_model_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features/artifacts/promoted_lm_head_lora/adapter_model.safetensors",
+    "attach_policy": {
+      "target_key": "lm_head",
+      "artifact_family": "module_lora",
+      "require_promoted_status": true,
+      "require_runtime_delta_verify": true,
+      "require_quality_eval_pass": true,
+      "forbid_silent_base_fallback": true,
+      "forbid_target_auto_remap": true,
+      "forbid_missing_adapter_pass": true
+    },
+    "runtime_switch": {
+      "default_enabled": true,
+      "allow_disable": true,
+      "log_adapter_state": true,
+      "base_only_mode_name": "base_only_explicit",
+      "lora_mode_name": "lm_head_lora_enabled"
+    },
+    "generation_hygiene": {
+      "enabled": true,
+      "smoke_prompts_path": "configs/eval_prompts/ash_sft_lm_head_quality_eval_ko.jsonl",
+      "max_smoke_prompts": 4,
+      "max_new_tokens": 32,
+      "forbid_empty_output": true,
+      "forbid_nan_logits": true,
+      "forbid_repeated_special_tokens": true,
+      "max_unk_ratio": 0.15,
+      "max_repetition_ratio": 0.5
+    },
+    "reports": {
+      "write_runtime_registry": true,
+      "write_integration_report": true,
+      "write_health_report": true,
+      "write_generation_hygiene_report": true
+    }
+  }
+}

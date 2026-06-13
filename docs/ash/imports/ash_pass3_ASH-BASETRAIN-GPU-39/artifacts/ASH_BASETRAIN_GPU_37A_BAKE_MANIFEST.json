@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37A",
+  "title": "Selected Group Full Row-Block Streaming Plan / CPU Tensor View Candidate To Sequential Row-Block Atlas Schedule No Read No GPU Upload Seal",
+  "source_sha256": "5d76e1e08e0881659234a75b1b37c1550792f609c1608be5e071a9ecc6ee0438",
+  "bin_sha256": "b68e23ff0646de9f767d3ab9ddceacdacd8b9399d41a9f41d6e191248d5fe98a",
+  "static_artifact_sha256": "05f62409746fcc3589b03c984935e8874a2fe475feeb38a1a485cdb3f3d48513",
+  "static_baked_status": "BLOCKED_36G_RECEIPT_NOT_FOUND",
+  "added_files": [
+    "crates/base_train/src/ash_basetrain_gpu_37a_selected_group_full_row_block_streaming_plan.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_37a_selected_group_full_row_block_streaming_plan.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37A.md",
+    "patch_reports/ASH-BASETRAIN-GPU-37A_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_37A_SELECTED_GROUP_FULL_ROW_BLOCK_STREAMING_PLAN.json",
+    "artifacts/ASH_BASETRAIN_GPU_37A_STATIC_CHECKS.txt",
+    "artifacts/ASH_BASETRAIN_GPU_37A_BAKE_MANIFEST.json"
+  ],
+  "live_input_receipt_same_path_included": false,
+  "expected_input_receipt": "artifacts/ASH_BASETRAIN_GPU_36G_BOUNDED_ROW_VIEW_READ_SMOKE.json",
+  "default_block_rows": 256,
+  "expected_total_blocks": 189,
+  "expected_full_blocks": 188,
+  "expected_tail_rows": 131,
+  "no_file_read": true,
+  "no_gpu_upload": true,
+  "no_full_tensor_load": true,
+  "rust_control_flow_policy": "minimize_if_use_match_and_lookup_tables",
+  "static_checks_sha256": "f7a5eea221dbf2032810b758d833dd083c8076ddc1f959795e772cca9001d845"
+}

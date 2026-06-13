@@ -1,0 +1,28 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUNTIME_VALIDATED",
+  "cpu_oracle_is_sampler_ssot": true,
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "gpu_projection": "burn_webgpu_backend::gpu_sampling_topp_scan.wgsl",
+  "behavior_change_default": false,
+  "receipt": "workspace/sampler05_parity_steps.jsonl",
+  "checked_steps": 0,
+  "schema_example_steps": 1,
+  "pass_steps": 0,
+  "warn_steps": 0,
+  "fail_steps": 0,
+  "threshold_kind_cpu": "weighted",
+  "threshold_kind_gpu": "weighted",
+  "min_p_threshold_score_kind_match": "DEFINED_BY_STATIC_PATCH_NOT_RUNTIME_PROVEN",
+  "top_k_policy": {
+    "policy": "observe_only by default; bypass_if_not_transition_aware available via ASH_SAMPLER05_TOPK_POLICY",
+    "transition_aware_topk": false,
+    "parity_safe_bypass_available": true,
+    "env_var": "ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware"
+  },
+  "global_finite_fallback_count": "NOT_RUN",
+  "ready_for_decode03a_entropy_receipt": false,
+  "ready_for_dynamic_sampler": false,
+  "reason": "Cargo/runtime/WebGPU execution was not available in this container; runtime parity probe must be run in the target environment before promotion."
+}

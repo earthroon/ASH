@@ -1,0 +1,45 @@
+--- /mnt/data/ash_workspace_check_r2_orig/crates/model_core/src/ash_ft32_shadow_candidate_approval_gate.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/ash_workspace_check_r2_work/crates/model_core/src/ash_ft32_shadow_candidate_approval_gate.rs	2026-06-08 15:06:03.015027554 +0000
+@@ -225,7 +225,7 @@
+     let approved_next = approval_eligible_before_operator && operator_valid && approved_runtime_dryrun;
+     let gate_status = if approved_next { "APPROVED_FOR_RUNTIME_BIND_DRYRUN" } else { "REVIEW_REQUIRED" };
+     let status = if approved_next { ASH_FT32_APPROVED_STATUS } else { ASH_FT32_STATUS };
+-    let route_status = if approved_next { "PASS" } else { string_field(&operator_approval, &["approval_status"]).unwrap_or_else(|| combined_route.to_string()) };
++    let route_status = if approved_next { "PASS".to_string() } else { string_field(&operator_approval, &["approval_status"]).unwrap_or_else(|| combined_route.to_string()) };
+     let shadow_candidate_id = string_field(&shadow_manifest, &["shadow_candidate_id"]).unwrap_or_else(|| "".to_string());
+ 
+     let approval_gate = json!({
+--- /mnt/data/ash_workspace_check_r2_orig/crates/model_core/src/ash_ft23_atlas_group_memory_budget_planner.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/ash_workspace_check_r2_work/crates/model_core/src/ash_ft23_atlas_group_memory_budget_planner.rs	2026-06-08 15:06:03.015409249 +0000
+@@ -868,7 +868,17 @@
+     } else {
+         None
+     };
+-    let largest = groups.iter().filter_map(|g| g.group_training_estimate_bytes.map(|v| (g, v))).max_by_key(|(_, v)| *v);
++    let largest = groups
++        .iter()
++        .filter_map(|g| {
++            g.group_training_estimate_bytes
++                .map(|v| (g.group_id.clone(), v, g.oom_risk_level.clone()))
++        })
++        .max_by_key(|(_, v, _)| *v);
++    let largest_group_id = largest.as_ref().map(|(group_id, _, _)| group_id.clone());
++    let largest_group_training_estimate_bytes = largest.as_ref().map(|(_, estimate_bytes, _)| *estimate_bytes);
++    let largest_group_oom_risk_level = largest.as_ref().map(|(_, _, oom_risk_level)| oom_risk_level.clone());
++
+     AshFt23GroupMemoryBudgetRegistry {
+         patch_id: ASH_FT23_PATCH_ID.to_string(),
+         registry_source: "ASH-FT-22".to_string(),
+@@ -878,9 +888,9 @@
+         groups,
+         total_parameter_bytes_known: total_known,
+         total_parameter_bytes_observed_from_registry: total_bytes,
+-        largest_group_id: largest.as_ref().map(|(g, _)| g.group_id.clone()),
+-        largest_group_training_estimate_bytes: largest.as_ref().map(|(_, v)| *v),
+-        largest_group_oom_risk_level: largest.as_ref().map(|(g, _)| g.oom_risk_level.clone()),
++        largest_group_id,
++        largest_group_training_estimate_bytes,
++        largest_group_oom_risk_level,
+         budget_registry_status: "PASS".to_string(),
+     }
+ }

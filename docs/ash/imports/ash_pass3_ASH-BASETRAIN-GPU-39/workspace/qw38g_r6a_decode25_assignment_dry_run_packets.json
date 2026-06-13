@@ -1,0 +1,209 @@
+[
+  {
+    "action_hints": [
+      "PrepareControlledReviewerAssignment"
+    ],
+    "approval_state": "Granted",
+    "assignment_candidate_id": "assignment-candidate-granted",
+    "assignment_dry_run_packet_hash": "b8bba5fbf1f1eac1634c86507f6475db74efbbcc548948bd246c09ed3b80da69",
+    "assignment_dry_run_packet_id": "assignment-dry-run-assignment_approval_granted_dry_run",
+    "block_reasons": [],
+    "candidate_id": "candidate-assignment-granted",
+    "cue_id": "mock-cue-0001",
+    "decode_session_id": "mock-decode-session-assignment-granted",
+    "dry_run_allowed": true,
+    "dry_run_passed": true,
+    "dry_run_requested": true,
+    "matched_reviewer_slot_hash": "ab28f16ea23572710dd04b5e63745809744e424d53167e42b4a58ca43c63579f",
+    "queue_candidate_id": "queue-candidate-0001",
+    "queue_entry_id": "queue-entry-0001",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [
+      "4e90d8227f1056f42d613e000f2b57726457b63836b6eb11c1d380b660ffe65b"
+    ],
+    "would_assign_if_real_run": true
+  },
+  {
+    "action_hints": [
+      "DoNotAssignReviewer"
+    ],
+    "approval_state": "Denied",
+    "assignment_candidate_id": "assignment-candidate-denied",
+    "assignment_dry_run_packet_hash": "66f53bcc95e9b7adfc8418248df35d9449ba2b573ff272a35e5d08ecd033757a",
+    "assignment_dry_run_packet_id": "assignment-dry-run-assignment_approval_denied",
+    "block_reasons": [
+      "ApprovalDenied"
+    ],
+    "candidate_id": "candidate-assignment-denied",
+    "cue_id": "mock-cue-0002",
+    "decode_session_id": "mock-decode-session-assignment-denied",
+    "dry_run_allowed": false,
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": "queue-candidate-0002",
+    "queue_entry_id": "queue-entry-0002",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [
+      "4e90d8227f1056f42d613e000f2b57726457b63836b6eb11c1d380b660ffe65b"
+    ],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RequestAssignmentApproval"
+    ],
+    "approval_state": "Pending",
+    "assignment_candidate_id": "assignment-candidate-pending",
+    "assignment_dry_run_packet_hash": "e80ffbd05c3d2eccff402e673e977f625787148be49be9bf5e8dd7442bc1be8d",
+    "assignment_dry_run_packet_id": "assignment-dry-run-assignment_approval_pending",
+    "block_reasons": [
+      "ApprovalPending"
+    ],
+    "candidate_id": "candidate-assignment-pending",
+    "cue_id": "mock-cue-0003",
+    "decode_session_id": "mock-decode-session-assignment-pending",
+    "dry_run_allowed": false,
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": "queue-candidate-0003",
+    "queue_entry_id": "queue-entry-0003",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [
+      "2dea8ced954465ff0ec10f032b10ddebfd10d6544adf6c9fd9c118d283a99a0b",
+      "3b025fd1b08c6e0717b5d5f26734ab55761c842589adfdfd0ea9bc573cb6524b"
+    ],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "AddReviewerCapabilitySlot"
+    ],
+    "approval_state": "Granted",
+    "assignment_candidate_id": "assignment-candidate-capability-unavailable",
+    "assignment_dry_run_packet_hash": "a55575d4f978a32b27beea952914ac1f255bb725ac4d67929bb68cc81d423159",
+    "assignment_dry_run_packet_id": "assignment-dry-run-capability_unavailable",
+    "block_reasons": [
+      "CapabilityUnavailable"
+    ],
+    "candidate_id": "candidate-capability-unavailable",
+    "cue_id": "mock-cue-0004",
+    "decode_session_id": "mock-decode-session-capability-unavailable",
+    "dry_run_allowed": true,
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": "queue-candidate-0004",
+    "queue_entry_id": "queue-entry-0004",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [
+      "e34d91669820699e8c84d1060d59a0e9ff68c057546ab71ccf49de9438b42e60"
+    ],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "NoAction"
+    ],
+    "approval_state": "NotRequired",
+    "assignment_candidate_id": null,
+    "assignment_dry_run_packet_hash": "80b7205ea66bd7b2fc12b0fff264a1becec13312637c1d1f8f7761ce24f80cd6",
+    "assignment_dry_run_packet_id": "assignment-dry-run-auto_accept_no_assignment",
+    "block_reasons": [
+      "AutoAcceptNoAssignmentRequired"
+    ],
+    "candidate_id": "candidate-auto-accept",
+    "cue_id": "mock-cue-0005",
+    "decode_session_id": "mock-decode-session-auto-accept-no-assignment",
+    "dry_run_allowed": false,
+    "dry_run_passed": false,
+    "dry_run_requested": false,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": null,
+    "queue_entry_id": null,
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "DoNotAssignReviewer"
+    ],
+    "approval_state": "Missing",
+    "assignment_candidate_id": "assignment-candidate-duplicate",
+    "assignment_dry_run_packet_hash": "d776753d4bb5ab883082bf10f252e27e1316391093d46ac0f94ec59c76ac06d0",
+    "assignment_dry_run_packet_id": "assignment-dry-run-duplicate_assignment_block",
+    "block_reasons": [
+      "DuplicateAssignmentCandidate"
+    ],
+    "candidate_id": "candidate-duplicate-assignment",
+    "cue_id": "mock-cue-0006",
+    "decode_session_id": "mock-decode-session-duplicate-assignment",
+    "dry_run_allowed": false,
+    "dry_run_passed": false,
+    "dry_run_requested": false,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": "queue-candidate-duplicate",
+    "queue_entry_id": "queue-entry-duplicate",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RepairAssignmentCandidate"
+    ],
+    "approval_state": "Missing",
+    "assignment_candidate_id": null,
+    "assignment_dry_run_packet_hash": "2a282c3f0470e2ea2b04523c7368295a61dde8e8dfaa94d615f14e992ee47e22",
+    "assignment_dry_run_packet_id": "assignment-dry-run-missing_assignment_candidate_receipt",
+    "block_reasons": [
+      "MissingAssignmentCandidateReceipt"
+    ],
+    "candidate_id": "candidate-missing-assignment-receipt",
+    "cue_id": "mock-cue-0007",
+    "decode_session_id": "mock-decode-session-missing-assignment-receipt",
+    "dry_run_allowed": false,
+    "dry_run_passed": false,
+    "dry_run_requested": false,
+    "matched_reviewer_slot_hash": null,
+    "queue_candidate_id": null,
+    "queue_entry_id": null,
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [],
+    "would_assign_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "PrepareControlledReviewerAssignment"
+    ],
+    "approval_state": "Granted",
+    "assignment_candidate_id": "assignment-candidate-repair",
+    "assignment_dry_run_packet_hash": "72249201f5d010b0799dfa433e6be72f396f591cce2d990c1346094861fec84f",
+    "assignment_dry_run_packet_id": "assignment-dry-run-repair_required_assignment_dry_run",
+    "block_reasons": [],
+    "candidate_id": "candidate-repair-assignment",
+    "cue_id": "mock-cue-0008",
+    "decode_session_id": "mock-decode-session-repair-assignment-dry-run",
+    "dry_run_allowed": true,
+    "dry_run_passed": true,
+    "dry_run_requested": true,
+    "matched_reviewer_slot_hash": "47d7d4b3aa1b2c3758fb1914aeb0d7478564ff0bdaeb39161afb9d6b258507e3",
+    "queue_candidate_id": "queue-candidate-0008",
+    "queue_entry_id": "queue-entry-0008",
+    "real_assignment_allowed": false,
+    "real_assignment_executed": false,
+    "required_capability_hashes": [
+      "d444d60f14c66c04ba00982cb59921cef96c73062cd440ae3b48b32154da7c14"
+    ],
+    "would_assign_if_real_run": true
+  }
+]

@@ -1,0 +1,791 @@
+--- /dev/null	2026-06-04 03:59:11.999036156 +0000
++++ crates/model_core/src/tokenizer_v5_embedding_lmhead_atlas_adaptation.rs	2026-06-04 04:02:11.246103368 +0000
+@@ -0,0 +1,788 @@
++use anyhow::{anyhow, Context, Result};
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use sha2::{Digest, Sha256};
++use std::collections::{BTreeMap, BTreeSet};
++use std::fs::{self, File};
++use std::io::{Read, Seek, SeekFrom};
++use std::path::{Path, PathBuf};
++
++pub const QW_TOK_TRAIN01_PATCH_ID: &str = "QW-TOK-TRAIN-01";
++pub const QW_TOK_TRAIN01_TITLE: &str =
++    "Embedding LMHead Vocab Atlas Micro Adaptation / No Transformer Block Update Seal";
++pub const QW_TOK_TRAIN01_REPORT_PATH: &str =
++    "artifacts/qw_tok_train01_embedding_lmhead_atlas_adaptation_report.json";
++pub const QW_TOK_TRAIN01_TENSOR_KEY_PROBE_PATH: &str =
++    "artifacts/qw_tok_train01_tensor_key_probe_receipt.json";
++pub const QW_TOK_TRAIN01_PLAN_PATH: &str =
++    "artifacts/qw_tok_train01_lmhead_atlas_training_plan.json";
++pub const QW_TOK_TRAIN01_REPEAT_FOCUS_PATH: &str =
++    "artifacts/qw_tok_train01_repeat_focus_row_probe.json";
++pub const QW_TOK_TRAIN01_TRAINING_RECEIPT_PATH: &str =
++    "artifacts/qw_tok_train01_training_receipt.json";
++pub const QW_TOK_TRAIN01_NO_TRANSFORMER_UPDATE_PATH: &str =
++    "artifacts/qw_tok_train01_no_transformer_update_receipt.json";
++pub const QW_TOK_TRAIN01_CHECKPOINT_WRITE_PATH: &str =
++    "artifacts/qw_tok_train01_checkpoint_write_receipt.json";
++pub const QW_TOK_TRAIN01_SMOKE_MATRIX_PATH: &str =
++    "artifacts/qw_tok_train01_before_after_smoke_matrix.json";
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01Config {
++    pub model_spec_path: String,
++    pub tokenizer_manifest_path: String,
++    pub checkpoint_path: String,
++    pub corpus_path: String,
++    pub candidate_checkpoint_path: String,
++    pub report_out_path: String,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub expected_hidden_size: usize,
++    pub dry_run: bool,
++    pub train_lm_head_only: bool,
++    pub enable_embedding_row_calibration: bool,
++    pub approve_write_new_checkpoint: bool,
++    pub allow_transformer_block_update: bool,
++    pub max_steps: usize,
++    pub seq_len: usize,
++    pub micro_batch: usize,
++    pub grad_accum: usize,
++    pub vocab_tile_size: usize,
++    pub hidden_tile_size: usize,
++}
++
++impl Default for QwTokTrain01Config {
++    fn default() -> Self {
++        Self {
++            model_spec_path: "specs/model_spec_v5_48259.toml".to_string(),
++            tokenizer_manifest_path: "tokenizer_v5/artifacts/tokenizer_manifest_v5_final.json".to_string(),
++            checkpoint_path: "tokenizer_v5/artifacts/full_model_vocab_v5_resized.train00_r2_metadata_rebound.safetensors".to_string(),
++            corpus_path: "tokenizer_v5/corpus_v2/train/tokenizer_train_v5_dedup.txt".to_string(),
++            candidate_checkpoint_path: "tokenizer_v5/artifacts/full_model_vocab_v5_resized.train01_embedding_lmhead_adapted.safetensors".to_string(),
++            report_out_path: QW_TOK_TRAIN01_REPORT_PATH.to_string(),
++            expected_model_spec_id: "model_tinyllama_1p1b_v5_48259".to_string(),
++            expected_vocab_size: 48_259,
++            expected_hidden_size: 2_048,
++            dry_run: true,
++            train_lm_head_only: false,
++            enable_embedding_row_calibration: false,
++            approve_write_new_checkpoint: false,
++            allow_transformer_block_update: false,
++            max_steps: 128,
++            seq_len: 128,
++            micro_batch: 1,
++            grad_accum: 16,
++            vocab_tile_size: 1024,
++            hidden_tile_size: 256,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01ModelSpecSsot {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub model_spec_id: Option<String>,
++    pub model_name: Option<String>,
++    pub vocab_size: Option<usize>,
++    pub hidden_size: Option<usize>,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub expected_hidden_size: usize,
++    pub model_spec_id_match: bool,
++    pub vocab_size_match: bool,
++    pub hidden_size_match: bool,
++    pub v4_residue_detected: bool,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01TokenizerSsot {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub tokenizer_id: Option<String>,
++    pub manifest_id: Option<String>,
++    pub tokenizer_spec_id: Option<String>,
++    pub hashes_manifest_hash: Option<String>,
++    pub vocab_hash: Option<String>,
++    pub sentencepiece_model_hash: Option<String>,
++    pub sentencepiece_vocab_hash: Option<String>,
++    pub top_level_manifest_hash_present: bool,
++    pub vocab_len: Option<usize>,
++    pub vocab_size_match: bool,
++    pub focus_piece_resolution: Vec<QwTokTrain01FocusTokenResolution>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01TensorInfo {
++    pub key: String,
++    pub dtype: Option<String>,
++    pub shape: Vec<usize>,
++    pub data_offsets: Option<[u64; 2]>,
++    pub byte_len: Option<u64>,
++    pub is_embedding_candidate: bool,
++    pub is_lm_head_candidate: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01TensorKeyProbeReceipt {
++    pub checkpoint_path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub file_size_bytes: Option<u64>,
++    pub header_length_bytes: Option<u64>,
++    pub tensor_key_count: usize,
++    pub tensor_keys_first_32: Vec<String>,
++    pub embedding_key: Option<String>,
++    pub lm_head_key: Option<String>,
++    pub embedding_shape: Option<Vec<usize>>,
++    pub lm_head_shape: Option<Vec<usize>>,
++    pub embedding_lmhead_tied: Option<bool>,
++    pub vocab_size_match: bool,
++    pub hidden_size_match: bool,
++    pub tensor_payload_loaded: bool,
++    pub tensor_payload_decoded: bool,
++    pub tensor_infos: Vec<QwTokTrain01TensorInfo>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01FocusTokenResolution {
++    pub token_id: usize,
++    pub expected_piece: String,
++    pub resolved_piece: Option<String>,
++    pub piece_match: Option<bool>,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01FocusRowProbe {
++    pub token_id: usize,
++    pub piece: String,
++    pub reason: String,
++    pub lm_head_row_probe_status: String,
++    pub embedding_row_probe_status: String,
++    pub row_norm_available: bool,
++    pub row_payload_decoded: bool,
++    pub expected_after_train01: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01RepeatFocusRowProbeReceipt {
++    pub repeat_focus_tokens: Vec<QwTokTrain01FocusRowProbe>,
++    pub payload_decode_policy: String,
++    pub topk_repeat_context: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01AtlasTrainingPlan {
++    pub backend_target: String,
++    pub memory_profile: String,
++    pub train_lm_head_only_requested: bool,
++    pub dry_run: bool,
++    pub max_steps: usize,
++    pub seq_len: usize,
++    pub micro_batch: usize,
++    pub grad_accum: usize,
++    pub vocab_tile_size: usize,
++    pub hidden_tile_size: usize,
++    pub vocab_tile_count: usize,
++    pub hidden_tile_count: usize,
++    pub optimizer: String,
++    pub precision_policy: String,
++    pub update_scope: Vec<String>,
++    pub frozen_scope: Vec<String>,
++    pub corpus_path: String,
++    pub corpus_exists: bool,
++    pub gpu_update_kernel_status: String,
++    pub execution_policy: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01TrainingReceipt {
++    pub training_executed: bool,
++    pub dry_run_executed: bool,
++    pub lm_head_training_requested: bool,
++    pub lm_head_update_executed: bool,
++    pub embedding_calibration_requested: bool,
++    pub embedding_update_executed: bool,
++    pub gradient_created: bool,
++    pub optimizer_created: bool,
++    pub optimizer_step_executed: bool,
++    pub gpu_kernel_executed: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01NoTransformerUpdateReceipt {
++    pub transformer_block_update_executed: bool,
++    pub attention_weight_update_executed: bool,
++    pub ffn_weight_update_executed: bool,
++    pub norm_weight_update_executed: bool,
++    pub rotary_mutation_executed: bool,
++    pub base_transformer_payload_mutation: bool,
++    pub allowed_mutation_scope: Vec<String>,
++    pub forbidden_scope: Vec<String>,
++    pub policy_enforced: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01CheckpointWriteReceipt {
++    pub candidate_write_requested: bool,
++    pub candidate_write_executed: bool,
++    pub operator_approval_present: bool,
++    pub original_checkpoint_in_place_overwritten: bool,
++    pub input_checkpoint_path: String,
++    pub output_checkpoint_path: String,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01SmokeMatrix {
++    pub before_smoke_required: bool,
++    pub after_smoke_required: bool,
++    pub decode_generation_executed_by_train01: bool,
++    pub recommended_smoke_command: Vec<String>,
++    pub focus_metrics_to_compare: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain01Report {
++    pub patch_id: String,
++    pub title: String,
++    pub status: String,
++    pub model_spec_ssot: QwTokTrain01ModelSpecSsot,
++    pub tokenizer_ssot: QwTokTrain01TokenizerSsot,
++    pub tensor_key_probe: QwTokTrain01TensorKeyProbeReceipt,
++    pub lmhead_atlas_training_plan: QwTokTrain01AtlasTrainingPlan,
++    pub repeat_focus_row_probe: QwTokTrain01RepeatFocusRowProbeReceipt,
++    pub training_receipt: QwTokTrain01TrainingReceipt,
++    pub no_transformer_update_receipt: QwTokTrain01NoTransformerUpdateReceipt,
++    pub checkpoint_write_receipt: QwTokTrain01CheckpointWriteReceipt,
++    pub before_after_smoke_matrix: QwTokTrain01SmokeMatrix,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++pub fn qw_tok_train01_config_from_args(args: &[String]) -> QwTokTrain01Config {
++    let mut cfg = QwTokTrain01Config::default();
++    let mut iter = args.iter();
++    while let Some(arg) = iter.next() {
++        match arg.as_str() {
++            "--model-spec" => if let Some(v) = iter.next() { cfg.model_spec_path = v.clone(); },
++            "--tokenizer" | "--tokenizer-manifest" => if let Some(v) = iter.next() { cfg.tokenizer_manifest_path = v.clone(); },
++            "--checkpoint" => if let Some(v) = iter.next() { cfg.checkpoint_path = v.clone(); },
++            "--corpus" => if let Some(v) = iter.next() { cfg.corpus_path = v.clone(); },
++            "--candidate-out" | "--out-checkpoint" => if let Some(v) = iter.next() { cfg.candidate_checkpoint_path = v.clone(); },
++            "--report-out" | "--out" => if let Some(v) = iter.next() { cfg.report_out_path = v.clone(); },
++            "--dry-run" => cfg.dry_run = true,
++            "--train-lm-head-only" => {
++                cfg.train_lm_head_only = true;
++                cfg.dry_run = false;
++            },
++            "--enable-embedding-row-calibration" => cfg.enable_embedding_row_calibration = true,
++            "--approve-write-new-checkpoint" => cfg.approve_write_new_checkpoint = true,
++            "--allow-transformer-block-update" => cfg.allow_transformer_block_update = true,
++            "--max-steps" => if let Some(v) = iter.next() { cfg.max_steps = v.parse().unwrap_or(cfg.max_steps); },
++            "--seq-len" => if let Some(v) = iter.next() { cfg.seq_len = v.parse().unwrap_or(cfg.seq_len); },
++            "--micro-batch" => if let Some(v) = iter.next() { cfg.micro_batch = v.parse().unwrap_or(cfg.micro_batch); },
++            "--grad-accum" => if let Some(v) = iter.next() { cfg.grad_accum = v.parse().unwrap_or(cfg.grad_accum); },
++            "--vocab-tile-size" => if let Some(v) = iter.next() { cfg.vocab_tile_size = v.parse().unwrap_or(cfg.vocab_tile_size); },
++            "--hidden-tile-size" => if let Some(v) = iter.next() { cfg.hidden_tile_size = v.parse().unwrap_or(cfg.hidden_tile_size); },
++            _ => {}
++        }
++    }
++    cfg
++}
++
++pub fn run_qw_tok_train01_embedding_lmhead_atlas_adaptation(
++    cfg: QwTokTrain01Config,
++) -> Result<QwTokTrain01Report> {
++    let model_spec_ssot = read_model_spec_ssot(&cfg);
++    let tokenizer_ssot = read_tokenizer_ssot(&cfg);
++    let tensor_key_probe = read_safetensors_tensor_probe(&cfg);
++    let repeat_focus_row_probe = build_repeat_focus_row_probe();
++    let lmhead_atlas_training_plan = build_training_plan(&cfg, &tensor_key_probe);
++    let training_receipt = build_training_receipt(&cfg);
++    let no_transformer_update_receipt = build_no_transformer_update_receipt(&cfg);
++    let checkpoint_write_receipt = build_checkpoint_write_receipt(&cfg, &training_receipt);
++    let before_after_smoke_matrix = build_smoke_matrix(&cfg);
++
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    failures.extend(model_spec_ssot.failures.clone());
++    failures.extend(tokenizer_ssot.failures.clone());
++    failures.extend(tensor_key_probe.failures.clone());
++    warnings.extend(model_spec_ssot.warnings.clone());
++    warnings.extend(tokenizer_ssot.warnings.clone());
++    warnings.extend(tensor_key_probe.warnings.clone());
++
++    if cfg.allow_transformer_block_update {
++        failures.push("allow_transformer_block_update must remain false for QW-TOK-TRAIN-01".to_string());
++    }
++
++    let status = if !failures.is_empty() {
++        "FAIL_QW_TOK_TRAIN01_PRECONDITION".to_string()
++    } else if cfg.train_lm_head_only {
++        "PARTIAL_QW_TOK_TRAIN01_GPU_ATLAS_UPDATE_PENDING_NO_CHECKPOINT_WRITE".to_string()
++    } else {
++        "PASS_QW_TOK_TRAIN01_DRY_RUN_PLAN_ONLY".to_string()
++    };
++
++    Ok(QwTokTrain01Report {
++        patch_id: QW_TOK_TRAIN01_PATCH_ID.to_string(),
++        title: QW_TOK_TRAIN01_TITLE.to_string(),
++        status,
++        model_spec_ssot,
++        tokenizer_ssot,
++        tensor_key_probe,
++        lmhead_atlas_training_plan,
++        repeat_focus_row_probe,
++        training_receipt,
++        no_transformer_update_receipt,
++        checkpoint_write_receipt,
++        before_after_smoke_matrix,
++        failures,
++        warnings,
++    })
++}
++
++pub fn write_qw_tok_train01_artifacts(root: &Path, report: &QwTokTrain01Report) -> Result<()> {
++    let artifacts = root.join("artifacts");
++    fs::create_dir_all(&artifacts)?;
++    write_json(&root.join(QW_TOK_TRAIN01_REPORT_PATH), report)?;
++    write_json(&root.join(QW_TOK_TRAIN01_TENSOR_KEY_PROBE_PATH), &report.tensor_key_probe)?;
++    write_json(&root.join(QW_TOK_TRAIN01_PLAN_PATH), &report.lmhead_atlas_training_plan)?;
++    write_json(&root.join(QW_TOK_TRAIN01_REPEAT_FOCUS_PATH), &report.repeat_focus_row_probe)?;
++    write_json(&root.join(QW_TOK_TRAIN01_TRAINING_RECEIPT_PATH), &report.training_receipt)?;
++    write_json(&root.join(QW_TOK_TRAIN01_NO_TRANSFORMER_UPDATE_PATH), &report.no_transformer_update_receipt)?;
++    write_json(&root.join(QW_TOK_TRAIN01_CHECKPOINT_WRITE_PATH), &report.checkpoint_write_receipt)?;
++    write_json(&root.join(QW_TOK_TRAIN01_SMOKE_MATRIX_PATH), &report.before_after_smoke_matrix)?;
++    Ok(())
++}
++
++fn read_model_spec_ssot(cfg: &QwTokTrain01Config) -> QwTokTrain01ModelSpecSsot {
++    let path = Path::new(&cfg.model_spec_path);
++    let exists = path.exists();
++    let mut out = QwTokTrain01ModelSpecSsot {
++        path: cfg.model_spec_path.clone(),
++        exists,
++        readable: false,
++        model_spec_id: None,
++        model_name: None,
++        vocab_size: None,
++        hidden_size: None,
++        expected_model_spec_id: cfg.expected_model_spec_id.clone(),
++        expected_vocab_size: cfg.expected_vocab_size,
++        expected_hidden_size: cfg.expected_hidden_size,
++        model_spec_id_match: false,
++        vocab_size_match: false,
++        hidden_size_match: false,
++        v4_residue_detected: false,
++        failures: Vec::new(),
++        warnings: Vec::new(),
++    };
++    if !exists {
++        out.failures.push("model_spec_missing".to_string());
++        return out;
++    }
++    let text = match fs::read_to_string(path) {
++        Ok(t) => t,
++        Err(err) => {
++            out.failures.push(format!("model_spec_unreadable:{err}"));
++            return out;
++        }
++    };
++    out.readable = true;
++    out.v4_residue_detected = text.contains("1p1b_v4") || text.contains("V4") || text.contains("56832");
++    match text.parse::<toml::Value>() {
++        Ok(value) => {
++            out.model_spec_id = value.get("model_spec_id").and_then(|v| v.as_str()).map(str::to_string);
++            out.model_name = value.get("model_name").and_then(|v| v.as_str()).map(str::to_string);
++            out.vocab_size = value.get("model").and_then(|m| m.get("vocab_size")).and_then(|v| v.as_integer()).or_else(|| value.get("vocab_size").and_then(|v| v.as_integer())).map(|v| v as usize);
++            out.hidden_size = value.get("model").and_then(|m| m.get("hidden_size")).and_then(|v| v.as_integer()).or_else(|| value.get("hidden_size").and_then(|v| v.as_integer())).map(|v| v as usize);
++        }
++        Err(err) => out.failures.push(format!("model_spec_toml_parse_failed:{err}")),
++    }
++    out.model_spec_id_match = out.model_spec_id.as_deref() == Some(cfg.expected_model_spec_id.as_str());
++    out.vocab_size_match = out.vocab_size == Some(cfg.expected_vocab_size);
++    out.hidden_size_match = out.hidden_size == Some(cfg.expected_hidden_size);
++    if !out.model_spec_id_match { out.failures.push("model_spec_id_mismatch".to_string()); }
++    if !out.vocab_size_match { out.failures.push("vocab_size_mismatch".to_string()); }
++    if !out.hidden_size_match { out.failures.push("hidden_size_mismatch".to_string()); }
++    if out.v4_residue_detected { out.warnings.push("v4_residue_detected_in_model_spec_text".to_string()); }
++    out
++}
++
++fn read_tokenizer_ssot(cfg: &QwTokTrain01Config) -> QwTokTrain01TokenizerSsot {
++    let path = Path::new(&cfg.tokenizer_manifest_path);
++    let exists = path.exists();
++    let mut out = QwTokTrain01TokenizerSsot {
++        path: cfg.tokenizer_manifest_path.clone(),
++        exists,
++        readable: false,
++        tokenizer_id: None,
++        manifest_id: None,
++        tokenizer_spec_id: None,
++        hashes_manifest_hash: None,
++        vocab_hash: None,
++        sentencepiece_model_hash: None,
++        sentencepiece_vocab_hash: None,
++        top_level_manifest_hash_present: false,
++        vocab_len: None,
++        vocab_size_match: false,
++        focus_piece_resolution: Vec::new(),
++        failures: Vec::new(),
++        warnings: Vec::new(),
++    };
++    if !exists {
++        out.failures.push("tokenizer_manifest_missing".to_string());
++        return out;
++    }
++    let text = match fs::read_to_string(path) {
++        Ok(t) => t,
++        Err(err) => {
++            out.failures.push(format!("tokenizer_manifest_unreadable:{err}"));
++            return out;
++        }
++    };
++    out.readable = true;
++    let value: Value = match serde_json::from_str(&text) {
++        Ok(v) => v,
++        Err(err) => {
++            out.failures.push(format!("tokenizer_manifest_json_parse_failed:{err}"));
++            return out;
++        }
++    };
++    out.top_level_manifest_hash_present = value.get("manifest_hash").is_some();
++    if out.top_level_manifest_hash_present {
++        out.failures.push("top_level_manifest_hash_present".to_string());
++    }
++    out.tokenizer_id = value.get("tokenizer_id").and_then(Value::as_str).map(str::to_string);
++    out.manifest_id = value.get("manifest_id").and_then(Value::as_str).map(str::to_string);
++    out.tokenizer_spec_id = value.get("tokenizer_spec_id").and_then(Value::as_str).map(str::to_string);
++    if let Some(hashes) = value.get("hashes") {
++        out.hashes_manifest_hash = hashes.get("manifest_hash").and_then(Value::as_str).map(str::to_string);
++        out.vocab_hash = hashes.get("vocab_hash").and_then(Value::as_str).map(str::to_string);
++        out.sentencepiece_model_hash = hashes.get("sentencepiece_model_hash").and_then(Value::as_str).map(str::to_string);
++        out.sentencepiece_vocab_hash = hashes.get("sentencepiece_vocab_hash").and_then(Value::as_str).map(str::to_string);
++    }
++    out.vocab_len = value.get("vocab").and_then(Value::as_array).map(|arr| arr.len());
++    out.vocab_size_match = out.vocab_len == Some(cfg.expected_vocab_size);
++    if !out.vocab_size_match {
++        out.warnings.push("tokenizer_vocab_len_unavailable_or_mismatch".to_string());
++    }
++    out.focus_piece_resolution = resolve_focus_pieces(value.get("vocab"));
++    out
++}
++
++fn resolve_focus_pieces(vocab: Option<&Value>) -> Vec<QwTokTrain01FocusTokenResolution> {
++    default_focus_tokens()
++        .into_iter()
++        .map(|(token_id, expected_piece, reason)| {
++            let resolved_piece = vocab.and_then(|v| piece_for_token_id(v, token_id));
++            let piece_match = resolved_piece.as_ref().map(|p| p == expected_piece);
++            QwTokTrain01FocusTokenResolution {
++                token_id,
++                expected_piece: expected_piece.to_string(),
++                resolved_piece,
++                piece_match,
++                reason: reason.to_string(),
++            }
++        })
++        .collect()
++}
++
++fn piece_for_token_id(vocab: &Value, token_id: usize) -> Option<String> {
++    if let Some(arr) = vocab.as_array() {
++        if let Some(item) = arr.get(token_id) {
++            if let Some(s) = item.as_str() { return Some(s.to_string()); }
++            for key in ["piece", "token", "text", "surface"] {
++                if let Some(s) = item.get(key).and_then(Value::as_str) { return Some(s.to_string()); }
++            }
++        }
++        for item in arr {
++            let id = item.get("id").or_else(|| item.get("token_id")).and_then(Value::as_u64)? as usize;
++            if id == token_id {
++                for key in ["piece", "token", "text", "surface"] {
++                    if let Some(s) = item.get(key).and_then(Value::as_str) { return Some(s.to_string()); }
++                }
++            }
++        }
++    }
++    None
++}
++
++fn read_safetensors_tensor_probe(cfg: &QwTokTrain01Config) -> QwTokTrain01TensorKeyProbeReceipt {
++    let path = Path::new(&cfg.checkpoint_path);
++    let exists = path.exists();
++    let mut out = QwTokTrain01TensorKeyProbeReceipt {
++        checkpoint_path: cfg.checkpoint_path.clone(),
++        exists,
++        readable: false,
++        file_size_bytes: None,
++        header_length_bytes: None,
++        tensor_key_count: 0,
++        tensor_keys_first_32: Vec::new(),
++        embedding_key: None,
++        lm_head_key: None,
++        embedding_shape: None,
++        lm_head_shape: None,
++        embedding_lmhead_tied: None,
++        vocab_size_match: false,
++        hidden_size_match: false,
++        tensor_payload_loaded: false,
++        tensor_payload_decoded: false,
++        tensor_infos: Vec::new(),
++        failures: Vec::new(),
++        warnings: Vec::new(),
++    };
++    if !exists {
++        out.failures.push("checkpoint_missing".to_string());
++        return out;
++    }
++    let mut file = match File::open(path) {
++        Ok(f) => f,
++        Err(err) => {
++            out.failures.push(format!("checkpoint_unreadable:{err}"));
++            return out;
++        }
++    };
++    out.readable = true;
++    out.file_size_bytes = file.metadata().ok().map(|m| m.len());
++    let mut len_buf = [0u8; 8];
++    if let Err(err) = file.read_exact(&mut len_buf) {
++        out.failures.push(format!("safetensors_header_len_read_failed:{err}"));
++        return out;
++    }
++    let header_len = u64::from_le_bytes(len_buf);
++    out.header_length_bytes = Some(header_len);
++    let mut header_bytes = vec![0u8; header_len as usize];
++    if let Err(err) = file.read_exact(&mut header_bytes) {
++        out.failures.push(format!("safetensors_header_read_failed:{err}"));
++        return out;
++    }
++    let header: Value = match serde_json::from_slice(&header_bytes) {
++        Ok(v) => v,
++        Err(err) => {
++            out.failures.push(format!("safetensors_header_json_parse_failed:{err}"));
++            return out;
++        }
++    };
++    let obj = match header.as_object() {
++        Some(o) => o,
++        None => {
++            out.failures.push("safetensors_header_not_object".to_string());
++            return out;
++        }
++    };
++
++    let mut infos = Vec::new();
++    for (key, value) in obj {
++        if key == "__metadata__" { continue; }
++        let shape = value.get("shape").and_then(Value::as_array)
++            .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as usize)).collect::<Vec<_>>())
++            .unwrap_or_default();
++        let dtype = value.get("dtype").and_then(Value::as_str).map(str::to_string);
++        let data_offsets = value.get("data_offsets").and_then(Value::as_array).and_then(|arr| {
++            if arr.len() == 2 {
++                Some([arr[0].as_u64()?, arr[1].as_u64()?])
++            } else { None }
++        });
++        let byte_len = data_offsets.map(|o| o[1].saturating_sub(o[0]));
++        let lower = key.to_lowercase();
++        let shape_match = shape.len() == 2 && shape[0] == cfg.expected_vocab_size && shape[1] == cfg.expected_hidden_size;
++        let is_lm_head_candidate = shape_match && (lower.contains("lm_head") || lower.contains("output") || lower.contains("head"));
++        let is_embedding_candidate = shape_match && (lower.contains("embed") || lower.contains("tok_embeddings") || lower.contains("wte"));
++        infos.push(QwTokTrain01TensorInfo { key: key.clone(), dtype, shape, data_offsets, byte_len, is_embedding_candidate, is_lm_head_candidate });
++    }
++    infos.sort_by(|a, b| a.key.cmp(&b.key));
++    out.tensor_key_count = infos.len();
++    out.tensor_keys_first_32 = infos.iter().take(32).map(|i| i.key.clone()).collect();
++    out.lm_head_key = infos.iter().find(|i| i.is_lm_head_candidate).map(|i| i.key.clone());
++    out.embedding_key = infos.iter().find(|i| i.is_embedding_candidate).map(|i| i.key.clone());
++    out.lm_head_shape = out.lm_head_key.as_ref().and_then(|k| infos.iter().find(|i| &i.key == k).map(|i| i.shape.clone()));
++    out.embedding_shape = out.embedding_key.as_ref().and_then(|k| infos.iter().find(|i| &i.key == k).map(|i| i.shape.clone()));
++    out.embedding_lmhead_tied = match (&out.embedding_key, &out.lm_head_key) {
++        (Some(a), Some(b)) => Some(a == b),
++        _ => None,
++    };
++    out.vocab_size_match = out.lm_head_shape.as_ref().map(|s| s.first() == Some(&cfg.expected_vocab_size)).unwrap_or(false)
++        && out.embedding_shape.as_ref().map(|s| s.first() == Some(&cfg.expected_vocab_size)).unwrap_or(false);
++    out.hidden_size_match = out.lm_head_shape.as_ref().map(|s| s.get(1) == Some(&cfg.expected_hidden_size)).unwrap_or(false)
++        && out.embedding_shape.as_ref().map(|s| s.get(1) == Some(&cfg.expected_hidden_size)).unwrap_or(false);
++    if out.lm_head_key.is_none() { out.failures.push("lm_head_tensor_key_not_found".to_string()); }
++    if out.embedding_key.is_none() { out.failures.push("embedding_tensor_key_not_found".to_string()); }
++    if !out.vocab_size_match { out.failures.push("embedding_or_lm_head_vocab_size_mismatch".to_string()); }
++    if !out.hidden_size_match { out.failures.push("embedding_or_lm_head_hidden_size_mismatch".to_string()); }
++    out.tensor_infos = infos;
++    let _ = file.seek(SeekFrom::Current(0));
++    out
++}
++
++fn build_training_plan(cfg: &QwTokTrain01Config, probe: &QwTokTrain01TensorKeyProbeReceipt) -> QwTokTrain01AtlasTrainingPlan {
++    let vocab_tile_count = div_ceil(cfg.expected_vocab_size, cfg.vocab_tile_size.max(1));
++    let hidden_tile_count = div_ceil(cfg.expected_hidden_size, cfg.hidden_tile_size.max(1));
++    QwTokTrain01AtlasTrainingPlan {
++        backend_target: "Rust + WebGPU/WGPU atlas micro-training".to_string(),
++        memory_profile: "lowmem_10gb_guarded".to_string(),
++        train_lm_head_only_requested: cfg.train_lm_head_only,
++        dry_run: cfg.dry_run || !cfg.train_lm_head_only,
++        max_steps: cfg.max_steps,
++        seq_len: cfg.seq_len,
++        micro_batch: cfg.micro_batch,
++        grad_accum: cfg.grad_accum,
++        vocab_tile_size: cfg.vocab_tile_size,
++        hidden_tile_size: cfg.hidden_tile_size,
++        vocab_tile_count,
++        hidden_tile_count,
++        optimizer: "SGD_or_shard_local_AdamW_candidate_no_state_created_in_train01_bake".to_string(),
++        precision_policy: "f16_weights_f32_accumulate_candidate".to_string(),
++        update_scope: if cfg.train_lm_head_only { vec!["lm_head.weight".to_string()] } else { vec!["plan_only".to_string()] },
++        frozen_scope: vec![
++            "transformer.blocks.*".to_string(),
++            "attention.qkv_o".to_string(),
++            "ffn.gate_up_down".to_string(),
++            "norms".to_string(),
++            "rotary".to_string(),
++        ],
++        corpus_path: cfg.corpus_path.clone(),
++        corpus_exists: Path::new(&cfg.corpus_path).exists(),
++        gpu_update_kernel_status: "PENDING_NOT_EXECUTED_BY_TRAIN01_BAKE".to_string(),
++        execution_policy: if probe.failures.is_empty() { "probe_passed_training_plan_emitted".to_string() } else { "probe_failed_training_blocked".to_string() },
++    }
++}
++
++fn build_repeat_focus_row_probe() -> QwTokTrain01RepeatFocusRowProbeReceipt {
++    QwTokTrain01RepeatFocusRowProbeReceipt {
++        repeat_focus_tokens: default_focus_tokens()
++            .into_iter()
++            .map(|(token_id, piece, reason)| QwTokTrain01FocusRowProbe {
++                token_id,
++                piece: piece.to_string(),
++                reason: reason.to_string(),
++                lm_head_row_probe_status: "ROW_OFFSET_IDENTIFIED_ONLY_NO_PAYLOAD_DECODE".to_string(),
++                embedding_row_probe_status: "ROW_OFFSET_IDENTIFIED_ONLY_NO_PAYLOAD_DECODE".to_string(),
++                row_norm_available: false,
++                row_payload_decoded: false,
++                expected_after_train01: "top1_lock_ratio_and_margin_should_be_rechecked_by_smoke_after_actual_gpu_update".to_string(),
++            })
++            .collect(),
++        payload_decode_policy: "no tensor payload decode in TRAIN-01 dry-run/probe bake".to_string(),
++        topk_repeat_context: "focus set derived from direct v5 greedy attractor: 익숙해졌/입력하면/품질에/장면에".to_string(),
++    }
++}
++
++fn build_training_receipt(cfg: &QwTokTrain01Config) -> QwTokTrain01TrainingReceipt {
++    QwTokTrain01TrainingReceipt {
++        training_executed: false,
++        dry_run_executed: true,
++        lm_head_training_requested: cfg.train_lm_head_only,
++        lm_head_update_executed: false,
++        embedding_calibration_requested: cfg.enable_embedding_row_calibration,
++        embedding_update_executed: false,
++        gradient_created: false,
++        optimizer_created: false,
++        optimizer_step_executed: false,
++        gpu_kernel_executed: false,
++        reason: if cfg.train_lm_head_only {
++            "TRAIN-01 bake emits atlas plan only; GPU update kernel execution is reserved for a later implementation seal".to_string()
++        } else {
++            "dry-run tensor probe and training plan only".to_string()
++        },
++    }
++}
++
++fn build_no_transformer_update_receipt(cfg: &QwTokTrain01Config) -> QwTokTrain01NoTransformerUpdateReceipt {
++    QwTokTrain01NoTransformerUpdateReceipt {
++        transformer_block_update_executed: false,
++        attention_weight_update_executed: false,
++        ffn_weight_update_executed: false,
++        norm_weight_update_executed: false,
++        rotary_mutation_executed: false,
++        base_transformer_payload_mutation: false,
++        allowed_mutation_scope: if cfg.enable_embedding_row_calibration {
++            vec!["lm_head.weight".to_string(), "embedding.weight_with_explicit_flag".to_string()]
++        } else {
++            vec!["lm_head.weight".to_string()]
++        },
++        forbidden_scope: vec![
++            "transformer.blocks.*".to_string(),
++            "attention.*".to_string(),
++            "ffn.*".to_string(),
++            "norm.*".to_string(),
++            "rotary.*".to_string(),
++        ],
++        policy_enforced: !cfg.allow_transformer_block_update,
++    }
++}
++
++fn build_checkpoint_write_receipt(cfg: &QwTokTrain01Config, training: &QwTokTrain01TrainingReceipt) -> QwTokTrain01CheckpointWriteReceipt {
++    QwTokTrain01CheckpointWriteReceipt {
++        candidate_write_requested: cfg.approve_write_new_checkpoint,
++        candidate_write_executed: false,
++        operator_approval_present: cfg.approve_write_new_checkpoint,
++        original_checkpoint_in_place_overwritten: false,
++        input_checkpoint_path: cfg.checkpoint_path.clone(),
++        output_checkpoint_path: cfg.candidate_checkpoint_path.clone(),
++        reason: if training.lm_head_update_executed {
++            "candidate write would be allowed after update, but no update was executed in this bake".to_string()
++        } else {
++            "no trainable update executed; checkpoint candidate write suppressed".to_string()
++        },
++    }
++}
++
++fn build_smoke_matrix(cfg: &QwTokTrain01Config) -> QwTokTrain01SmokeMatrix {
++    QwTokTrain01SmokeMatrix {
++        before_smoke_required: true,
++        after_smoke_required: true,
++        decode_generation_executed_by_train01: false,
++        recommended_smoke_command: vec![
++            ".\\target\\debug\\examples\\infer_only.exe".to_string(),
++            "--model-spec".to_string(), cfg.model_spec_path.clone(),
++            "--tokenizer".to_string(), cfg.tokenizer_manifest_path.clone(),
++            "--checkpoint".to_string(), cfg.candidate_checkpoint_path.clone(),
++            "--task".to_string(), "translation_assist".to_string(),
++            "--max-new-tokens".to_string(), "16".to_string(),
++            "--seed".to_string(), "42".to_string(),
++            "--request-id".to_string(), "train01_embedding_lmhead_adapted_smoke_001".to_string(),
++            "--json".to_string(),
++        ],
++        focus_metrics_to_compare: vec![
++            "checkpoint tokenizer hash warning absent".to_string(),
++            "repeat_focus token 29892 top1_lock_ratio".to_string(),
++            "top1_top2_margin after repeat onset".to_string(),
++            "outputGuardRejectReasons".to_string(),
++            "rawModelOutputBeforeGuard".to_string(),
++        ],
++    }
++}
++
++fn default_focus_tokens() -> Vec<(usize, &'static str, &'static str)> {
++    vec![
++        (29892, "▁익숙해졌", "direct_v5_repeat_attractor"),
++        (29871, "▁입력하면", "topk_neighbor"),
++        (29906, "▁품질에", "early_top1"),
++        (29889, "▁장면에", "previous_repeat_attractor"),
++    ]
++}
++
++fn div_ceil(a: usize, b: usize) -> usize {
++    if b == 0 { 0 } else { (a + b - 1) / b }
++}
++
++fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
++    if let Some(parent) = path.parent() {
++        fs::create_dir_all(parent)?;
++    }
++    let text = serde_json::to_string_pretty(value)?;
++    fs::write(path, text)?;
++    Ok(())
++}

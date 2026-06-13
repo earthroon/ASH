@@ -1,0 +1,85 @@
+{
+  "decision": "StaticFixtureIntegrityFailedJsonParse",
+  "deterministic_receipt_key": "q4sha256:d21eabc9cd2e7589b6e118f72382ade0799ea27775a584b9c3053a3ce6ffdded",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "non_blocking_duplicate_key_notes": [
+    {
+      "actual_shape_hash": "q4sha256:34cb9627385ef45ba0734ff3785f2f5ab4bad70e1bd37659c5d5da087af8c4c6",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[0]",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:b99f5ea97af70d07471515fc48ed335f69fed95db28c1210976ace44961a6756",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[1]",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:4ed10c88c3292936969bae0a3272c3ea259c37372c3d9dbb284c3c3328df8a59",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_soft_penalty_repeated_punctuation_receipt.json",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:1c8bb719e91cb87f17927754e5668fd8357c38f5569cd45550b378cba7cdddca",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_step_integrity_fail_receipt.json",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    }
+  ],
+  "parse_failures": [
+    {
+      "blocking_for_integrity": true,
+      "domain_ssot_detected": null,
+      "fixture_path": "workspace/qw38g_r6a_r12i_r2_r1_static_validation_result.json",
+      "parse_error_column": 28,
+      "parse_error_hash": "sha256:8c87fb3cba09cf0f0acb87275d9ec1e11d89757b620dc21c7561650f8f52fd0c",
+      "parse_error_line": 20,
+      "status": "ParseFailed",
+      "top_level_kind": null
+    },
+    {
+      "blocking_for_integrity": true,
+      "domain_ssot_detected": null,
+      "fixture_path": "workspace/qw38g_r6a_r12i_r2_static_validation_result.json",
+      "parse_error_column": 28,
+      "parse_error_hash": "sha256:039fe540adf1169d53296a8705d055c32a5b9cad6dd56e37b378f09883ba19b7",
+      "parse_error_line": 22,
+      "status": "ParseFailed",
+      "top_level_kind": null
+    }
+  ],
+  "patch_id": "16AI-QW-38G-R6A-CLOSURE-03",
+  "patch_name": "Static Receipt Fixture Integrity / JSON Schema Validation Seal",
+  "status": "PASS_OBSERVED_STATIC_RECEIPT_FIXTURE_INTEGRITY_FAILURE_CONTRACT",
+  "summary": {
+    "acceptance_count_mismatch_count": 0,
+    "blocking_drift_count": 2,
+    "domain_ssot_mismatch_count": 0,
+    "duplicate_receipt_key_count": 4,
+    "json_checked_count": 654,
+    "json_parse_failed_count": 2,
+    "missing_required_field_count": 0,
+    "non_blocking_drift_count": 4,
+    "receipt_checked_count": 151,
+    "static_fixture_integrity_passed": false,
+    "total_fixture_count": 1857
+  }
+}

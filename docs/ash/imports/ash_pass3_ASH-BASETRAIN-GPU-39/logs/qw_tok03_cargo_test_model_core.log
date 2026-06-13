@@ -1,0 +1,6 @@
+cargo/rustc unavailable in current container; local commands to run:
+
+cargo test -p model_core qw_tok03 --test qw_tok03_runtime_input_packet_replay
+cargo test -p model_core qw_tok03 --test qw_tok03_infer_smoke_candidate
+cargo test -p model_core qw_tok03 --test qw_tok03_runner_schema_contract
+cargo test -p model_core qw_tok03 --test qw_tok03_no_generation_no_sampler

@@ -1,0 +1,63 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-PERF-REVIEW-00",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "fingerprint_path": "artifacts/checkpoint_meta/full_model_vocab_v5_resized.fingerprint.json",
+  "fingerprint_exists": true,
+  "fingerprint_sha256": "sha256:f644913d09736415bd3996ec5f40758917ed04ba298708980d621b4b290d7f47",
+  "checkpoint_path_from_fingerprint": "tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors",
+  "checkpoint_file_exists_in_archive": false,
+  "checkpoint_id": "full_model_vocab_v5_resized",
+  "checkpoint_sha256_recorded": "sha256:00c1e3dd8bd92bc2c6054c038b91d678b0f7aa9da7dd6642c9cbf724284d00af",
+  "tokenizer": {
+    "manifest_path": "artifacts/tokenizer_manifest_v5_final.json",
+    "manifest_sha256": "sha256:a449033ff7672e8e771fc3f3e69279e608b4bd5ac220736a68e8f3c84613de49",
+    "vocab_size": 48259,
+    "special_token_ids": {
+      "pad": 0,
+      "bos": 1,
+      "eos": 2,
+      "unk": 3
+    }
+  },
+  "model_spec": {
+    "path": "specs/model_spec_v5_48259.toml",
+    "sha256": "sha256:f07fab63dc3f0c529c2e5e06773510fabe06ef4d71c47fb1264ea32d1c5ddb45",
+    "declared_vocab_size": 48259
+  },
+  "checkpoint_tensors": {
+    "embedding_weight": {
+      "name": "model.embed_tokens.weight",
+      "shape": [
+        48259,
+        2048
+      ],
+      "dtype": "F32"
+    },
+    "lm_head_weight": {
+      "name": "lm_head.weight",
+      "shape": [
+        48259,
+        2048
+      ],
+      "dtype": "F32"
+    },
+    "lm_head_bias": null,
+    "tensor_layout": {
+      "embedding_vocab_axis": 0,
+      "lm_head_vocab_axis": 0
+    }
+  },
+  "alignment_snapshot": {
+    "tokenizer_vocab_size": 48259,
+    "model_spec_vocab_size": 48259,
+    "embedding_vocab_size": 48259,
+    "lm_head_vocab_size": 48259,
+    "shape_vocab_alignment_ok": true,
+    "spec_vocab_alignment_ok": true,
+    "warnings": []
+  },
+  "checkpoint_shape_matches_fingerprint": true,
+  "checkpoint_shape_verified_from_weight_file": false,
+  "checkpoint_shape_reason": "safetensors weight file not present in extracted archive; only retrofilled fingerprint metadata is available",
+  "estimated_param_count_class": "1.1B_lineage_by_spec_and_fingerprint_not_weight_verified"
+}

@@ -1,0 +1,55 @@
+{
+  "patch_id": "QW-50-R0W",
+  "title": "Native Decode TopK Token Trace / Repetition Attractor Source Seal",
+  "schema_version": 1,
+  "required_top_level_fields": [
+    "patch_id",
+    "title",
+    "base_patch",
+    "previous_patch",
+    "runtime",
+    "prompt",
+    "generation",
+    "top1Trace",
+    "topKCandidatesByStep",
+    "repeatAnalysis",
+    "outputSplit",
+    "mutationPolicy",
+    "status"
+  ],
+  "generation_fields": [
+    "generated_token_count",
+    "generatedTokenIds",
+    "rawGeneratedTokenIds",
+    "generatedPieces",
+    "generatedPieceTrace"
+  ],
+  "topk_candidate_fields": [
+    "rank",
+    "rank_before",
+    "token_id",
+    "piece",
+    "logit",
+    "base_logit",
+    "rerank_delta",
+    "is_selected"
+  ],
+  "output_split_fields": [
+    "rawModelOutputBeforeGuard",
+    "finalOutputAfterGuard",
+    "outputGuardAccepted",
+    "outputGuardRejectReasons",
+    "outputGuardFallbackApplied",
+    "fallbackResponseMatched"
+  ],
+  "mutation_policy_required_false": [
+    "decode_policy_mutation",
+    "guard_policy_mutation",
+    "lora_scale_mutation",
+    "model_weight_mutation",
+    "token_ban_added",
+    "webgpu_policy_mutation",
+    "qwave_detector_enabled",
+    "cheonjiin_detector_enabled"
+  ]
+}

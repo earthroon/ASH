@@ -1,0 +1,626 @@
+diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/lib.rs /mnt/data/work_sampler04/crates/model_core/src/lib.rs
+--- /mnt/data/work_sampler04_orig/crates/model_core/src/lib.rs	2026-05-26 15:51:54.000000000 +0000
++++ /mnt/data/work_sampler04/crates/model_core/src/lib.rs	2026-05-26 23:14:11.291226719 +0000
+@@ -11,6 +11,7 @@
+ mod sampling_helpers;
+ mod cpu_oracle_sampler;
+ mod sampler_parity;
++mod sampler_parity_validation;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -59,6 +60,7 @@
+ 
+ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use generation_telemetry::{
+     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
+     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
+diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity.rs /mnt/data/work_sampler04/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity.rs	2026-05-26 16:05:55.000000000 +0000
++++ /mnt/data/work_sampler04/crates/model_core/src/sampler_parity.rs	2026-05-26 23:14:11.295162704 +0000
+@@ -254,4 +254,5 @@
+             let _ = writeln!(file, "{}", line);
+         }
+     }
++    crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
+ }
+diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity_validation.rs /mnt/data/work_sampler04/crates/model_core/src/sampler_parity_validation.rs
+--- /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity_validation.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work_sampler04/crates/model_core/src/sampler_parity_validation.rs	2026-05-26 23:14:09.664976696 +0000
+@@ -0,0 +1,279 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum SamplerParityValidationMode {
++    Off,
++    ValidateProbe,
++    PromoteStrictCandidate,
++}
++
++impl SamplerParityValidationMode {
++    pub fn from_env() -> Self {
++        let enabled = env::var("ASH_SAMPLER_PARITY_VALIDATE")
++            .ok()
++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "validate"))
++            .unwrap_or(false);
++        if !enabled {
++            return Self::Off;
++        }
++        let promote = env::var("ASH_SAMPLER_PARITY_PROMOTE_STRICT")
++            .ok()
++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "promote"))
++            .unwrap_or(false);
++        if promote {
++            Self::PromoteStrictCandidate
++        } else {
++            Self::ValidateProbe
++        }
++    }
++
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ValidateProbe => "ValidateProbe",
++            Self::PromoteStrictCandidate => "PromoteStrictCandidate",
++        }
++    }
++
++    pub fn enabled(&self) -> bool {
++        !matches!(self, Self::Off)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler04CpuValidationTrace {
++    pub active_ids: Vec<u32>,
++    pub final_ids: Vec<u32>,
++    pub active_count: usize,
++    pub final_count: usize,
++    pub min_p_threshold: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler04GpuValidationTrace {
++    pub trace_readback_ok: bool,
++    pub trace_completeness: String,
++    pub active_ids: Vec<u32>,
++    pub final_ids: Vec<u32>,
++    pub active_count_total: Option<usize>,
++    pub final_count_total: Option<usize>,
++    pub active_overflow: bool,
++    pub final_overflow: bool,
++    pub min_p_threshold: Option<f32>,
++    pub recovery_mode: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler04ParityValidationStatus {
++    pub active_set_match: Option<bool>,
++    pub final_set_match: Option<bool>,
++    pub threshold_match: Option<bool>,
++    pub recovery_match: Option<bool>,
++    pub trace_readback_ok: bool,
++    pub status: String,
++    pub promotion_blocking: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler04ValidationReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub step: usize,
++    pub fixture: String,
++    pub mode: String,
++    pub trace_top_n: usize,
++    pub cpu: Sampler04CpuValidationTrace,
++    pub gpu: Sampler04GpuValidationTrace,
++    pub parity: Sampler04ParityValidationStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler04ValidationSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub semantic_reference: String,
++    pub validation_mode_default: String,
++    pub strict_default_changed: bool,
++    pub receipt: String,
++    pub checked_steps: usize,
++    pub pass_steps: usize,
++    pub warn_steps: usize,
++    pub fail_steps: usize,
++    pub trace_readback_fail_steps: usize,
++    pub promotion_status: String,
++    pub non_scope: Vec<String>,
++}
++
++pub fn validation_receipt_path() -> PathBuf {
++    env::var("ASH_SAMPLER_PARITY_VALIDATE_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler04_runtime_validation_receipt.jsonl"))
++}
++
++pub fn validation_summary_path() -> PathBuf {
++    env::var("ASH_SAMPLER_PARITY_VALIDATE_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler04_runtime_validation_summary.json"))
++}
++
++fn fixture_name(receipt: &SamplerParityReceipt) -> String {
++    env::var("ASH_SAMPLER_PARITY_FIXTURE")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| format!("runtime_step_{}", receipt.step))
++}
++
++fn is_pass_like(status: &str) -> bool {
++    matches!(status, "PASS" | "WARN_SELECTED_ONLY")
++}
++
++fn is_warn(status: &str) -> bool {
++    status.starts_with("WARN_")
++}
++
++fn is_fail(status: &str) -> bool {
++    status.starts_with("FAIL_") || status.starts_with("PARTIAL_")
++}
++
++pub fn validation_receipt_from_sampler03(
++    mode: SamplerParityValidationMode,
++    receipt: &SamplerParityReceipt,
++) -> Sampler04ValidationReceipt {
++    let trace_readback_ok = receipt.gpu.trace_completeness == "gpu_candidate_trace_buffer"
++        && (!receipt.gpu.active_ids_head.is_empty()
++            || !receipt.gpu.final_ids_head.is_empty()
++            || receipt.gpu.active_count.unwrap_or(0) == 0 && receipt.gpu.final_count.unwrap_or(0) == 0);
++    let status = if !trace_readback_ok {
++        "STRICT_CANDIDATE_BLOCKED_TRACE_READBACK".to_string()
++    } else {
++        receipt.parity.status.clone()
++    };
++    let promotion_blocking = !trace_readback_ok || is_fail(&status);
++
++    Sampler04ValidationReceipt {
++        patch_id: "16AI-QW-38G-R6A-SAMPLER-04".to_string(),
++        input_patch: receipt.patch_id.clone(),
++        step: receipt.step,
++        fixture: fixture_name(receipt),
++        mode: mode.as_str().to_string(),
++        trace_top_n: receipt.gpu.trace_top_n,
++        cpu: Sampler04CpuValidationTrace {
++            active_ids: receipt.cpu.active_ids_head.clone(),
++            final_ids: receipt.cpu.final_ids_head.clone(),
++            active_count: receipt.cpu.active_count,
++            final_count: receipt.cpu.final_count,
++            min_p_threshold: receipt.cpu.min_p_threshold,
++        },
++        gpu: Sampler04GpuValidationTrace {
++            trace_readback_ok,
++            trace_completeness: receipt.gpu.trace_completeness.clone(),
++            active_ids: receipt.gpu.active_ids_head.clone(),
++            final_ids: receipt.gpu.final_ids_head.clone(),
++            active_count_total: receipt.gpu.active_count,
++            final_count_total: receipt.gpu.final_count,
++            active_overflow: receipt.gpu.active_overflow,
++            final_overflow: receipt.gpu.final_overflow,
++            min_p_threshold: receipt.gpu.min_p_threshold,
++            recovery_mode: receipt.gpu.recovery_mode.clone(),
++        },
++        parity: Sampler04ParityValidationStatus {
++            active_set_match: receipt.parity.active_set_match,
++            final_set_match: receipt.parity.final_set_match,
++            threshold_match: receipt.parity.threshold_match,
++            recovery_match: receipt.parity.recovery_mode_match,
++            trace_readback_ok,
++            status,
++            promotion_blocking,
++        },
++    }
++}
++
++pub fn append_validation_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
++    let mode = SamplerParityValidationMode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    let validation = validation_receipt_from_sampler03(mode, receipt);
++    let path = validation_receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&validation) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++    write_validation_summary(mode);
++}
++
++pub fn write_validation_summary(mode: SamplerParityValidationMode) {
++    let receipt_path = validation_receipt_path();
++    let summary_path = validation_summary_path();
++    let mut checked = 0usize;
++    let mut pass = 0usize;
++    let mut warn = 0usize;
++    let mut fail = 0usize;
++    let mut trace_fail = 0usize;
++
++    if let Ok(text) = fs::read_to_string(&receipt_path) {
++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
++            if let Ok(r) = serde_json::from_str::<Sampler04ValidationReceipt>(line) {
++                checked = checked.saturating_add(1);
++                if !r.gpu.trace_readback_ok {
++                    trace_fail = trace_fail.saturating_add(1);
++                }
++                if is_pass_like(&r.parity.status) {
++                    pass = pass.saturating_add(1);
++                } else if is_warn(&r.parity.status) {
++                    warn = warn.saturating_add(1);
++                } else {
++                    fail = fail.saturating_add(1);
++                }
++            }
++        }
++    }
++
++    let promotion_status = if checked == 0 {
++        "NOT_RUN"
++    } else if fail > 0 || trace_fail > 0 {
++        "STRICT_CANDIDATE_BLOCKED"
++    } else if matches!(mode, SamplerParityValidationMode::PromoteStrictCandidate) {
++        "STRICT_CANDIDATE_READY"
++    } else {
++        "VALIDATION_COLLECTING"
++    };
++
++    let summary = Sampler04ValidationSummary {
++        patch_id: "16AI-QW-38G-R6A-SAMPLER-04".to_string(),
++        status: "RUNTIME_CANDIDATE_TRACE_VALIDATION_DEFINED".to_string(),
++        input_patch: "16AI-QW-38G-R6A-SAMPLER-03".to_string(),
++        semantic_reference: "model_core::cpu_oracle_sampler".to_string(),
++        validation_mode_default: "Off".to_string(),
++        strict_default_changed: false,
++        receipt: receipt_path.to_string_lossy().to_string(),
++        checked_steps: checked,
++        pass_steps: pass,
++        warn_steps: warn,
++        fail_steps: fail,
++        trace_readback_fail_steps: trace_fail,
++        promotion_status: promotion_status.to_string(),
++        non_scope: vec![
++            "deltak_qwave_weighted_minp".to_string(),
++            "shader_formula_change".to_string(),
++            "cpu_oracle_formula_change".to_string(),
++            "tokenizer_decode_change".to_string(),
++        ],
++    };
++
++    if let Some(parent) = summary_path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(summary_path, text);
++    }
++}
+diff -ruN /mnt/data/work_sampler04_orig/workspace/sampler04.patch /mnt/data/work_sampler04/workspace/sampler04.patch
+--- /mnt/data/work_sampler04_orig/workspace/sampler04.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work_sampler04/workspace/sampler04.patch	2026-05-26 23:14:21.544077184 +0000
+@@ -0,0 +1,311 @@
++diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/lib.rs /mnt/data/work_sampler04/crates/model_core/src/lib.rs
++--- /mnt/data/work_sampler04_orig/crates/model_core/src/lib.rs	2026-05-26 15:51:54.000000000 +0000
+++++ /mnt/data/work_sampler04/crates/model_core/src/lib.rs	2026-05-26 23:14:11.291226719 +0000
++@@ -11,6 +11,7 @@
++ mod sampling_helpers;
++ mod cpu_oracle_sampler;
++ mod sampler_parity;
+++mod sampler_parity_validation;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -59,6 +60,7 @@
++ 
++ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+++pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use generation_telemetry::{
++     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
++     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
++diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity.rs /mnt/data/work_sampler04/crates/model_core/src/sampler_parity.rs
++--- /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity.rs	2026-05-26 16:05:55.000000000 +0000
+++++ /mnt/data/work_sampler04/crates/model_core/src/sampler_parity.rs	2026-05-26 23:14:11.295162704 +0000
++@@ -254,4 +254,5 @@
++             let _ = writeln!(file, "{}", line);
++         }
++     }
+++    crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
++ }
++diff -ruN /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity_validation.rs /mnt/data/work_sampler04/crates/model_core/src/sampler_parity_validation.rs
++--- /mnt/data/work_sampler04_orig/crates/model_core/src/sampler_parity_validation.rs	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/work_sampler04/crates/model_core/src/sampler_parity_validation.rs	2026-05-26 23:14:09.664976696 +0000
++@@ -0,0 +1,279 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum SamplerParityValidationMode {
+++    Off,
+++    ValidateProbe,
+++    PromoteStrictCandidate,
+++}
+++
+++impl SamplerParityValidationMode {
+++    pub fn from_env() -> Self {
+++        let enabled = env::var("ASH_SAMPLER_PARITY_VALIDATE")
+++            .ok()
+++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "validate"))
+++            .unwrap_or(false);
+++        if !enabled {
+++            return Self::Off;
+++        }
+++        let promote = env::var("ASH_SAMPLER_PARITY_PROMOTE_STRICT")
+++            .ok()
+++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "promote"))
+++            .unwrap_or(false);
+++        if promote {
+++            Self::PromoteStrictCandidate
+++        } else {
+++            Self::ValidateProbe
+++        }
+++    }
+++
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ValidateProbe => "ValidateProbe",
+++            Self::PromoteStrictCandidate => "PromoteStrictCandidate",
+++        }
+++    }
+++
+++    pub fn enabled(&self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler04CpuValidationTrace {
+++    pub active_ids: Vec<u32>,
+++    pub final_ids: Vec<u32>,
+++    pub active_count: usize,
+++    pub final_count: usize,
+++    pub min_p_threshold: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler04GpuValidationTrace {
+++    pub trace_readback_ok: bool,
+++    pub trace_completeness: String,
+++    pub active_ids: Vec<u32>,
+++    pub final_ids: Vec<u32>,
+++    pub active_count_total: Option<usize>,
+++    pub final_count_total: Option<usize>,
+++    pub active_overflow: bool,
+++    pub final_overflow: bool,
+++    pub min_p_threshold: Option<f32>,
+++    pub recovery_mode: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler04ParityValidationStatus {
+++    pub active_set_match: Option<bool>,
+++    pub final_set_match: Option<bool>,
+++    pub threshold_match: Option<bool>,
+++    pub recovery_match: Option<bool>,
+++    pub trace_readback_ok: bool,
+++    pub status: String,
+++    pub promotion_blocking: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler04ValidationReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub step: usize,
+++    pub fixture: String,
+++    pub mode: String,
+++    pub trace_top_n: usize,
+++    pub cpu: Sampler04CpuValidationTrace,
+++    pub gpu: Sampler04GpuValidationTrace,
+++    pub parity: Sampler04ParityValidationStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler04ValidationSummary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub input_patch: String,
+++    pub semantic_reference: String,
+++    pub validation_mode_default: String,
+++    pub strict_default_changed: bool,
+++    pub receipt: String,
+++    pub checked_steps: usize,
+++    pub pass_steps: usize,
+++    pub warn_steps: usize,
+++    pub fail_steps: usize,
+++    pub trace_readback_fail_steps: usize,
+++    pub promotion_status: String,
+++    pub non_scope: Vec<String>,
+++}
+++
+++pub fn validation_receipt_path() -> PathBuf {
+++    env::var("ASH_SAMPLER_PARITY_VALIDATE_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler04_runtime_validation_receipt.jsonl"))
+++}
+++
+++pub fn validation_summary_path() -> PathBuf {
+++    env::var("ASH_SAMPLER_PARITY_VALIDATE_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler04_runtime_validation_summary.json"))
+++}
+++
+++fn fixture_name(receipt: &SamplerParityReceipt) -> String {
+++    env::var("ASH_SAMPLER_PARITY_FIXTURE")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| format!("runtime_step_{}", receipt.step))
+++}
+++
+++fn is_pass_like(status: &str) -> bool {
+++    matches!(status, "PASS" | "WARN_SELECTED_ONLY")
+++}
+++
+++fn is_warn(status: &str) -> bool {
+++    status.starts_with("WARN_")
+++}
+++
+++fn is_fail(status: &str) -> bool {
+++    status.starts_with("FAIL_") || status.starts_with("PARTIAL_")
+++}
+++
+++pub fn validation_receipt_from_sampler03(
+++    mode: SamplerParityValidationMode,
+++    receipt: &SamplerParityReceipt,
+++) -> Sampler04ValidationReceipt {
+++    let trace_readback_ok = receipt.gpu.trace_completeness == "gpu_candidate_trace_buffer"
+++        && (!receipt.gpu.active_ids_head.is_empty()
+++            || !receipt.gpu.final_ids_head.is_empty()
+++            || receipt.gpu.active_count.unwrap_or(0) == 0 && receipt.gpu.final_count.unwrap_or(0) == 0);
+++    let status = if !trace_readback_ok {
+++        "STRICT_CANDIDATE_BLOCKED_TRACE_READBACK".to_string()
+++    } else {
+++        receipt.parity.status.clone()
+++    };
+++    let promotion_blocking = !trace_readback_ok || is_fail(&status);
+++
+++    Sampler04ValidationReceipt {
+++        patch_id: "16AI-QW-38G-R6A-SAMPLER-04".to_string(),
+++        input_patch: receipt.patch_id.clone(),
+++        step: receipt.step,
+++        fixture: fixture_name(receipt),
+++        mode: mode.as_str().to_string(),
+++        trace_top_n: receipt.gpu.trace_top_n,
+++        cpu: Sampler04CpuValidationTrace {
+++            active_ids: receipt.cpu.active_ids_head.clone(),
+++            final_ids: receipt.cpu.final_ids_head.clone(),
+++            active_count: receipt.cpu.active_count,
+++            final_count: receipt.cpu.final_count,
+++            min_p_threshold: receipt.cpu.min_p_threshold,
+++        },
+++        gpu: Sampler04GpuValidationTrace {
+++            trace_readback_ok,
+++            trace_completeness: receipt.gpu.trace_completeness.clone(),
+++            active_ids: receipt.gpu.active_ids_head.clone(),
+++            final_ids: receipt.gpu.final_ids_head.clone(),
+++            active_count_total: receipt.gpu.active_count,
+++            final_count_total: receipt.gpu.final_count,
+++            active_overflow: receipt.gpu.active_overflow,
+++            final_overflow: receipt.gpu.final_overflow,
+++            min_p_threshold: receipt.gpu.min_p_threshold,
+++            recovery_mode: receipt.gpu.recovery_mode.clone(),
+++        },
+++        parity: Sampler04ParityValidationStatus {
+++            active_set_match: receipt.parity.active_set_match,
+++            final_set_match: receipt.parity.final_set_match,
+++            threshold_match: receipt.parity.threshold_match,
+++            recovery_match: receipt.parity.recovery_mode_match,
+++            trace_readback_ok,
+++            status,
+++            promotion_blocking,
+++        },
+++    }
+++}
+++
+++pub fn append_validation_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
+++    let mode = SamplerParityValidationMode::from_env();
+++    if !mode.enabled() {
+++        return;
+++    }
+++    let validation = validation_receipt_from_sampler03(mode, receipt);
+++    let path = validation_receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&validation) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++    write_validation_summary(mode);
+++}
+++
+++pub fn write_validation_summary(mode: SamplerParityValidationMode) {
+++    let receipt_path = validation_receipt_path();
+++    let summary_path = validation_summary_path();
+++    let mut checked = 0usize;
+++    let mut pass = 0usize;
+++    let mut warn = 0usize;
+++    let mut fail = 0usize;
+++    let mut trace_fail = 0usize;
+++
+++    if let Ok(text) = fs::read_to_string(&receipt_path) {
+++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
+++            if let Ok(r) = serde_json::from_str::<Sampler04ValidationReceipt>(line) {
+++                checked = checked.saturating_add(1);
+++                if !r.gpu.trace_readback_ok {
+++                    trace_fail = trace_fail.saturating_add(1);
+++                }
+++                if is_pass_like(&r.parity.status) {
+++                    pass = pass.saturating_add(1);
+++                } else if is_warn(&r.parity.status) {
+++                    warn = warn.saturating_add(1);
+++                } else {
+++                    fail = fail.saturating_add(1);
+++                }
+++            }
+++        }
+++    }
+++
+++    let promotion_status = if checked == 0 {
+++        "NOT_RUN"
+++    } else if fail > 0 || trace_fail > 0 {
+++        "STRICT_CANDIDATE_BLOCKED"
+++    } else if matches!(mode, SamplerParityValidationMode::PromoteStrictCandidate) {
+++        "STRICT_CANDIDATE_READY"
+++    } else {
+++        "VALIDATION_COLLECTING"
+++    };
+++
+++    let summary = Sampler04ValidationSummary {
+++        patch_id: "16AI-QW-38G-R6A-SAMPLER-04".to_string(),
+++        status: "RUNTIME_CANDIDATE_TRACE_VALIDATION_DEFINED".to_string(),
+++        input_patch: "16AI-QW-38G-R6A-SAMPLER-03".to_string(),
+++        semantic_reference: "model_core::cpu_oracle_sampler".to_string(),
+++        validation_mode_default: "Off".to_string(),
+++        strict_default_changed: false,
+++        receipt: receipt_path.to_string_lossy().to_string(),
+++        checked_steps: checked,
+++        pass_steps: pass,
+++        warn_steps: warn,
+++        fail_steps: fail,
+++        trace_readback_fail_steps: trace_fail,
+++        promotion_status: promotion_status.to_string(),
+++        non_scope: vec![
+++            "deltak_qwave_weighted_minp".to_string(),
+++            "shader_formula_change".to_string(),
+++            "cpu_oracle_formula_change".to_string(),
+++            "tokenizer_decode_change".to_string(),
+++        ],
+++    };
+++
+++    if let Some(parent) = summary_path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(summary_path, text);
+++    }
+++}

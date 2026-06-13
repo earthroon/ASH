@@ -1,0 +1,102 @@
+--- /mnt/data/stage2_orig/crates/model_core/src/lib.rs	2026-04-19 11:54:46.000000000 +0000
++++ crates/model_core/src/lib.rs	2026-04-19 13:01:19.648362400 +0000
+@@ -4323,12 +4323,12 @@
+ }
+ 
+ impl ReferenceModel {
+-    pub fn capture_module_io_ids_batch(
++    fn capture_module_io_from_padded_batch(
+         &self,
+-        batch_ids: &[Vec<u32>],
++        padded: &PaddedTokenBatch,
+         target_key: &str,
+     ) -> Result<Vec<CapturedModuleIo>> {
+-        if batch_ids.is_empty() {
++        if padded.batch_size == 0 {
+             return Ok(Vec::new());
+         }
+ 
+@@ -4354,10 +4354,8 @@
+             );
+         }
+ 
+-        let padded = build_padded_token_batch(batch_ids)?;
+         if padded.max_seq_len == 0 {
+-            return Ok(batch_ids
+-                .iter()
++            return Ok((0..padded.batch_size)
+                 .map(|_| CapturedModuleIo {
+                     target_key: target_key.to_string(),
+                     input_dim: expected_in,
+@@ -4369,7 +4367,7 @@
+                 .collect());
+         }
+ 
+-        let mut states = embed_token_batch(full, &padded)?;
++        let mut states = embed_token_batch(full, padded)?;
+         for (idx, layer) in full.layers.iter().enumerate() {
+             let normed = rms_norm_batched(&states, &layer.input_norm, self.spec.norm.eps)?;
+             let mut q_all = linear_apply_batched(&normed, &layer.q_proj)?;
+@@ -4413,6 +4411,62 @@
+         bail!("failed to capture module-local batched trace for target_key={} layer_idx={} (layer not reached)", target_key, layer_idx)
+     }
+ 
++    pub fn capture_module_io_padded_batch(
++        &self,
++        token_ids: &[u32],
++        lengths: &[usize],
++        max_seq_len: usize,
++        target_key: &str,
++    ) -> Result<Vec<CapturedModuleIo>> {
++        if lengths.is_empty() {
++            return Ok(Vec::new());
++        }
++        let batch_size = lengths.len();
++        let padded_seq_len = max_seq_len.max(1);
++        ensure!(
++            token_ids.len() == batch_size * padded_seq_len,
++            "module-local prepadded token buffer mismatch: batch_size={} max_seq_len={} token_ids_len={} expected={}",
++            batch_size,
++            max_seq_len,
++            token_ids.len(),
++            batch_size * padded_seq_len,
++        );
++        let mut active_mask = vec![0.0f32; token_ids.len()];
++        for (batch_idx, length) in lengths.iter().copied().enumerate() {
++            ensure!(
++                length <= max_seq_len,
++                "module-local prepadded length exceeds max_seq_len: batch_idx={} length={} max_seq_len={}",
++                batch_idx,
++                length,
++                max_seq_len,
++            );
++            let row_offset = batch_idx * padded_seq_len;
++            for token_idx in 0..length {
++                active_mask[row_offset + token_idx] = 1.0;
++            }
++        }
++        let padded = PaddedTokenBatch {
++            batch_size,
++            max_seq_len,
++            lengths: lengths.to_vec(),
++            token_ids: token_ids.to_vec(),
++            active_mask,
++        };
++        self.capture_module_io_from_padded_batch(&padded, target_key)
++    }
++
++    pub fn capture_module_io_ids_batch(
++        &self,
++        batch_ids: &[Vec<u32>],
++        target_key: &str,
++    ) -> Result<Vec<CapturedModuleIo>> {
++        if batch_ids.is_empty() {
++            return Ok(Vec::new());
++        }
++        let padded = build_padded_token_batch(batch_ids)?;
++        self.capture_module_io_from_padded_batch(&padded, target_key)
++    }
++
+     pub fn capture_module_io_ids(&self, input_ids: &[u32], target_key: &str) -> Result<CapturedModuleIo> {
+         let full = match &self.execution_path {
+             ReferenceExecutionPath::FullCheckpointBacked(full) => full,

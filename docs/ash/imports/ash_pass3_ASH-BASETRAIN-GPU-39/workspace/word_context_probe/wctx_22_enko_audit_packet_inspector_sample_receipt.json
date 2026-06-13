@@ -1,0 +1,170 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-22",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "source_export_receipt_key": "sha256:651559cd58938020c8fe58bb57d7bd722419fb9bf9a18b49e5ac8e2e90727127",
+  "inspector_status": "inspection_pass_empty_ledger",
+  "manifest_inspection": {
+    "manifest_present": true,
+    "patch_id_matches": true,
+    "domain_ssot_matches": true,
+    "packet_id": "audit_packet:wctx21:0270ba9ad451f25d4a1c7dc794dd515e9d0789aee4db50f0083485768d319381",
+    "export_format": "json_and_markdown_audit_packet",
+    "source_query_receipt_count": 4,
+    "source_query_receipt_keys_sorted": true,
+    "empty_ledger_observed": true,
+    "total_revision_events_seen": 0,
+    "total_commit_events_seen": 0,
+    "total_revert_events_seen": 0,
+    "manifest_key_present": true,
+    "inspection_reason": "WCTX-21 audit packet manifest is present and consistent"
+  },
+  "section_inspection": {
+    "section_count": 7,
+    "manifest_section_present": true,
+    "ledger_summary_section_present": true,
+    "cue_history_section_present": true,
+    "latest_target_snapshot_section_present": true,
+    "integrity_status_section_present": true,
+    "empty_ledger_notice_section_present": true,
+    "source_receipt_index_section_present": true,
+    "missing_required_sections": [],
+    "section_hashes_present": true,
+    "section_hash_mismatch_count": 0,
+    "section_order_deterministic": true,
+    "inspection_reason": "all required audit sections are present"
+  },
+  "hash_inspection": {
+    "packet_hash_present": true,
+    "packet_hash_verified": true,
+    "manifest_hash_present": true,
+    "section_hashes_verified": true,
+    "hash_mismatch_detected": false,
+    "expected_packet_hash": "sha256:9f44384aa19b3e3bbe6152a37f61d269bdf81f9325f1ce74e4c81e7113cd7fcb",
+    "observed_packet_hash": "sha256:9f44384aa19b3e3bbe6152a37f61d269bdf81f9325f1ce74e4c81e7113cd7fcb",
+    "mismatch_reasons": []
+  },
+  "source_receipt_index_inspection": {
+    "source_query_receipt_keys_present": true,
+    "export_receipt_keys_match_packet_manifest": true,
+    "duplicate_source_query_receipt_key_count": 0,
+    "source_key_count": 4,
+    "source_key_order_deterministic": true,
+    "inspection_reason": "source query receipt index is present, sorted, and matches export receipt"
+  },
+  "checks": [
+    {
+      "check_id": "wctx22_check:audit_packet_present",
+      "kind": "audit_packet_present",
+      "pass": true,
+      "severity": "critical",
+      "detail": "audit packet object is present"
+    },
+    {
+      "check_id": "wctx22_check:manifest_present",
+      "kind": "manifest_present",
+      "pass": true,
+      "severity": "critical",
+      "detail": "WCTX-21 audit packet manifest is present and consistent"
+    },
+    {
+      "check_id": "wctx22_check:manifest_patch_id",
+      "kind": "manifest_patch_id",
+      "pass": true,
+      "severity": "critical",
+      "detail": "manifest patch_id must remain WCTX-21"
+    },
+    {
+      "check_id": "wctx22_check:manifest_domain_ssot",
+      "kind": "manifest_domain_ssot",
+      "pass": true,
+      "severity": "critical",
+      "detail": "manifest domain SSOT must remain EN-KO subtitle-machine"
+    },
+    {
+      "check_id": "wctx22_check:source_query_receipt_index",
+      "kind": "source_query_receipt_index",
+      "pass": true,
+      "severity": "critical",
+      "detail": "source query receipt index is present, sorted, and matches export receipt"
+    },
+    {
+      "check_id": "wctx22_check:required_sections_present",
+      "kind": "required_sections_present",
+      "pass": true,
+      "severity": "critical",
+      "detail": "all required audit sections are present"
+    },
+    {
+      "check_id": "wctx22_check:section_hash_integrity",
+      "kind": "section_hash_integrity",
+      "pass": true,
+      "severity": "critical",
+      "detail": "section hashes match canonical section material"
+    },
+    {
+      "check_id": "wctx22_check:packet_hash_integrity",
+      "kind": "packet_hash_integrity",
+      "pass": true,
+      "severity": "critical",
+      "detail": "packet hash matches canonical packet material"
+    },
+    {
+      "check_id": "wctx22_check:empty_ledger_notice_present",
+      "kind": "empty_ledger_notice_present",
+      "pass": true,
+      "severity": "info",
+      "detail": "empty ledger packet includes an explicit empty ledger notice"
+    },
+    {
+      "check_id": "wctx22_check:empty_ledger_no_fabricated_events",
+      "kind": "empty_ledger_no_fabricated_events",
+      "pass": true,
+      "severity": "critical",
+      "detail": "empty ledger packet has zero fabricated revision events"
+    },
+    {
+      "check_id": "wctx22_check:read_only_export",
+      "kind": "read_only_export",
+      "pass": true,
+      "severity": "critical",
+      "detail": "audit packet remains read-only"
+    },
+    {
+      "check_id": "wctx22_check:runtime_apply_closed",
+      "kind": "runtime_apply_closed",
+      "pass": true,
+      "severity": "critical",
+      "detail": "runtime apply and rerank gates remain closed"
+    }
+  ],
+  "risk": {
+    "token_id_mutated": false,
+    "decode_executed_in_inspector": false,
+    "generation_executed_in_inspector": false,
+    "model_forward_executed_in_inspector": false,
+    "sampling_executed_in_inspector": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "ledger_mutated": false,
+    "audit_packet_mutated": false,
+    "revision_event_created": false,
+    "commit_executed_in_inspector": false,
+    "rollback_executed_in_inspector": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "inspector_receipt_created": true,
+    "empty_ledger_packet_verified": true,
+    "missing_required_section": false,
+    "hash_mismatch_detected": false,
+    "inconsistent_manifest_detected": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "created_by": "ash_core::word_context_commit_ledger_export_inspector",
+  "schema_version": 1,
+  "deterministic_receipt_key": "sha256:a1f15aa8b52a75ad0fa6e03804892016575df147d6b7923a82040941e6c3b256"
+}

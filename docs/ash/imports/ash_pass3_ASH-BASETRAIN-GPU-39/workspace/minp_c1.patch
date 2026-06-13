@@ -1,0 +1,2584 @@
+diff -ruN minp_c1_base/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md minp_c1_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md
+--- minp_c1_base/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md	2026-05-26 23:27:25.681734136 +0000
+@@ -0,0 +1,35 @@
++# Acceptance — 16AI-QW-38G-R6A-MINP-C1
++
++## Result
++
++STATIC_PASS
++
++## Static checks
++
++- generation_semantic_prior_config_exists: PASS
++- generation_sampling_has_semantic_prior_field: PASS
++- generation_to_gpu_passes_semantic_prior: PASS
++- cpu_oracle_semantic_scores_interface: PASS
++- cpu_oracle_uses_weighted_logit: PASS
++- cpu_trace_has_bias_stats: PASS
++- gpu_semantic_prior_config_exists: PASS
++- gpu_config_has_score_buffers: PASS
++- gpu_uniform_has_semantic_fields: PASS
++- gpu_dispatch_allocates_score_buffers: PASS
++- topk_uses_weighted_logit: PASS
++- topp_uses_weighted_logit: PASS
++- select_uses_weighted_score: PASS
++- legacy_zero_source_fallback: PASS
++- runtime_semantic_prior_config_exists: PASS
++- runtime_env_gate_exists: PASS
++
++## Execution checks
++
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WebGPU runtime parity: NOT_RUN
++
++## Acceptance note
++
++This is accepted as a static bake only. Runtime promotion requires actual QWave/ΔK score source buffers plus SAMPLER-04 strict readiness.
+diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/gpu_sampling.rs minp_c1_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- minp_c1_base/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 16:05:30.000000000 +0000
++++ minp_c1_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 23:26:38.868724066 +0000
+@@ -438,6 +438,53 @@
+     matches!(rollout, GpuSamplingRollout::CompareAndFallback)
+ }
+ 
++
++#[derive(Debug, Clone, Copy)]
++pub struct GpuSemanticPriorConfig {
++    pub enabled: bool,
++    pub qwave_weight: f32,
++    pub deltak_weight: f32,
++    pub cross_weight: f32,
++    pub bias_cap: f32,
++    pub qwave_source_available: bool,
++    pub deltak_source_available: bool,
++}
++
++impl Default for GpuSemanticPriorConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            qwave_weight: 0.20,
++            deltak_weight: 0.15,
++            cross_weight: 0.10,
++            bias_cap: 0.75,
++            qwave_source_available: false,
++            deltak_source_available: false,
++        }
++    }
++}
++
++impl GpuSemanticPriorConfig {
++    pub fn sanitized(self) -> Self {
++        let mut out = self;
++        if !out.qwave_weight.is_finite() { out.qwave_weight = 0.0; }
++        if !out.deltak_weight.is_finite() { out.deltak_weight = 0.0; }
++        if !out.cross_weight.is_finite() { out.cross_weight = 0.0; }
++        if !out.bias_cap.is_finite() || out.bias_cap < 0.0 { out.bias_cap = 0.0; }
++        out.bias_cap = out.bias_cap.min(0.75);
++        out
++    }
++
++    pub fn effective(&self) -> bool {
++        let cfg = self.sanitized();
++        cfg.enabled && (cfg.qwave_source_available || cfg.deltak_source_available) && cfg.bias_cap > 0.0
++    }
++
++    pub fn source_mask(&self) -> u32 {
++        (if self.qwave_source_available { 1 } else { 0 }) | (if self.deltak_source_available { 2 } else { 0 })
++    }
++}
++
+ #[derive(Debug, Clone)]
+ pub struct GpuSamplingConfig {
+     pub vocab_size: usize,
+@@ -445,6 +492,9 @@
+     pub top_k: u32,
+     pub top_p: f32,
+     pub min_p: f32,
++    pub semantic_prior: GpuSemanticPriorConfig,
++    pub qwave_scores: Option<Vec<f32>>,
++    pub deltak_scores: Option<Vec<f32>>,
+     pub seed_lo: u32,
+     pub seed_hi: u32,
+     pub rollout_policy: GpuSamplingRollout,
+@@ -484,6 +534,16 @@
+         if !self.min_p.is_finite() || self.min_p < 0.0 || self.min_p >= 1.0 {
+             bail!("gpu sampling: min_p out of range");
+         }
++        let semantic = self.semantic_prior.sanitized();
++        if semantic.enabled && semantic.bias_cap > 0.75 {
++            bail!("gpu sampling: semantic bias_cap exceeds 0.75");
++        }
++        if let Some(scores) = self.qwave_scores.as_ref() {
++            if scores.len() < self.vocab_size { bail!("gpu sampling: qwave score buffer shorter than vocab_size"); }
++        }
++        if let Some(scores) = self.deltak_scores.as_ref() {
++            if scores.len() < self.vocab_size { bail!("gpu sampling: deltak score buffer shorter than vocab_size"); }
++        }
+         if !self.compare_score_eps.is_finite() || self.compare_score_eps < 0.0 {
+             bail!("gpu sampling: compare_score_eps must be >= 0");
+         }
+@@ -511,6 +571,13 @@
+     pub block_count: u32,
+     pub min_p: f32,
+     pub _pad0: [u32; 3],
++    pub semantic_prior_enabled: u32,
++    pub semantic_prior_source_mask: u32,
++    pub _semantic_pad0: [u32; 2],
++    pub qwave_weight: f32,
++    pub deltak_weight: f32,
++    pub cross_weight: f32,
++    pub bias_cap: f32,
+ }
+ 
+ impl GpuSamplingUniform {
+@@ -530,6 +597,13 @@
+                 gpu_candidate_trace_top_n().min(u32::MAX as usize) as u32,
+                 0,
+             ],
++            semantic_prior_enabled: if v.semantic_prior.enabled && (v.qwave_scores.is_some() || v.deltak_scores.is_some()) { 1 } else { 0 },
++            semantic_prior_source_mask: (if v.qwave_scores.is_some() { 1 } else { 0 }) | (if v.deltak_scores.is_some() { 2 } else { 0 }),
++            _semantic_pad0: [0, 0],
++            qwave_weight: v.semantic_prior.sanitized().qwave_weight,
++            deltak_weight: v.semantic_prior.sanitized().deltak_weight,
++            cross_weight: v.semantic_prior.sanitized().cross_weight,
++            bias_cap: v.semantic_prior.sanitized().bias_cap,
+         }
+     }
+ }
+@@ -583,6 +657,8 @@
+     flags: u32,
+     logit: f32,
+     prob: f32,
++    semantic_bias: f32,
++    weighted_logit: f32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -593,6 +669,8 @@
+     pub flags: u32,
+     pub logit: f32,
+     pub prob: f32,
++    pub semantic_bias: f32,
++    pub weighted_logit: f32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -658,6 +736,8 @@
+     pub selection_out: Arc<BackendBuffer>,
+     pub candidate_trace_header: Arc<BackendBuffer>,
+     pub candidate_trace_entries: Arc<BackendBuffer>,
++    pub qwave_scores: Arc<BackendBuffer>,
++    pub deltak_scores: Arc<BackendBuffer>,
+ }
+ 
+ pub struct GpuSamplingRuntime {
+@@ -729,6 +809,8 @@
+                 rw_storage_entry(2),
+                 rw_storage_entry(3),
+                 rw_storage_entry(4),
++                read_storage_entry(5),
++                read_storage_entry(6),
+             ],
+         });
+         let stats_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
+@@ -751,6 +833,8 @@
+                 rw_storage_entry(6),
+                 rw_storage_entry(7),
+                 rw_storage_entry(8),
++                read_storage_entry(9),
++                read_storage_entry(10),
+             ],
+         });
+         let final_select_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
+@@ -763,6 +847,8 @@
+                 read_storage_entry(4),
+                 rw_storage_entry(5),
+                 rw_storage_entry(6),
++                read_storage_entry(7),
++                read_storage_entry(8),
+             ],
+         });
+ 
+@@ -1196,6 +1282,14 @@
+                     binding: 8,
+                     resource: dispatch.candidate_trace_entries.as_entire_binding(),
+                 },
++                backend_wgpu::BindGroupEntry {
++                    binding: 9,
++                    resource: dispatch.qwave_scores.as_entire_binding(),
++                },
++                backend_wgpu::BindGroupEntry {
++                    binding: 10,
++                    resource: dispatch.deltak_scores.as_entire_binding(),
++                },
+             ],
+         });
+ 
+@@ -1750,6 +1844,16 @@
+                 "gpu_sampling.candidate_trace_entries",
+             )?,
+         ));
++        let qwave_scores = Arc::new(self.create_semantic_score_buffer(
++            "gpu_sampling.semantic.qwave_scores",
++            cfg.qwave_scores.as_deref(),
++            cfg.vocab_size,
++        )?);
++        let deltak_scores = Arc::new(self.create_semantic_score_buffer(
++            "gpu_sampling.semantic.deltak_scores",
++            cfg.deltak_scores.as_deref(),
++            cfg.vocab_size,
++        )?);
+ 
+         Ok(GpuSamplingDispatch {
+             uniform,
+@@ -1774,9 +1878,31 @@
+             selection_out,
+             candidate_trace_header,
+             candidate_trace_entries,
++            qwave_scores,
++            deltak_scores,
+         })
+     }
+ 
++    fn create_semantic_score_buffer(
++        &self,
++        label: &'static str,
++        scores: Option<&[f32]>,
++        vocab_size: usize,
++    ) -> Result<BackendBuffer> {
++        let mut zero_scores;
++        let slice = if let Some(scores) = scores {
++            &scores[..vocab_size]
++        } else {
++            zero_scores = vec![0.0f32; vocab_size.max(1)];
++            &zero_scores[..]
++        };
++        Ok(self.device.create_buffer_init(&BackendBufferInitDescriptor {
++            label: Some(label),
++            contents: cast_slice(slice),
++            usage: BackendBufferUsages::STORAGE | BackendBufferUsages::COPY_DST | BackendBufferUsages::COPY_SRC,
++        }))
++    }
++
+     fn create_uniform_buffer(
+         &self,
+         label: &'static str,
+@@ -1847,6 +1973,14 @@
+                     binding: 4,
+                     resource: dispatch.local_topk_logits.as_entire_binding(),
+                 },
++                backend_wgpu::BindGroupEntry {
++                    binding: 5,
++                    resource: dispatch.qwave_scores.as_entire_binding(),
++                },
++                backend_wgpu::BindGroupEntry {
++                    binding: 6,
++                    resource: dispatch.deltak_scores.as_entire_binding(),
++                },
+             ],
+         })
+     }
+@@ -1889,6 +2023,14 @@
+                     binding: 6,
+                     resource: dispatch.local_selection_out.as_entire_binding(),
+                 },
++                backend_wgpu::BindGroupEntry {
++                    binding: 7,
++                    resource: dispatch.qwave_scores.as_entire_binding(),
++                },
++                backend_wgpu::BindGroupEntry {
++                    binding: 8,
++                    resource: dispatch.deltak_scores.as_entire_binding(),
++                },
+             ],
+         })
+     }
+@@ -1982,6 +2124,8 @@
+                 flags: raw.flags,
+                 logit: raw.logit,
+                 prob: raw.prob,
++                semantic_bias: raw.semantic_bias,
++                weighted_logit: raw.weighted_logit,
+             };
+             if raw.stage == 1 {
+                 active_ids.push(raw.token_id);
+@@ -2571,6 +2715,9 @@
+             top_k: 16,
+             top_p: 1.0,
+             min_p: 0.0,
++            semantic_prior: GpuSemanticPriorConfig::default(),
++            qwave_scores: None,
++            deltak_scores: None,
+             seed_lo: 1,
+             seed_hi: 2,
+             rollout_policy: GpuSamplingRollout::MultistageOnly,
+diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl
+--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 15:41:43.000000000 +0000
++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 23:24:55.673605913 +0000
+@@ -25,6 +25,14 @@
+   _pad0_a: u32,
+   _pad0_b: u32,
+   _pad0_c: u32,
++  semantic_prior_enabled: u32,
++  semantic_prior_source_mask: u32,
++  _semantic_pad0_a: u32,
++  _semantic_pad0_b: u32,
++  qwave_weight: f32,
++  deltak_weight: f32,
++  cross_weight: f32,
++  bias_cap: f32,
+ };
+ 
+ struct SelectionOut {
+@@ -43,6 +51,8 @@
+ @group(0) @binding(4) var<storage, read> final_mask: array<u32>;
+ @group(0) @binding(5) var<storage, read_write> out_buf: SelectionOut;
+ @group(0) @binding(6) var<storage, read_write> local_out: array<SelectionOut>;
++@group(0) @binding(7) var<storage, read> qwave_scores: array<f32>;
++@group(0) @binding(8) var<storage, read> deltak_scores: array<f32>;
+ 
+ const BLOCK_SIZE: u32 = 256u;
+ const INVALID_INDEX: u32 = 0xffffffffu;
+@@ -56,8 +66,28 @@
+   return (v == v) && (abs(v) < 3.402823e38);
+ }
+ 
++
++fn safe_semantic_score(v: f32) -> f32 {
++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
++  return 0.0;
++}
++
++fn semantic_bias_at(index: u32) -> f32 {
++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
++  var q = 0.0;
++  var k = 0.0;
++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_semantic_score(qwave_scores[index]); }
++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_semantic_score(deltak_scores[index]); }
++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
++  return clamp(raw, -u.bias_cap, u.bias_cap);
++}
++
++fn weighted_logit_at(index: u32) -> f32 {
++  return scaled_logits[index] + semantic_bias_at(index);
++}
++
+ fn score_at(i: u32) -> f32 {
+-  return scaled_logits[i] + noise_buf[i];
++  return weighted_logit_at(i) + noise_buf[i];
+ }
+ 
+ fn logprob_at(i: u32) -> f32 {
+diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl
+--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 15:41:43.000000000 +0000
++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 23:24:55.674073114 +0000
+@@ -16,6 +16,14 @@
+   _pad0_a: u32,
+   _pad0_b: u32,
+   _pad0_c: u32,
++  semantic_prior_enabled: u32,
++  semantic_prior_source_mask: u32,
++  _semantic_pad0_a: u32,
++  _semantic_pad0_b: u32,
++  qwave_weight: f32,
++  deltak_weight: f32,
++  cross_weight: f32,
++  bias_cap: f32,
+ };
+ 
+ struct SelectionOut {
+@@ -72,8 +80,18 @@
+   return logits[index] / denom;
+ }
+ 
++
++fn semantic_bias_at(index: u32) -> f32 {
++  // Legacy path has no semantic score bindings in MINP-C1; zero-source fallback keeps vanilla parity.
++  return 0.0;
++}
++
++fn weighted_scaled_logit(index: u32, denom: f32) -> f32 {
++  return scaled_logit(index, denom) + semantic_bias_at(index);
++}
++
+ fn score_at(index: u32, denom: f32) -> f32 {
+-  return scaled_logit(index, denom) + gumbel_noise(index, u.seed_lo, u.seed_hi);
++  return weighted_scaled_logit(index, denom) + gumbel_noise(index, u.seed_lo, u.seed_hi);
+ }
+ 
+ fn use_topk(vocab: u32) -> bool {
+@@ -99,8 +117,8 @@
+ }
+ 
+ fn should_precede(lhs_idx: u32, rhs_idx: u32, denom: f32) -> bool {
+-  let lhs = scaled_logit(lhs_idx, denom);
+-  let rhs = scaled_logit(rhs_idx, denom);
++  let lhs = weighted_scaled_logit(lhs_idx, denom);
++  let rhs = weighted_scaled_logit(rhs_idx, denom);
+   return (lhs > rhs) || ((lhs == rhs) && (lhs_idx < rhs_idx));
+ }
+ 
+@@ -154,7 +172,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logit(i, denom);
++    let s = weighted_scaled_logit(i, denom);
+     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
+       active_count = active_count + 1u;
+       if (!active_found || should_precede(i, active_top1, denom)) {
+@@ -179,7 +197,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logit(i, denom);
++    let s = weighted_scaled_logit(i, denom);
+     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
+       active_sum_exp = active_sum_exp + exp(s - active_max);
+     }
+@@ -195,7 +213,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let si = scaled_logit(i, denom);
++    let si = weighted_scaled_logit(i, denom);
+     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || si >= min_p_threshold)) {
+       let pi = exp(si - active_max) / active_sum_exp;
+       var allowed = true;
+@@ -205,7 +223,7 @@
+         var j: u32 = 0u;
+         loop {
+           if (j >= vocab) { break; }
+-          let sj = scaled_logit(j, denom);
++          let sj = weighted_scaled_logit(j, denom);
+           if (base_allowed(j, vocab, k, denom) && ((!use_minp) || sj >= min_p_threshold)) {
+             let higher = sj > si;
+             let equal_earlier = (sj == si) && (j < i);
+diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl
+--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl	2026-05-26 08:04:55.000000000 +0000
++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl	2026-05-26 23:24:55.672724592 +0000
+@@ -18,6 +18,14 @@
+   _pad0_a: u32,
+   _pad0_b: u32,
+   _pad0_c: u32,
++  semantic_prior_enabled: u32,
++  semantic_prior_source_mask: u32,
++  _semantic_pad0_a: u32,
++  _semantic_pad0_b: u32,
++  qwave_weight: f32,
++  deltak_weight: f32,
++  cross_weight: f32,
++  bias_cap: f32,
+ };
+ 
+ @group(0) @binding(0) var<uniform> u: SamplingUniform;
+@@ -25,6 +33,8 @@
+ @group(0) @binding(2) var<storage, read_write> topk_mask: array<u32>;
+ @group(0) @binding(3) var<storage, read_write> local_topk_indices: array<u32>;
+ @group(0) @binding(4) var<storage, read_write> local_topk_logits: array<f32>;
++@group(0) @binding(5) var<storage, read> qwave_scores: array<f32>;
++@group(0) @binding(6) var<storage, read> deltak_scores: array<f32>;
+ 
+ const MAX_TOP_K: u32 = 512u;
+ const BLOCK_SIZE: u32 = 256u;
+@@ -38,6 +48,26 @@
+   return min(min(requested_k, vocab), MAX_TOP_K);
+ }
+ 
++
++fn safe_score(v: f32) -> f32 {
++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
++  return 0.0;
++}
++
++fn semantic_bias(index: u32) -> f32 {
++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
++  var q = 0.0;
++  var k = 0.0;
++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_score(qwave_scores[index]); }
++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_score(deltak_scores[index]); }
++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
++  return clamp(raw, -u.bias_cap, u.bias_cap);
++}
++
++fn weighted_logit(index: u32) -> f32 {
++  return scaled_logits[index] + semantic_bias(index);
++}
++
+ fn should_precede_idx_score(lhs_idx: u32, lhs_score: f32, rhs_idx: u32, rhs_score: f32) -> bool {
+   return (lhs_score > rhs_score) || ((lhs_score == rhs_score) && (lhs_idx < rhs_idx));
+ }
+@@ -84,7 +114,7 @@
+     var i = start;
+     loop {
+       if (i >= end) { break; }
+-      let score = scaled_logits[i];
++      let score = weighted_logit(i);
+       var insert_pos = used;
+       var j = 0u;
+       loop {
+diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
+--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 16:06:58.000000000 +0000
++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 23:24:55.673311157 +0000
+@@ -26,6 +26,14 @@
+   _pad0_a: u32,
+   _pad0_b: u32,
+   _pad0_c: u32,
++  semantic_prior_enabled: u32,
++  semantic_prior_source_mask: u32,
++  _semantic_pad0_a: u32,
++  _semantic_pad0_b: u32,
++  qwave_weight: f32,
++  deltak_weight: f32,
++  cross_weight: f32,
++  bias_cap: f32,
+ };
+ 
+ struct SamplingStats {
+@@ -57,6 +65,8 @@
+   flags: u32,
+   logit: f32,
+   prob: f32,
++  semantic_bias: f32,
++  weighted_logit: f32,
+ };
+ 
+ @group(0) @binding(0) var<uniform> u: SamplingUniform;
+@@ -68,10 +78,32 @@
+ @group(0) @binding(6) var<storage, read_write> final_mask: array<u32>;
+ @group(0) @binding(7) var<storage, read_write> trace_header: CandidateTraceHeader;
+ @group(0) @binding(8) var<storage, read_write> trace_entries: array<CandidateTraceEntry>;
++@group(0) @binding(9) var<storage, read> qwave_scores: array<f32>;
++@group(0) @binding(10) var<storage, read> deltak_scores: array<f32>;
+ 
+ const NEG_INF: f32 = -3.402823e38;
+ const INVALID_INDEX: u32 = 0xffffffffu;
+ 
++
++fn safe_semantic_score(v: f32) -> f32 {
++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
++  return 0.0;
++}
++
++fn semantic_bias_at(index: u32) -> f32 {
++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
++  var q = 0.0;
++  var k = 0.0;
++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_semantic_score(qwave_scores[index]); }
++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_semantic_score(deltak_scores[index]); }
++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
++  return clamp(raw, -u.bias_cap, u.bias_cap);
++}
++
++fn weighted_logit_at(index: u32) -> f32 {
++  return scaled_logits[index] + semantic_bias_at(index);
++}
++
+ fn topk_enabled(vocab: u32, requested_k: u32) -> bool {
+   return requested_k > 0u && requested_k < vocab;
+ }
+@@ -88,7 +120,7 @@
+ }
+ 
+ fn base_allowed(index: u32, use_topk: bool) -> bool {
+-  return finite_f32(scaled_logits[index]) && topk_allowed(index, use_topk);
++  return finite_f32(scaled_logits[index]) && finite_f32(weighted_logit_at(index)) && topk_allowed(index, use_topk);
+ }
+ 
+ fn minp_allowed_scaled(value: f32, use_minp: bool, threshold: f32) -> bool {
+@@ -99,8 +131,8 @@
+ }
+ 
+ fn should_precede(lhs_idx: u32, rhs_idx: u32) -> bool {
+-  let lhs = scaled_logits[lhs_idx];
+-  let rhs = scaled_logits[rhs_idx];
++  let lhs = weighted_logit_at(lhs_idx);
++  let rhs = weighted_logit_at(rhs_idx);
+   return (lhs > rhs) || ((lhs == rhs) && (lhs_idx < rhs_idx));
+ }
+ 
+@@ -210,7 +242,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logits[i];
++    let s = weighted_logit_at(i);
+     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
+       active_count = active_count + 1u;
+       if (active_top1 == INVALID_INDEX || should_precede(i, active_top1)) {
+@@ -239,7 +271,7 @@
+       trace_header.min_p_threshold = min_p_threshold;
+       trace_header.active_max = pre_minp_max;
+       trace_header.active_sum_exp = 1.0;
+-      write_trace_entry(2u, 0u, pre_minp_top1, scaled_logits[pre_minp_top1], 1.0);
++      write_trace_entry(2u, 0u, pre_minp_top1, weighted_logit_at(pre_minp_top1), 1.0);
+     }
+     return;
+   }
+@@ -249,7 +281,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logits[i];
++    let s = weighted_logit_at(i);
+     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
+       active_sum_exp = active_sum_exp + exp(s - active_max);
+     }
+@@ -260,7 +292,7 @@
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logits[i];
++    let s = weighted_logit_at(i);
+     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
+       probs[i] = exp(s - active_max) / active_sum_exp;
+     }
+@@ -278,7 +310,7 @@
+       if (i >= vocab) { break; }
+       if (probs[i] > 0.0) {
+         if (written_active < trace_limit()) {
+-          write_trace_entry(1u, written_active, i, scaled_logits[i], probs[i]);
++          write_trace_entry(1u, written_active, i, weighted_logit_at(i), probs[i]);
+         }
+         written_active = written_active + 1u;
+       }
+@@ -308,7 +340,7 @@
+         if (i >= vocab) { break; }
+         if (final_mask[i] != 0u) {
+           if (written_final < trace_limit()) {
+-            write_trace_entry(2u, written_final, i, scaled_logits[i], probs[i]);
++            write_trace_entry(2u, written_final, i, weighted_logit_at(i), probs[i]);
+           }
+           written_final = written_final + 1u;
+         }
+@@ -366,7 +398,7 @@
+       if (i >= vocab) { break; }
+       if (final_mask[i] != 0u) {
+         if (written_final < trace_limit()) {
+-          write_trace_entry(2u, written_final, i, scaled_logits[i], probs[i]);
++          write_trace_entry(2u, written_final, i, weighted_logit_at(i), probs[i]);
+         }
+         written_final = written_final + 1u;
+       }
+diff -ruN minp_c1_base/crates/model_core/src/cpu_oracle_sampler.rs minp_c1_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- minp_c1_base/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:51:54.000000000 +0000
++++ minp_c1_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:23:39.823830337 +0000
+@@ -21,6 +21,26 @@
+     pub min_new_tokens: usize,
+ }
+ 
++#[derive(Debug, Clone, Copy, Default)]
++pub struct SemanticPriorScores<'a> {
++    pub qwave_scores: Option<&'a [f32]>,
++    pub deltak_scores: Option<&'a [f32]>,
++}
++
++impl<'a> SemanticPriorScores<'a> {
++    pub fn qwave_at(&self, token_id: u32) -> Option<f32> {
++        self.qwave_scores.and_then(|scores| scores.get(token_id as usize).copied())
++    }
++
++    pub fn deltak_at(&self, token_id: u32) -> Option<f32> {
++        self.deltak_scores.and_then(|scores| scores.get(token_id as usize).copied())
++    }
++
++    pub fn any_source_available(&self) -> bool {
++        self.qwave_scores.is_some() || self.deltak_scores.is_some()
++    }
++}
++
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum SamplerRecoveryMode {
+@@ -63,6 +83,16 @@
+     pub active_sum_exp: Option<f32>,
+     pub final_mask_recovered: bool,
+     pub recovery_mode: SamplerRecoveryMode,
++    pub semantic_prior_enabled: bool,
++    pub semantic_prior_effective: bool,
++    pub qwave_source_available: bool,
++    pub deltak_source_available: bool,
++    pub semantic_bias_cap: f32,
++    pub weighted_active_max: Option<f32>,
++    pub weighted_min_p_threshold: Option<f32>,
++    pub semantic_bias_min: Option<f32>,
++    pub semantic_bias_max: Option<f32>,
++    pub semantic_bias_mean: Option<f32>,
+ }
+ 
+ impl Default for CpuOracleCandidateTrace {
+@@ -80,6 +110,16 @@
+             active_sum_exp: None,
+             final_mask_recovered: false,
+             recovery_mode: SamplerRecoveryMode::None,
++            semantic_prior_enabled: false,
++            semantic_prior_effective: false,
++            qwave_source_available: false,
++            deltak_source_available: false,
++            semantic_bias_cap: 0.0,
++            weighted_active_max: None,
++            weighted_min_p_threshold: None,
++            semantic_bias_min: None,
++            semantic_bias_max: None,
++            semantic_bias_mean: None,
+         }
+     }
+ }
+@@ -106,6 +146,8 @@
+     id: u32,
+     logit: f32,
+     scaled: f32,
++    semantic_bias: f32,
++    weighted: f32,
+     prob: f32,
+ }
+ 
+@@ -117,8 +159,18 @@
+     min_p_threshold: Option<f32>,
+     final_mask_recovered: bool,
+     recovery_mode: SamplerRecoveryMode,
++    config: &GenerationSamplingConfig,
++    prior_scores: SemanticPriorScores<'_>,
+ ) -> CpuOracleCandidateTrace {
+     let (active_max, active_sum_exp) = active_stats(active);
++    let semantic_prior_enabled = config.semantic_prior.enabled;
++    let semantic_prior_effective = semantic_prior_enabled && prior_scores.any_source_available();
++    let qwave_source_available = prior_scores.qwave_scores.is_some();
++    let deltak_source_available = prior_scores.deltak_scores.is_some();
++    let bias_values = active.iter().map(|c| c.semantic_bias).collect::<Vec<_>>();
++    let semantic_bias_min = bias_values.iter().copied().reduce(f32::min);
++    let semantic_bias_max = bias_values.iter().copied().reduce(f32::max);
++    let semantic_bias_mean = if bias_values.is_empty() { None } else { Some(bias_values.iter().sum::<f32>() / bias_values.len() as f32) };
+     CpuOracleCandidateTrace {
+         active_ids: active.iter().map(|c| c.id).collect(),
+         final_ids: final_candidates.iter().map(|c| c.id).collect(),
+@@ -132,6 +184,16 @@
+         active_sum_exp,
+         final_mask_recovered,
+         recovery_mode,
++        semantic_prior_enabled,
++        semantic_prior_effective,
++        qwave_source_available,
++        deltak_source_available,
++        semantic_bias_cap: config.semantic_prior.sanitized().bias_cap,
++        weighted_active_max: active_max,
++        weighted_min_p_threshold: min_p_threshold,
++        semantic_bias_min,
++        semantic_bias_max,
++        semantic_bias_mean,
+     }
+ }
+ 
+@@ -141,12 +203,12 @@
+     }
+     let max_scaled = candidates
+         .iter()
+-        .map(|c| c.scaled)
++        .map(|c| c.weighted)
+         .max_by(|a, b| a.total_cmp(b));
+     let Some(max_scaled) = max_scaled else { return (None, None); };
+     let mut sum = 0.0f32;
+     for cand in candidates {
+-        sum += (cand.scaled - max_scaled).exp();
++        sum += (cand.weighted - max_scaled).exp();
+     }
+     (Some(max_scaled), Some(sum))
+ }
+@@ -160,6 +222,15 @@
+     config: &GenerationSamplingConfig,
+     ctx: &CpuOracleContext,
+ ) -> CpuOracleSampleResult {
++    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, SemanticPriorScores::default())
++}
++
++pub fn sample_with_cpu_oracle_with_semantic_prior(
++    logits: &[f32],
++    config: &GenerationSamplingConfig,
++    ctx: &CpuOracleContext,
++    prior_scores: SemanticPriorScores<'_>,
++) -> CpuOracleSampleResult {
+     if logits.is_empty() {
+         return CpuOracleSampleResult {
+             selected_id: ctx.eos_token_id.unwrap_or(0),
+@@ -203,10 +274,20 @@
+             if !logit.is_finite() || banned(id) || eos_blocked(id) {
+                 return None;
+             }
++            let scaled = logit / temp;
++            let q = prior_scores.qwave_at(id).unwrap_or(0.0);
++            let k = prior_scores.deltak_at(id).unwrap_or(0.0);
++            let semantic_bias = if prior_scores.any_source_available() {
++                config.semantic_prior.bias_from_scores(q, k)
++            } else {
++                0.0
++            };
+             Some(Candidate {
+                 id,
+                 logit,
+-                scaled: logit / temp,
++                scaled,
++                semantic_bias,
++                weighted: scaled + semantic_bias,
+                 prob: 0.0,
+             })
+         })
+@@ -216,7 +297,7 @@
+         return recover_valid_top1(logits, ctx, "no_candidate_after_ban_eos_guard");
+     }
+ 
+-    candidates.sort_by(|a, b| b.scaled.total_cmp(&a.scaled));
++    candidates.sort_by(|a, b| b.weighted.total_cmp(&a.weighted));
+     if config.top_k > 0 {
+         let k = (config.top_k as usize).min(candidates.len()).max(1);
+         candidates.truncate(k);
+@@ -226,10 +307,10 @@
+     let mut min_p_threshold = None;
+     if config.min_p.is_finite() && config.min_p > 0.0 {
+         let min_p = config.min_p.clamp(0.0, 0.95);
+-        if let Some(max_scaled) = candidates.iter().map(|c| c.scaled).max_by(|a, b| a.total_cmp(b)) {
++        if let Some(max_scaled) = candidates.iter().map(|c| c.weighted).max_by(|a, b| a.total_cmp(b)) {
+             let threshold = max_scaled + min_p.ln();
+             min_p_threshold = Some(threshold);
+-            candidates.retain(|c| c.scaled >= threshold);
++            candidates.retain(|c| c.weighted >= threshold);
+         }
+     }
+ 
+@@ -294,6 +375,8 @@
+             min_p_threshold,
+             false,
+             SamplerRecoveryMode::None,
++            config,
++            prior_scores,
+         ),
+     }
+ }
+@@ -304,12 +387,12 @@
+     }
+     let max_scaled = candidates
+         .iter()
+-        .map(|c| c.scaled)
++        .map(|c| c.weighted)
+         .max_by(|a, b| a.total_cmp(b))
+         .unwrap_or(0.0);
+     let mut sum = 0.0f32;
+     for cand in candidates.iter_mut() {
+-        cand.prob = (cand.scaled - max_scaled).exp();
++        cand.prob = (cand.weighted - max_scaled).exp();
+         sum += cand.prob;
+     }
+     if sum.is_finite() && sum > 0.0 {
+@@ -366,6 +449,7 @@
+             active_sum_exp: if best_logit.is_finite() { Some(1.0) } else { None },
+             final_mask_recovered: false,
+             recovery_mode: SamplerRecoveryMode::None,
++            ..Default::default()
+         },
+     }
+ }
+diff -ruN minp_c1_base/crates/model_core/src/generation_sampling.rs minp_c1_work/crates/model_core/src/generation_sampling.rs
+--- minp_c1_base/crates/model_core/src/generation_sampling.rs	2026-05-26 16:10:11.000000000 +0000
++++ minp_c1_work/crates/model_core/src/generation_sampling.rs	2026-05-26 23:22:26.117346935 +0000
+@@ -621,11 +621,79 @@
+     }
+ }
+ 
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++pub struct SemanticPriorConfig {
++    pub enabled: bool,
++    pub qwave_weight: f32,
++    pub deltak_weight: f32,
++    pub cross_weight: f32,
++    pub bias_cap: f32,
++    pub apply_to_min_p: bool,
++    pub apply_to_top_p: bool,
++    pub apply_to_sampling_score: bool,
++    pub require_sampler04_strict_ready: bool,
++}
++
++impl Default for SemanticPriorConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            qwave_weight: 0.20,
++            deltak_weight: 0.15,
++            cross_weight: 0.10,
++            bias_cap: 0.75,
++            apply_to_min_p: true,
++            apply_to_top_p: true,
++            apply_to_sampling_score: true,
++            require_sampler04_strict_ready: true,
++        }
++    }
++}
++
++impl SemanticPriorConfig {
++    pub fn sanitized(mut self) -> Self {
++        if !self.qwave_weight.is_finite() { self.qwave_weight = 0.0; }
++        if !self.deltak_weight.is_finite() { self.deltak_weight = 0.0; }
++        if !self.cross_weight.is_finite() { self.cross_weight = 0.0; }
++        if !self.bias_cap.is_finite() || self.bias_cap < 0.0 { self.bias_cap = 0.0; }
++        self.bias_cap = self.bias_cap.min(0.75);
++        self
++    }
++
++    pub fn bias_from_scores(&self, qwave: f32, deltak: f32) -> f32 {
++        let cfg = self.sanitized();
++        if !cfg.enabled { return 0.0; }
++        let q = if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 };
++        let k = if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 };
++        let raw = cfg.qwave_weight * q + cfg.deltak_weight * k + cfg.cross_weight * q * k;
++        if raw.is_finite() { raw.clamp(-cfg.bias_cap, cfg.bias_cap) } else { 0.0 }
++    }
++}
++
++impl From<SemanticPriorConfig> for GpuSemanticPriorConfig {
++    fn from(value: SemanticPriorConfig) -> Self {
++        let cfg = value.sanitized();
++        Self {
++            enabled: cfg.enabled,
++            qwave_weight: cfg.qwave_weight,
++            deltak_weight: cfg.deltak_weight,
++            cross_weight: cfg.cross_weight,
++            bias_cap: cfg.bias_cap,
++            qwave_source_available: false,
++            deltak_source_available: false,
++        }
++    }
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct SamplingPolicyCompact {
+     pub rollout_policy: Option<String>,
+     pub rollout_reason: Option<String>,
+     pub min_p: Option<f32>,
++    pub semantic_prior_enabled: Option<bool>,
++    pub semantic_prior_effective: Option<bool>,
++    pub semantic_bias_cap: Option<f32>,
+     pub compare_score_eps: Option<f32>,
+     pub compare_logprob_eps: Option<f32>,
+     pub fallback_on_mismatch: Option<bool>,
+@@ -640,6 +708,7 @@
+     pub top_k: u32,
+     pub top_p: f32,
+     pub min_p: f32,
++    pub semantic_prior: SemanticPriorConfig,
+     pub seed: Option<u64>,
+     pub stop_sequences: Vec<String>,
+     pub min_new_tokens: usize,
+@@ -671,6 +740,7 @@
+             top_k: 0,
+             top_p: 1.0,
+             min_p: 0.0,
++            semantic_prior: SemanticPriorConfig::default(),
+             seed: None,
+             stop_sequences: Vec::new(),
+             min_new_tokens: 0,
+@@ -711,6 +781,9 @@
+             rollout_policy: Some(resolved_policy.as_str().to_string()),
+             rollout_reason: Some(resolved_reason.into()),
+             min_p: Some(self.min_p),
++            semantic_prior_enabled: Some(self.semantic_prior.enabled),
++            semantic_prior_effective: Some(self.semantic_prior.enabled),
++            semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
+             compare_score_eps: self.compare_score_eps,
+             compare_logprob_eps: self.compare_logprob_eps,
+             fallback_on_mismatch: self.fallback_on_mismatch,
+@@ -734,6 +807,9 @@
+             top_k: self.top_k,
+             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
+             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
++            semantic_prior: self.semantic_prior.sanitized().into(),
++            qwave_scores: None,
++            deltak_scores: None,
+             seed_lo: (seed & 0xffff_ffff) as u32,
+             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
+             rollout_policy,
+diff -ruN minp_c1_base/crates/model_core/src/lib.rs minp_c1_work/crates/model_core/src/lib.rs
+--- minp_c1_base/crates/model_core/src/lib.rs	2026-05-26 23:14:11.000000000 +0000
++++ minp_c1_work/crates/model_core/src/lib.rs	2026-05-26 23:23:57.279208059 +0000
+@@ -19,7 +19,7 @@
+ 
+ 
+ use anyhow::{anyhow, bail, ensure, Result};
+-use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
++use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSemanticPriorConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
+ use burn::{
+     backend::{wgpu::WgpuDevice, Wgpu},
+     module::{Ignored, Module, Param},
+@@ -58,7 +58,7 @@
+     tensorcube_health_snapshot_from_telemetry_summaries,
+ };
+ 
+-pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use generation_telemetry::{
+@@ -97,7 +97,7 @@
+     GpuSamplingProfileDurabilityConfig, GpuSamplingRecoveryAction, GpuSamplingRecoveryPolicy,
+     GpuSamplingRecoverySeverity, GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
+     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
+-    SamplingPolicyCompact, SamplingRolloutPolicy,
++    SamplingPolicyCompact, SemanticPriorConfig, SamplingRolloutPolicy,
+     GPU_SAMPLING_PERSISTENT_STATE_SCHEMA_VERSION, classify_gpu_sampling_recovery_severity,
+     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
+     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
+diff -ruN minp_c1_base/crates/runtime/src/engine/bootstrap.rs minp_c1_work/crates/runtime/src/engine/bootstrap.rs
+--- minp_c1_base/crates/runtime/src/engine/bootstrap.rs	2026-05-26 14:42:00.000000000 +0000
++++ minp_c1_work/crates/runtime/src/engine/bootstrap.rs	2026-05-26 23:25:42.785916842 +0000
+@@ -1209,6 +1209,7 @@
+             top_p: mark_supported(legacy_gate.top_p, capabilities.supports_top_p),
+             top_k: mark_supported(legacy_gate.top_k, capabilities.supports_top_k),
+             min_p: AppliedField::Applied(normalize_min_p(cfg.min_p.unwrap_or(0.0))),
++            semantic_prior: cfg.semantic_prior,
+             repeat_penalty: if capabilities.supports_repeat_penalty {
+                 AppliedField::Applied(legacy_gate.repeat_penalty)
+             } else {
+diff -ruN minp_c1_base/crates/runtime/src/infer.rs minp_c1_work/crates/runtime/src/infer.rs
+--- minp_c1_base/crates/runtime/src/infer.rs	2026-05-26 14:42:00.000000000 +0000
++++ minp_c1_work/crates/runtime/src/infer.rs	2026-05-26 23:24:28.632849274 +0000
+@@ -18,7 +18,7 @@
+     GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
+     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
+     GpuSamplingTelemetryCompact, GpuSamplingTelemetrySummary, ModelSpec, NativeWgpuModel,
+-    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy,
++    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig,
+     TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary,
+     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
+     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
+@@ -1589,6 +1589,29 @@
+         .max(1)
+ }
+ 
++fn semantic_prior_config_from_env() -> SemanticPriorConfig {
++    let mode = std::env::var("ASH_SEMANTIC_PRIOR").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
++    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true");
++    let parse_f32 = |key: &str, default: f32| -> f32 {
++        std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default)
++    };
++    let require_ready = std::env::var("ASH_SEMANTIC_PRIOR_REQUIRE_STRICT_READY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "off"))
++        .unwrap_or(true);
++    SemanticPriorConfig {
++        enabled,
++        qwave_weight: parse_f32("ASH_SEMANTIC_PRIOR_QWAVE_WEIGHT", 0.20),
++        deltak_weight: parse_f32("ASH_SEMANTIC_PRIOR_DELTAK_WEIGHT", 0.15),
++        cross_weight: parse_f32("ASH_SEMANTIC_PRIOR_CROSS_WEIGHT", 0.10),
++        bias_cap: parse_f32("ASH_SEMANTIC_PRIOR_BIAS_CAP", 0.75),
++        apply_to_min_p: true,
++        apply_to_top_p: true,
++        apply_to_sampling_score: true,
++        require_sampler04_strict_ready: require_ready,
++    }.sanitized()
++}
++
+ fn build_generation_sampling_config(
+     req_seed: u64,
+     decode: Option<&StandardInferDecodeOverride>,
+@@ -1599,6 +1622,15 @@
+     GpuSamplingPersistentRuntimeMetadata,
+ ) {
+     let mut cfg = GenerationSamplingConfig::default();
++    cfg.semantic_prior = semantic_prior_config_from_env();
++    if cfg.semantic_prior.require_sampler04_strict_ready {
++        let ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
++            .map(|v| v == "STRICT_CANDIDATE_READY")
++            .unwrap_or(false);
++        if !ready {
++            cfg.semantic_prior.enabled = false;
++        }
++    }
+     if let Some(d) = decode {
+         if let Some(v) = d.temperature {
+             cfg.temperature = v;
+diff -ruN minp_c1_base/crates/runtime/src/types.rs minp_c1_work/crates/runtime/src/types.rs
+--- minp_c1_base/crates/runtime/src/types.rs	2026-05-26 14:44:35.000000000 +0000
++++ minp_c1_work/crates/runtime/src/types.rs	2026-05-26 23:24:15.958390302 +0000
+@@ -67,6 +67,8 @@
+     pub top_k: usize,
+     #[serde(default, alias = "minP", alias = "samplingMinP", alias = "sampling_min_p")]
+     pub min_p: Option<f32>,
++    #[serde(default)]
++    pub semantic_prior: RuntimeSemanticPriorConfig,
+     pub repeat_penalty: f32,
+     pub repeat_last_n: usize,
+     pub stop: Vec<String>,
+@@ -110,6 +112,46 @@
+     pub loop_index: Option<f32>,
+ }
+ 
++
++pub fn default_semantic_qwave_weight() -> f32 { 0.20 }
++pub fn default_semantic_deltak_weight() -> f32 { 0.15 }
++pub fn default_semantic_cross_weight() -> f32 { 0.10 }
++pub fn default_semantic_bias_cap() -> f32 { 0.75 }
++pub fn default_semantic_require_strict_ready() -> bool { true }
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++pub struct RuntimeSemanticPriorConfig {
++    #[serde(default)]
++    pub enabled: bool,
++    #[serde(default = "default_semantic_qwave_weight")]
++    pub qwave_weight: f32,
++    #[serde(default = "default_semantic_deltak_weight")]
++    pub deltak_weight: f32,
++    #[serde(default = "default_semantic_cross_weight")]
++    pub cross_weight: f32,
++    #[serde(default = "default_semantic_bias_cap")]
++    pub bias_cap: f32,
++    #[serde(default = "default_semantic_require_strict_ready")]
++    pub require_sampler04_strict_ready: bool,
++}
++
++impl Default for RuntimeSemanticPriorConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            qwave_weight: default_semantic_qwave_weight(),
++            deltak_weight: default_semantic_deltak_weight(),
++            cross_weight: default_semantic_cross_weight(),
++            bias_cap: default_semantic_bias_cap(),
++            require_sampler04_strict_ready: default_semantic_require_strict_ready(),
++        }
++    }
++}
++
++pub fn default_runtime_semantic_prior() -> RuntimeSemanticPriorConfig {
++    RuntimeSemanticPriorConfig::default()
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct RuntimeSamplingConfig {
+     pub temperature: AppliedField<f32>,
+@@ -117,6 +159,8 @@
+     pub top_k: AppliedField<usize>,
+     #[serde(default = "default_runtime_min_p")]
+     pub min_p: AppliedField<f32>,
++    #[serde(default = "default_runtime_semantic_prior")]
++    pub semantic_prior: RuntimeSemanticPriorConfig,
+     pub repeat_penalty: AppliedField<f32>,
+     pub repeat_last_n: AppliedField<usize>,
+     pub token_bias: RuntimeTokenBiasConfig,
+diff -ruN minp_c1_base/workspace/minp_c1.patch minp_c1_work/workspace/minp_c1.patch
+--- minp_c1_base/workspace/minp_c1.patch	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1.patch	2026-05-26 23:27:44.116811893 +0000
+@@ -0,0 +1,1168 @@
++diff -ruN minp_c1_base/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md minp_c1_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md
++--- minp_c1_base/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c1_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md	2026-05-26 23:27:25.681734136 +0000
++@@ -0,0 +1,35 @@
+++# Acceptance — 16AI-QW-38G-R6A-MINP-C1
+++
+++## Result
+++
+++STATIC_PASS
+++
+++## Static checks
+++
+++- generation_semantic_prior_config_exists: PASS
+++- generation_sampling_has_semantic_prior_field: PASS
+++- generation_to_gpu_passes_semantic_prior: PASS
+++- cpu_oracle_semantic_scores_interface: PASS
+++- cpu_oracle_uses_weighted_logit: PASS
+++- cpu_trace_has_bias_stats: PASS
+++- gpu_semantic_prior_config_exists: PASS
+++- gpu_config_has_score_buffers: PASS
+++- gpu_uniform_has_semantic_fields: PASS
+++- gpu_dispatch_allocates_score_buffers: PASS
+++- topk_uses_weighted_logit: PASS
+++- topp_uses_weighted_logit: PASS
+++- select_uses_weighted_score: PASS
+++- legacy_zero_source_fallback: PASS
+++- runtime_semantic_prior_config_exists: PASS
+++- runtime_env_gate_exists: PASS
+++
+++## Execution checks
+++
+++- cargo check: NOT_RUN
+++- cargo test: NOT_RUN
+++- rustfmt: NOT_RUN
+++- WebGPU runtime parity: NOT_RUN
+++
+++## Acceptance note
+++
+++This is accepted as a static bake only. Runtime promotion requires actual QWave/ΔK score source buffers plus SAMPLER-04 strict readiness.
++diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/gpu_sampling.rs minp_c1_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
++--- minp_c1_base/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 16:05:30.000000000 +0000
+++++ minp_c1_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 23:26:38.868724066 +0000
++@@ -438,6 +438,53 @@
++     matches!(rollout, GpuSamplingRollout::CompareAndFallback)
++ }
++ 
+++
+++#[derive(Debug, Clone, Copy)]
+++pub struct GpuSemanticPriorConfig {
+++    pub enabled: bool,
+++    pub qwave_weight: f32,
+++    pub deltak_weight: f32,
+++    pub cross_weight: f32,
+++    pub bias_cap: f32,
+++    pub qwave_source_available: bool,
+++    pub deltak_source_available: bool,
+++}
+++
+++impl Default for GpuSemanticPriorConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            qwave_weight: 0.20,
+++            deltak_weight: 0.15,
+++            cross_weight: 0.10,
+++            bias_cap: 0.75,
+++            qwave_source_available: false,
+++            deltak_source_available: false,
+++        }
+++    }
+++}
+++
+++impl GpuSemanticPriorConfig {
+++    pub fn sanitized(self) -> Self {
+++        let mut out = self;
+++        if !out.qwave_weight.is_finite() { out.qwave_weight = 0.0; }
+++        if !out.deltak_weight.is_finite() { out.deltak_weight = 0.0; }
+++        if !out.cross_weight.is_finite() { out.cross_weight = 0.0; }
+++        if !out.bias_cap.is_finite() || out.bias_cap < 0.0 { out.bias_cap = 0.0; }
+++        out.bias_cap = out.bias_cap.min(0.75);
+++        out
+++    }
+++
+++    pub fn effective(&self) -> bool {
+++        let cfg = self.sanitized();
+++        cfg.enabled && (cfg.qwave_source_available || cfg.deltak_source_available) && cfg.bias_cap > 0.0
+++    }
+++
+++    pub fn source_mask(&self) -> u32 {
+++        (if self.qwave_source_available { 1 } else { 0 }) | (if self.deltak_source_available { 2 } else { 0 })
+++    }
+++}
+++
++ #[derive(Debug, Clone)]
++ pub struct GpuSamplingConfig {
++     pub vocab_size: usize,
++@@ -445,6 +492,9 @@
++     pub top_k: u32,
++     pub top_p: f32,
++     pub min_p: f32,
+++    pub semantic_prior: GpuSemanticPriorConfig,
+++    pub qwave_scores: Option<Vec<f32>>,
+++    pub deltak_scores: Option<Vec<f32>>,
++     pub seed_lo: u32,
++     pub seed_hi: u32,
++     pub rollout_policy: GpuSamplingRollout,
++@@ -484,6 +534,16 @@
++         if !self.min_p.is_finite() || self.min_p < 0.0 || self.min_p >= 1.0 {
++             bail!("gpu sampling: min_p out of range");
++         }
+++        let semantic = self.semantic_prior.sanitized();
+++        if semantic.enabled && semantic.bias_cap > 0.75 {
+++            bail!("gpu sampling: semantic bias_cap exceeds 0.75");
+++        }
+++        if let Some(scores) = self.qwave_scores.as_ref() {
+++            if scores.len() < self.vocab_size { bail!("gpu sampling: qwave score buffer shorter than vocab_size"); }
+++        }
+++        if let Some(scores) = self.deltak_scores.as_ref() {
+++            if scores.len() < self.vocab_size { bail!("gpu sampling: deltak score buffer shorter than vocab_size"); }
+++        }
++         if !self.compare_score_eps.is_finite() || self.compare_score_eps < 0.0 {
++             bail!("gpu sampling: compare_score_eps must be >= 0");
++         }
++@@ -511,6 +571,13 @@
++     pub block_count: u32,
++     pub min_p: f32,
++     pub _pad0: [u32; 3],
+++    pub semantic_prior_enabled: u32,
+++    pub semantic_prior_source_mask: u32,
+++    pub _semantic_pad0: [u32; 2],
+++    pub qwave_weight: f32,
+++    pub deltak_weight: f32,
+++    pub cross_weight: f32,
+++    pub bias_cap: f32,
++ }
++ 
++ impl GpuSamplingUniform {
++@@ -530,6 +597,13 @@
++                 gpu_candidate_trace_top_n().min(u32::MAX as usize) as u32,
++                 0,
++             ],
+++            semantic_prior_enabled: if v.semantic_prior.enabled && (v.qwave_scores.is_some() || v.deltak_scores.is_some()) { 1 } else { 0 },
+++            semantic_prior_source_mask: (if v.qwave_scores.is_some() { 1 } else { 0 }) | (if v.deltak_scores.is_some() { 2 } else { 0 }),
+++            _semantic_pad0: [0, 0],
+++            qwave_weight: v.semantic_prior.sanitized().qwave_weight,
+++            deltak_weight: v.semantic_prior.sanitized().deltak_weight,
+++            cross_weight: v.semantic_prior.sanitized().cross_weight,
+++            bias_cap: v.semantic_prior.sanitized().bias_cap,
++         }
++     }
++ }
++@@ -583,6 +657,8 @@
++     flags: u32,
++     logit: f32,
++     prob: f32,
+++    semantic_bias: f32,
+++    weighted_logit: f32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -593,6 +669,8 @@
++     pub flags: u32,
++     pub logit: f32,
++     pub prob: f32,
+++    pub semantic_bias: f32,
+++    pub weighted_logit: f32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -658,6 +736,8 @@
++     pub selection_out: Arc<BackendBuffer>,
++     pub candidate_trace_header: Arc<BackendBuffer>,
++     pub candidate_trace_entries: Arc<BackendBuffer>,
+++    pub qwave_scores: Arc<BackendBuffer>,
+++    pub deltak_scores: Arc<BackendBuffer>,
++ }
++ 
++ pub struct GpuSamplingRuntime {
++@@ -729,6 +809,8 @@
++                 rw_storage_entry(2),
++                 rw_storage_entry(3),
++                 rw_storage_entry(4),
+++                read_storage_entry(5),
+++                read_storage_entry(6),
++             ],
++         });
++         let stats_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
++@@ -751,6 +833,8 @@
++                 rw_storage_entry(6),
++                 rw_storage_entry(7),
++                 rw_storage_entry(8),
+++                read_storage_entry(9),
+++                read_storage_entry(10),
++             ],
++         });
++         let final_select_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
++@@ -763,6 +847,8 @@
++                 read_storage_entry(4),
++                 rw_storage_entry(5),
++                 rw_storage_entry(6),
+++                read_storage_entry(7),
+++                read_storage_entry(8),
++             ],
++         });
++ 
++@@ -1196,6 +1282,14 @@
++                     binding: 8,
++                     resource: dispatch.candidate_trace_entries.as_entire_binding(),
++                 },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 9,
+++                    resource: dispatch.qwave_scores.as_entire_binding(),
+++                },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 10,
+++                    resource: dispatch.deltak_scores.as_entire_binding(),
+++                },
++             ],
++         });
++ 
++@@ -1750,6 +1844,16 @@
++                 "gpu_sampling.candidate_trace_entries",
++             )?,
++         ));
+++        let qwave_scores = Arc::new(self.create_semantic_score_buffer(
+++            "gpu_sampling.semantic.qwave_scores",
+++            cfg.qwave_scores.as_deref(),
+++            cfg.vocab_size,
+++        )?);
+++        let deltak_scores = Arc::new(self.create_semantic_score_buffer(
+++            "gpu_sampling.semantic.deltak_scores",
+++            cfg.deltak_scores.as_deref(),
+++            cfg.vocab_size,
+++        )?);
++ 
++         Ok(GpuSamplingDispatch {
++             uniform,
++@@ -1774,9 +1878,31 @@
++             selection_out,
++             candidate_trace_header,
++             candidate_trace_entries,
+++            qwave_scores,
+++            deltak_scores,
++         })
++     }
++ 
+++    fn create_semantic_score_buffer(
+++        &self,
+++        label: &'static str,
+++        scores: Option<&[f32]>,
+++        vocab_size: usize,
+++    ) -> Result<BackendBuffer> {
+++        let mut zero_scores;
+++        let slice = if let Some(scores) = scores {
+++            &scores[..vocab_size]
+++        } else {
+++            zero_scores = vec![0.0f32; vocab_size.max(1)];
+++            &zero_scores[..]
+++        };
+++        Ok(self.device.create_buffer_init(&BackendBufferInitDescriptor {
+++            label: Some(label),
+++            contents: cast_slice(slice),
+++            usage: BackendBufferUsages::STORAGE | BackendBufferUsages::COPY_DST | BackendBufferUsages::COPY_SRC,
+++        }))
+++    }
+++
++     fn create_uniform_buffer(
++         &self,
++         label: &'static str,
++@@ -1847,6 +1973,14 @@
++                     binding: 4,
++                     resource: dispatch.local_topk_logits.as_entire_binding(),
++                 },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 5,
+++                    resource: dispatch.qwave_scores.as_entire_binding(),
+++                },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 6,
+++                    resource: dispatch.deltak_scores.as_entire_binding(),
+++                },
++             ],
++         })
++     }
++@@ -1889,6 +2023,14 @@
++                     binding: 6,
++                     resource: dispatch.local_selection_out.as_entire_binding(),
++                 },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 7,
+++                    resource: dispatch.qwave_scores.as_entire_binding(),
+++                },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 8,
+++                    resource: dispatch.deltak_scores.as_entire_binding(),
+++                },
++             ],
++         })
++     }
++@@ -1982,6 +2124,8 @@
++                 flags: raw.flags,
++                 logit: raw.logit,
++                 prob: raw.prob,
+++                semantic_bias: raw.semantic_bias,
+++                weighted_logit: raw.weighted_logit,
++             };
++             if raw.stage == 1 {
++                 active_ids.push(raw.token_id);
++@@ -2571,6 +2715,9 @@
++             top_k: 16,
++             top_p: 1.0,
++             min_p: 0.0,
+++            semantic_prior: GpuSemanticPriorConfig::default(),
+++            qwave_scores: None,
+++            deltak_scores: None,
++             seed_lo: 1,
++             seed_hi: 2,
++             rollout_policy: GpuSamplingRollout::MultistageOnly,
++diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl
++--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 15:41:43.000000000 +0000
+++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 23:24:55.673605913 +0000
++@@ -25,6 +25,14 @@
++   _pad0_a: u32,
++   _pad0_b: u32,
++   _pad0_c: u32,
+++  semantic_prior_enabled: u32,
+++  semantic_prior_source_mask: u32,
+++  _semantic_pad0_a: u32,
+++  _semantic_pad0_b: u32,
+++  qwave_weight: f32,
+++  deltak_weight: f32,
+++  cross_weight: f32,
+++  bias_cap: f32,
++ };
++ 
++ struct SelectionOut {
++@@ -43,6 +51,8 @@
++ @group(0) @binding(4) var<storage, read> final_mask: array<u32>;
++ @group(0) @binding(5) var<storage, read_write> out_buf: SelectionOut;
++ @group(0) @binding(6) var<storage, read_write> local_out: array<SelectionOut>;
+++@group(0) @binding(7) var<storage, read> qwave_scores: array<f32>;
+++@group(0) @binding(8) var<storage, read> deltak_scores: array<f32>;
++ 
++ const BLOCK_SIZE: u32 = 256u;
++ const INVALID_INDEX: u32 = 0xffffffffu;
++@@ -56,8 +66,28 @@
++   return (v == v) && (abs(v) < 3.402823e38);
++ }
++ 
+++
+++fn safe_semantic_score(v: f32) -> f32 {
+++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
+++  return 0.0;
+++}
+++
+++fn semantic_bias_at(index: u32) -> f32 {
+++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
+++  var q = 0.0;
+++  var k = 0.0;
+++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_semantic_score(qwave_scores[index]); }
+++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_semantic_score(deltak_scores[index]); }
+++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
+++  return clamp(raw, -u.bias_cap, u.bias_cap);
+++}
+++
+++fn weighted_logit_at(index: u32) -> f32 {
+++  return scaled_logits[index] + semantic_bias_at(index);
+++}
+++
++ fn score_at(i: u32) -> f32 {
++-  return scaled_logits[i] + noise_buf[i];
+++  return weighted_logit_at(i) + noise_buf[i];
++ }
++ 
++ fn logprob_at(i: u32) -> f32 {
++diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl
++--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 15:41:43.000000000 +0000
+++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 23:24:55.674073114 +0000
++@@ -16,6 +16,14 @@
++   _pad0_a: u32,
++   _pad0_b: u32,
++   _pad0_c: u32,
+++  semantic_prior_enabled: u32,
+++  semantic_prior_source_mask: u32,
+++  _semantic_pad0_a: u32,
+++  _semantic_pad0_b: u32,
+++  qwave_weight: f32,
+++  deltak_weight: f32,
+++  cross_weight: f32,
+++  bias_cap: f32,
++ };
++ 
++ struct SelectionOut {
++@@ -72,8 +80,18 @@
++   return logits[index] / denom;
++ }
++ 
+++
+++fn semantic_bias_at(index: u32) -> f32 {
+++  // Legacy path has no semantic score bindings in MINP-C1; zero-source fallback keeps vanilla parity.
+++  return 0.0;
+++}
+++
+++fn weighted_scaled_logit(index: u32, denom: f32) -> f32 {
+++  return scaled_logit(index, denom) + semantic_bias_at(index);
+++}
+++
++ fn score_at(index: u32, denom: f32) -> f32 {
++-  return scaled_logit(index, denom) + gumbel_noise(index, u.seed_lo, u.seed_hi);
+++  return weighted_scaled_logit(index, denom) + gumbel_noise(index, u.seed_lo, u.seed_hi);
++ }
++ 
++ fn use_topk(vocab: u32) -> bool {
++@@ -99,8 +117,8 @@
++ }
++ 
++ fn should_precede(lhs_idx: u32, rhs_idx: u32, denom: f32) -> bool {
++-  let lhs = scaled_logit(lhs_idx, denom);
++-  let rhs = scaled_logit(rhs_idx, denom);
+++  let lhs = weighted_scaled_logit(lhs_idx, denom);
+++  let rhs = weighted_scaled_logit(rhs_idx, denom);
++   return (lhs > rhs) || ((lhs == rhs) && (lhs_idx < rhs_idx));
++ }
++ 
++@@ -154,7 +172,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let s = scaled_logit(i, denom);
+++    let s = weighted_scaled_logit(i, denom);
++     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
++       active_count = active_count + 1u;
++       if (!active_found || should_precede(i, active_top1, denom)) {
++@@ -179,7 +197,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let s = scaled_logit(i, denom);
+++    let s = weighted_scaled_logit(i, denom);
++     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
++       active_sum_exp = active_sum_exp + exp(s - active_max);
++     }
++@@ -195,7 +213,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let si = scaled_logit(i, denom);
+++    let si = weighted_scaled_logit(i, denom);
++     if (base_allowed(i, vocab, k, denom) && ((!use_minp) || si >= min_p_threshold)) {
++       let pi = exp(si - active_max) / active_sum_exp;
++       var allowed = true;
++@@ -205,7 +223,7 @@
++         var j: u32 = 0u;
++         loop {
++           if (j >= vocab) { break; }
++-          let sj = scaled_logit(j, denom);
+++          let sj = weighted_scaled_logit(j, denom);
++           if (base_allowed(j, vocab, k, denom) && ((!use_minp) || sj >= min_p_threshold)) {
++             let higher = sj > si;
++             let equal_earlier = (sj == si) && (j < i);
++diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl
++--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl	2026-05-26 08:04:55.000000000 +0000
+++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl	2026-05-26 23:24:55.672724592 +0000
++@@ -18,6 +18,14 @@
++   _pad0_a: u32,
++   _pad0_b: u32,
++   _pad0_c: u32,
+++  semantic_prior_enabled: u32,
+++  semantic_prior_source_mask: u32,
+++  _semantic_pad0_a: u32,
+++  _semantic_pad0_b: u32,
+++  qwave_weight: f32,
+++  deltak_weight: f32,
+++  cross_weight: f32,
+++  bias_cap: f32,
++ };
++ 
++ @group(0) @binding(0) var<uniform> u: SamplingUniform;
++@@ -25,6 +33,8 @@
++ @group(0) @binding(2) var<storage, read_write> topk_mask: array<u32>;
++ @group(0) @binding(3) var<storage, read_write> local_topk_indices: array<u32>;
++ @group(0) @binding(4) var<storage, read_write> local_topk_logits: array<f32>;
+++@group(0) @binding(5) var<storage, read> qwave_scores: array<f32>;
+++@group(0) @binding(6) var<storage, read> deltak_scores: array<f32>;
++ 
++ const MAX_TOP_K: u32 = 512u;
++ const BLOCK_SIZE: u32 = 256u;
++@@ -38,6 +48,26 @@
++   return min(min(requested_k, vocab), MAX_TOP_K);
++ }
++ 
+++
+++fn safe_score(v: f32) -> f32 {
+++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
+++  return 0.0;
+++}
+++
+++fn semantic_bias(index: u32) -> f32 {
+++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
+++  var q = 0.0;
+++  var k = 0.0;
+++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_score(qwave_scores[index]); }
+++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_score(deltak_scores[index]); }
+++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
+++  return clamp(raw, -u.bias_cap, u.bias_cap);
+++}
+++
+++fn weighted_logit(index: u32) -> f32 {
+++  return scaled_logits[index] + semantic_bias(index);
+++}
+++
++ fn should_precede_idx_score(lhs_idx: u32, lhs_score: f32, rhs_idx: u32, rhs_score: f32) -> bool {
++   return (lhs_score > rhs_score) || ((lhs_score == rhs_score) && (lhs_idx < rhs_idx));
++ }
++@@ -84,7 +114,7 @@
++     var i = start;
++     loop {
++       if (i >= end) { break; }
++-      let score = scaled_logits[i];
+++      let score = weighted_logit(i);
++       var insert_pos = used;
++       var j = 0u;
++       loop {
++diff -ruN minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
++--- minp_c1_base/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 16:06:58.000000000 +0000
+++++ minp_c1_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 23:24:55.673311157 +0000
++@@ -26,6 +26,14 @@
++   _pad0_a: u32,
++   _pad0_b: u32,
++   _pad0_c: u32,
+++  semantic_prior_enabled: u32,
+++  semantic_prior_source_mask: u32,
+++  _semantic_pad0_a: u32,
+++  _semantic_pad0_b: u32,
+++  qwave_weight: f32,
+++  deltak_weight: f32,
+++  cross_weight: f32,
+++  bias_cap: f32,
++ };
++ 
++ struct SamplingStats {
++@@ -57,6 +65,8 @@
++   flags: u32,
++   logit: f32,
++   prob: f32,
+++  semantic_bias: f32,
+++  weighted_logit: f32,
++ };
++ 
++ @group(0) @binding(0) var<uniform> u: SamplingUniform;
++@@ -68,10 +78,32 @@
++ @group(0) @binding(6) var<storage, read_write> final_mask: array<u32>;
++ @group(0) @binding(7) var<storage, read_write> trace_header: CandidateTraceHeader;
++ @group(0) @binding(8) var<storage, read_write> trace_entries: array<CandidateTraceEntry>;
+++@group(0) @binding(9) var<storage, read> qwave_scores: array<f32>;
+++@group(0) @binding(10) var<storage, read> deltak_scores: array<f32>;
++ 
++ const NEG_INF: f32 = -3.402823e38;
++ const INVALID_INDEX: u32 = 0xffffffffu;
++ 
+++
+++fn safe_semantic_score(v: f32) -> f32 {
+++  if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
+++  return 0.0;
+++}
+++
+++fn semantic_bias_at(index: u32) -> f32 {
+++  if (u.semantic_prior_enabled == 0u) { return 0.0; }
+++  var q = 0.0;
+++  var k = 0.0;
+++  if ((u.semantic_prior_source_mask & 1u) != 0u) { q = safe_semantic_score(qwave_scores[index]); }
+++  if ((u.semantic_prior_source_mask & 2u) != 0u) { k = safe_semantic_score(deltak_scores[index]); }
+++  let raw = u.qwave_weight * q + u.deltak_weight * k + u.cross_weight * q * k;
+++  return clamp(raw, -u.bias_cap, u.bias_cap);
+++}
+++
+++fn weighted_logit_at(index: u32) -> f32 {
+++  return scaled_logits[index] + semantic_bias_at(index);
+++}
+++
++ fn topk_enabled(vocab: u32, requested_k: u32) -> bool {
++   return requested_k > 0u && requested_k < vocab;
++ }
++@@ -88,7 +120,7 @@
++ }
++ 
++ fn base_allowed(index: u32, use_topk: bool) -> bool {
++-  return finite_f32(scaled_logits[index]) && topk_allowed(index, use_topk);
+++  return finite_f32(scaled_logits[index]) && finite_f32(weighted_logit_at(index)) && topk_allowed(index, use_topk);
++ }
++ 
++ fn minp_allowed_scaled(value: f32, use_minp: bool, threshold: f32) -> bool {
++@@ -99,8 +131,8 @@
++ }
++ 
++ fn should_precede(lhs_idx: u32, rhs_idx: u32) -> bool {
++-  let lhs = scaled_logits[lhs_idx];
++-  let rhs = scaled_logits[rhs_idx];
+++  let lhs = weighted_logit_at(lhs_idx);
+++  let rhs = weighted_logit_at(rhs_idx);
++   return (lhs > rhs) || ((lhs == rhs) && (lhs_idx < rhs_idx));
++ }
++ 
++@@ -210,7 +242,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let s = scaled_logits[i];
+++    let s = weighted_logit_at(i);
++     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++       active_count = active_count + 1u;
++       if (active_top1 == INVALID_INDEX || should_precede(i, active_top1)) {
++@@ -239,7 +271,7 @@
++       trace_header.min_p_threshold = min_p_threshold;
++       trace_header.active_max = pre_minp_max;
++       trace_header.active_sum_exp = 1.0;
++-      write_trace_entry(2u, 0u, pre_minp_top1, scaled_logits[pre_minp_top1], 1.0);
+++      write_trace_entry(2u, 0u, pre_minp_top1, weighted_logit_at(pre_minp_top1), 1.0);
++     }
++     return;
++   }
++@@ -249,7 +281,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let s = scaled_logits[i];
+++    let s = weighted_logit_at(i);
++     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++       active_sum_exp = active_sum_exp + exp(s - active_max);
++     }
++@@ -260,7 +292,7 @@
++   i = 0u;
++   loop {
++     if (i >= vocab) { break; }
++-    let s = scaled_logits[i];
+++    let s = weighted_logit_at(i);
++     if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++       probs[i] = exp(s - active_max) / active_sum_exp;
++     }
++@@ -278,7 +310,7 @@
++       if (i >= vocab) { break; }
++       if (probs[i] > 0.0) {
++         if (written_active < trace_limit()) {
++-          write_trace_entry(1u, written_active, i, scaled_logits[i], probs[i]);
+++          write_trace_entry(1u, written_active, i, weighted_logit_at(i), probs[i]);
++         }
++         written_active = written_active + 1u;
++       }
++@@ -308,7 +340,7 @@
++         if (i >= vocab) { break; }
++         if (final_mask[i] != 0u) {
++           if (written_final < trace_limit()) {
++-            write_trace_entry(2u, written_final, i, scaled_logits[i], probs[i]);
+++            write_trace_entry(2u, written_final, i, weighted_logit_at(i), probs[i]);
++           }
++           written_final = written_final + 1u;
++         }
++@@ -366,7 +398,7 @@
++       if (i >= vocab) { break; }
++       if (final_mask[i] != 0u) {
++         if (written_final < trace_limit()) {
++-          write_trace_entry(2u, written_final, i, scaled_logits[i], probs[i]);
+++          write_trace_entry(2u, written_final, i, weighted_logit_at(i), probs[i]);
++         }
++         written_final = written_final + 1u;
++       }
++diff -ruN minp_c1_base/crates/model_core/src/cpu_oracle_sampler.rs minp_c1_work/crates/model_core/src/cpu_oracle_sampler.rs
++--- minp_c1_base/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:51:54.000000000 +0000
+++++ minp_c1_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:23:39.823830337 +0000
++@@ -21,6 +21,26 @@
++     pub min_new_tokens: usize,
++ }
++ 
+++#[derive(Debug, Clone, Copy, Default)]
+++pub struct SemanticPriorScores<'a> {
+++    pub qwave_scores: Option<&'a [f32]>,
+++    pub deltak_scores: Option<&'a [f32]>,
+++}
+++
+++impl<'a> SemanticPriorScores<'a> {
+++    pub fn qwave_at(&self, token_id: u32) -> Option<f32> {
+++        self.qwave_scores.and_then(|scores| scores.get(token_id as usize).copied())
+++    }
+++
+++    pub fn deltak_at(&self, token_id: u32) -> Option<f32> {
+++        self.deltak_scores.and_then(|scores| scores.get(token_id as usize).copied())
+++    }
+++
+++    pub fn any_source_available(&self) -> bool {
+++        self.qwave_scores.is_some() || self.deltak_scores.is_some()
+++    }
+++}
+++
++ 
++ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++ pub enum SamplerRecoveryMode {
++@@ -63,6 +83,16 @@
++     pub active_sum_exp: Option<f32>,
++     pub final_mask_recovered: bool,
++     pub recovery_mode: SamplerRecoveryMode,
+++    pub semantic_prior_enabled: bool,
+++    pub semantic_prior_effective: bool,
+++    pub qwave_source_available: bool,
+++    pub deltak_source_available: bool,
+++    pub semantic_bias_cap: f32,
+++    pub weighted_active_max: Option<f32>,
+++    pub weighted_min_p_threshold: Option<f32>,
+++    pub semantic_bias_min: Option<f32>,
+++    pub semantic_bias_max: Option<f32>,
+++    pub semantic_bias_mean: Option<f32>,
++ }
++ 
++ impl Default for CpuOracleCandidateTrace {
++@@ -80,6 +110,16 @@
++             active_sum_exp: None,
++             final_mask_recovered: false,
++             recovery_mode: SamplerRecoveryMode::None,
+++            semantic_prior_enabled: false,
+++            semantic_prior_effective: false,
+++            qwave_source_available: false,
+++            deltak_source_available: false,
+++            semantic_bias_cap: 0.0,
+++            weighted_active_max: None,
+++            weighted_min_p_threshold: None,
+++            semantic_bias_min: None,
+++            semantic_bias_max: None,
+++            semantic_bias_mean: None,
++         }
++     }
++ }
++@@ -106,6 +146,8 @@
++     id: u32,
++     logit: f32,
++     scaled: f32,
+++    semantic_bias: f32,
+++    weighted: f32,
++     prob: f32,
++ }
++ 
++@@ -117,8 +159,18 @@
++     min_p_threshold: Option<f32>,
++     final_mask_recovered: bool,
++     recovery_mode: SamplerRecoveryMode,
+++    config: &GenerationSamplingConfig,
+++    prior_scores: SemanticPriorScores<'_>,
++ ) -> CpuOracleCandidateTrace {
++     let (active_max, active_sum_exp) = active_stats(active);
+++    let semantic_prior_enabled = config.semantic_prior.enabled;
+++    let semantic_prior_effective = semantic_prior_enabled && prior_scores.any_source_available();
+++    let qwave_source_available = prior_scores.qwave_scores.is_some();
+++    let deltak_source_available = prior_scores.deltak_scores.is_some();
+++    let bias_values = active.iter().map(|c| c.semantic_bias).collect::<Vec<_>>();
+++    let semantic_bias_min = bias_values.iter().copied().reduce(f32::min);
+++    let semantic_bias_max = bias_values.iter().copied().reduce(f32::max);
+++    let semantic_bias_mean = if bias_values.is_empty() { None } else { Some(bias_values.iter().sum::<f32>() / bias_values.len() as f32) };
++     CpuOracleCandidateTrace {
++         active_ids: active.iter().map(|c| c.id).collect(),
++         final_ids: final_candidates.iter().map(|c| c.id).collect(),
++@@ -132,6 +184,16 @@
++         active_sum_exp,
++         final_mask_recovered,
++         recovery_mode,
+++        semantic_prior_enabled,
+++        semantic_prior_effective,
+++        qwave_source_available,
+++        deltak_source_available,
+++        semantic_bias_cap: config.semantic_prior.sanitized().bias_cap,
+++        weighted_active_max: active_max,
+++        weighted_min_p_threshold: min_p_threshold,
+++        semantic_bias_min,
+++        semantic_bias_max,
+++        semantic_bias_mean,
++     }
++ }
++ 
++@@ -141,12 +203,12 @@
++     }
++     let max_scaled = candidates
++         .iter()
++-        .map(|c| c.scaled)
+++        .map(|c| c.weighted)
++         .max_by(|a, b| a.total_cmp(b));
++     let Some(max_scaled) = max_scaled else { return (None, None); };
++     let mut sum = 0.0f32;
++     for cand in candidates {
++-        sum += (cand.scaled - max_scaled).exp();
+++        sum += (cand.weighted - max_scaled).exp();
++     }
++     (Some(max_scaled), Some(sum))
++ }
++@@ -160,6 +222,15 @@
++     config: &GenerationSamplingConfig,
++     ctx: &CpuOracleContext,
++ ) -> CpuOracleSampleResult {
+++    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, SemanticPriorScores::default())
+++}
+++
+++pub fn sample_with_cpu_oracle_with_semantic_prior(
+++    logits: &[f32],
+++    config: &GenerationSamplingConfig,
+++    ctx: &CpuOracleContext,
+++    prior_scores: SemanticPriorScores<'_>,
+++) -> CpuOracleSampleResult {
++     if logits.is_empty() {
++         return CpuOracleSampleResult {
++             selected_id: ctx.eos_token_id.unwrap_or(0),
++@@ -203,10 +274,20 @@
++             if !logit.is_finite() || banned(id) || eos_blocked(id) {
++                 return None;
++             }
+++            let scaled = logit / temp;
+++            let q = prior_scores.qwave_at(id).unwrap_or(0.0);
+++            let k = prior_scores.deltak_at(id).unwrap_or(0.0);
+++            let semantic_bias = if prior_scores.any_source_available() {
+++                config.semantic_prior.bias_from_scores(q, k)
+++            } else {
+++                0.0
+++            };
++             Some(Candidate {
++                 id,
++                 logit,
++-                scaled: logit / temp,
+++                scaled,
+++                semantic_bias,
+++                weighted: scaled + semantic_bias,
++                 prob: 0.0,
++             })
++         })
++@@ -216,7 +297,7 @@
++         return recover_valid_top1(logits, ctx, "no_candidate_after_ban_eos_guard");
++     }
++ 
++-    candidates.sort_by(|a, b| b.scaled.total_cmp(&a.scaled));
+++    candidates.sort_by(|a, b| b.weighted.total_cmp(&a.weighted));
++     if config.top_k > 0 {
++         let k = (config.top_k as usize).min(candidates.len()).max(1);
++         candidates.truncate(k);
++@@ -226,10 +307,10 @@
++     let mut min_p_threshold = None;
++     if config.min_p.is_finite() && config.min_p > 0.0 {
++         let min_p = config.min_p.clamp(0.0, 0.95);
++-        if let Some(max_scaled) = candidates.iter().map(|c| c.scaled).max_by(|a, b| a.total_cmp(b)) {
+++        if let Some(max_scaled) = candidates.iter().map(|c| c.weighted).max_by(|a, b| a.total_cmp(b)) {
++             let threshold = max_scaled + min_p.ln();
++             min_p_threshold = Some(threshold);
++-            candidates.retain(|c| c.scaled >= threshold);
+++            candidates.retain(|c| c.weighted >= threshold);
++         }
++     }
++ 
++@@ -294,6 +375,8 @@
++             min_p_threshold,
++             false,
++             SamplerRecoveryMode::None,
+++            config,
+++            prior_scores,
++         ),
++     }
++ }
++@@ -304,12 +387,12 @@
++     }
++     let max_scaled = candidates
++         .iter()
++-        .map(|c| c.scaled)
+++        .map(|c| c.weighted)
++         .max_by(|a, b| a.total_cmp(b))
++         .unwrap_or(0.0);
++     let mut sum = 0.0f32;
++     for cand in candidates.iter_mut() {
++-        cand.prob = (cand.scaled - max_scaled).exp();
+++        cand.prob = (cand.weighted - max_scaled).exp();
++         sum += cand.prob;
++     }
++     if sum.is_finite() && sum > 0.0 {
++@@ -366,6 +449,7 @@
++             active_sum_exp: if best_logit.is_finite() { Some(1.0) } else { None },
++             final_mask_recovered: false,
++             recovery_mode: SamplerRecoveryMode::None,
+++            ..Default::default()
++         },
++     }
++ }
++diff -ruN minp_c1_base/crates/model_core/src/generation_sampling.rs minp_c1_work/crates/model_core/src/generation_sampling.rs
++--- minp_c1_base/crates/model_core/src/generation_sampling.rs	2026-05-26 16:10:11.000000000 +0000
+++++ minp_c1_work/crates/model_core/src/generation_sampling.rs	2026-05-26 23:22:26.117346935 +0000
++@@ -621,11 +621,79 @@
++     }
++ }
++ 
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+++pub struct SemanticPriorConfig {
+++    pub enabled: bool,
+++    pub qwave_weight: f32,
+++    pub deltak_weight: f32,
+++    pub cross_weight: f32,
+++    pub bias_cap: f32,
+++    pub apply_to_min_p: bool,
+++    pub apply_to_top_p: bool,
+++    pub apply_to_sampling_score: bool,
+++    pub require_sampler04_strict_ready: bool,
+++}
+++
+++impl Default for SemanticPriorConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            qwave_weight: 0.20,
+++            deltak_weight: 0.15,
+++            cross_weight: 0.10,
+++            bias_cap: 0.75,
+++            apply_to_min_p: true,
+++            apply_to_top_p: true,
+++            apply_to_sampling_score: true,
+++            require_sampler04_strict_ready: true,
+++        }
+++    }
+++}
+++
+++impl SemanticPriorConfig {
+++    pub fn sanitized(mut self) -> Self {
+++        if !self.qwave_weight.is_finite() { self.qwave_weight = 0.0; }
+++        if !self.deltak_weight.is_finite() { self.deltak_weight = 0.0; }
+++        if !self.cross_weight.is_finite() { self.cross_weight = 0.0; }
+++        if !self.bias_cap.is_finite() || self.bias_cap < 0.0 { self.bias_cap = 0.0; }
+++        self.bias_cap = self.bias_cap.min(0.75);
+++        self
+++    }
+++
+++    pub fn bias_from_scores(&self, qwave: f32, deltak: f32) -> f32 {
+++        let cfg = self.sanitized();
+++        if !cfg.enabled { return 0.0; }
+++        let q = if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 };
+++        let k = if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 };
+++        let raw = cfg.qwave_weight * q + cfg.deltak_weight * k + cfg.cross_weight * q * k;
+++        if raw.is_finite() { raw.clamp(-cfg.bias_cap, cfg.bias_cap) } else { 0.0 }
+++    }
+++}
+++
+++impl From<SemanticPriorConfig> for GpuSemanticPriorConfig {
+++    fn from(value: SemanticPriorConfig) -> Self {
+++        let cfg = value.sanitized();
+++        Self {
+++            enabled: cfg.enabled,
+++            qwave_weight: cfg.qwave_weight,
+++            deltak_weight: cfg.deltak_weight,
+++            cross_weight: cfg.cross_weight,
+++            bias_cap: cfg.bias_cap,
+++            qwave_source_available: false,
+++            deltak_source_available: false,
+++        }
+++    }
+++}
+++
++ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
++ pub struct SamplingPolicyCompact {
++     pub rollout_policy: Option<String>,
++     pub rollout_reason: Option<String>,
++     pub min_p: Option<f32>,
+++    pub semantic_prior_enabled: Option<bool>,
+++    pub semantic_prior_effective: Option<bool>,
+++    pub semantic_bias_cap: Option<f32>,
++     pub compare_score_eps: Option<f32>,
++     pub compare_logprob_eps: Option<f32>,
++     pub fallback_on_mismatch: Option<bool>,
++@@ -640,6 +708,7 @@
++     pub top_k: u32,
++     pub top_p: f32,
++     pub min_p: f32,
+++    pub semantic_prior: SemanticPriorConfig,
++     pub seed: Option<u64>,
++     pub stop_sequences: Vec<String>,
++     pub min_new_tokens: usize,
++@@ -671,6 +740,7 @@
++             top_k: 0,
++             top_p: 1.0,
++             min_p: 0.0,
+++            semantic_prior: SemanticPriorConfig::default(),
++             seed: None,
++             stop_sequences: Vec::new(),
++             min_new_tokens: 0,
++@@ -711,6 +781,9 @@
++             rollout_policy: Some(resolved_policy.as_str().to_string()),
++             rollout_reason: Some(resolved_reason.into()),
++             min_p: Some(self.min_p),
+++            semantic_prior_enabled: Some(self.semantic_prior.enabled),
+++            semantic_prior_effective: Some(self.semantic_prior.enabled),
+++            semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
++             compare_score_eps: self.compare_score_eps,
++             compare_logprob_eps: self.compare_logprob_eps,
++             fallback_on_mismatch: self.fallback_on_mismatch,
++@@ -734,6 +807,9 @@
++             top_k: self.top_k,
++             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
++             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
+++            semantic_prior: self.semantic_prior.sanitized().into(),
+++            qwave_scores: None,
+++            deltak_scores: None,
++             seed_lo: (seed & 0xffff_ffff) as u32,
++             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
++             rollout_policy,
++diff -ruN minp_c1_base/crates/model_core/src/lib.rs minp_c1_work/crates/model_core/src/lib.rs
++--- minp_c1_base/crates/model_core/src/lib.rs	2026-05-26 23:14:11.000000000 +0000
+++++ minp_c1_work/crates/model_core/src/lib.rs	2026-05-26 23:23:57.279208059 +0000
++@@ -19,7 +19,7 @@
++ 
++ 
++ use anyhow::{anyhow, bail, ensure, Result};
++-use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
+++use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSemanticPriorConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
++ use burn::{
++     backend::{wgpu::WgpuDevice, Wgpu},
++     module::{Ignored, Module, Param},
++@@ -58,7 +58,7 @@
++     tensorcube_health_snapshot_from_telemetry_summaries,
++ };
++ 
++-pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
+++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use generation_telemetry::{
++@@ -97,7 +97,7 @@
++     GpuSamplingProfileDurabilityConfig, GpuSamplingRecoveryAction, GpuSamplingRecoveryPolicy,
++     GpuSamplingRecoverySeverity, GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
++     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
++-    SamplingPolicyCompact, SamplingRolloutPolicy,
+++    SamplingPolicyCompact, SemanticPriorConfig, SamplingRolloutPolicy,
++     GPU_SAMPLING_PERSISTENT_STATE_SCHEMA_VERSION, classify_gpu_sampling_recovery_severity,
++     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
++     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
++diff -ruN minp_c1_base/crates/runtime/src/engine/bootstrap.rs minp_c1_work/crates/runtime/src/engine/bootstrap.rs
++--- minp_c1_base/crates/runtime/src/engine/bootstrap.rs	2026-05-26 14:42:00.000000000 +0000
+++++ minp_c1_work/crates/runtime/src/engine/bootstrap.rs	2026-05-26 23:25:42.785916842 +0000
++@@ -1209,6 +1209,7 @@
++             top_p: mark_supported(legacy_gate.top_p, capabilities.supports_top_p),
++             top_k: mark_supported(legacy_gate.top_k, capabilities.supports_top_k),
++             min_p: AppliedField::Applied(normalize_min_p(cfg.min_p.unwrap_or(0.0))),
+++            semantic_prior: cfg.semantic_prior,
++             repeat_penalty: if capabilities.supports_repeat_penalty {
++                 AppliedField::Applied(legacy_gate.repeat_penalty)
++             } else {
++diff -ruN minp_c1_base/crates/runtime/src/infer.rs minp_c1_work/crates/runtime/src/infer.rs
++--- minp_c1_base/crates/runtime/src/infer.rs	2026-05-26 14:42:00.000000000 +0000
+++++ minp_c1_work/crates/runtime/src/infer.rs	2026-05-26 23:24:28.632849274 +0000
++@@ -18,7 +18,7 @@
++     GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
++     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
++     GpuSamplingTelemetryCompact, GpuSamplingTelemetrySummary, ModelSpec, NativeWgpuModel,
++-    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy,
+++    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig,
++     TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary,
++     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
++     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
++@@ -1589,6 +1589,29 @@
++         .max(1)
++ }
++ 
+++fn semantic_prior_config_from_env() -> SemanticPriorConfig {
+++    let mode = std::env::var("ASH_SEMANTIC_PRIOR").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
+++    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true");
+++    let parse_f32 = |key: &str, default: f32| -> f32 {
+++        std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default)
+++    };
+++    let require_ready = std::env::var("ASH_SEMANTIC_PRIOR_REQUIRE_STRICT_READY")
+++        .ok()
+++        .map(|v| !matches!(v.as_str(), "0" | "false" | "off"))
+++        .unwrap_or(true);
+++    SemanticPriorConfig {
+++        enabled,
+++        qwave_weight: parse_f32("ASH_SEMANTIC_PRIOR_QWAVE_WEIGHT", 0.20),
+++        deltak_weight: parse_f32("ASH_SEMANTIC_PRIOR_DELTAK_WEIGHT", 0.15),
+++        cross_weight: parse_f32("ASH_SEMANTIC_PRIOR_CROSS_WEIGHT", 0.10),
+++        bias_cap: parse_f32("ASH_SEMANTIC_PRIOR_BIAS_CAP", 0.75),
+++        apply_to_min_p: true,
+++        apply_to_top_p: true,
+++        apply_to_sampling_score: true,
+++        require_sampler04_strict_ready: require_ready,
+++    }.sanitized()
+++}
+++
++ fn build_generation_sampling_config(
++     req_seed: u64,
++     decode: Option<&StandardInferDecodeOverride>,
++@@ -1599,6 +1622,15 @@
++     GpuSamplingPersistentRuntimeMetadata,
++ ) {
++     let mut cfg = GenerationSamplingConfig::default();
+++    cfg.semantic_prior = semantic_prior_config_from_env();
+++    if cfg.semantic_prior.require_sampler04_strict_ready {
+++        let ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
+++            .map(|v| v == "STRICT_CANDIDATE_READY")
+++            .unwrap_or(false);
+++        if !ready {
+++            cfg.semantic_prior.enabled = false;
+++        }
+++    }
++     if let Some(d) = decode {
++         if let Some(v) = d.temperature {
++             cfg.temperature = v;
++diff -ruN minp_c1_base/crates/runtime/src/types.rs minp_c1_work/crates/runtime/src/types.rs
++--- minp_c1_base/crates/runtime/src/types.rs	2026-05-26 14:44:35.000000000 +0000
+++++ minp_c1_work/crates/runtime/src/types.rs	2026-05-26 23:24:15.958390302 +0000
++@@ -67,6 +67,8 @@
++     pub top_k: usize,
++     #[serde(default, alias = "minP", alias = "samplingMinP", alias = "sampling_min_p")]
++     pub min_p: Option<f32>,
+++    #[serde(default)]
+++    pub semantic_prior: RuntimeSemanticPriorConfig,
++     pub repeat_penalty: f32,
++     pub repeat_last_n: usize,
++     pub stop: Vec<String>,
++@@ -110,6 +112,46 @@
++     pub loop_index: Option<f32>,
++ }
++ 
+++
+++pub fn default_semantic_qwave_weight() -> f32 { 0.20 }
+++pub fn default_semantic_deltak_weight() -> f32 { 0.15 }
+++pub fn default_semantic_cross_weight() -> f32 { 0.10 }
+++pub fn default_semantic_bias_cap() -> f32 { 0.75 }
+++pub fn default_semantic_require_strict_ready() -> bool { true }
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+++pub struct RuntimeSemanticPriorConfig {
+++    #[serde(default)]
+++    pub enabled: bool,
+++    #[serde(default = "default_semantic_qwave_weight")]
+++    pub qwave_weight: f32,
+++    #[serde(default = "default_semantic_deltak_weight")]
+++    pub deltak_weight: f32,
+++    #[serde(default = "default_semantic_cross_weight")]
+++    pub cross_weight: f32,
+++    #[serde(default = "default_semantic_bias_cap")]
+++    pub bias_cap: f32,
+++    #[serde(default = "default_semantic_require_strict_ready")]
+++    pub require_sampler04_strict_ready: bool,
+++}
+++
+++impl Default for RuntimeSemanticPriorConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            qwave_weight: default_semantic_qwave_weight(),
+++            deltak_weight: default_semantic_deltak_weight(),
+++            cross_weight: default_semantic_cross_weight(),
+++            bias_cap: default_semantic_bias_cap(),
+++            require_sampler04_strict_ready: default_semantic_require_strict_ready(),
+++        }
+++    }
+++}
+++
+++pub fn default_runtime_semantic_prior() -> RuntimeSemanticPriorConfig {
+++    RuntimeSemanticPriorConfig::default()
+++}
+++
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++ pub struct RuntimeSamplingConfig {
++     pub temperature: AppliedField<f32>,
++@@ -117,6 +159,8 @@
++     pub top_k: AppliedField<usize>,
++     #[serde(default = "default_runtime_min_p")]
++     pub min_p: AppliedField<f32>,
+++    #[serde(default = "default_runtime_semantic_prior")]
+++    pub semantic_prior: RuntimeSemanticPriorConfig,
++     pub repeat_penalty: AppliedField<f32>,
++     pub repeat_last_n: AppliedField<usize>,
++     pub token_bias: RuntimeTokenBiasConfig,
+diff -ruN minp_c1_base/workspace/minp_c1_report.md minp_c1_work/workspace/minp_c1_report.md
+--- minp_c1_base/workspace/minp_c1_report.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_report.md	2026-05-26 23:27:25.681582214 +0000
+@@ -0,0 +1,26 @@
++# 16AI-QW-38G-R6A-MINP-C1 — ΔK-QWave Weighted Min-P Core Sampler Bake Report
++
++## Static status
++
++STATIC_PASS
++
++## Scope
++
++Implemented semantic-prior plumbing and weighted-logit sampler hooks without inventing QWave/ΔK score sources. Missing score sources resolve to zero, so the sampler falls back to vanilla behavior and records the non-effective state.
++
++## Key changes
++
++- Added `SemanticPriorConfig` to `GenerationSamplingConfig`.
++- Added `RuntimeSemanticPriorConfig` and `ASH_SEMANTIC_PRIOR*` environment gate.
++- Added CPU oracle `SemanticPriorScores` and `sample_with_cpu_oracle_with_semantic_prior`.
++- Added GPU `GpuSemanticPriorConfig`, optional qwave/deltak score buffers, and semantic-prior uniform fields.
++- Wired WebGPU top-k, top-p/min-p scan, and final select shaders to weighted logits where score sources exist.
++- Extended candidate trace entries with `semantic_bias` and `weighted_logit`.
++
++## Important limitation
++
++The bake does **not** generate QWave or ΔK token scores. That remains a future source-provider patch. With no source buffer, C1 is deliberately non-effective and preserves vanilla sampler behavior.
++
++## Execution
++
++`cargo`, `rustc`, `rustfmt`, and WebGPU runtime validation were unavailable in this container, so execution validation is `NOT_RUN`.
+diff -ruN minp_c1_base/workspace/minp_c1_static_checks.json minp_c1_work/workspace/minp_c1_static_checks.json
+--- minp_c1_base/workspace/minp_c1_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_static_checks.json	2026-05-26 23:27:25.681492751 +0000
+@@ -0,0 +1,18 @@
++{
++  "generation_semantic_prior_config_exists": true,
++  "generation_sampling_has_semantic_prior_field": true,
++  "generation_to_gpu_passes_semantic_prior": true,
++  "cpu_oracle_semantic_scores_interface": true,
++  "cpu_oracle_uses_weighted_logit": true,
++  "cpu_trace_has_bias_stats": true,
++  "gpu_semantic_prior_config_exists": true,
++  "gpu_config_has_score_buffers": true,
++  "gpu_uniform_has_semantic_fields": true,
++  "gpu_dispatch_allocates_score_buffers": true,
++  "topk_uses_weighted_logit": true,
++  "topp_uses_weighted_logit": true,
++  "select_uses_weighted_score": true,
++  "legacy_zero_source_fallback": true,
++  "runtime_semantic_prior_config_exists": true,
++  "runtime_env_gate_exists": true
++}
+\ No newline at end of file
+diff -ruN minp_c1_base/workspace/minp_c1_weighted_minp_fixtures.json minp_c1_work/workspace/minp_c1_weighted_minp_fixtures.json
+--- minp_c1_base/workspace/minp_c1_weighted_minp_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_weighted_minp_fixtures.json	2026-05-26 23:27:25.681164367 +0000
+@@ -0,0 +1,92 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1",
++  "fixtures": [
++    {
++      "name": "no_source_fallback",
++      "semantic_prior_enabled": true,
++      "qwave_scores": null,
++      "deltak_scores": null,
++      "expected": "weighted_logit == scaled_logit; candidate set equals vanilla"
++    },
++    {
++      "name": "bias_formula",
++      "scaled_logit": 10.0,
++      "qwave_score": 0.8,
++      "deltak_score": 0.5,
++      "weights": {
++        "qwave": 0.2,
++        "deltak": 0.15,
++        "cross": 0.1
++      },
++      "bias_cap": 0.75,
++      "expected_bias": 0.275,
++      "expected_weighted_logit": 10.275
++    },
++    {
++      "name": "weighted_min_p",
++      "logits": [
++        10.0,
++        9.0,
++        8.0,
++        2.0
++      ],
++      "semantic_bias": [
++        0.0,
++        0.5,
++        0.4,
++        0.75
++      ],
++      "weighted": [
++        10.0,
++        9.5,
++        8.4,
++        2.75
++      ],
++      "min_p": 0.1,
++      "expected_kept": [
++        0,
++        1,
++        2
++      ]
++    },
++    {
++      "name": "prior_rescue",
++      "logits": [
++        10.0,
++        7.6,
++        7.0
++      ],
++      "semantic_bias": [
++        0.0,
++        0.2,
++        0.0
++      ],
++      "min_p": 0.1,
++      "vanilla_kept": [
++        0
++      ],
++      "weighted_kept": [
++        0,
++        1
++      ],
++      "rescued_by_semantic_prior": [
++        1
++      ]
++    },
++    {
++      "name": "banned_token_cannot_resurrect",
++      "logits": [
++        10.0,
++        7.6
++      ],
++      "semantic_bias": [
++        0.0,
++        0.75
++      ],
++      "banned": [
++        1
++      ],
++      "expected": "token 1 remains removed"
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN minp_c1_base/workspace/minp_c1_weighted_minp_receipt.jsonl minp_c1_work/workspace/minp_c1_weighted_minp_receipt.jsonl
+--- minp_c1_base/workspace/minp_c1_weighted_minp_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_weighted_minp_receipt.jsonl	2026-05-26 23:27:25.681386295 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-MINP-C1", "step": 0, "semantic_prior": {"enabled": false, "effective": false, "qwave_weight": 0.2, "deltak_weight": 0.15, "cross_weight": 0.1, "bias_cap": 0.75, "qwave_source_available": false, "deltak_source_available": false, "reason": "NO_QWAVE_DELTAK_SOURCE_OR_SAMPLER04_STRICT_NOT_READY"}, "min_p": {"value": 0.0, "threshold_basis": "vanilla_scaled_logit_zero_source_fallback", "weighted_max": null, "threshold": null}, "bias_stats": {"min": 0.0, "max": 0.0, "mean": 0.0}, "candidate_counts": {"pre_min_p": 0, "post_min_p": 0, "post_top_p": 0}, "parity": {"cpu_gpu_candidate_set_match": null, "semantic_bias_match": null, "weighted_threshold_match": null, "status": "NOT_RUN_STATIC_BAKE"}}
+diff -ruN minp_c1_base/workspace/minp_c1_weighted_minp_receipt_schema.json minp_c1_work/workspace/minp_c1_weighted_minp_receipt_schema.json
+--- minp_c1_base/workspace/minp_c1_weighted_minp_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_weighted_minp_receipt_schema.json	2026-05-26 23:27:25.681273166 +0000
+@@ -0,0 +1,38 @@
++{
++  "jsonl": "workspace/minp_c1_weighted_minp_receipt.jsonl",
++  "fields": {
++    "semantic_prior": [
++      "enabled",
++      "effective",
++      "qwave_weight",
++      "deltak_weight",
++      "cross_weight",
++      "bias_cap",
++      "qwave_source_available",
++      "deltak_source_available",
++      "reason"
++    ],
++    "min_p": [
++      "value",
++      "threshold_basis",
++      "weighted_max",
++      "threshold"
++    ],
++    "bias_stats": [
++      "min",
++      "max",
++      "mean"
++    ],
++    "candidate_counts": [
++      "pre_min_p",
++      "post_min_p",
++      "post_top_p"
++    ],
++    "parity": [
++      "cpu_gpu_candidate_set_match",
++      "semantic_bias_match",
++      "weighted_threshold_match",
++      "status"
++    ]
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c1_base/workspace/minp_c1_weighted_minp_summary.json minp_c1_work/workspace/minp_c1_weighted_minp_summary.json
+--- minp_c1_base/workspace/minp_c1_weighted_minp_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1_work/workspace/minp_c1_weighted_minp_summary.json	2026-05-26 23:27:25.680912483 +0000
+@@ -0,0 +1,41 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1",
++  "status": "DELTAK_QWAVE_WEIGHTED_MINP_CORE_SAMPLER_BAKED",
++  "static_status": "STATIC_PASS",
++  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
++  "min_p_ssot": "RuntimeSamplingConfig.min_p",
++  "semantic_prior_ssot": "RuntimeSamplingConfig.semantic_prior / GenerationSamplingConfig.semantic_prior",
++  "sampler_semantic_reference": "model_core::cpu_oracle_sampler",
++  "weighted_logit_formula": "scaled_logit + clamp(qw*qwave + dk*deltak + cross*qwave*deltak, -bias_cap, bias_cap)",
++  "threshold_basis": "weighted_logit when semantic score source is available; vanilla scaled_logit under zero-source fallback",
++  "default_enabled": false,
++  "requires_sampler04_strict_ready": true,
++  "default_weights": {
++    "qwave_weight": 0.2,
++    "deltak_weight": 0.15,
++    "cross_weight": 0.1,
++    "bias_cap": 0.75
++  },
++  "source_policy": {
++    "qwave_source_missing": "score=0.0, semantic_prior_effective=false",
++    "deltak_source_missing": "score=0.0, semantic_prior_effective=false",
++    "both_missing": "weighted_logit == scaled_logit, vanilla candidate set preserved"
++  },
++  "implemented": [
++    "model_core SemanticPriorConfig",
++    "runtime RuntimeSemanticPriorConfig and env gate",
++    "CPU oracle semantic score interface and weighted logits",
++    "GPU semantic prior config and score buffers",
++    "topk/topp/select WGSL weighted-logit hooks",
++    "candidate trace V2 semantic_bias/weighted_logit fields",
++    "zero-source fallback and SAMPLER-04 readiness guard"
++  ],
++  "non_scope": [
++    "QWave score generator implementation",
++    "DeltaK score generator implementation",
++    "context router training",
++    "LoRA/lm_head/vocab atlas changes",
++    "runtime WebGPU execution validation"
++  ],
++  "execution_validation": "NOT_RUN: cargo/rustc/WebGPU runtime unavailable in container"
++}
+\ No newline at end of file

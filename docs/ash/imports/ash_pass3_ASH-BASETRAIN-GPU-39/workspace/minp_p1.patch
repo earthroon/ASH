@@ -1,0 +1,282 @@
+diff --git a/minp_p1_clean/apps/desktop/src/App.vue b/minp_p1_work/apps/desktop/src/App.vue
+index 67883de..32f720a 100644
+--- a/minp_p1_clean/apps/desktop/src/App.vue
++++ b/minp_p1_work/apps/desktop/src/App.vue
+@@ -496,6 +496,10 @@ source2 => target2" />
+             <span>prompt</span>
+             <textarea v-model="prompt" rows="8" placeholder="여기에 프롬프트를 넣으세요." />
+           </label>
++          <label class="field">
++            <span>min-p / 후보 하한 {{ minP.toFixed(2) }}</span>
++            <input v-model.number="minP" type="range" min="0" max="0.95" step="0.01" />
++          </label>
+         </article>
+         <article class="card">
+           <h2>실시간 생성 결과</h2>
+@@ -1344,6 +1348,7 @@ const ashGate = reactive({
+   maxNewTokens: 0,
+   temperature: 0,
+   topP: 0,
++  minP: 0,
+   topK: 0,
+   repeatPenalty: 0,
+   repeatLastN: 0,
+@@ -1404,6 +1409,7 @@ const systemPrompt = ref("You are a concise local assistant.");
+ const maxNewTokens = ref(48);
+ const temperature = ref(0.8);
+ const topP = ref(0.95);
++const minP = ref(0.0);
+ const topK = ref(40);
+ const repeatPenalty = ref(1.0);
+ const repeatLastN = ref(64);
+@@ -4104,11 +4110,22 @@ async function runLiveTranslateGroup(group: AsrSegment[], cleanedById?: Map<stri
+   }
+ }
+ 
++function normalizeMinPForPayload(value: unknown): number {
++  const n = Number(value);
++
++  if (!Number.isFinite(n)) return 0.0;
++  if (n < 0.0) return 0.0;
++  if (n > 0.95) return 0.95;
++
++  return n;
++}
++
+ async function runGenerationJob(options: {
+   prompt: string;
+   systemPrompt?: string;
+   maxNewTokens?: number;
+   temperature?: number;
++  minP?: number;
+   task?: "freeform" | "subtitle_polish" | "json_array_polish" | "translation_assist";
+ }) {
+   const jobSessionId = createJobSessionId("translate");
+@@ -4133,6 +4150,7 @@ async function runGenerationJob(options: {
+         max_new_tokens: options.maxNewTokens ?? translationMaxNewTokens.value,
+         temperature: options.temperature ?? translationTemperature.value,
+         top_p: 0.9,
++        min_p: normalizeMinPForPayload(options.minP ?? minP.value),
+         top_k: 40,
+         repeat_penalty: 1.02,
+         repeat_last_n: 96,
+@@ -4217,6 +4235,7 @@ async function runGenerate() {
+       max_new_tokens: maxNewTokens.value,
+       temperature: temperature.value,
+       top_p: topP.value,
++      min_p: normalizeMinPForPayload(minP.value),
+       top_k: topK.value,
+       repeat_penalty: repeatPenalty.value,
+       repeat_last_n: repeatLastN.value,
+@@ -4715,6 +4734,7 @@ function handleEvent(msg: EngineMessage) {
+     ashGate.maxNewTokens = Number(payload.max_new_tokens ?? 0);
+     ashGate.temperature = Number(payload.temperature ?? 0);
+     ashGate.topP = Number(payload.top_p ?? 0);
++    ashGate.minP = Number(payload.min_p ?? payload.minP ?? 0);
+     ashGate.topK = Number(payload.top_k ?? 0);
+     ashGate.repeatPenalty = Number(payload.repeat_penalty ?? 0);
+     ashGate.repeatLastN = Number(payload.repeat_last_n ?? 0);
+diff --git a/minp_p1_clean/crates/orchestrator_local/src/lib.rs b/minp_p1_work/crates/orchestrator_local/src/lib.rs
+index f798eb7..edeace5 100644
+--- a/minp_p1_clean/crates/orchestrator_local/src/lib.rs
++++ b/minp_p1_work/crates/orchestrator_local/src/lib.rs
+@@ -82,7 +82,7 @@ use std::{
+     sync::{Arc, Mutex},
+ };
+ use runtime::{
+-    build_candidate_plan_for_task, load_runtime_profile_toml, run_standard_infer,
++    build_candidate_plan_for_task, load_runtime_profile_toml, normalize_min_p, run_standard_infer,
+     run_standard_infer_candidate_pool, StandardInferRequest,
+ };
+ use text_kernel::{observe_text_kernel, TextKernelRequest};
+@@ -184,6 +184,90 @@ pub(crate) fn emit_event(event: &str, payload: Value, stdout_lock: &Arc<Mutex<()
+     );
+ }
+ 
++
++fn payload_f64_alias(payload: &Value, aliases: &[&str]) -> Option<f64> {
++    aliases
++        .iter()
++        .find_map(|key| payload.get(*key).and_then(|v| v.as_f64()))
++}
++
++fn model_generate_bridge_payload(payload: &Value) -> Value {
++    let mut bridged = payload.as_object().cloned().unwrap_or_default();
++
++    bridged.insert("kind".to_string(), json!("infer"));
++    bridged.insert("model_generate_bridge".to_string(), json!(true));
++
++    let session_id = payload
++        .get("session_id")
++        .and_then(|v| v.as_str())
++        .unwrap_or("session");
++    bridged.insert("model_generate_session_id".to_string(), json!(session_id));
++
++    if !bridged.contains_key("input") {
++        let prompt = payload
++            .get("prompt")
++            .and_then(|v| v.as_str())
++            .unwrap_or_default();
++        bridged.insert("input".to_string(), json!(prompt));
++    }
++
++    if !bridged.contains_key("maxNewTokens") {
++        if let Some(v) = payload
++            .get("max_new_tokens")
++            .or_else(|| payload.get("maxNewTokens"))
++            .and_then(|v| v.as_u64())
++        {
++            bridged.insert("maxNewTokens".to_string(), json!(v));
++        }
++    }
++
++    if let Some(v) = payload_f64_alias(payload, &["min_p", "minP", "samplingMinP", "sampling_min_p"]) {
++        bridged.insert("min_p".to_string(), json!(normalize_min_p(v as f32)));
++    } else {
++        bridged.insert("min_p".to_string(), json!(0.0));
++    }
++
++    Value::Object(bridged)
++}
++
++
++#[cfg(test)]
++mod minp_p1_tests {
++    use super::*;
++
++    #[test]
++    fn model_generate_bridge_maps_prompt_to_infer_input_and_preserves_min_p() {
++        let payload = json!({
++            "session_id": "sess_p1",
++            "prompt": "안녕",
++            "max_new_tokens": 16,
++            "temperature": 0.8,
++            "top_p": 0.9,
++            "top_k": 64,
++            "min_p": 0.05
++        });
++        let bridged = model_generate_bridge_payload(&payload);
++
++        assert_eq!(bridged.get("kind").and_then(|v| v.as_str()), Some("infer"));
++        assert_eq!(bridged.get("input").and_then(|v| v.as_str()), Some("안녕"));
++        assert_eq!(bridged.get("maxNewTokens").and_then(|v| v.as_u64()), Some(16));
++        assert_eq!(bridged.get("model_generate_session_id").and_then(|v| v.as_str()), Some("sess_p1"));
++        assert_eq!(bridged.get("min_p").and_then(|v| v.as_f64()), Some(0.05));
++    }
++
++    #[test]
++    fn model_generate_bridge_normalizes_min_p_aliases_and_clamps() {
++        let aliases = ["minP", "min_p", "samplingMinP", "sampling_min_p"];
++        for alias in aliases {
++            let mut payload = serde_json::Map::new();
++            payload.insert(alias.to_string(), json!(2.0));
++            payload.insert("prompt".to_string(), json!("x"));
++            let bridged = model_generate_bridge_payload(&Value::Object(payload));
++            assert_eq!(bridged.get("min_p").and_then(|v| v.as_f64()), Some(0.95));
++        }
++    }
++}
++
+ fn handle_command(
+     incoming: Incoming,
+     state: &mut ServiceState,
+@@ -498,24 +582,43 @@ fn handle_command(
+                 .payload
+                 .get("session_id")
+                 .and_then(|v| v.as_str())
+-                .unwrap_or("session");
+-            let prompt = incoming
+-                .payload
+-                .get("prompt")
+-                .and_then(|v| v.as_str())
+-                .unwrap_or("");
+-            emit_response(&incoming.id, true, json!({"accepted": true}), stdout_lock);
+-            emit_event(
+-                "model.output.chunk",
+-                json!({"session_id": session_id, "text": prompt}),
+-                stdout_lock,
++                .unwrap_or("session")
++                .to_string();
++            let bridged_payload = model_generate_bridge_payload(&incoming.payload);
++            let min_p = bridged_payload
++                .get("min_p")
++                .and_then(|v| v.as_f64())
++                .unwrap_or(0.0);
++            let sampled_decode = min_p > 0.0
++                || bridged_payload.get("temperature").and_then(|v| v.as_f64()).map(|v| (v - 1.0).abs() > f64::EPSILON).unwrap_or(false)
++                || bridged_payload.get("top_p").and_then(|v| v.as_f64()).map(|v| v < 1.0).unwrap_or(false)
++                || bridged_payload.get("topP").and_then(|v| v.as_f64()).map(|v| v < 1.0).unwrap_or(false)
++                || bridged_payload.get("top_k").and_then(|v| v.as_u64()).map(|v| v > 0).unwrap_or(false)
++                || bridged_payload.get("topK").and_then(|v| v.as_u64()).map(|v| v > 0).unwrap_or(false);
++
++            eprintln!(
++                "[16AI-QW-38G-R6A-MINP-P1][model.generate] bridge_to_infer session_id={} min_p={} sampled_decode={}",
++                session_id,
++                min_p,
++                sampled_decode,
+             );
+             emit_event(
+-                "model.output.done",
+-                json!({"session_id": session_id, "text": prompt}),
++                "generate.started",
++                json!({
++                    "session_id": session_id,
++                    "bridge_to_infer": true,
++                    "min_p": min_p,
++                    "sampled_decode": sampled_decode,
++                }),
+                 stdout_lock,
+             );
+-            Ok(())
++
++            let bridged = Incoming {
++                cmd: "run.start".to_string(),
++                id: incoming.id.clone(),
++                payload: bridged_payload,
++            };
++            handle_infer_run(&bridged, state, stdout_lock)
+         }
+         other => {
+             emit_response(
+diff --git a/minp_p1_clean/crates/orchestrator_local/src/infer_entry.rs b/minp_p1_work/crates/orchestrator_local/src/infer_entry.rs
+index 53b065d..bfa6e54 100644
+--- a/minp_p1_clean/crates/orchestrator_local/src/infer_entry.rs
++++ b/minp_p1_work/crates/orchestrator_local/src/infer_entry.rs
+@@ -2586,6 +2586,37 @@ pub(crate) fn handle_infer_run(
+     response_json.insert("salad01cReceiptPath".to_string(), json!(salad01c_receipt_path.clone()));
+     response_json.insert("salad01cCanonicalReceiptPath".to_string(), json!(salad01c_canonical_receipt_path.clone()));
+ 
++    if let Some(model_generate_session_id) = incoming
++        .payload
++        .get("model_generate_session_id")
++        .and_then(|v| v.as_str())
++    {
++        let min_p = sampler01_requested_min_p(&incoming.payload).unwrap_or(0.0);
++        response_json.insert("modelGenerateBridge".to_string(), json!(true));
++        response_json.insert("modelGenerateSessionId".to_string(), json!(model_generate_session_id));
++        response_json.insert("minP".to_string(), json!(min_p));
++        response_json.insert("min_p".to_string(), json!(min_p));
++        emit_event(
++            "generate.output",
++            json!({
++                "session_id": model_generate_session_id,
++                "text": result.output_text.clone(),
++                "bridge_to_infer": true,
++                "min_p": min_p,
++            }),
++            stdout_lock,
++        );
++        emit_event(
++            "generate.done",
++            json!({
++                "session_id": model_generate_session_id,
++                "bridge_to_infer": true,
++                "min_p": min_p,
++            }),
++            stdout_lock,
++        );
++    }
++
+     emit_response(
+         &incoming.id,
+         true,

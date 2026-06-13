@@ -1,0 +1,32 @@
+QW-MCTS-07B module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwMcts07bDoubleBufferUploadDryrunConfig: PASS
+QwMcts07bPayloadByteLayout: PASS
+QwMcts07bUploadRangeDescriptor: PASS
+QwMcts07bStagingUploadPlan: PASS
+QwMcts07bNoQueueWriteReceipt: PASS
+QwMcts07bDoubleBufferUploadDryrunReport: PASS
+build_qw_mcts07b_payload_byte_layout: PASS
+build_qw_mcts07b_upload_range_descriptor: PASS
+qw_mcts07b_validate_no_range_overlap: PASS
+build_qw_mcts07b_staging_upload_plan: PASS
+build_qw_mcts07b_double_buffer_upload_dryrun_report: PASS
+build_qw_mcts07b_default_double_buffer_upload_dryrun_report: PASS
+matrix f32 const 256: PASS
+matrix byte len const 1024: PASS
+alignment const 256: PASS
+default blocks buffer create: PASS
+default blocks queue write: PASS
+default blocks queue submit: PASS
+default blocks GPU dispatch: PASS
+default blocks command encoder: PASS
+default blocks compute pass: PASS
+default blocks backend mutation: PASS
+test upload dryrun present: PASS
+test no queue write present: PASS
+no QW-MCTS-07B marker in generation_sampling.rs: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+overall: PASS

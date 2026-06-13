@@ -1,0 +1,113 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-PERF-REVIEW-00",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "model_spec_path": "specs/model_spec.toml",
+  "model_spec_exists": true,
+  "model_spec_sha256": "sha256:fb70c62f9c9c9ce90f0cbe2855fb8091174691add195c5169c72c6d777debff1",
+  "model_spec": {
+    "model_spec_id": "model_1p1b_v1",
+    "model_name": "Ash 1.1B Subtitle-First Task LM",
+    "description": "1.1B decoder-only bilingual task LM for subtitle polish, translation assist, and structured repair",
+    "identity": {
+      "family": "ash",
+      "profile": "subtitle_first_bilingual",
+      "architecture": "decoder_only_transformer",
+      "mode": "local_only"
+    },
+    "dimensions": {
+      "vocab_size": 56000,
+      "hidden_size": 1536,
+      "num_layers": 32,
+      "num_attention_heads": 12,
+      "num_key_value_heads": 4,
+      "head_dim": 128,
+      "intermediate_size": 4096,
+      "max_position_embeddings": 8192
+    },
+    "tasks": {
+      "native_task_tokens": true,
+      "supported": [
+        "subtitle_polish",
+        "translation_assist",
+        "json_array_polish",
+        "freeform"
+      ],
+      "default": "subtitle_polish"
+    },
+    "languages": {
+      "primary": [
+        "ko",
+        "en"
+      ],
+      "allow_code_mixed": true,
+      "preserve_newlines": true,
+      "preserve_cue_structure": true
+    },
+    "backend": {
+      "requires_backend_spec": true,
+      "preferred_backend": "burn_webgpu_v1",
+      "allow_cpu_fallback": false
+    }
+  },
+  "training_policy": {
+    "path": "specs/training_policy.toml",
+    "exists": true,
+    "id": "training_policy_1p1b_subtitle_v1",
+    "name": "1.1B Subtitle-First Bilingual Policy",
+    "model": {
+      "model_spec_id": "model_1p1b_v1",
+      "require_model_spec_match": true,
+      "require_tokenizer_manifest_match": true,
+      "require_backend_spec_match": true
+    },
+    "data_mix": {
+      "subtitle_polish": 0.45,
+      "translation_assist": 0.3,
+      "json_array_polish": 0.1,
+      "freeform": 0.05,
+      "noise_robustness": 0.1
+    },
+    "quality": {
+      "enable_eval_suite": true,
+      "eval_suite_id": "eval_subtitle_translation_v1",
+      "track_loss": true,
+      "track_perplexity": true,
+      "track_tokens_per_second": true,
+      "track_task_accuracy": true
+    }
+  },
+  "active_runtime_profile": {
+    "path": "specs/runtime_profile.toml",
+    "exists": true,
+    "runtime_profile_id": "dust_runtime_tinyllama_1p1b_v4",
+    "runtime_name": "DUST TinyLlama 1.1B v4 Runtime",
+    "model_spec_path": "model_spec_tinyllama_1p1b_v4.toml",
+    "tokenizer_manifest_path": "../tokenizer_manifest_clean_v4.json",
+    "checkpoint_path": "../workspace/base_train_runs/tinyllama_1p1b_v4_base/full_model.safetensors",
+    "default_task": "subtitle_polish",
+    "allow_cpu_fallback": false
+  },
+  "v5_checkpoint_spec": {
+    "path": "specs/model_spec_v5_48259.toml",
+    "exists": true,
+    "model_spec_id": "model_tinyllama_1p1b_v4",
+    "model_name": "TinyLlama 1.1B V4",
+    "dimensions": {
+      "vocab_size": 48259,
+      "hidden_size": 2048,
+      "num_layers": 22,
+      "num_attention_heads": 32,
+      "num_key_value_heads": 4,
+      "head_dim": 64,
+      "intermediate_size": 5632,
+      "max_position_embeddings": 2048
+    }
+  },
+  "ash_1p1b_ssot_checked": true,
+  "stale_300m_spec_used_as_ssot": false,
+  "notes": [
+    "Primary specs/model_spec.toml declares Ash 1.1B Subtitle-First Task LM with 56000 vocab and 1536x32 architecture.",
+    "Runtime/profile and checkpoint fingerprint lineage also contain TinyLlama/Ash 1.1B V4 path with 48259 vocab and 2048x22 architecture.",
+    "300M dialogue specs remain present as stale/experiment files and must not be promoted to body SSOT."
+  ]
+}

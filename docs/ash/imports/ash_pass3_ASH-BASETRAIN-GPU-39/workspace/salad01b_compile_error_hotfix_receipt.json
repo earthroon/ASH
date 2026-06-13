@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01B",
+  "base_patch_id": "16AI-QW-38G-R6A-SALAD-01A",
+  "title": "Runtime AshGate Scope Repair / Decode Profile Event Seal",
+  "source_error": "E0425 cannot find value gate in crates/runtime/src/engine/generation_runner.rs lines 334-335",
+  "root_cause": "SALAD-01 event fields referenced gate.audit inside the generation thread after gate had gone out of scope and was not moved into the closure.",
+  "fix": "Capture decode_profile and word_salad_guard inside the engine lock immediately after derive_gate, return them through the outer tuple, and emit them from closure-owned values.",
+  "changed_files": [
+    "crates/runtime/src/engine/generation_runner.rs"
+  ],
+  "model_mutation": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "static_validation": {
+    "dangling_gate_audit_reference_in_generation_runner": false,
+    "decode_profile_event_field_present": true,
+    "word_salad_guard_event_field_present": true,
+    "cargo_available_in_bake_container": false,
+    "local_cargo_check_required": true
+  },
+  "adjudication": "PASS_STATIC_SCOPE_HOTFIX_PENDING_LOCAL_CARGO_BUILD"
+}

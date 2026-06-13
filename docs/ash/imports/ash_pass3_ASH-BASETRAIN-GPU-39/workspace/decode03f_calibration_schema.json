@@ -1,0 +1,28 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
+  "schema_version": 1,
+  "ssot": "DECODE-03E applied receipt + EVAL-00/01/02 summaries",
+  "mode_default": "AnalyzeOnly",
+  "candidate_only": true,
+  "runtime_apply": false,
+  "required_inputs": [
+    "workspace/eval00_summary.json",
+    "workspace/eval01_summary.json",
+    "workspace/eval02_summary.json",
+    "workspace/decode03e_summary.json"
+  ],
+  "forbidden": [
+    "runtime_apply",
+    "base_config_mutation",
+    "silent_threshold_change",
+    "default_promotion"
+  ],
+  "candidate_fields": [
+    "current_params",
+    "proposed_params",
+    "param_deltas",
+    "expected_effect",
+    "risk_assessment",
+    "acceptance_gate"
+  ]
+}

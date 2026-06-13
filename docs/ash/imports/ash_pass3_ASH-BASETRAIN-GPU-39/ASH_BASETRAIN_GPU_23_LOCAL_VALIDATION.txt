@@ -1,0 +1,15 @@
+ASH-BASETRAIN-GPU-23 local validation
+
+Required local command:
+
+cargo build -p base_train --bin ash_basetrain_gpu_23_loss_repeatability_audit --jobs 1
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_23_loss_repeatability_audit
+
+Expected PASS verdict:
+
+PASS_ASH_BASETRAIN_GPU_23_LOSS_REPEATABILITY_AUDIT_REPEATED_LOCAL_WINDOW_TARGET_1_LOSS_SCALAR_STABILITY_NO_BACKWARD_NO_OPTIMIZER
+
+Bake environment note:
+
+cargo_build = not_run_cargo_unavailable
+runtime_pass = pending_user_local_log

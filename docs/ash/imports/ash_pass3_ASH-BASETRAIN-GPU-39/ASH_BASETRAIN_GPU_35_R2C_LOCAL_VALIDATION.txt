@@ -1,0 +1,7 @@
+container_cargo_build=NOT_EXECUTED_IN_CONTAINER
+container_cargo_run=NOT_EXECUTED_IN_CONTAINER
+reason=cargo_rustc_unavailable_in_container
+user_local_runtime_pass_required=true
+runtime_gpu_required=false
+recommended_build=cargo build -p base_train --bin ash_basetrain_gpu_35_r2c_atlas_group_plan_receipt_locator --jobs 1
+recommended_run=cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2c_atlas_group_plan_receipt_locator

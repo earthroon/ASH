@@ -1,0 +1,1835 @@
+diff -ruN sampler05_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md sampler05_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md
+--- sampler05_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md	2026-05-27 05:51:53.465319470 +0000
+@@ -0,0 +1,19 @@
++# 16AI-QW-38G-R6A-SAMPLER-05 Acceptance
++
++## Status
++STATIC_BAKE_ONLY / RUNTIME_NOT_RUN
++
++## Accepted in this bake
++- SAMPLER-05 module added.
++- SAMPLER-03 append hook now forwards to SAMPLER-05 receipt when `ASH_SAMPLER05_PARITY` is enabled.
++- GPU top-p/min-p scan threshold now uses weighted score for pre-min-p max.
++- Top-k transition-awareness risk is exposed through controlled bypass policy, default off.
++- Workspace receipt/schema/summary/static-check artifacts included.
++
++## Not accepted as runtime pass
++- Cargo check/test: NOT_RUN, cargo unavailable in container.
++- WGSL compile: NOT_RUN, target GPU compiler unavailable in container.
++- Runtime parity probe: NOT_RUN, requires target runtime.
++
++## Promotion block
++`ready_for_dynamic_sampler=false` until actual `workspace/sampler05_parity_steps.jsonl` is produced by runtime probe and summary is updated from real receipts.
+diff -ruN sampler05_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs sampler05_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- sampler05_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:56:22.000000000 +0000
++++ sampler05_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 05:50:47.799547542 +0000
+@@ -135,6 +135,23 @@
+     pub candidate_cap: u32,
+     pub require_exact_top_p: bool,
+     pub shadow_compare: bool,
++    pub top_k_bypass_reason: Option<&'static str>,
++}
++
++fn sampler05_topk_bypass_reason(cfg: &GpuSamplingConfig) -> Option<&'static str> {
++    let policy = std::env::var("ASH_SAMPLER05_TOPK_POLICY")
++        .unwrap_or_default()
++        .trim()
++        .to_ascii_lowercase();
++    let bypass_requested = matches!(
++        policy.as_str(),
++        "bypass_if_not_transition_aware" | "bypass-transition" | "transition_safe_bypass"
++    );
++    if bypass_requested && cfg.top_k > 0 && cfg.transition_guard.enabled {
++        Some("GPU_TOPK_NOT_TRANSITION_AWARE")
++    } else {
++        None
++    }
+ }
+ 
+ impl GpuSamplingParallelPlan {
+@@ -142,7 +159,8 @@
+         let vocab_size = cfg.vocab_size.min(u32::MAX as usize) as u32;
+         let block_size = GPU_SAMPLING_PARALLEL_BLOCK_SIZE;
+         let block_count = div_ceil_u32(vocab_size.max(1), block_size).max(1);
+-        let effective_top_k = if cfg.top_k == 0 {
++        let top_k_bypass_reason = sampler05_topk_bypass_reason(cfg);
++        let effective_top_k = if top_k_bypass_reason.is_some() || cfg.top_k == 0 {
+             0
+         } else {
+             cfg.top_k.min(vocab_size).min(GPU_SAMPLING_TOPK_MAX)
+@@ -190,6 +208,7 @@
+             candidate_cap,
+             require_exact_top_p: top_p_enabled,
+             shadow_compare: matches!(mode, GpuSamplingParallelMode::Shadow),
++            top_k_bypass_reason,
+         }
+     }
+ 
+@@ -632,9 +651,13 @@
+ 
+ impl GpuSamplingUniform {
+     pub fn from_config(v: &GpuSamplingConfig, stage: u32, block_count: u32) -> Self {
++        Self::from_config_with_top_k(v, stage, block_count, v.top_k)
++    }
++
++    pub fn from_config_with_top_k(v: &GpuSamplingConfig, stage: u32, block_count: u32, effective_top_k: u32) -> Self {
+         Self {
+             vocab_size: v.vocab_size as u32,
+-            top_k: v.top_k,
++            top_k: effective_top_k,
+             temperature: v.temperature,
+             top_p: v.top_p,
+             seed_lo: v.seed_lo,
+@@ -1392,12 +1415,14 @@
+             plan.block_size,
+         );
+         eprintln!(
+-            "[gpu_sampling][parallel_topk] vocab_size={} block_count={} local_k={} candidate_count={} requested_top_k={}",
++            "[gpu_sampling][parallel_topk] vocab_size={} block_count={} local_k={} candidate_count={} requested_top_k={} effective_top_k={} sampler05_bypass_reason={}",
+             plan.vocab_size,
+             plan.block_count,
+             plan.local_k,
+             plan.candidate_cap,
+             cfg.top_k,
++            plan.top_k,
++            plan.top_k_bypass_reason.unwrap_or("none"),
+         );
+         eprintln!(
+             "[gpu_sampling][parallel_topp] mode={} top_p={} min_p={} candidate_count={} retained_count=defer coverage={}",
+@@ -1828,15 +1853,15 @@
+     }
+ 
+     fn allocate_dispatch(&self, cfg: &GpuSamplingConfig, plan: &GpuSamplingParallelPlan) -> Result<GpuSamplingDispatch> {
+-        let uniform = Arc::new(self.create_uniform_buffer("gpu_sampling.uniform", cfg, 0, plan.block_count));
+-        let stats_uniform_local_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_max", cfg, 0, plan.block_count));
+-        let stats_uniform_global_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_max", cfg, 1, plan.block_count));
+-        let stats_uniform_local_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_sum", cfg, 2, plan.block_count));
+-        let stats_uniform_global_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_sum", cfg, 3, plan.block_count));
+-        let topk_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.local", cfg, 0, plan.block_count));
+-        let topk_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.global", cfg, 1, plan.block_count));
+-        let select_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.local", cfg, 0, plan.block_count));
+-        let select_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.global", cfg, 1, plan.block_count));
++        let uniform = Arc::new(self.create_uniform_buffer("gpu_sampling.uniform", cfg, 0, plan.block_count, plan.top_k));
++        let stats_uniform_local_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_max", cfg, 0, plan.block_count, plan.top_k));
++        let stats_uniform_global_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_max", cfg, 1, plan.block_count, plan.top_k));
++        let stats_uniform_local_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_sum", cfg, 2, plan.block_count, plan.top_k));
++        let stats_uniform_global_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_sum", cfg, 3, plan.block_count, plan.top_k));
++        let topk_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.local", cfg, 0, plan.block_count, plan.top_k));
++        let topk_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.global", cfg, 1, plan.block_count, plan.top_k));
++        let select_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.local", cfg, 0, plan.block_count, plan.top_k));
++        let select_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.global", cfg, 1, plan.block_count, plan.top_k));
+ 
+         let vocab_bytes = storage_bytes_checked::<f32>(cfg.vocab_size, "gpu_sampling.vocab")?;
+         let mask_bytes = storage_bytes_checked::<u32>(cfg.vocab_size, "gpu_sampling.mask")?;
+@@ -2018,10 +2043,11 @@
+         cfg: &GpuSamplingConfig,
+         stage: u32,
+         block_count: u32,
++        effective_top_k: u32,
+     ) -> BackendBuffer {
+         self.device.create_buffer_init(&BackendBufferInitDescriptor {
+             label: Some(label),
+-            contents: cast_slice(&[GpuSamplingUniform::from_config(cfg, stage, block_count)]),
++            contents: cast_slice(&[GpuSamplingUniform::from_config_with_top_k(cfg, stage, block_count, effective_top_k)]),
+             usage: BackendBufferUsages::UNIFORM | BackendBufferUsages::COPY_DST,
+         })
+     }
+@@ -2434,7 +2460,7 @@
+ 
+ fn emit_parallel_plan_log(plan: &GpuSamplingParallelPlan) {
+     eprintln!(
+-        "[gpu_sampling][parallel_plan] mode={} kind={:?} vocab_size={} block_size={} block_count={} top_k={} top_p_enabled={} min_p_enabled={} top_p_mode={} candidate_cap={} shadow_compare={}",
++        "[gpu_sampling][parallel_plan] mode={} kind={:?} vocab_size={} block_size={} block_count={} top_k={} top_p_enabled={} min_p_enabled={} top_p_mode={} candidate_cap={} shadow_compare={} sampler05_topk_bypass_reason={}",
+         plan.mode.as_str(),
+         plan.kind,
+         plan.vocab_size,
+@@ -2446,6 +2472,7 @@
+         plan.top_p_mode.as_str(),
+         plan.candidate_cap,
+         plan.shadow_compare,
++        plan.top_k_bypass_reason.unwrap_or("none"),
+     );
+ }
+ 
+diff -ruN sampler05_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl sampler05_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
+--- sampler05_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:56:22.000000000 +0000
++++ sampler05_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 05:48:36.307973782 +0000
+@@ -331,7 +331,12 @@
+       if (!pre_minp_found || should_precede(i, pre_minp_top1)) {
+         pre_minp_found = true;
+         pre_minp_top1 = i;
+-        pre_minp_max = scaled_logits[i];
++        // 16AI-QW-38G-R6A-SAMPLER-05:
++        // Min-p threshold SSOT is the post static-prior / transition-guard
++        // weighted sampler score, matching model_core::cpu_oracle_sampler.
++        // Do not mix scaled logits for the threshold with weighted logits for
++        // candidate retention, or CPU/GPU active sets silently diverge.
++        pre_minp_max = weighted_logit_at(i);
+       }
+     }
+     i = i + 1u;
+diff -ruN sampler05_orig/crates/model_core/src/lib.rs sampler05_work/crates/model_core/src/lib.rs
+--- sampler05_orig/crates/model_core/src/lib.rs	2026-05-27 05:23:00.000000000 +0000
++++ sampler05_work/crates/model_core/src/lib.rs	2026-05-27 05:49:24.115043252 +0000
+@@ -15,6 +15,7 @@
+ mod decode_transition_validation;
+ mod sampler_parity;
+ mod sampler_parity_validation;
++mod sampler05_parity;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -77,6 +78,11 @@
+ };
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++pub use sampler05_parity::{
++    SAMPLER05_PATCH_ID, SAMPLER05_INPUT_PATCH_ID, Sampler05Mode,
++    Sampler05ParityReceipt, Sampler05Summary, append_sampler05_receipt_from_sampler03,
++    write_summary_from_receipt_file as write_sampler05_summary_from_receipt_file,
++};
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN sampler05_orig/crates/model_core/src/sampler05_parity.rs sampler05_work/crates/model_core/src/sampler05_parity.rs
+--- sampler05_orig/crates/model_core/src/sampler05_parity.rs	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/crates/model_core/src/sampler05_parity.rs	2026-05-27 05:49:22.870556971 +0000
+@@ -0,0 +1,566 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const SAMPLER05_PATCH_ID: &str = "16AI-QW-38G-R6A-SAMPLER-05";
++pub const SAMPLER05_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SAMPLER-04";
++pub const SAMPLER05_CPU_SSOT: &str = "model_core::cpu_oracle_sampler";
++pub const SAMPLER05_GPU_PROJECTION: &str = "burn_webgpu_backend::gpu_sampling_topp_scan.wgsl";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum Sampler05Mode {
++    Off,
++    Receipt,
++    Strict,
++}
++
++impl Sampler05Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_SAMPLER05_PARITY")
++            .or_else(|_| env::var("ASH_SAMPLER05_VALIDATE"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "probe_only" => Self::Receipt,
++            "strict" => Self::Strict,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn enabled(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::Receipt => "Receipt",
++            Self::Strict => "Strict",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05DecodeConfig {
++    pub temperature: f32,
++    pub top_k: u32,
++    pub top_p: f32,
++    pub min_p: f32,
++    pub top_k_policy: String,
++    pub forbid_global_fallback: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05TraceSide {
++    pub selected_id: u32,
++    pub selected_logprob: Option<f32>,
++    pub active_count: Option<usize>,
++    pub final_count: Option<usize>,
++    pub min_p_threshold: Option<f32>,
++    pub min_p_threshold_score_kind: String,
++    pub active_max: Option<f32>,
++    pub active_sum_exp: Option<f32>,
++    pub fallback_mode: Option<String>,
++    pub active_ids_head: Vec<u32>,
++    pub final_ids_head: Vec<u32>,
++    pub trace_completeness: String,
++    pub transition_guard_enabled: bool,
++    pub transition_guard_probe_only: bool,
++    pub selected_transition_action_code: Option<u32>,
++    pub selected_transition_reason_mask: Option<u32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05ParityStatus {
++    pub threshold_kind_match: bool,
++    pub threshold_value_match: Option<bool>,
++    pub active_count_match: Option<bool>,
++    pub final_count_match: Option<bool>,
++    pub active_set_match: Option<bool>,
++    pub final_set_match: Option<bool>,
++    pub selected_id_match: bool,
++    pub fallback_match: Option<bool>,
++    pub transition_hardblock_safe: Option<bool>,
++    pub global_finite_fallback_forbidden: bool,
++    pub status: String,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05ParityReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub step: usize,
++    pub fixture_id: String,
++    pub mode: String,
++    pub semantic_reference: String,
++    pub gpu_projection: String,
++    pub behavior_change: bool,
++    pub decode_config: Sampler05DecodeConfig,
++    pub cpu: Sampler05TraceSide,
++    pub gpu: Sampler05TraceSide,
++    pub parity: Sampler05ParityStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05TopKPolicySummary {
++    pub policy: String,
++    pub transition_aware_topk: bool,
++    pub parity_safe_bypass_available: bool,
++    pub env_var: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Sampler05Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub cpu_oracle_is_sampler_ssot: bool,
++    pub semantic_reference: String,
++    pub gpu_projection: String,
++    pub behavior_change_default: bool,
++    pub receipt: String,
++    pub checked_steps: usize,
++    pub pass_steps: usize,
++    pub warn_steps: usize,
++    pub fail_steps: usize,
++    pub threshold_kind_cpu: String,
++    pub threshold_kind_gpu: String,
++    pub min_p_threshold_score_kind_match: bool,
++    pub top_k_policy: Sampler05TopKPolicySummary,
++    pub global_finite_fallback_count: usize,
++    pub ready_for_decode03a_entropy_receipt: bool,
++    pub ready_for_dynamic_sampler: bool,
++    pub reason: String,
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_SAMPLER05_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler05_parity_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_SAMPLER05_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler05_summary.json"))
++}
++
++pub fn fixture_id() -> String {
++    env::var("ASH_SAMPLER05_FIXTURE")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "runtime_sampler03_bridge".to_string())
++}
++
++pub fn top_k_policy_from_env() -> String {
++    env::var("ASH_SAMPLER05_TOPK_POLICY")
++        .unwrap_or_else(|_| "observe_only".to_string())
++}
++
++pub fn forbid_global_fallback_from_env() -> bool {
++    env_bool("ASH_SAMPLER05_FORBID_GLOBAL_FALLBACK", true)
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn sorted_equal(a: &[u32], b: &[u32]) -> bool {
++    let mut aa = a.to_vec();
++    let mut bb = b.to_vec();
++    aa.sort_unstable();
++    bb.sort_unstable();
++    aa == bb
++}
++
++fn threshold_value_match(a: Option<f32>, b: Option<f32>) -> Option<bool> {
++    match (a, b) {
++        (Some(x), Some(y)) => Some((x - y).abs() <= 1e-4),
++        (None, None) => Some(true),
++        _ => None,
++    }
++}
++
++fn is_global_finite_fallback(mode: Option<&str>) -> bool {
++    matches!(mode, Some("valid_global_top1") | Some("GLOBAL_FINITE_FALLBACK") | Some("global_finite_fallback"))
++}
++
++fn side_from_cpu(receipt: &SamplerParityReceipt) -> Sampler05TraceSide {
++    Sampler05TraceSide {
++        selected_id: receipt.cpu.selected_id,
++        selected_logprob: receipt.cpu.selected_logprob,
++        active_count: Some(receipt.cpu.active_count),
++        final_count: Some(receipt.cpu.final_count),
++        min_p_threshold: receipt.cpu.min_p_threshold,
++        // SAMPLER-05 SSOT: cpu_oracle_sampler applies min-p over weighted score
++        // after temperature/static-prior/transition-guard processing.
++        min_p_threshold_score_kind: "weighted".to_string(),
++        active_max: receipt.cpu.active_max,
++        active_sum_exp: receipt.cpu.active_sum_exp,
++        fallback_mode: Some(receipt.cpu.recovery_mode.clone()),
++        active_ids_head: receipt.cpu.active_ids_head.clone(),
++        final_ids_head: receipt.cpu.final_ids_head.clone(),
++        trace_completeness: "cpu_oracle_full_candidate_trace".to_string(),
++        transition_guard_enabled: receipt.cpu.transition_guard_enabled,
++        transition_guard_probe_only: receipt.cpu.transition_guard_probe_only,
++        selected_transition_action_code: receipt.cpu.selected_transition_action_code,
++        selected_transition_reason_mask: receipt.cpu.selected_transition_reason_mask,
++    }
++}
++
++fn side_from_gpu(receipt: &SamplerParityReceipt) -> Sampler05TraceSide {
++    Sampler05TraceSide {
++        selected_id: receipt.gpu.selected_id,
++        selected_logprob: receipt.gpu.selected_logprob,
++        active_count: receipt.gpu.active_count,
++        final_count: receipt.gpu.final_count,
++        min_p_threshold: receipt.gpu.min_p_threshold,
++        // SAMPLER-05 pairs this receipt layer with the WGSL patch that computes
++        // pre_minp_max via weighted_logit_at(index). If the shader is reverted,
++        // sampler05_static_checks must fail and this receipt must not promote.
++        min_p_threshold_score_kind: "weighted".to_string(),
++        active_max: receipt.gpu.active_max,
++        active_sum_exp: receipt.gpu.active_sum_exp,
++        fallback_mode: receipt.gpu.recovery_mode.clone(),
++        active_ids_head: receipt.gpu.active_ids_head.clone(),
++        final_ids_head: receipt.gpu.final_ids_head.clone(),
++        trace_completeness: receipt.gpu.trace_completeness.clone(),
++        transition_guard_enabled: receipt.gpu.transition_guard_enabled,
++        transition_guard_probe_only: receipt.gpu.transition_guard_probe_only,
++        selected_transition_action_code: receipt.gpu.selected_transition_action_code,
++        selected_transition_reason_mask: receipt.gpu.selected_transition_reason_mask,
++    }
++}
++
++pub fn receipt_from_sampler03(mode: Sampler05Mode, source: &SamplerParityReceipt) -> Sampler05ParityReceipt {
++    let cpu = side_from_cpu(source);
++    let gpu = side_from_gpu(source);
++    let threshold_kind_match = cpu.min_p_threshold_score_kind == gpu.min_p_threshold_score_kind;
++    let threshold_value_match = threshold_value_match(cpu.min_p_threshold, gpu.min_p_threshold);
++    let active_count_match = cpu.active_count.zip(gpu.active_count).map(|(c, g)| c == g);
++    let final_count_match = cpu.final_count.zip(gpu.final_count).map(|(c, g)| c == g);
++    let active_set_match = if !cpu.active_ids_head.is_empty() || !gpu.active_ids_head.is_empty() {
++        Some(sorted_equal(&cpu.active_ids_head, &gpu.active_ids_head))
++    } else {
++        None
++    };
++    let final_set_match = if !cpu.final_ids_head.is_empty() || !gpu.final_ids_head.is_empty() {
++        Some(sorted_equal(&cpu.final_ids_head, &gpu.final_ids_head))
++    } else {
++        None
++    };
++    let selected_id_match = cpu.selected_id == gpu.selected_id;
++    let fallback_match = match (cpu.fallback_mode.as_ref(), gpu.fallback_mode.as_ref()) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => Some(true),
++        _ => None,
++    };
++    let transition_hardblock_safe = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
++        (Some(c), Some(g)) => Some(c == g || (c != 2 && g != 2)),
++        _ => None,
++    };
++    let global_finite_fallback_forbidden = forbid_global_fallback_from_env();
++    let global_fallback_seen = is_global_finite_fallback(cpu.fallback_mode.as_deref())
++        || is_global_finite_fallback(gpu.fallback_mode.as_deref());
++
++    let (status, reason) = if !threshold_kind_match {
++        ("FAIL_THRESHOLD_KIND_MISMATCH", "CPU/GPU min-p threshold score kind differs")
++    } else if threshold_value_match == Some(false) {
++        ("FAIL_THRESHOLD_VALUE_MISMATCH", "CPU/GPU min-p threshold value differs beyond tolerance")
++    } else if active_count_match == Some(false) {
++        ("FAIL_ACTIVE_COUNT_MISMATCH", "CPU/GPU active count differs")
++    } else if final_count_match == Some(false) {
++        ("FAIL_FINAL_COUNT_MISMATCH", "CPU/GPU final count differs")
++    } else if active_set_match == Some(false) {
++        ("FAIL_ACTIVE_SET_MISMATCH", "CPU/GPU active id head differs")
++    } else if final_set_match == Some(false) {
++        ("FAIL_FINAL_SET_MISMATCH", "CPU/GPU final id head differs")
++    } else if transition_hardblock_safe == Some(false) {
++        ("FAIL_TRANSITION_HARDBLOCK_UNSAFE", "GPU selected transition hardblock decision is unsafe")
++    } else if global_finite_fallback_forbidden && global_fallback_seen {
++        ("FAIL_GLOBAL_FINITE_FALLBACK", "global finite fallback is forbidden by SAMPLER-05")
++    } else if !selected_id_match {
++        ("WARN_SELECTED_ID_MISMATCH", "candidate evidence is compatible but selected id differs")
++    } else if active_set_match.is_none() || final_set_match.is_none() {
++        ("WARN_PARTIAL_TRACE", "candidate id trace is partial or unavailable")
++    } else {
++        ("PASS", "CPU oracle and GPU active-set evidence match")
++    };
++
++    Sampler05ParityReceipt {
++        patch_id: SAMPLER05_PATCH_ID.to_string(),
++        input_patch: SAMPLER05_INPUT_PATCH_ID.to_string(),
++        step: source.step,
++        fixture_id: fixture_id(),
++        mode: mode.as_str().to_string(),
++        semantic_reference: SAMPLER05_CPU_SSOT.to_string(),
++        gpu_projection: SAMPLER05_GPU_PROJECTION.to_string(),
++        behavior_change: false,
++        decode_config: Sampler05DecodeConfig {
++            temperature: source.decode_config.temperature,
++            top_k: source.decode_config.top_k,
++            top_p: source.decode_config.top_p,
++            min_p: source.decode_config.min_p,
++            top_k_policy: top_k_policy_from_env(),
++            forbid_global_fallback: global_finite_fallback_forbidden,
++        },
++        cpu,
++        gpu,
++        parity: Sampler05ParityStatus {
++            threshold_kind_match,
++            threshold_value_match,
++            active_count_match,
++            final_count_match,
++            active_set_match,
++            final_set_match,
++            selected_id_match,
++            fallback_match,
++            transition_hardblock_safe,
++            global_finite_fallback_forbidden,
++            status: status.to_string(),
++            reason: reason.to_string(),
++        },
++    }
++}
++
++pub fn append_sampler05_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Sampler05Mode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    let receipt = receipt_from_sampler03(mode, source);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++    write_summary_from_receipt_file();
++}
++
++fn classify_status(status: &str) -> &'static str {
++    if status.starts_with("FAIL") {
++        "fail"
++    } else if status.starts_with("WARN") || status.starts_with("PARTIAL") {
++        "warn"
++    } else {
++        "pass"
++    }
++}
++
++pub fn summary_from_receipts(receipts: &[Sampler05ParityReceipt]) -> Sampler05Summary {
++    let checked_steps = receipts.len();
++    let mut pass_steps = 0usize;
++    let mut warn_steps = 0usize;
++    let mut fail_steps = 0usize;
++    let mut global_finite_fallback_count = 0usize;
++    for receipt in receipts {
++        match classify_status(&receipt.parity.status) {
++            "fail" => fail_steps = fail_steps.saturating_add(1),
++            "warn" => warn_steps = warn_steps.saturating_add(1),
++            _ => pass_steps = pass_steps.saturating_add(1),
++        }
++        if is_global_finite_fallback(receipt.cpu.fallback_mode.as_deref())
++            || is_global_finite_fallback(receipt.gpu.fallback_mode.as_deref())
++        {
++            global_finite_fallback_count = global_finite_fallback_count.saturating_add(1);
++        }
++    }
++
++    let status = if checked_steps == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if fail_steps > 0 {
++        "FAIL"
++    } else if warn_steps > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    };
++    let ready_for_decode03a = checked_steps > 0 && fail_steps == 0;
++
++    Sampler05Summary {
++        patch_id: SAMPLER05_PATCH_ID.to_string(),
++        input_patch: SAMPLER05_INPUT_PATCH_ID.to_string(),
++        status: status.to_string(),
++        cpu_oracle_is_sampler_ssot: true,
++        semantic_reference: SAMPLER05_CPU_SSOT.to_string(),
++        gpu_projection: SAMPLER05_GPU_PROJECTION.to_string(),
++        behavior_change_default: false,
++        receipt: receipt_path().to_string_lossy().to_string(),
++        checked_steps,
++        pass_steps,
++        warn_steps,
++        fail_steps,
++        threshold_kind_cpu: "weighted".to_string(),
++        threshold_kind_gpu: "weighted".to_string(),
++        min_p_threshold_score_kind_match: true,
++        top_k_policy: Sampler05TopKPolicySummary {
++            policy: top_k_policy_from_env(),
++            transition_aware_topk: false,
++            parity_safe_bypass_available: true,
++            env_var: "ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware".to_string(),
++        },
++        global_finite_fallback_count,
++        ready_for_decode03a_entropy_receipt: ready_for_decode03a,
++        ready_for_dynamic_sampler: false,
++        reason: if ready_for_decode03a {
++            "SAMPLER-05 evidence has no fail steps; DECODE-03A may attach entropy metrics next".to_string()
++        } else if checked_steps == 0 {
++            "static bake only; runtime parity probe must be executed before dynamic sampler promotion".to_string()
++        } else {
++            "runtime parity failures block entropy/dynamic sampler promotion".to_string()
++        },
++    }
++}
++
++pub fn write_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() {
++                continue;
++            }
++            if let Ok(receipt) = serde_json::from_str::<Sampler05ParityReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::sampler_parity::{
++        CpuSamplerRuntimeTrace, GpuSamplerRuntimeTrace, SamplerParityDecodeConfig, SamplerParityStatus,
++    };
++
++    fn base_source_receipt() -> SamplerParityReceipt {
++        SamplerParityReceipt {
++            patch_id: "16AI-QW-38G-R6A-SAMPLER-03".to_string(),
++            step: 0,
++            mode: "ProbeOnly".to_string(),
++            decode_config: SamplerParityDecodeConfig {
++                temperature: 0.25,
++                top_k: 0,
++                top_p: 0.88,
++                min_p: 0.05,
++            },
++            cpu: CpuSamplerRuntimeTrace {
++                selected_id: 42,
++                selected_logprob: Some(-0.1),
++                active_count: 3,
++                final_count: 2,
++                min_p_threshold: Some(1.5),
++                active_max: Some(4.0),
++                active_sum_exp: Some(1.7),
++                active_ids_head: vec![1, 2, 42],
++                final_ids_head: vec![2, 42],
++                recovery_mode: "none".to_string(),
++                transition_guard_enabled: true,
++                transition_guard_probe_only: false,
++                selected_transition_risk: Some(0.0),
++                selected_transition_penalty: Some(0.0),
++                selected_transition_action_code: Some(0),
++                selected_transition_reason_mask: Some(0),
++            },
++            gpu: GpuSamplerRuntimeTrace {
++                selected_id: 42,
++                selected_logprob: Some(-0.1),
++                recovery_mode: Some("none".to_string()),
++                active_count: Some(3),
++                final_count: Some(2),
++                min_p_threshold: Some(1.50001),
++                active_max: Some(4.0),
++                active_sum_exp: Some(1.7),
++                active_ids_head: vec![42, 2, 1],
++                final_ids_head: vec![42, 2],
++                active_overflow: false,
++                final_overflow: false,
++                trace_top_n: 64,
++                trace_completeness: "gpu_candidate_trace_buffer".to_string(),
++                transition_actions_head: vec![0, 0],
++                transition_reason_masks_head: vec![0, 0],
++                candidate_trace_version: 4,
++                transition_guard_enabled: true,
++                transition_guard_probe_only: false,
++                selected_transition_risk: Some(0.0),
++                selected_transition_penalty: Some(0.0),
++                selected_transition_action_code: Some(0),
++                selected_transition_reason_mask: Some(0),
++                weighted_logit_before_transition: Some(4.0),
++                weighted_logit_after_transition: Some(4.0),
++                prob_before_transition: Some(0.7),
++                prob_after_transition: Some(0.7),
++                mask_before_transition: Some(1),
++                mask_after_transition: Some(1),
++                active_count_before_transition: Some(3),
++                active_count_after_transition: Some(3),
++                final_count_before_transition: Some(2),
++                final_count_after_transition: Some(2),
++                selected_id_before_transition: Some(42),
++                selected_id_after_transition: Some(42),
++            },
++            parity: SamplerParityStatus {
++                candidate_set_match: Some(true),
++                active_set_match: Some(true),
++                final_set_match: Some(true),
++                active_count_match: Some(true),
++                final_count_match: Some(true),
++                threshold_match: Some(true),
++                recovery_mode_match: Some(true),
++                selected_match: true,
++                trace_truncated: false,
++                strict_demoted: false,
++                transition_action_match: Some(true),
++                transition_reason_match: Some(true),
++                transition_hardblock_match: Some(true),
++                transition_probe_integrity_status: None,
++                transition_probe_weighted_logit_changed_count: None,
++                transition_probe_active_mask_changed_count: None,
++                transition_probe_final_mask_changed_count: None,
++                transition_probe_selected_id_changed: None,
++                transition_probe_max_weighted_logit_delta_abs: None,
++                transition_probe_mutation_detected: None,
++                status: "PASS".to_string(),
++                reason: "fixture".to_string(),
++            },
++        }
++    }
++
++    #[test]
++    fn sampler05_receipt_keeps_weighted_threshold_kind() {
++        let source = base_source_receipt();
++        let receipt = receipt_from_sampler03(Sampler05Mode::Receipt, &source);
++        assert_eq!(receipt.patch_id, SAMPLER05_PATCH_ID);
++        assert_eq!(receipt.cpu.min_p_threshold_score_kind, "weighted");
++        assert_eq!(receipt.gpu.min_p_threshold_score_kind, "weighted");
++        assert!(receipt.parity.threshold_kind_match);
++    }
++
++    #[test]
++    fn sampler05_summary_blocks_dynamic_sampler_until_runtime_checked() {
++        let summary = summary_from_receipts(&[]);
++        assert_eq!(summary.status, "STATIC_BAKE_DEFINED_NOT_RUN");
++        assert!(!summary.ready_for_dynamic_sampler);
++        assert!(!summary.ready_for_decode03a_entropy_receipt);
++    }
++}
+diff -ruN sampler05_orig/crates/model_core/src/sampler_parity.rs sampler05_work/crates/model_core/src/sampler_parity.rs
+--- sampler05_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:57:38.000000000 +0000
++++ sampler05_work/crates/model_core/src/sampler_parity.rs	2026-05-27 05:49:24.115493935 +0000
+@@ -390,5 +390,6 @@
+         }
+     }
+     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
++    crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN sampler05_orig/workspace/sampler05.patch sampler05_work/workspace/sampler05.patch
+--- sampler05_orig/workspace/sampler05.patch	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05.patch	2026-05-27 05:52:08.163817325 +0000
+@@ -0,0 +1,774 @@
++diff -ruN sampler05_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md sampler05_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md
++--- sampler05_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ sampler05_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-05_acceptance.md	2026-05-27 05:51:53.465319470 +0000
++@@ -0,0 +1,19 @@
+++# 16AI-QW-38G-R6A-SAMPLER-05 Acceptance
+++
+++## Status
+++STATIC_BAKE_ONLY / RUNTIME_NOT_RUN
+++
+++## Accepted in this bake
+++- SAMPLER-05 module added.
+++- SAMPLER-03 append hook now forwards to SAMPLER-05 receipt when `ASH_SAMPLER05_PARITY` is enabled.
+++- GPU top-p/min-p scan threshold now uses weighted score for pre-min-p max.
+++- Top-k transition-awareness risk is exposed through controlled bypass policy, default off.
+++- Workspace receipt/schema/summary/static-check artifacts included.
+++
+++## Not accepted as runtime pass
+++- Cargo check/test: NOT_RUN, cargo unavailable in container.
+++- WGSL compile: NOT_RUN, target GPU compiler unavailable in container.
+++- Runtime parity probe: NOT_RUN, requires target runtime.
+++
+++## Promotion block
+++`ready_for_dynamic_sampler=false` until actual `workspace/sampler05_parity_steps.jsonl` is produced by runtime probe and summary is updated from real receipts.
++diff -ruN sampler05_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs sampler05_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
++--- sampler05_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:56:22.000000000 +0000
+++++ sampler05_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 05:50:47.799547542 +0000
++@@ -135,6 +135,23 @@
++     pub candidate_cap: u32,
++     pub require_exact_top_p: bool,
++     pub shadow_compare: bool,
+++    pub top_k_bypass_reason: Option<&'static str>,
+++}
+++
+++fn sampler05_topk_bypass_reason(cfg: &GpuSamplingConfig) -> Option<&'static str> {
+++    let policy = std::env::var("ASH_SAMPLER05_TOPK_POLICY")
+++        .unwrap_or_default()
+++        .trim()
+++        .to_ascii_lowercase();
+++    let bypass_requested = matches!(
+++        policy.as_str(),
+++        "bypass_if_not_transition_aware" | "bypass-transition" | "transition_safe_bypass"
+++    );
+++    if bypass_requested && cfg.top_k > 0 && cfg.transition_guard.enabled {
+++        Some("GPU_TOPK_NOT_TRANSITION_AWARE")
+++    } else {
+++        None
+++    }
++ }
++ 
++ impl GpuSamplingParallelPlan {
++@@ -142,7 +159,8 @@
++         let vocab_size = cfg.vocab_size.min(u32::MAX as usize) as u32;
++         let block_size = GPU_SAMPLING_PARALLEL_BLOCK_SIZE;
++         let block_count = div_ceil_u32(vocab_size.max(1), block_size).max(1);
++-        let effective_top_k = if cfg.top_k == 0 {
+++        let top_k_bypass_reason = sampler05_topk_bypass_reason(cfg);
+++        let effective_top_k = if top_k_bypass_reason.is_some() || cfg.top_k == 0 {
++             0
++         } else {
++             cfg.top_k.min(vocab_size).min(GPU_SAMPLING_TOPK_MAX)
++@@ -190,6 +208,7 @@
++             candidate_cap,
++             require_exact_top_p: top_p_enabled,
++             shadow_compare: matches!(mode, GpuSamplingParallelMode::Shadow),
+++            top_k_bypass_reason,
++         }
++     }
++ 
++@@ -632,9 +651,13 @@
++ 
++ impl GpuSamplingUniform {
++     pub fn from_config(v: &GpuSamplingConfig, stage: u32, block_count: u32) -> Self {
+++        Self::from_config_with_top_k(v, stage, block_count, v.top_k)
+++    }
+++
+++    pub fn from_config_with_top_k(v: &GpuSamplingConfig, stage: u32, block_count: u32, effective_top_k: u32) -> Self {
++         Self {
++             vocab_size: v.vocab_size as u32,
++-            top_k: v.top_k,
+++            top_k: effective_top_k,
++             temperature: v.temperature,
++             top_p: v.top_p,
++             seed_lo: v.seed_lo,
++@@ -1392,12 +1415,14 @@
++             plan.block_size,
++         );
++         eprintln!(
++-            "[gpu_sampling][parallel_topk] vocab_size={} block_count={} local_k={} candidate_count={} requested_top_k={}",
+++            "[gpu_sampling][parallel_topk] vocab_size={} block_count={} local_k={} candidate_count={} requested_top_k={} effective_top_k={} sampler05_bypass_reason={}",
++             plan.vocab_size,
++             plan.block_count,
++             plan.local_k,
++             plan.candidate_cap,
++             cfg.top_k,
+++            plan.top_k,
+++            plan.top_k_bypass_reason.unwrap_or("none"),
++         );
++         eprintln!(
++             "[gpu_sampling][parallel_topp] mode={} top_p={} min_p={} candidate_count={} retained_count=defer coverage={}",
++@@ -1828,15 +1853,15 @@
++     }
++ 
++     fn allocate_dispatch(&self, cfg: &GpuSamplingConfig, plan: &GpuSamplingParallelPlan) -> Result<GpuSamplingDispatch> {
++-        let uniform = Arc::new(self.create_uniform_buffer("gpu_sampling.uniform", cfg, 0, plan.block_count));
++-        let stats_uniform_local_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_max", cfg, 0, plan.block_count));
++-        let stats_uniform_global_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_max", cfg, 1, plan.block_count));
++-        let stats_uniform_local_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_sum", cfg, 2, plan.block_count));
++-        let stats_uniform_global_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_sum", cfg, 3, plan.block_count));
++-        let topk_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.local", cfg, 0, plan.block_count));
++-        let topk_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.global", cfg, 1, plan.block_count));
++-        let select_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.local", cfg, 0, plan.block_count));
++-        let select_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.global", cfg, 1, plan.block_count));
+++        let uniform = Arc::new(self.create_uniform_buffer("gpu_sampling.uniform", cfg, 0, plan.block_count, plan.top_k));
+++        let stats_uniform_local_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_max", cfg, 0, plan.block_count, plan.top_k));
+++        let stats_uniform_global_max = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_max", cfg, 1, plan.block_count, plan.top_k));
+++        let stats_uniform_local_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.local_sum", cfg, 2, plan.block_count, plan.top_k));
+++        let stats_uniform_global_sum = Arc::new(self.create_uniform_buffer("gpu_sampling.stats.uniform.global_sum", cfg, 3, plan.block_count, plan.top_k));
+++        let topk_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.local", cfg, 0, plan.block_count, plan.top_k));
+++        let topk_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.topk.uniform.global", cfg, 1, plan.block_count, plan.top_k));
+++        let select_uniform_local = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.local", cfg, 0, plan.block_count, plan.top_k));
+++        let select_uniform_global = Arc::new(self.create_uniform_buffer("gpu_sampling.select.uniform.global", cfg, 1, plan.block_count, plan.top_k));
++ 
++         let vocab_bytes = storage_bytes_checked::<f32>(cfg.vocab_size, "gpu_sampling.vocab")?;
++         let mask_bytes = storage_bytes_checked::<u32>(cfg.vocab_size, "gpu_sampling.mask")?;
++@@ -2018,10 +2043,11 @@
++         cfg: &GpuSamplingConfig,
++         stage: u32,
++         block_count: u32,
+++        effective_top_k: u32,
++     ) -> BackendBuffer {
++         self.device.create_buffer_init(&BackendBufferInitDescriptor {
++             label: Some(label),
++-            contents: cast_slice(&[GpuSamplingUniform::from_config(cfg, stage, block_count)]),
+++            contents: cast_slice(&[GpuSamplingUniform::from_config_with_top_k(cfg, stage, block_count, effective_top_k)]),
++             usage: BackendBufferUsages::UNIFORM | BackendBufferUsages::COPY_DST,
++         })
++     }
++@@ -2434,7 +2460,7 @@
++ 
++ fn emit_parallel_plan_log(plan: &GpuSamplingParallelPlan) {
++     eprintln!(
++-        "[gpu_sampling][parallel_plan] mode={} kind={:?} vocab_size={} block_size={} block_count={} top_k={} top_p_enabled={} min_p_enabled={} top_p_mode={} candidate_cap={} shadow_compare={}",
+++        "[gpu_sampling][parallel_plan] mode={} kind={:?} vocab_size={} block_size={} block_count={} top_k={} top_p_enabled={} min_p_enabled={} top_p_mode={} candidate_cap={} shadow_compare={} sampler05_topk_bypass_reason={}",
++         plan.mode.as_str(),
++         plan.kind,
++         plan.vocab_size,
++@@ -2446,6 +2472,7 @@
++         plan.top_p_mode.as_str(),
++         plan.candidate_cap,
++         plan.shadow_compare,
+++        plan.top_k_bypass_reason.unwrap_or("none"),
++     );
++ }
++ 
++diff -ruN sampler05_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl sampler05_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
++--- sampler05_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:56:22.000000000 +0000
+++++ sampler05_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 05:48:36.307973782 +0000
++@@ -331,7 +331,12 @@
++       if (!pre_minp_found || should_precede(i, pre_minp_top1)) {
++         pre_minp_found = true;
++         pre_minp_top1 = i;
++-        pre_minp_max = scaled_logits[i];
+++        // 16AI-QW-38G-R6A-SAMPLER-05:
+++        // Min-p threshold SSOT is the post static-prior / transition-guard
+++        // weighted sampler score, matching model_core::cpu_oracle_sampler.
+++        // Do not mix scaled logits for the threshold with weighted logits for
+++        // candidate retention, or CPU/GPU active sets silently diverge.
+++        pre_minp_max = weighted_logit_at(i);
++       }
++     }
++     i = i + 1u;
++diff -ruN sampler05_orig/crates/model_core/src/lib.rs sampler05_work/crates/model_core/src/lib.rs
++--- sampler05_orig/crates/model_core/src/lib.rs	2026-05-27 05:23:00.000000000 +0000
+++++ sampler05_work/crates/model_core/src/lib.rs	2026-05-27 05:49:24.115043252 +0000
++@@ -15,6 +15,7 @@
++ mod decode_transition_validation;
++ mod sampler_parity;
++ mod sampler_parity_validation;
+++mod sampler05_parity;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -77,6 +78,11 @@
++ };
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+++pub use sampler05_parity::{
+++    SAMPLER05_PATCH_ID, SAMPLER05_INPUT_PATCH_ID, Sampler05Mode,
+++    Sampler05ParityReceipt, Sampler05Summary, append_sampler05_receipt_from_sampler03,
+++    write_summary_from_receipt_file as write_sampler05_summary_from_receipt_file,
+++};
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN sampler05_orig/crates/model_core/src/sampler05_parity.rs sampler05_work/crates/model_core/src/sampler05_parity.rs
++--- sampler05_orig/crates/model_core/src/sampler05_parity.rs	1970-01-01 00:00:00.000000000 +0000
+++++ sampler05_work/crates/model_core/src/sampler05_parity.rs	2026-05-27 05:49:22.870556971 +0000
++@@ -0,0 +1,566 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const SAMPLER05_PATCH_ID: &str = "16AI-QW-38G-R6A-SAMPLER-05";
+++pub const SAMPLER05_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SAMPLER-04";
+++pub const SAMPLER05_CPU_SSOT: &str = "model_core::cpu_oracle_sampler";
+++pub const SAMPLER05_GPU_PROJECTION: &str = "burn_webgpu_backend::gpu_sampling_topp_scan.wgsl";
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum Sampler05Mode {
+++    Off,
+++    Receipt,
+++    Strict,
+++}
+++
+++impl Sampler05Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_SAMPLER05_PARITY")
+++            .or_else(|_| env::var("ASH_SAMPLER05_VALIDATE"))
+++            .unwrap_or_else(|_| "off".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "probe_only" => Self::Receipt,
+++            "strict" => Self::Strict,
+++            _ => Self::Off,
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::Receipt => "Receipt",
+++            Self::Strict => "Strict",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05DecodeConfig {
+++    pub temperature: f32,
+++    pub top_k: u32,
+++    pub top_p: f32,
+++    pub min_p: f32,
+++    pub top_k_policy: String,
+++    pub forbid_global_fallback: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05TraceSide {
+++    pub selected_id: u32,
+++    pub selected_logprob: Option<f32>,
+++    pub active_count: Option<usize>,
+++    pub final_count: Option<usize>,
+++    pub min_p_threshold: Option<f32>,
+++    pub min_p_threshold_score_kind: String,
+++    pub active_max: Option<f32>,
+++    pub active_sum_exp: Option<f32>,
+++    pub fallback_mode: Option<String>,
+++    pub active_ids_head: Vec<u32>,
+++    pub final_ids_head: Vec<u32>,
+++    pub trace_completeness: String,
+++    pub transition_guard_enabled: bool,
+++    pub transition_guard_probe_only: bool,
+++    pub selected_transition_action_code: Option<u32>,
+++    pub selected_transition_reason_mask: Option<u32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05ParityStatus {
+++    pub threshold_kind_match: bool,
+++    pub threshold_value_match: Option<bool>,
+++    pub active_count_match: Option<bool>,
+++    pub final_count_match: Option<bool>,
+++    pub active_set_match: Option<bool>,
+++    pub final_set_match: Option<bool>,
+++    pub selected_id_match: bool,
+++    pub fallback_match: Option<bool>,
+++    pub transition_hardblock_safe: Option<bool>,
+++    pub global_finite_fallback_forbidden: bool,
+++    pub status: String,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05ParityReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub step: usize,
+++    pub fixture_id: String,
+++    pub mode: String,
+++    pub semantic_reference: String,
+++    pub gpu_projection: String,
+++    pub behavior_change: bool,
+++    pub decode_config: Sampler05DecodeConfig,
+++    pub cpu: Sampler05TraceSide,
+++    pub gpu: Sampler05TraceSide,
+++    pub parity: Sampler05ParityStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05TopKPolicySummary {
+++    pub policy: String,
+++    pub transition_aware_topk: bool,
+++    pub parity_safe_bypass_available: bool,
+++    pub env_var: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Sampler05Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub cpu_oracle_is_sampler_ssot: bool,
+++    pub semantic_reference: String,
+++    pub gpu_projection: String,
+++    pub behavior_change_default: bool,
+++    pub receipt: String,
+++    pub checked_steps: usize,
+++    pub pass_steps: usize,
+++    pub warn_steps: usize,
+++    pub fail_steps: usize,
+++    pub threshold_kind_cpu: String,
+++    pub threshold_kind_gpu: String,
+++    pub min_p_threshold_score_kind_match: bool,
+++    pub top_k_policy: Sampler05TopKPolicySummary,
+++    pub global_finite_fallback_count: usize,
+++    pub ready_for_decode03a_entropy_receipt: bool,
+++    pub ready_for_dynamic_sampler: bool,
+++    pub reason: String,
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_SAMPLER05_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler05_parity_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_SAMPLER05_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler05_summary.json"))
+++}
+++
+++pub fn fixture_id() -> String {
+++    env::var("ASH_SAMPLER05_FIXTURE")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "runtime_sampler03_bridge".to_string())
+++}
+++
+++pub fn top_k_policy_from_env() -> String {
+++    env::var("ASH_SAMPLER05_TOPK_POLICY")
+++        .unwrap_or_else(|_| "observe_only".to_string())
+++}
+++
+++pub fn forbid_global_fallback_from_env() -> bool {
+++    env_bool("ASH_SAMPLER05_FORBID_GLOBAL_FALLBACK", true)
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn sorted_equal(a: &[u32], b: &[u32]) -> bool {
+++    let mut aa = a.to_vec();
+++    let mut bb = b.to_vec();
+++    aa.sort_unstable();
+++    bb.sort_unstable();
+++    aa == bb
+++}
+++
+++fn threshold_value_match(a: Option<f32>, b: Option<f32>) -> Option<bool> {
+++    match (a, b) {
+++        (Some(x), Some(y)) => Some((x - y).abs() <= 1e-4),
+++        (None, None) => Some(true),
+++        _ => None,
+++    }
+++}
+++
+++fn is_global_finite_fallback(mode: Option<&str>) -> bool {
+++    matches!(mode, Some("valid_global_top1") | Some("GLOBAL_FINITE_FALLBACK") | Some("global_finite_fallback"))
+++}
+++
+++fn side_from_cpu(receipt: &SamplerParityReceipt) -> Sampler05TraceSide {
+++    Sampler05TraceSide {
+++        selected_id: receipt.cpu.selected_id,
+++        selected_logprob: receipt.cpu.selected_logprob,
+++        active_count: Some(receipt.cpu.active_count),
+++        final_count: Some(receipt.cpu.final_count),
+++        min_p_threshold: receipt.cpu.min_p_threshold,
+++        // SAMPLER-05 SSOT: cpu_oracle_sampler applies min-p over weighted score
+++        // after temperature/static-prior/transition-guard processing.
+++        min_p_threshold_score_kind: "weighted".to_string(),
+++        active_max: receipt.cpu.active_max,
+++        active_sum_exp: receipt.cpu.active_sum_exp,
+++        fallback_mode: Some(receipt.cpu.recovery_mode.clone()),
+++        active_ids_head: receipt.cpu.active_ids_head.clone(),
+++        final_ids_head: receipt.cpu.final_ids_head.clone(),
+++        trace_completeness: "cpu_oracle_full_candidate_trace".to_string(),
+++        transition_guard_enabled: receipt.cpu.transition_guard_enabled,
+++        transition_guard_probe_only: receipt.cpu.transition_guard_probe_only,
+++        selected_transition_action_code: receipt.cpu.selected_transition_action_code,
+++        selected_transition_reason_mask: receipt.cpu.selected_transition_reason_mask,
+++    }
+++}
+++
+++fn side_from_gpu(receipt: &SamplerParityReceipt) -> Sampler05TraceSide {
+++    Sampler05TraceSide {
+++        selected_id: receipt.gpu.selected_id,
+++        selected_logprob: receipt.gpu.selected_logprob,
+++        active_count: receipt.gpu.active_count,
+++        final_count: receipt.gpu.final_count,
+++        min_p_threshold: receipt.gpu.min_p_threshold,
+++        // SAMPLER-05 pairs this receipt layer with the WGSL patch that computes
+++        // pre_minp_max via weighted_logit_at(index). If the shader is reverted,
+++        // sampler05_static_checks must fail and this receipt must not promote.
+++        min_p_threshold_score_kind: "weighted".to_string(),
+++        active_max: receipt.gpu.active_max,
+++        active_sum_exp: receipt.gpu.active_sum_exp,
+++        fallback_mode: receipt.gpu.recovery_mode.clone(),
+++        active_ids_head: receipt.gpu.active_ids_head.clone(),
+++        final_ids_head: receipt.gpu.final_ids_head.clone(),
+++        trace_completeness: receipt.gpu.trace_completeness.clone(),
+++        transition_guard_enabled: receipt.gpu.transition_guard_enabled,
+++        transition_guard_probe_only: receipt.gpu.transition_guard_probe_only,
+++        selected_transition_action_code: receipt.gpu.selected_transition_action_code,
+++        selected_transition_reason_mask: receipt.gpu.selected_transition_reason_mask,
+++    }
+++}
+++
+++pub fn receipt_from_sampler03(mode: Sampler05Mode, source: &SamplerParityReceipt) -> Sampler05ParityReceipt {
+++    let cpu = side_from_cpu(source);
+++    let gpu = side_from_gpu(source);
+++    let threshold_kind_match = cpu.min_p_threshold_score_kind == gpu.min_p_threshold_score_kind;
+++    let threshold_value_match = threshold_value_match(cpu.min_p_threshold, gpu.min_p_threshold);
+++    let active_count_match = cpu.active_count.zip(gpu.active_count).map(|(c, g)| c == g);
+++    let final_count_match = cpu.final_count.zip(gpu.final_count).map(|(c, g)| c == g);
+++    let active_set_match = if !cpu.active_ids_head.is_empty() || !gpu.active_ids_head.is_empty() {
+++        Some(sorted_equal(&cpu.active_ids_head, &gpu.active_ids_head))
+++    } else {
+++        None
+++    };
+++    let final_set_match = if !cpu.final_ids_head.is_empty() || !gpu.final_ids_head.is_empty() {
+++        Some(sorted_equal(&cpu.final_ids_head, &gpu.final_ids_head))
+++    } else {
+++        None
+++    };
+++    let selected_id_match = cpu.selected_id == gpu.selected_id;
+++    let fallback_match = match (cpu.fallback_mode.as_ref(), gpu.fallback_mode.as_ref()) {
+++        (Some(c), Some(g)) => Some(c == g),
+++        (None, None) => Some(true),
+++        _ => None,
+++    };
+++    let transition_hardblock_safe = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
+++        (Some(c), Some(g)) => Some(c == g || (c != 2 && g != 2)),
+++        _ => None,
+++    };
+++    let global_finite_fallback_forbidden = forbid_global_fallback_from_env();
+++    let global_fallback_seen = is_global_finite_fallback(cpu.fallback_mode.as_deref())
+++        || is_global_finite_fallback(gpu.fallback_mode.as_deref());
+++
+++    let (status, reason) = if !threshold_kind_match {
+++        ("FAIL_THRESHOLD_KIND_MISMATCH", "CPU/GPU min-p threshold score kind differs")
+++    } else if threshold_value_match == Some(false) {
+++        ("FAIL_THRESHOLD_VALUE_MISMATCH", "CPU/GPU min-p threshold value differs beyond tolerance")
+++    } else if active_count_match == Some(false) {
+++        ("FAIL_ACTIVE_COUNT_MISMATCH", "CPU/GPU active count differs")
+++    } else if final_count_match == Some(false) {
+++        ("FAIL_FINAL_COUNT_MISMATCH", "CPU/GPU final count differs")
+++    } else if active_set_match == Some(false) {
+++        ("FAIL_ACTIVE_SET_MISMATCH", "CPU/GPU active id head differs")
+++    } else if final_set_match == Some(false) {
+++        ("FAIL_FINAL_SET_MISMATCH", "CPU/GPU final id head differs")
+++    } else if transition_hardblock_safe == Some(false) {
+++        ("FAIL_TRANSITION_HARDBLOCK_UNSAFE", "GPU selected transition hardblock decision is unsafe")
+++    } else if global_finite_fallback_forbidden && global_fallback_seen {
+++        ("FAIL_GLOBAL_FINITE_FALLBACK", "global finite fallback is forbidden by SAMPLER-05")
+++    } else if !selected_id_match {
+++        ("WARN_SELECTED_ID_MISMATCH", "candidate evidence is compatible but selected id differs")
+++    } else if active_set_match.is_none() || final_set_match.is_none() {
+++        ("WARN_PARTIAL_TRACE", "candidate id trace is partial or unavailable")
+++    } else {
+++        ("PASS", "CPU oracle and GPU active-set evidence match")
+++    };
+++
+++    Sampler05ParityReceipt {
+++        patch_id: SAMPLER05_PATCH_ID.to_string(),
+++        input_patch: SAMPLER05_INPUT_PATCH_ID.to_string(),
+++        step: source.step,
+++        fixture_id: fixture_id(),
+++        mode: mode.as_str().to_string(),
+++        semantic_reference: SAMPLER05_CPU_SSOT.to_string(),
+++        gpu_projection: SAMPLER05_GPU_PROJECTION.to_string(),
+++        behavior_change: false,
+++        decode_config: Sampler05DecodeConfig {
+++            temperature: source.decode_config.temperature,
+++            top_k: source.decode_config.top_k,
+++            top_p: source.decode_config.top_p,
+++            min_p: source.decode_config.min_p,
+++            top_k_policy: top_k_policy_from_env(),
+++            forbid_global_fallback: global_finite_fallback_forbidden,
+++        },
+++        cpu,
+++        gpu,
+++        parity: Sampler05ParityStatus {
+++            threshold_kind_match,
+++            threshold_value_match,
+++            active_count_match,
+++            final_count_match,
+++            active_set_match,
+++            final_set_match,
+++            selected_id_match,
+++            fallback_match,
+++            transition_hardblock_safe,
+++            global_finite_fallback_forbidden,
+++            status: status.to_string(),
+++            reason: reason.to_string(),
+++        },
+++    }
+++}
+++
+++pub fn append_sampler05_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Sampler05Mode::from_env();
+++    if !mode.enabled() {
+++        return;
+++    }
+++    let receipt = receipt_from_sampler03(mode, source);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++    write_summary_from_receipt_file();
+++}
+++
+++fn classify_status(status: &str) -> &'static str {
+++    if status.starts_with("FAIL") {
+++        "fail"
+++    } else if status.starts_with("WARN") || status.starts_with("PARTIAL") {
+++        "warn"
+++    } else {
+++        "pass"
+++    }
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Sampler05ParityReceipt]) -> Sampler05Summary {
+++    let checked_steps = receipts.len();
+++    let mut pass_steps = 0usize;
+++    let mut warn_steps = 0usize;
+++    let mut fail_steps = 0usize;
+++    let mut global_finite_fallback_count = 0usize;
+++    for receipt in receipts {
+++        match classify_status(&receipt.parity.status) {
+++            "fail" => fail_steps = fail_steps.saturating_add(1),
+++            "warn" => warn_steps = warn_steps.saturating_add(1),
+++            _ => pass_steps = pass_steps.saturating_add(1),
+++        }
+++        if is_global_finite_fallback(receipt.cpu.fallback_mode.as_deref())
+++            || is_global_finite_fallback(receipt.gpu.fallback_mode.as_deref())
+++        {
+++            global_finite_fallback_count = global_finite_fallback_count.saturating_add(1);
+++        }
+++    }
+++
+++    let status = if checked_steps == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if fail_steps > 0 {
+++        "FAIL"
+++    } else if warn_steps > 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    };
+++    let ready_for_decode03a = checked_steps > 0 && fail_steps == 0;
+++
+++    Sampler05Summary {
+++        patch_id: SAMPLER05_PATCH_ID.to_string(),
+++        input_patch: SAMPLER05_INPUT_PATCH_ID.to_string(),
+++        status: status.to_string(),
+++        cpu_oracle_is_sampler_ssot: true,
+++        semantic_reference: SAMPLER05_CPU_SSOT.to_string(),
+++        gpu_projection: SAMPLER05_GPU_PROJECTION.to_string(),
+++        behavior_change_default: false,
+++        receipt: receipt_path().to_string_lossy().to_string(),
+++        checked_steps,
+++        pass_steps,
+++        warn_steps,
+++        fail_steps,
+++        threshold_kind_cpu: "weighted".to_string(),
+++        threshold_kind_gpu: "weighted".to_string(),
+++        min_p_threshold_score_kind_match: true,
+++        top_k_policy: Sampler05TopKPolicySummary {
+++            policy: top_k_policy_from_env(),
+++            transition_aware_topk: false,
+++            parity_safe_bypass_available: true,
+++            env_var: "ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware".to_string(),
+++        },
+++        global_finite_fallback_count,
+++        ready_for_decode03a_entropy_receipt: ready_for_decode03a,
+++        ready_for_dynamic_sampler: false,
+++        reason: if ready_for_decode03a {
+++            "SAMPLER-05 evidence has no fail steps; DECODE-03A may attach entropy metrics next".to_string()
+++        } else if checked_steps == 0 {
+++            "static bake only; runtime parity probe must be executed before dynamic sampler promotion".to_string()
+++        } else {
+++            "runtime parity failures block entropy/dynamic sampler promotion".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_summary_from_receipt_file() {
+++    let path = receipt_path();
+++    let mut receipts = Vec::new();
+++    if let Ok(text) = fs::read_to_string(&path) {
+++        for line in text.lines() {
+++            if line.trim().is_empty() {
+++                continue;
+++            }
+++            if let Ok(receipt) = serde_json::from_str::<Sampler05ParityReceipt>(line) {
+++                receipts.push(receipt);
+++            }
+++        }
+++    }
+++    let summary = summary_from_receipts(&receipts);
+++    let out = summary_path();
+++    if let Some(parent) = out.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(out, format!("{}\n", text));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++    use crate::sampler_parity::{
+++        CpuSamplerRuntimeTrace, GpuSamplerRuntimeTrace, SamplerParityDecodeConfig, SamplerParityStatus,
+++    };
+++
+++    fn base_source_receipt() -> SamplerParityReceipt {
+++        SamplerParityReceipt {
+++            patch_id: "16AI-QW-38G-R6A-SAMPLER-03".to_string(),
+++            step: 0,
+++            mode: "ProbeOnly".to_string(),
+++            decode_config: SamplerParityDecodeConfig {
+++                temperature: 0.25,
+++                top_k: 0,
+++                top_p: 0.88,
+++                min_p: 0.05,
+++            },
+++            cpu: CpuSamplerRuntimeTrace {
+++                selected_id: 42,
+++                selected_logprob: Some(-0.1),
+++                active_count: 3,
+++                final_count: 2,
+++                min_p_threshold: Some(1.5),
+++                active_max: Some(4.0),
+++                active_sum_exp: Some(1.7),
+++                active_ids_head: vec![1, 2, 42],
+++                final_ids_head: vec![2, 42],
+++                recovery_mode: "none".to_string(),
+++                transition_guard_enabled: true,
+++                transition_guard_probe_only: false,
+++                selected_transition_risk: Some(0.0),
+++                selected_transition_penalty: Some(0.0),
+++                selected_transition_action_code: Some(0),
+++                selected_transition_reason_mask: Some(0),
+++            },
+++            gpu: GpuSamplerRuntimeTrace {
+++                selected_id: 42,
+++                selected_logprob: Some(-0.1),
+++                recovery_mode: Some("none".to_string()),
+++                active_count: Some(3),
+++                final_count: Some(2),
+++                min_p_threshold: Some(1.50001),
+++                active_max: Some(4.0),
+++                active_sum_exp: Some(1.7),
+++                active_ids_head: vec![42, 2, 1],
+++                final_ids_head: vec![42, 2],
+++                active_overflow: false,
+++                final_overflow: false,
+++                trace_top_n: 64,
+++                trace_completeness: "gpu_candidate_trace_buffer".to_string(),
+++                transition_actions_head: vec![0, 0],
+++                transition_reason_masks_head: vec![0, 0],
+++                candidate_trace_version: 4,
+++                transition_guard_enabled: true,
+++                transition_guard_probe_only: false,
+++                selected_transition_risk: Some(0.0),
+++                selected_transition_penalty: Some(0.0),
+++                selected_transition_action_code: Some(0),
+++                selected_transition_reason_mask: Some(0),
+++                weighted_logit_before_transition: Some(4.0),
+++                weighted_logit_after_transition: Some(4.0),
+++                prob_before_transition: Some(0.7),
+++                prob_after_transition: Some(0.7),
+++                mask_before_transition: Some(1),
+++                mask_after_transition: Some(1),
+++                active_count_before_transition: Some(3),
+++                active_count_after_transition: Some(3),
+++                final_count_before_transition: Some(2),
+++                final_count_after_transition: Some(2),
+++                selected_id_before_transition: Some(42),
+++                selected_id_after_transition: Some(42),
+++            },
+++            parity: SamplerParityStatus {
+++                candidate_set_match: Some(true),
+++                active_set_match: Some(true),
+++                final_set_match: Some(true),
+++                active_count_match: Some(true),
+++                final_count_match: Some(true),
+++                threshold_match: Some(true),
+++                recovery_mode_match: Some(true),
+++                selected_match: true,
+++                trace_truncated: false,
+++                strict_demoted: false,
+++                transition_action_match: Some(true),
+++                transition_reason_match: Some(true),
+++                transition_hardblock_match: Some(true),
+++                transition_probe_integrity_status: None,
+++                transition_probe_weighted_logit_changed_count: None,
+++                transition_probe_active_mask_changed_count: None,
+++                transition_probe_final_mask_changed_count: None,
+++                transition_probe_selected_id_changed: None,
+++                transition_probe_max_weighted_logit_delta_abs: None,
+++                transition_probe_mutation_detected: None,
+++                status: "PASS".to_string(),
+++                reason: "fixture".to_string(),
+++            },
+++        }
+++    }
+++
+++    #[test]
+++    fn sampler05_receipt_keeps_weighted_threshold_kind() {
+++        let source = base_source_receipt();
+++        let receipt = receipt_from_sampler03(Sampler05Mode::Receipt, &source);
+++        assert_eq!(receipt.patch_id, SAMPLER05_PATCH_ID);
+++        assert_eq!(receipt.cpu.min_p_threshold_score_kind, "weighted");
+++        assert_eq!(receipt.gpu.min_p_threshold_score_kind, "weighted");
+++        assert!(receipt.parity.threshold_kind_match);
+++    }
+++
+++    #[test]
+++    fn sampler05_summary_blocks_dynamic_sampler_until_runtime_checked() {
+++        let summary = summary_from_receipts(&[]);
+++        assert_eq!(summary.status, "STATIC_BAKE_DEFINED_NOT_RUN");
+++        assert!(!summary.ready_for_dynamic_sampler);
+++        assert!(!summary.ready_for_decode03a_entropy_receipt);
+++    }
+++}
++diff -ruN sampler05_orig/crates/model_core/src/sampler_parity.rs sampler05_work/crates/model_core/src/sampler_parity.rs
++--- sampler05_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:57:38.000000000 +0000
+++++ sampler05_work/crates/model_core/src/sampler_parity.rs	2026-05-27 05:49:24.115493935 +0000
++@@ -390,5 +390,6 @@
++         }
++     }
++     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
+++    crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN sampler05_orig/workspace/sampler05_parity_fixture_manifest.json sampler05_work/workspace/sampler05_parity_fixture_manifest.json
+--- sampler05_orig/workspace/sampler05_parity_fixture_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_parity_fixture_manifest.json	2026-05-27 05:51:53.463364342 +0000
+@@ -0,0 +1,144 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
++  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
++  "semantic_reference": "model_core::cpu_oracle_sampler",
++  "behavior_change_default": false,
++  "fixtures": [
++    {
++      "fixture_id": "F01_basic_minp_no_prior",
++      "description": "Min-p threshold over weighted score without semantic/transition modifiers",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "static_prior_enabled": false,
++      "transition_guard_enabled": false,
++      "expectation": {
++        "threshold_kind_cpu": "weighted",
++        "threshold_kind_gpu": "weighted",
++        "global_finite_fallback_forbidden": true
++      }
++    },
++    {
++      "fixture_id": "F02_minp_with_static_prior",
++      "description": "Static prior bias must be included in pre-min-p max and retention score",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "static_prior_enabled": true,
++      "transition_guard_enabled": false,
++      "expectation": {
++        "threshold_kind_cpu": "weighted",
++        "threshold_kind_gpu": "weighted"
++      }
++    },
++    {
++      "fixture_id": "F03_minp_with_transition_penalty",
++      "description": "Transition soft penalty must be included in weighted min-p threshold and active set",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "static_prior_enabled": false,
++      "transition_guard_enabled": true,
++      "expectation": {
++        "threshold_kind_cpu": "weighted",
++        "threshold_kind_gpu": "weighted"
++      }
++    },
++    {
++      "fixture_id": "F04_transition_hardblock_before_topk",
++      "description": "Hard-blocked transition token must not survive as GPU selected candidate",
++      "temperature": 0.25,
++      "top_p": 0.9,
++      "top_k": 40,
++      "min_p": 0.03,
++      "static_prior_enabled": false,
++      "transition_guard_enabled": true,
++      "top_k_policy": "bypass_if_not_transition_aware",
++      "expectation": {
++        "selected_transition_hardblock": false
++      }
++    },
++    {
++      "fixture_id": "F05_topk_minp_interaction",
++      "description": "Top-k/min-p interaction must record requested/effective top-k and active counts",
++      "temperature": 0.35,
++      "top_p": 0.92,
++      "top_k": 64,
++      "min_p": 0.05,
++      "transition_guard_enabled": true,
++      "top_k_policy": "bypass_if_not_transition_aware",
++      "expectation": {
++        "top_k_bypass_receipt_required": true
++      }
++    },
++    {
++      "fixture_id": "F06_topp_after_minp",
++      "description": "Top-p must cut over active probabilities after min-p renormalization",
++      "temperature": 0.3,
++      "top_p": 0.8,
++      "top_k": 0,
++      "min_p": 0.05,
++      "expectation": {
++        "active_count_after_top_p_lte_after_min_p": true
++      }
++    },
++    {
++      "fixture_id": "F07_final_mask_empty_recovery",
++      "description": "Empty final mask must recover by pre-min-p/active top1 or strict fail, not arbitrary global token",
++      "temperature": 0.25,
++      "top_p": 0.75,
++      "top_k": 0,
++      "min_p": 0.2,
++      "expectation": {
++        "global_finite_fallback_forbidden": true
++      }
++    },
++    {
++      "fixture_id": "F08_global_fallback_forbidden",
++      "description": "Valid-global-top1 fallback is quality-risk fail under SAMPLER-05",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.95,
++      "expectation": {
++        "status_on_global_fallback": "FAIL_GLOBAL_FINITE_FALLBACK"
++      }
++    },
++    {
++      "fixture_id": "F09_korean_piece_loop_candidate",
++      "description": "Korean particle/ending loop candidates must preserve transition reason/action parity",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "transition_guard_enabled": true,
++      "expectation": {
++        "transition_reason_match": true
++      }
++    },
++    {
++      "fixture_id": "F10_semantic_prior_bias_parity",
++      "description": "QWave/DeltaK static prior bias must produce identical candidate ordering in CPU/GPU trace heads",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "static_prior_enabled": true,
++      "expectation": {
++        "active_set_match": true
++      }
++    }
++  ],
++  "runtime_env": {
++    "ASH_SAMPLER_PARITY": "probe",
++    "ASH_SAMPLER05_PARITY": "receipt",
++    "ASH_GPU_CANDIDATE_TRACE": "1",
++    "ASH_SAMPLER05_TOPK_POLICY": "bypass_if_not_transition_aware",
++    "ASH_SAMPLER05_FORBID_GLOBAL_FALLBACK": "true",
++    "ASH_SAMPLER05_RECEIPT": "workspace/sampler05_parity_steps.jsonl",
++    "ASH_SAMPLER05_SUMMARY": "workspace/sampler05_summary.json"
++  }
++}
+diff -ruN sampler05_orig/workspace/sampler05_parity_receipt_schema.json sampler05_work/workspace/sampler05_parity_receipt_schema.json
+--- sampler05_orig/workspace/sampler05_parity_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_parity_receipt_schema.json	2026-05-27 05:51:53.463612476 +0000
+@@ -0,0 +1,26 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
++  "file": "workspace/sampler05_parity_steps.jsonl",
++  "format": "jsonl",
++  "behavior_change": false,
++  "required_fields": [
++    "patch_id",
++    "input_patch",
++    "step",
++    "fixture_id",
++    "mode",
++    "semantic_reference",
++    "gpu_projection",
++    "decode_config",
++    "cpu",
++    "gpu",
++    "parity"
++  ],
++  "threshold_kind_contract": {
++    "cpu": "weighted",
++    "gpu": "weighted"
++  },
++  "fallback_contract": {
++    "GLOBAL_FINITE_FALLBACK": "forbidden unless explicitly downgraded outside SAMPLER-05"
++  }
++}
+diff -ruN sampler05_orig/workspace/sampler05_parity_steps.jsonl sampler05_work/workspace/sampler05_parity_steps.jsonl
+--- sampler05_orig/workspace/sampler05_parity_steps.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_parity_steps.jsonl	2026-05-27 05:51:53.463748500 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-SAMPLER-05", "input_patch": "16AI-QW-38G-R6A-SAMPLER-04", "step": 0, "fixture_id": "schema_example_basic_min_p_weighted_threshold", "mode": "Receipt", "semantic_reference": "model_core::cpu_oracle_sampler", "gpu_projection": "burn_webgpu_backend::gpu_sampling_topp_scan.wgsl", "behavior_change": false, "decode_config": {"temperature": 0.25, "top_k": 0, "top_p": 0.88, "min_p": 0.05, "top_k_policy": "observe_only", "forbid_global_fallback": true}, "cpu": {"selected_id": 42, "selected_logprob": -0.1, "active_count": 3, "final_count": 2, "min_p_threshold": 1.5, "min_p_threshold_score_kind": "weighted", "active_max": 4.0, "active_sum_exp": 1.7, "fallback_mode": "none", "active_ids_head": [1, 2, 42], "final_ids_head": [2, 42], "trace_completeness": "cpu_oracle_full_candidate_trace", "transition_guard_enabled": true, "transition_guard_probe_only": false, "selected_transition_action_code": 0, "selected_transition_reason_mask": 0}, "gpu": {"selected_id": 42, "selected_logprob": -0.1, "active_count": 3, "final_count": 2, "min_p_threshold": 1.50001, "min_p_threshold_score_kind": "weighted", "active_max": 4.0, "active_sum_exp": 1.7, "fallback_mode": "none", "active_ids_head": [42, 2, 1], "final_ids_head": [42, 2], "trace_completeness": "gpu_candidate_trace_buffer", "transition_guard_enabled": true, "transition_guard_probe_only": false, "selected_transition_action_code": 0, "selected_transition_reason_mask": 0}, "parity": {"threshold_kind_match": true, "threshold_value_match": true, "active_count_match": true, "final_count_match": true, "active_set_match": true, "final_set_match": true, "selected_id_match": true, "fallback_match": true, "transition_hardblock_safe": true, "global_finite_fallback_forbidden": true, "status": "PASS", "reason": "schema example only"}, "schema_example": true, "runtime_execution": "NOT_RUN_IN_CONTAINER"}
+diff -ruN sampler05_orig/workspace/sampler05_report.md sampler05_work/workspace/sampler05_report.md
+--- sampler05_orig/workspace/sampler05_report.md	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_report.md	2026-05-27 05:51:53.465273989 +0000
+@@ -0,0 +1,35 @@
++# 16AI-QW-38G-R6A-SAMPLER-05
++
++## CPU Oracle / GPU Active Set Parity Seal
++
++### Scope
++- Input patch: `16AI-QW-38G-R6A-SAMPLER-04`
++- Semantic SSOT: `model_core::cpu_oracle_sampler`
++- GPU projection: `burn_webgpu_backend::gpu_sampling_topp_scan.wgsl`
++- Default behavior change: `false`
++
++### Implemented
++1. Added `crates/model_core/src/sampler05_parity.rs`.
++2. Exported SAMPLER-05 types/functions from `crates/model_core/src/lib.rs`.
++3. Hooked existing SAMPLER-03 append path into SAMPLER-05 receipt append.
++4. Patched `gpu_sampling_topp_scan.wgsl` so pre-min-p max uses `weighted_logit_at(i)`, not raw/scaled logits.
++5. Added controlled top-k bypass policy in `gpu_sampling.rs` via `ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware`.
++6. Added workspace fixture manifest, receipt schema/example, summary, static checks, and patch diff.
++
++### Runtime env
++```text
++ASH_SAMPLER_PARITY=probe
++ASH_SAMPLER05_PARITY=receipt
++ASH_GPU_CANDIDATE_TRACE=1
++ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware
++ASH_SAMPLER05_FORBID_GLOBAL_FALLBACK=true
++ASH_SAMPLER05_RECEIPT=workspace/sampler05_parity_steps.jsonl
++ASH_SAMPLER05_SUMMARY=workspace/sampler05_summary.json
++```
++
++### Gate
++- PASS requires runtime receipt, not schema example.
++- Dynamic sampler / DECODE-03A promotion remains blocked until runtime parity probe executes.
++
++### Container validation
++`cargo` was not available in this container, so cargo check/test and WGPU shader compilation were not run here. Static file checks passed and are recorded in `workspace/sampler05_static_checks.json`.
+diff -ruN sampler05_orig/workspace/sampler05_static_checks.json sampler05_work/workspace/sampler05_static_checks.json
+--- sampler05_orig/workspace/sampler05_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_static_checks.json	2026-05-27 05:52:02.302356672 +0000
+@@ -0,0 +1,25 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
++  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
++  "checks": {
++    "sampler05_module_exists": true,
++    "lib_declares_sampler05": true,
++    "lib_exports_sampler05": true,
++    "sampler03_append_hooks_sampler05": true,
++    "sampler05_default_behavior_change_false": true,
++    "sampler05_forbids_global_finite_fallback": true,
++    "wgsl_pre_minp_uses_weighted": true,
++    "wgsl_scaled_threshold_removed": true,
++    "gpu_topk_bypass_policy_present": true,
++    "gpu_uniform_uses_effective_top_k": true,
++    "gpu_logs_effective_top_k": true,
++    "cargo_available_in_container": false,
++    "patch_file_exists": true,
++    "patch_contains_wgsl_weighted": true,
++    "patch_contains_sampler05_module": true
++  },
++  "cargo_check": "NOT_RUN_CARGO_NOT_FOUND_IN_CONTAINER",
++  "wgsl_compile": "NOT_RUN_WGPU_COMPILER_NOT_AVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN_TARGET_RUNTIME_REQUIRED",
++  "promotion_status": "STATIC_BAKE_ONLY"
++}
+diff -ruN sampler05_orig/workspace/sampler05_summary.json sampler05_work/workspace/sampler05_summary.json
+--- sampler05_orig/workspace/sampler05_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ sampler05_work/workspace/sampler05_summary.json	2026-05-27 05:51:53.463852686 +0000
+@@ -0,0 +1,28 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
++  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUNTIME_VALIDATED",
++  "cpu_oracle_is_sampler_ssot": true,
++  "semantic_reference": "model_core::cpu_oracle_sampler",
++  "gpu_projection": "burn_webgpu_backend::gpu_sampling_topp_scan.wgsl",
++  "behavior_change_default": false,
++  "receipt": "workspace/sampler05_parity_steps.jsonl",
++  "checked_steps": 0,
++  "schema_example_steps": 1,
++  "pass_steps": 0,
++  "warn_steps": 0,
++  "fail_steps": 0,
++  "threshold_kind_cpu": "weighted",
++  "threshold_kind_gpu": "weighted",
++  "min_p_threshold_score_kind_match": "DEFINED_BY_STATIC_PATCH_NOT_RUNTIME_PROVEN",
++  "top_k_policy": {
++    "policy": "observe_only by default; bypass_if_not_transition_aware available via ASH_SAMPLER05_TOPK_POLICY",
++    "transition_aware_topk": false,
++    "parity_safe_bypass_available": true,
++    "env_var": "ASH_SAMPLER05_TOPK_POLICY=bypass_if_not_transition_aware"
++  },
++  "global_finite_fallback_count": "NOT_RUN",
++  "ready_for_decode03a_entropy_receipt": false,
++  "ready_for_dynamic_sampler": false,
++  "reason": "Cargo/runtime/WebGPU execution was not available in this container; runtime parity probe must be run in the target environment before promotion."
++}

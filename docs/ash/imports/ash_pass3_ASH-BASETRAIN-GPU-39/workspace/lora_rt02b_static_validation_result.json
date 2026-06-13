@@ -1,0 +1,19 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-LORA-RT-02B-A",
+  "status": "PASS_POWERSHELL_ASCII_SAFE_WRAPPER_HOTFIX_BAKED",
+  "powershell_scripts_ascii_only": true,
+  "nonascii_byte_counts": {
+    "workspace/examples/lora_rt02b_full_backoff.ps1": 0,
+    "workspace/examples/lora_rt02b_scale_sweep_low.ps1": 0,
+    "workspace/examples/lora_rt02b_verify.ps1": 0
+  },
+  "parser_error_root_cause": "non_ascii_mojibake_literals_in_powershell_pattern_array",
+  "fix": "replace literal mojibake strings with ascii-safe regex shape detector",
+  "cargo_check": "NOT_RUN_IN_CONTAINER_CARGO_NOT_AVAILABLE",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "base_safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

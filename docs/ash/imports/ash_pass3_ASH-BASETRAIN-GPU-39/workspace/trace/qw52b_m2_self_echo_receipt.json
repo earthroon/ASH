@@ -1,0 +1,291 @@
+{
+  "patch_id": "QW-52B-M2",
+  "title": "Self Echo / Reflection Lock Detector Seal",
+  "base_patch": "QW-52B-M1",
+  "status": "PASS_STATIC_SELF_ECHO_DETECTOR",
+  "detector_added": {
+    "detector_id": "self_echo_detector",
+    "detector_family": "output_self_reflection_lock",
+    "registry_detector_count_before": 10,
+    "registry_detector_count_after": 11
+  },
+  "config": {
+    "recent_window_size": 8,
+    "token_echo_weight": 0.2,
+    "piece_echo_weight": 0.2,
+    "ngram_echo_weight": 0.2,
+    "qwave_echo_weight": 0.15,
+    "cji_xyz_echo_weight": 0.1,
+    "phase_lock_weight": 0.1,
+    "contextless_reentry_weight": 0.05,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85
+  },
+  "fixture_results": [
+    {
+      "case_id": "normal_non_echo_output",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M2",
+        "detector_id": "self_echo_detector",
+        "decode_step": 0,
+        "candidate_rank": 0,
+        "token_id": 512,
+        "piece": "그래서",
+        "recent_window_available": true,
+        "qwave_trace_available": true,
+        "cji_xyz_trace_available": false,
+        "token_echo_score": 0.125,
+        "piece_echo_score": 0.125,
+        "ngram_echo_score": 0.0,
+        "qwave_echo_score": 0.0,
+        "cji_xyz_echo_score": null,
+        "phase_lock_score": 0.0,
+        "contextless_reentry_score": 0.0,
+        "reflection_lock_score": 0.0,
+        "self_echo_score": 0.125,
+        "risk_score": 0.125,
+        "risk_level": "None",
+        "evidence": {
+          "token_window": [
+            101,
+            204,
+            305,
+            406
+          ],
+          "piece_window": [
+            "오늘",
+            "날씨가",
+            "좋네요",
+            "."
+          ],
+          "repeated_token_ids": [],
+          "repeated_pieces": [],
+          "repeated_ngrams": [],
+          "max_same_token_streak": 1,
+          "max_same_piece_streak": 1,
+          "max_ngram_repeat_count": 0,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": 0.0,
+          "qwave_signature_repeat_count": 0,
+          "cji_xyz_repeat_count": null,
+          "input_output_resonance_hint": 0.72,
+          "missing_channels": [
+            "cji_xyz_trace"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "piece_echo_loop_output",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M2",
+        "detector_id": "self_echo_detector",
+        "decode_step": 1,
+        "candidate_rank": 0,
+        "token_id": 901,
+        "piece": "나오죠",
+        "recent_window_available": true,
+        "qwave_trace_available": true,
+        "cji_xyz_trace_available": false,
+        "token_echo_score": 0.8,
+        "piece_echo_score": 0.8,
+        "ngram_echo_score": 0.55,
+        "qwave_echo_score": 0.45,
+        "cji_xyz_echo_score": null,
+        "phase_lock_score": 0.3375,
+        "contextless_reentry_score": 0.0,
+        "reflection_lock_score": 0.59,
+        "self_echo_score": 0.8,
+        "risk_score": 0.8,
+        "risk_level": "High",
+        "evidence": {
+          "token_window": [
+            900,
+            901,
+            901,
+            901
+          ],
+          "piece_window": [
+            "있고",
+            "나오죠",
+            "나오죠",
+            "나오죠"
+          ],
+          "repeated_token_ids": [
+            901
+          ],
+          "repeated_pieces": [
+            "나오죠"
+          ],
+          "repeated_ngrams": [
+            "나오죠|나오죠",
+            "나오죠|나오죠|나오죠"
+          ],
+          "max_same_token_streak": 4,
+          "max_same_piece_streak": 4,
+          "max_ngram_repeat_count": 2,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": 0.59,
+          "qwave_signature_repeat_count": 3,
+          "cji_xyz_repeat_count": null,
+          "input_output_resonance_hint": 0.21,
+          "missing_channels": [
+            "cji_xyz_trace"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "contextless_reentry_attractor",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M2",
+        "detector_id": "self_echo_detector",
+        "decode_step": 2,
+        "candidate_rank": 0,
+        "token_id": 401,
+        "piece": "풋살화",
+        "recent_window_available": true,
+        "qwave_trace_available": true,
+        "cji_xyz_trace_available": false,
+        "token_echo_score": 0.325,
+        "piece_echo_score": 0.325,
+        "ngram_echo_score": 0.55,
+        "qwave_echo_score": 0.3,
+        "cji_xyz_echo_score": null,
+        "phase_lock_score": 0.225,
+        "contextless_reentry_score": 0.6,
+        "reflection_lock_score": 0.37,
+        "self_echo_score": 0.6,
+        "risk_score": 0.6,
+        "risk_level": "Medium",
+        "evidence": {
+          "token_window": [
+            300,
+            401,
+            502,
+            401,
+            502
+          ],
+          "piece_window": [
+            "있고",
+            "풋살화",
+            "나오죠",
+            "풋살화",
+            "나오죠"
+          ],
+          "repeated_token_ids": [
+            401
+          ],
+          "repeated_pieces": [
+            "풋살화"
+          ],
+          "repeated_ngrams": [
+            "풋살화|나오죠",
+            "나오죠|풋살화",
+            "풋살화|나오죠|풋살화"
+          ],
+          "max_same_token_streak": 1,
+          "max_same_piece_streak": 1,
+          "max_ngram_repeat_count": 2,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": 0.37,
+          "qwave_signature_repeat_count": 2,
+          "cji_xyz_repeat_count": null,
+          "input_output_resonance_hint": 0.18,
+          "missing_channels": [
+            "cji_xyz_trace"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "missing_recent_window",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M2",
+        "detector_id": "self_echo_detector",
+        "decode_step": 3,
+        "candidate_rank": 0,
+        "token_id": 512,
+        "piece": "그래서",
+        "recent_window_available": false,
+        "qwave_trace_available": false,
+        "cji_xyz_trace_available": false,
+        "token_echo_score": null,
+        "piece_echo_score": null,
+        "ngram_echo_score": null,
+        "qwave_echo_score": null,
+        "cji_xyz_echo_score": null,
+        "phase_lock_score": null,
+        "contextless_reentry_score": null,
+        "reflection_lock_score": null,
+        "self_echo_score": null,
+        "risk_score": null,
+        "risk_level": "Unavailable",
+        "evidence": {
+          "token_window": [],
+          "piece_window": [],
+          "repeated_token_ids": [],
+          "repeated_pieces": [],
+          "repeated_ngrams": [],
+          "max_same_token_streak": 0,
+          "max_same_piece_streak": 0,
+          "max_ngram_repeat_count": 0,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": null,
+          "qwave_signature_repeat_count": null,
+          "cji_xyz_repeat_count": null,
+          "input_output_resonance_hint": null,
+          "missing_channels": [
+            "recent_output_window"
+          ],
+          "note": [
+            "recent output window unavailable; detector sealed as Unavailable"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false
+  },
+  "next_candidates": [
+    "QW-52B-M3",
+    "QW-52B-M4",
+    "QW-52B-C1"
+  ],
+  "notes": [
+    "Self Echo is trace-only.",
+    "Output self-reflection is recorded separately from input-output mirror resonance.",
+    "No candidate selection is changed.",
+    "Normal words are not banned; contextless reentry is evidence only."
+  ]
+}

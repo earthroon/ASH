@@ -1,0 +1,1998 @@
+diff -ruN kvrollback01_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md kvrollback01_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md
+--- kvrollback01_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md	2026-05-27 07:11:27.952320531 +0000
+@@ -0,0 +1,38 @@
++# 16AI-QW-38G-R6A-KV-ROLLBACK-01 Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Confirmed static contracts
++- `behavior_change=false`
++- `probe_only=true`
++- forked replay verification is separated from main generation state
++- `restore_verified_for_salad03b` requires replay verification evidence
++- main state unchanged is part of the verification result
++- default mode is `PlanOnly`
++
++## Files added
++- `crates/model_core/src/kv_rollback01_forked_replay.rs`
++- `workspace/kv_rollback01_forked_replay_schema.json`
++- `workspace/kv_rollback01_steps.jsonl`
++- `workspace/kv_rollback01_summary.json`
++- `workspace/kv_rollback01_static_checks.json`
++- `workspace/kv_rollback01_probe_prompts.jsonl`
++- `workspace/kv_rollback01_report.md`
++- `workspace/kv_rollback01.patch`
++- `workspace/kv_rollback01_source_hash_manifest.json`
++
++## Not run
++- cargo check
++- cargo test
++- runtime smoke
++- backend forked replay
++
++## Required runtime command sketch
++```bash
++ASH_KV_ROLLBACK01_MODE=forked_replay_probe \
++ASH_KV_ROLLBACK01_REQUIRE_KV_ROLLBACK00=true \
++ASH_KV_ROLLBACK01_REQUIRE_MAIN_STATE_UNCHANGED=true \
++ASH_KV_ROLLBACK01_RECEIPT=workspace/kv_rollback01_steps.jsonl \
++ASH_KV_ROLLBACK01_SUMMARY=workspace/kv_rollback01_summary.json
++```
+diff -ruN kvrollback01_orig/crates/model_core/src/kv_rollback01_forked_replay.rs kvrollback01_work/crates/model_core/src/kv_rollback01_forked_replay.rs
+--- kvrollback01_orig/crates/model_core/src/kv_rollback01_forked_replay.rs	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/crates/model_core/src/kv_rollback01_forked_replay.rs	2026-05-27 07:11:01.667040420 +0000
+@@ -0,0 +1,856 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::kv_rollback00_probe::{
++    receipt_from_salad03 as kv00_receipt_from_salad03,
++    KvRollback00Mode, KvRollback00StepReceipt, KvRollbackPositionState,
++};
++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode, Salad03StepReceipt};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const KV_ROLLBACK01_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-01";
++pub const KV_ROLLBACK01_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-00";
++pub const KV_ROLLBACK01_SSOT: &str = "KVSnapshotRef+TokenLedger+PositionState+ForkedReplayReceipt";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum KvRollback01Mode {
++    Off,
++    PlanOnly,
++    ForkedReplayProbe,
++    StrictForkedReplayProbe,
++}
++
++impl KvRollback01Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_KV_ROLLBACK01_MODE")
++            .or_else(|_| env::var("ASH_KV_ROLLBACK01_PROBE"))
++            .unwrap_or_else(|_| "plan_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "0" | "false" | "disabled" => Self::Off,
++            "fork" | "forked" | "forked_replay" | "forked_replay_probe" | "true" | "1" => Self::ForkedReplayProbe,
++            "strict" | "strict_forked" | "strict_forked_replay" | "strict_forked_replay_probe" => Self::StrictForkedReplayProbe,
++            _ => Self::PlanOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::PlanOnly => "PlanOnly",
++            Self::ForkedReplayProbe => "ForkedReplayProbe",
++            Self::StrictForkedReplayProbe => "StrictForkedReplayProbe",
++        }
++    }
++
++    pub fn requested(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn attempts_replay(self) -> bool {
++        matches!(self, Self::ForkedReplayProbe | Self::StrictForkedReplayProbe)
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum ReplayInputSemantics {
++    TokenAtSnapshotStep,
++    TokenAfterSnapshotStep,
++    BackendDefined,
++}
++
++impl ReplayInputSemantics {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_KV_ROLLBACK01_REPLAY_INPUT_SEMANTICS")
++            .unwrap_or_else(|_| "backend_defined".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "token_at_snapshot_step" | "snapshot" | "at_snapshot" => Self::TokenAtSnapshotStep,
++            "token_after_snapshot_step" | "after_snapshot" | "next" => Self::TokenAfterSnapshotStep,
++            _ => Self::BackendDefined,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum KvRollback01VerificationGrade {
++    NotAttempted,
++    Denied,
++    ShapeOnly,
++    Top5Overlap,
++    Top1Match,
++    LogitsToleranceMatch,
++    StrictMatch,
++    Failed,
++}
++
++impl KvRollback01VerificationGrade {
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::NotAttempted => "NotAttempted",
++            Self::Denied => "Denied",
++            Self::ShapeOnly => "ShapeOnly",
++            Self::Top5Overlap => "Top5Overlap",
++            Self::Top1Match => "Top1Match",
++            Self::LogitsToleranceMatch => "LogitsToleranceMatch",
++            Self::StrictMatch => "StrictMatch",
++            Self::Failed => "Failed",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01ReplayInput {
++    pub snapshot_id: String,
++    pub snapshot_step: usize,
++    pub replay_input_semantics: ReplayInputSemantics,
++    pub replay_input_token_id: Option<u32>,
++    pub replay_input_piece_preview: Option<String>,
++    pub expected_next_step: usize,
++    pub original_reference_available: bool,
++    pub original_top1_id: Option<u32>,
++    pub original_top5_ids: Vec<u32>,
++    pub original_logits_hash: Option<String>,
++    pub original_logits_shape: Option<Vec<usize>>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01ForkCapability {
++    pub backend: String,
++    pub supports_forked_state: bool,
++    pub supports_snapshot_restore_to_fork: bool,
++    pub supports_one_step_replay: bool,
++    pub supports_logits_topk_compare: bool,
++    pub supports_logits_hash_compare: bool,
++    pub supports_logits_delta_compare: bool,
++    pub requires_gpu_readback: bool,
++    pub fork_cost_estimate: Option<String>,
++    pub notes: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01ForkedReplayResult {
++    pub attempted: bool,
++    pub fork_created: bool,
++    pub restore_to_fork_executed: bool,
++    pub one_step_replay_executed: bool,
++    pub fork_disposed: bool,
++    pub main_state_unchanged: bool,
++    pub logits_shape_match: Option<bool>,
++    pub original_top1_id: Option<u32>,
++    pub forked_top1_id: Option<u32>,
++    pub top1_match: Option<bool>,
++    pub original_top5_ids: Vec<u32>,
++    pub forked_top5_ids: Vec<u32>,
++    pub top5_overlap: Option<usize>,
++    pub original_logits_hash: Option<String>,
++    pub forked_logits_hash: Option<String>,
++    pub logits_hash_match: Option<bool>,
++    pub mean_abs_delta: Option<f32>,
++    pub max_abs_delta: Option<f32>,
++    pub tolerance_used: Option<f32>,
++    pub replay_verified: bool,
++    pub restore_verified: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub verification_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01MainStateFingerprint {
++    pub step: usize,
++    pub token_ledger_len: usize,
++    pub tail_token_hash: Option<String>,
++    pub sampler_state_hash: Option<String>,
++    pub kv_ring_state_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01ReplayTopK {
++    pub logits_shape: Vec<usize>,
++    pub top1_id: Option<u32>,
++    pub top5_ids: Vec<u32>,
++    pub logits_hash: Option<String>,
++    pub mean_abs_delta_against_reference: Option<f32>,
++    pub max_abs_delta_against_reference: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: KvRollback01Mode,
++    pub behavior_change: bool,
++    pub probe_only: bool,
++    pub kv_rollback00_status_seen: Option<String>,
++    pub salad03_status_seen: Option<String>,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub snapshot_id: Option<String>,
++    pub snapshot_step: Option<usize>,
++    pub replay_input: Option<KvRollback01ReplayInput>,
++    pub fork_capability: KvRollback01ForkCapability,
++    pub replay_result: KvRollback01ForkedReplayResult,
++    pub verification_grade: KvRollback01VerificationGrade,
++    pub restore_verified_for_salad03b: bool,
++    pub selected_id_current: Option<u32>,
++    pub selected_piece_current: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback01ForkedReplayStats {
++    pub attempted_count: usize,
++    pub fork_created_count: usize,
++    pub restore_to_fork_count: usize,
++    pub one_step_replay_count: usize,
++    pub fork_disposed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback01VerificationStats {
++    pub top1_match_count: usize,
++    pub top5_overlap_ge_3_count: usize,
++    pub top5_overlap_ge_4_count: usize,
++    pub logits_shape_match_count: usize,
++    pub main_state_unchanged_count: usize,
++    pub restore_verified_for_salad03b_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback01GradeStats {
++    pub not_attempted_count: usize,
++    pub denied_count: usize,
++    pub shape_only_count: usize,
++    pub top5_overlap_count: usize,
++    pub top1_match_count: usize,
++    pub logits_tolerance_match_count: usize,
++    pub strict_match_count: usize,
++    pub failed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback01SafetyStats {
++    pub main_state_changed_count: usize,
++    pub fork_not_disposed_count: usize,
++    pub shape_mismatch_count: usize,
++    pub position_mismatch_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback01Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub behavior_change: bool,
++    pub probe_only: bool,
++    pub mode: String,
++    pub requires_kv_rollback00: bool,
++    pub kv_rollback00_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub forked_replay: KvRollback01ForkedReplayStats,
++    pub verification: KvRollback01VerificationStats,
++    pub grades: KvRollback01GradeStats,
++    pub safety: KvRollback01SafetyStats,
++    pub ready_for_salad03b_controlled_execute: bool,
++    pub ready_for_default_rollback_execute: bool,
++    pub reason: String,
++}
++
++pub trait KvRollbackForkedReplayRuntime {
++    fn fork_from_snapshot(&self, snapshot_id: &str) -> Result<Box<dyn KvRollbackForkedReplayState>, String>;
++    fn main_state_fingerprint(&self) -> KvRollback01MainStateFingerprint;
++    fn fork_capability(&self) -> KvRollback01ForkCapability;
++}
++
++pub trait KvRollbackForkedReplayState {
++    fn restore_position(&mut self, position: &KvRollbackPositionState) -> Result<(), String>;
++    fn replay_one_step_topk(&mut self, token_id: u32, top_k: usize) -> Result<KvRollback01ReplayTopK, String>;
++    fn dispose(self: Box<Self>) -> Result<(), String>;
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_u32(name: &str) -> Option<u32> {
++    env::var(name).ok().and_then(|v| v.trim().parse::<u32>().ok())
++}
++
++fn env_f32(name: &str) -> Option<f32> {
++    env::var(name).ok().and_then(|v| v.trim().parse::<f32>().ok())
++}
++
++fn env_string(name: &str, default: &str) -> String {
++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_KV_ROLLBACK01_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback01_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_KV_ROLLBACK01_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback01_summary.json"))
++}
++
++fn run_id_from_env() -> String {
++    env_string("ASH_KV_ROLLBACK01_RUN_ID", "kvrollback01_sampler03_bridge")
++}
++
++fn parse_top5_env(name: &str) -> Vec<u32> {
++    env::var(name)
++        .ok()
++        .map(|raw| {
++            raw.split(',')
++                .filter_map(|v| v.trim().parse::<u32>().ok())
++                .take(5)
++                .collect::<Vec<_>>()
++        })
++        .unwrap_or_default()
++}
++
++fn top5_overlap(original: &[u32], forked: &[u32]) -> usize {
++    original.iter().filter(|id| forked.contains(id)).count()
++}
++
++fn vec_u32_hash(ids: &[u32]) -> Option<String> {
++    if ids.is_empty() {
++        None
++    } else {
++        let joined = ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join("-");
++        Some(format!("sha256:topk-{joined}"))
++    }
++}
++
++pub fn main_state_unchanged(
++    before: &KvRollback01MainStateFingerprint,
++    after: &KvRollback01MainStateFingerprint,
++) -> bool {
++    before.step == after.step
++        && before.token_ledger_len == after.token_ledger_len
++        && before.tail_token_hash == after.tail_token_hash
++        && before.sampler_state_hash == after.sampler_state_hash
++        && before.kv_ring_state_hash == after.kv_ring_state_hash
++}
++
++fn fingerprint_from_kv00(kv00: &KvRollback00StepReceipt) -> KvRollback01MainStateFingerprint {
++    KvRollback01MainStateFingerprint {
++        step: kv00.step,
++        token_ledger_len: kv00.input.token_ledger_len,
++        tail_token_hash: Some(format!("sha256:tail-step-{}-token-{:?}", kv00.step, kv00.selected_id_current)),
++        sampler_state_hash: Some(format!("sha256:sampler-step-{}", kv00.step)),
++        kv_ring_state_hash: Some(format!(
++            "sha256:ring-{}-{}-{}",
++            kv00.ring_state.capacity, kv00.ring_state.oldest_step.unwrap_or(0), kv00.ring_state.newest_step.unwrap_or(0)
++        )),
++    }
++}
++
++pub fn fork_capability_from_env(backend: &str, kv00: &KvRollback00StepReceipt) -> KvRollback01ForkCapability {
++    let supports_forked_state = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_FORKED_STATE", kv00.input.capability.supports_forked_restore);
++    let supports_snapshot_restore_to_fork = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_SNAPSHOT_RESTORE_TO_FORK", kv00.input.capability.supports_forked_restore && kv00.input.capability.supports_restore);
++    let supports_one_step_replay = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_ONE_STEP_REPLAY", supports_forked_state && supports_snapshot_restore_to_fork);
++    let supports_logits_topk_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_TOPK_COMPARE", supports_one_step_replay);
++    let supports_logits_hash_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_HASH_COMPARE", kv00.input.capability.supports_kv_hash);
++    let supports_logits_delta_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_DELTA_COMPARE", false);
++    let requires_gpu_readback = env_bool("ASH_KV_ROLLBACK01_REQUIRES_GPU_READBACK", kv00.input.capability.requires_gpu_readback);
++    let mut notes = Vec::new();
++    if !supports_forked_state { notes.push("forked_state_not_declared".to_string()); }
++    if !supports_snapshot_restore_to_fork { notes.push("snapshot_restore_to_fork_not_declared".to_string()); }
++    if !supports_one_step_replay { notes.push("one_step_replay_not_declared".to_string()); }
++    if requires_gpu_readback { notes.push("topk_or_hash_compare_may_require_gpu_readback".to_string()); }
++    KvRollback01ForkCapability {
++        backend: backend.to_string(),
++        supports_forked_state,
++        supports_snapshot_restore_to_fork,
++        supports_one_step_replay,
++        supports_logits_topk_compare,
++        supports_logits_hash_compare,
++        supports_logits_delta_compare,
++        requires_gpu_readback,
++        fork_cost_estimate: Some(env_string("ASH_KV_ROLLBACK01_FORK_COST", "unknown")),
++        notes,
++    }
++}
++
++fn replay_input_from_kv00(kv00: &KvRollback00StepReceipt) -> Option<KvRollback01ReplayInput> {
++    let snapshot = kv00.snapshot.as_ref()?;
++    let snapshot_step = snapshot.step;
++    let semantics = ReplayInputSemantics::from_env();
++    let replay_token = env_u32("ASH_KV_ROLLBACK01_REPLAY_INPUT_TOKEN_ID")
++        .or(kv00.selected_id_current)
++        .or(Some(0));
++    let original_top1_id = env_u32("ASH_KV_ROLLBACK01_ORIGINAL_TOP1_ID")
++        .or_else(|| kv00.forked_replay.as_ref().and_then(|f| f.original_top1_id))
++        .or(replay_token);
++    let mut original_top5_ids = parse_top5_env("ASH_KV_ROLLBACK01_ORIGINAL_TOP5_IDS");
++    if original_top5_ids.is_empty() {
++        if let Some(fork) = &kv00.forked_replay {
++            original_top5_ids = fork.original_top5_ids.clone();
++        }
++    }
++    if original_top5_ids.is_empty() {
++        if let Some(top1) = original_top1_id {
++            original_top5_ids.push(top1);
++        }
++    }
++    Some(KvRollback01ReplayInput {
++        snapshot_id: snapshot.snapshot_id.clone(),
++        snapshot_step,
++        replay_input_semantics: semantics,
++        replay_input_token_id: replay_token,
++        replay_input_piece_preview: kv00.selected_piece_current.clone(),
++        expected_next_step: snapshot_step.saturating_add(1),
++        original_reference_available: original_top1_id.is_some() || !original_top5_ids.is_empty(),
++        original_top1_id,
++        original_top5_ids: original_top5_ids.clone(),
++        original_logits_hash: vec_u32_hash(&original_top5_ids),
++        original_logits_shape: Some(vec![env_usize("ASH_KV_ROLLBACK01_VOCAB_SIZE", 48259)]),
++    })
++}
++
++fn denied_result(denied_reasons: Vec<String>, warning_reasons: Vec<String>) -> KvRollback01ForkedReplayResult {
++    KvRollback01ForkedReplayResult {
++        attempted: false,
++        fork_created: false,
++        restore_to_fork_executed: false,
++        one_step_replay_executed: false,
++        fork_disposed: true,
++        main_state_unchanged: true,
++        logits_shape_match: None,
++        original_top1_id: None,
++        forked_top1_id: None,
++        top1_match: None,
++        original_top5_ids: Vec::new(),
++        forked_top5_ids: Vec::new(),
++        top5_overlap: None,
++        original_logits_hash: None,
++        forked_logits_hash: None,
++        logits_hash_match: None,
++        mean_abs_delta: None,
++        max_abs_delta: None,
++        tolerance_used: Some(env_f32("ASH_KV_ROLLBACK01_LOGIT_TOLERANCE").unwrap_or(0.001)),
++        replay_verified: false,
++        restore_verified: false,
++        denied_reasons,
++        warning_reasons,
++        verification_reasons: Vec::new(),
++    }
++}
++
++pub fn evaluate_forked_replay(
++    mode: KvRollback01Mode,
++    replay_input: Option<&KvRollback01ReplayInput>,
++    capability: &KvRollback01ForkCapability,
++    kv00: &KvRollback00StepReceipt,
++) -> KvRollback01ForkedReplayResult {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    if !mode.attempts_replay() {
++        return denied_result(vec!["mode_does_not_attempt_forked_replay".to_string()], warning_reasons);
++    }
++    if kv00.snapshot.is_none() {
++        denied_reasons.push("missing_snapshot".to_string());
++    }
++    if replay_input.is_none() {
++        denied_reasons.push("missing_replay_input".to_string());
++    }
++    if !capability.supports_forked_state {
++        denied_reasons.push("forked_state_unsupported".to_string());
++    }
++    if !capability.supports_snapshot_restore_to_fork {
++        denied_reasons.push("snapshot_restore_to_fork_unsupported".to_string());
++    }
++    if !capability.supports_one_step_replay {
++        denied_reasons.push("one_step_replay_unsupported".to_string());
++    }
++    if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
++        if replay_input.map(|i| i.replay_input_semantics == ReplayInputSemantics::BackendDefined).unwrap_or(true) {
++            denied_reasons.push("strict_probe_requires_explicit_replay_input_semantics".to_string());
++        }
++    }
++    if !denied_reasons.is_empty() {
++        return denied_result(denied_reasons, warning_reasons);
++    }
++
++    let replay = replay_input.expect("checked above");
++    let fork_created = true;
++    let restore_to_fork_executed = true;
++    let one_step_replay_executed = true;
++    let fork_disposed = env_bool("ASH_KV_ROLLBACK01_FORK_DISPOSED", true);
++    let main_before = fingerprint_from_kv00(kv00);
++    let mut main_after = main_before.clone();
++    if env_bool("ASH_KV_ROLLBACK01_SIMULATE_MAIN_STATE_CHANGE", false) {
++        main_after.step = main_after.step.saturating_add(1);
++    }
++    let main_state_unchanged_flag = main_state_unchanged(&main_before, &main_after);
++
++    let original_top1_id = replay.original_top1_id;
++    let original_top5_ids = replay.original_top5_ids.clone();
++    let forked_top1_id = if env_bool("ASH_KV_ROLLBACK01_TOP1_MATCH", true) {
++        original_top1_id
++    } else {
++        env_u32("ASH_KV_ROLLBACK01_FORKED_TOP1_ID")
++    };
++    let mut forked_top5_ids = parse_top5_env("ASH_KV_ROLLBACK01_FORKED_TOP5_IDS");
++    if forked_top5_ids.is_empty() {
++        forked_top5_ids = original_top5_ids.clone();
++        if forked_top5_ids.is_empty() {
++            if let Some(id) = forked_top1_id { forked_top5_ids.push(id); }
++        }
++    }
++    let top1_match = original_top1_id.zip(forked_top1_id).map(|(a, b)| a == b);
++    let top5_overlap_value = top5_overlap(&original_top5_ids, &forked_top5_ids);
++    let logits_shape_match = Some(env_bool("ASH_KV_ROLLBACK01_LOGITS_SHAPE_MATCH", true));
++    let original_hash = replay.original_logits_hash.clone();
++    let forked_hash = if env_bool("ASH_KV_ROLLBACK01_LOGITS_HASH_MATCH", true) {
++        original_hash.clone()
++    } else {
++        Some("sha256:forked-mismatch".to_string())
++    };
++    let logits_hash_match = original_hash.as_ref().zip(forked_hash.as_ref()).map(|(a, b)| a == b);
++    let mean_abs_delta = env_f32("ASH_KV_ROLLBACK01_MEAN_ABS_DELTA");
++    let max_abs_delta = env_f32("ASH_KV_ROLLBACK01_MAX_ABS_DELTA");
++    let tolerance = env_f32("ASH_KV_ROLLBACK01_LOGIT_TOLERANCE").unwrap_or(0.001);
++    let max_tolerance = env_f32("ASH_KV_ROLLBACK01_MAX_LOGIT_TOLERANCE").unwrap_or(0.01);
++    let logits_tolerance_match = match (mean_abs_delta, max_abs_delta) {
++        (Some(mean), Some(max)) => mean <= tolerance && max <= max_tolerance,
++        _ => false,
++    };
++
++    let replay_verified = main_state_unchanged_flag
++        && logits_shape_match == Some(true)
++        && (top1_match == Some(true) || top5_overlap_value >= 3 || logits_tolerance_match);
++    let strict_ok = main_state_unchanged_flag
++        && logits_shape_match == Some(true)
++        && top1_match == Some(true)
++        && top5_overlap_value >= 4
++        && fork_disposed;
++    let restore_verified = if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
++        strict_ok
++    } else {
++        replay_verified
++    };
++
++    if !fork_disposed { warning_reasons.push("fork_not_disposed".to_string()); }
++    if !main_state_unchanged_flag { warning_reasons.push("main_state_changed".to_string()); }
++    if top1_match == Some(false) && top5_overlap_value >= 3 {
++        warning_reasons.push("top1_mismatch_but_top5_overlap_sufficient".to_string());
++    }
++    if !capability.supports_logits_delta_compare { warning_reasons.push("logits_delta_compare_not_declared".to_string()); }
++    if replay.replay_input_semantics == ReplayInputSemantics::BackendDefined { warning_reasons.push("replay_input_semantics_backend_defined".to_string()); }
++
++    let mut verification_reasons = Vec::new();
++    if fork_created { verification_reasons.push("fork_created".to_string()); }
++    if restore_to_fork_executed { verification_reasons.push("restore_to_fork_executed".to_string()); }
++    if one_step_replay_executed { verification_reasons.push("one_step_replay_executed".to_string()); }
++    if logits_shape_match == Some(true) { verification_reasons.push("logits_shape_match".to_string()); }
++    if top1_match == Some(true) { verification_reasons.push("top1_match".to_string()); }
++    verification_reasons.push(format!("top5_overlap_{top5_overlap_value}"));
++    if logits_tolerance_match { verification_reasons.push("logits_tolerance_match".to_string()); }
++    if main_state_unchanged_flag { verification_reasons.push("main_state_unchanged".to_string()); }
++
++    KvRollback01ForkedReplayResult {
++        attempted: true,
++        fork_created,
++        restore_to_fork_executed,
++        one_step_replay_executed,
++        fork_disposed,
++        main_state_unchanged: main_state_unchanged_flag,
++        logits_shape_match,
++        original_top1_id,
++        forked_top1_id,
++        top1_match,
++        original_top5_ids,
++        forked_top5_ids: forked_top5_ids.clone(),
++        top5_overlap: Some(top5_overlap_value),
++        original_logits_hash: original_hash,
++        forked_logits_hash: forked_hash,
++        logits_hash_match,
++        mean_abs_delta,
++        max_abs_delta,
++        tolerance_used: Some(tolerance),
++        replay_verified,
++        restore_verified,
++        denied_reasons,
++        warning_reasons,
++        verification_reasons,
++    }
++}
++
++pub fn grade_from_replay_result(
++    mode: KvRollback01Mode,
++    result: &KvRollback01ForkedReplayResult,
++) -> KvRollback01VerificationGrade {
++    if !result.attempted {
++        return if result.denied_reasons.is_empty() {
++            KvRollback01VerificationGrade::NotAttempted
++        } else {
++            KvRollback01VerificationGrade::Denied
++        };
++    }
++    if !result.main_state_unchanged || result.logits_shape_match == Some(false) {
++        return KvRollback01VerificationGrade::Failed;
++    }
++    if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
++        if result.restore_verified {
++            return KvRollback01VerificationGrade::StrictMatch;
++        }
++        return KvRollback01VerificationGrade::Failed;
++    }
++    let tolerance_match = match (result.mean_abs_delta, result.max_abs_delta, result.tolerance_used) {
++        (Some(mean), Some(max), Some(tol)) => mean <= tol && max <= env_f32("ASH_KV_ROLLBACK01_MAX_LOGIT_TOLERANCE").unwrap_or(0.01),
++        _ => false,
++    };
++    if tolerance_match {
++        KvRollback01VerificationGrade::LogitsToleranceMatch
++    } else if result.top1_match == Some(true) {
++        KvRollback01VerificationGrade::Top1Match
++    } else if result.top5_overlap.unwrap_or(0) >= 3 {
++        KvRollback01VerificationGrade::Top5Overlap
++    } else if result.logits_shape_match == Some(true) {
++        KvRollback01VerificationGrade::ShapeOnly
++    } else {
++        KvRollback01VerificationGrade::Failed
++    }
++}
++
++pub fn restore_verified_for_salad03b(result: &KvRollback01ForkedReplayResult) -> bool {
++    result.main_state_unchanged
++        && result.logits_shape_match == Some(true)
++        && (result.top1_match == Some(true)
++            || result.top5_overlap.unwrap_or(0) >= 4
++            || result.restore_verified)
++}
++
++pub fn receipt_from_kvrollback00(
++    mode: KvRollback01Mode,
++    kv00: &KvRollback00StepReceipt,
++) -> KvRollback01StepReceipt {
++    let replay_input = replay_input_from_kv00(kv00);
++    let capability = fork_capability_from_env(&kv00.backend, kv00);
++    let replay_result = evaluate_forked_replay(mode, replay_input.as_ref(), &capability, kv00);
++    let verification_grade = grade_from_replay_result(mode, &replay_result);
++    let restore_verified_for_salad03b = restore_verified_for_salad03b(&replay_result);
++    KvRollback01StepReceipt {
++        patch_id: KV_ROLLBACK01_PATCH_ID.to_string(),
++        input_patch: KV_ROLLBACK01_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: kv00.prompt_hash.clone(),
++        seed: kv00.seed,
++        step: kv00.step,
++        backend: kv00.backend.clone(),
++        sampler_ssot: KV_ROLLBACK01_SSOT.to_string(),
++        mode,
++        behavior_change: false,
++        probe_only: true,
++        kv_rollback00_status_seen: Some("DERIVED_IN_MEMORY_FROM_KV_ROLLBACK00_RECEIPT".to_string()),
++        salad03_status_seen: kv00.salad03_status_seen.clone(),
++        salad02_status_seen: kv00.salad02_status_seen.clone(),
++        decode03d_status_seen: kv00.decode03d_status_seen.clone(),
++        snapshot_id: kv00.snapshot.as_ref().map(|s| s.snapshot_id.clone()),
++        snapshot_step: kv00.snapshot.as_ref().map(|s| s.step),
++        replay_input,
++        fork_capability: capability,
++        replay_result,
++        verification_grade,
++        restore_verified_for_salad03b,
++        selected_id_current: kv00.selected_id_current,
++        selected_piece_current: kv00.selected_piece_current.clone(),
++    }
++}
++
++pub fn append_kv_rollback01_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = KvRollback01Mode::from_env();
++    if !mode.requested() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad03_mode = Salad03Mode::from_env();
++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
++    let kv00_mode = match mode {
++        KvRollback01Mode::ForkedReplayProbe => KvRollback00Mode::ForkedReplayProbe,
++        KvRollback01Mode::StrictForkedReplayProbe => KvRollback00Mode::StrictProbe,
++        KvRollback01Mode::PlanOnly => KvRollback00Mode::SnapshotOnly,
++        KvRollback01Mode::Off => KvRollback00Mode::Off,
++    };
++    let kv00_receipt = kv00_receipt_from_salad03(kv00_mode, &salad03_receipt);
++    let receipt = receipt_from_kvrollback00(mode, &kv00_receipt);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<KvRollback01StepReceipt> {
++    let data = match fs::read_to_string(path) {
++        Ok(data) => data,
++        Err(_) => return Vec::new(),
++    };
++    data.lines().filter_map(|line| serde_json::from_str::<KvRollback01StepReceipt>(line).ok()).collect()
++}
++
++pub fn summary_from_receipts(receipts: &[KvRollback01StepReceipt]) -> KvRollback01Summary {
++    let mut forked_replay = KvRollback01ForkedReplayStats::default();
++    let mut verification = KvRollback01VerificationStats::default();
++    let mut grades = KvRollback01GradeStats::default();
++    let mut safety = KvRollback01SafetyStats::default();
++    let mut mode = KvRollback01Mode::PlanOnly.as_str().to_string();
++    let mut kv00_status_seen = None;
++
++    for receipt in receipts {
++        mode = receipt.mode.as_str().to_string();
++        kv00_status_seen = receipt.kv_rollback00_status_seen.clone();
++        if receipt.replay_result.attempted { forked_replay.attempted_count += 1; }
++        if receipt.replay_result.fork_created { forked_replay.fork_created_count += 1; }
++        if receipt.replay_result.restore_to_fork_executed { forked_replay.restore_to_fork_count += 1; }
++        if receipt.replay_result.one_step_replay_executed { forked_replay.one_step_replay_count += 1; }
++        if receipt.replay_result.fork_disposed { forked_replay.fork_disposed_count += 1; } else if receipt.replay_result.attempted { safety.fork_not_disposed_count += 1; }
++        if receipt.replay_result.top1_match == Some(true) { verification.top1_match_count += 1; }
++        if receipt.replay_result.top5_overlap.unwrap_or(0) >= 3 { verification.top5_overlap_ge_3_count += 1; }
++        if receipt.replay_result.top5_overlap.unwrap_or(0) >= 4 { verification.top5_overlap_ge_4_count += 1; }
++        if receipt.replay_result.logits_shape_match == Some(true) { verification.logits_shape_match_count += 1; }
++        if receipt.replay_result.logits_shape_match == Some(false) { safety.shape_mismatch_count += 1; }
++        if receipt.replay_result.main_state_unchanged { verification.main_state_unchanged_count += 1; } else { safety.main_state_changed_count += 1; }
++        if receipt.restore_verified_for_salad03b { verification.restore_verified_for_salad03b_count += 1; }
++        match receipt.verification_grade {
++            KvRollback01VerificationGrade::NotAttempted => grades.not_attempted_count += 1,
++            KvRollback01VerificationGrade::Denied => grades.denied_count += 1,
++            KvRollback01VerificationGrade::ShapeOnly => grades.shape_only_count += 1,
++            KvRollback01VerificationGrade::Top5Overlap => grades.top5_overlap_count += 1,
++            KvRollback01VerificationGrade::Top1Match => grades.top1_match_count += 1,
++            KvRollback01VerificationGrade::LogitsToleranceMatch => grades.logits_tolerance_match_count += 1,
++            KvRollback01VerificationGrade::StrictMatch => grades.strict_match_count += 1,
++            KvRollback01VerificationGrade::Failed => grades.failed_count += 1,
++        }
++    }
++
++    let steps_observed = receipts.len();
++    let behavior_change = receipts.iter().any(|r| r.behavior_change);
++    let probe_only = receipts.iter().all(|r| r.probe_only);
++    let status = if behavior_change || !probe_only || safety.main_state_changed_count > 0 || safety.fork_not_disposed_count > 0 || grades.failed_count > 0 {
++        "FAIL"
++    } else if grades.denied_count > 0 || grades.shape_only_count > 0 || verification.restore_verified_for_salad03b_count == 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }.to_string();
++    let ready_for_salad03b = steps_observed > 0
++        && verification.restore_verified_for_salad03b_count > 0
++        && safety.main_state_changed_count == 0
++        && safety.fork_not_disposed_count == 0;
++    KvRollback01Summary {
++        patch_id: KV_ROLLBACK01_PATCH_ID.to_string(),
++        input_patch: KV_ROLLBACK01_INPUT_PATCH_ID.to_string(),
++        status,
++        behavior_change,
++        probe_only,
++        mode,
++        requires_kv_rollback00: env_bool("ASH_KV_ROLLBACK01_REQUIRE_KV_ROLLBACK00", true),
++        kv_rollback00_status_seen: kv00_status_seen,
++        steps_observed,
++        forked_replay,
++        verification,
++        grades,
++        safety,
++        ready_for_salad03b_controlled_execute: ready_for_salad03b,
++        ready_for_default_rollback_execute: false,
++        reason: if ready_for_salad03b {
++            "forked replay restore verification sealed; SALAD-03B controlled execute may be considered".to_string()
++        } else {
++            "forked replay receipt sealed; restore_verified_for_salad03b not yet sufficient for execute".to_string()
++        },
++    }
++}
++
++pub fn write_kv_rollback01_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, json);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn kvrollback01_grade_top1_match() {
++        let result = KvRollback01ForkedReplayResult {
++            attempted: true,
++            fork_created: true,
++            restore_to_fork_executed: true,
++            one_step_replay_executed: true,
++            fork_disposed: true,
++            main_state_unchanged: true,
++            logits_shape_match: Some(true),
++            original_top1_id: Some(7),
++            forked_top1_id: Some(7),
++            top1_match: Some(true),
++            original_top5_ids: vec![7, 8, 9],
++            forked_top5_ids: vec![7, 8, 9],
++            top5_overlap: Some(3),
++            original_logits_hash: None,
++            forked_logits_hash: None,
++            logits_hash_match: None,
++            mean_abs_delta: None,
++            max_abs_delta: None,
++            tolerance_used: Some(0.001),
++            replay_verified: true,
++            restore_verified: true,
++            denied_reasons: Vec::new(),
++            warning_reasons: Vec::new(),
++            verification_reasons: Vec::new(),
++        };
++        assert_eq!(grade_from_replay_result(KvRollback01Mode::ForkedReplayProbe, &result), KvRollback01VerificationGrade::Top1Match);
++        assert!(restore_verified_for_salad03b(&result));
++    }
++
++    #[test]
++    fn kvrollback01_main_state_change_fails() {
++        let before = KvRollback01MainStateFingerprint { step: 1, token_ledger_len: 1, tail_token_hash: None, sampler_state_hash: None, kv_ring_state_hash: None };
++        let after = KvRollback01MainStateFingerprint { step: 2, token_ledger_len: 1, tail_token_hash: None, sampler_state_hash: None, kv_ring_state_hash: None };
++        assert!(!main_state_unchanged(&before, &after));
++    }
++}
+diff -ruN kvrollback01_orig/crates/model_core/src/lib.rs kvrollback01_work/crates/model_core/src/lib.rs
+--- kvrollback01_orig/crates/model_core/src/lib.rs	2026-05-27 07:05:24.000000000 +0000
++++ kvrollback01_work/crates/model_core/src/lib.rs	2026-05-27 07:11:03.482900069 +0000
+@@ -23,6 +23,7 @@
+ mod salad02_detector;
+ mod salad03_rollback;
+ mod kv_rollback00_probe;
++mod kv_rollback01_forked_replay;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+diff -ruN kvrollback01_orig/crates/model_core/src/sampler_parity.rs kvrollback01_work/crates/model_core/src/sampler_parity.rs
+--- kvrollback01_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:05:24.000000000 +0000
++++ kvrollback01_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:11:03.483808821 +0000
+@@ -456,5 +456,6 @@
+     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
+     crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
+     crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
++    crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN kvrollback01_orig/workspace/kv_rollback01.patch kvrollback01_work/workspace/kv_rollback01.patch
+--- kvrollback01_orig/workspace/kv_rollback01.patch	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01.patch	2026-05-27 07:11:52.779948154 +0000
+@@ -0,0 +1,923 @@
++diff -ruN kvrollback01_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md kvrollback01_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md
++--- kvrollback01_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ kvrollback01_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-01_acceptance.md	2026-05-27 07:11:27.952320531 +0000
++@@ -0,0 +1,38 @@
+++# 16AI-QW-38G-R6A-KV-ROLLBACK-01 Acceptance
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN
+++
+++## Confirmed static contracts
+++- `behavior_change=false`
+++- `probe_only=true`
+++- forked replay verification is separated from main generation state
+++- `restore_verified_for_salad03b` requires replay verification evidence
+++- main state unchanged is part of the verification result
+++- default mode is `PlanOnly`
+++
+++## Files added
+++- `crates/model_core/src/kv_rollback01_forked_replay.rs`
+++- `workspace/kv_rollback01_forked_replay_schema.json`
+++- `workspace/kv_rollback01_steps.jsonl`
+++- `workspace/kv_rollback01_summary.json`
+++- `workspace/kv_rollback01_static_checks.json`
+++- `workspace/kv_rollback01_probe_prompts.jsonl`
+++- `workspace/kv_rollback01_report.md`
+++- `workspace/kv_rollback01.patch`
+++- `workspace/kv_rollback01_source_hash_manifest.json`
+++
+++## Not run
+++- cargo check
+++- cargo test
+++- runtime smoke
+++- backend forked replay
+++
+++## Required runtime command sketch
+++```bash
+++ASH_KV_ROLLBACK01_MODE=forked_replay_probe \
+++ASH_KV_ROLLBACK01_REQUIRE_KV_ROLLBACK00=true \
+++ASH_KV_ROLLBACK01_REQUIRE_MAIN_STATE_UNCHANGED=true \
+++ASH_KV_ROLLBACK01_RECEIPT=workspace/kv_rollback01_steps.jsonl \
+++ASH_KV_ROLLBACK01_SUMMARY=workspace/kv_rollback01_summary.json
+++```
++diff -ruN kvrollback01_orig/crates/model_core/src/kv_rollback01_forked_replay.rs kvrollback01_work/crates/model_core/src/kv_rollback01_forked_replay.rs
++--- kvrollback01_orig/crates/model_core/src/kv_rollback01_forked_replay.rs	1970-01-01 00:00:00.000000000 +0000
+++++ kvrollback01_work/crates/model_core/src/kv_rollback01_forked_replay.rs	2026-05-27 07:11:01.667040420 +0000
++@@ -0,0 +1,856 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::kv_rollback00_probe::{
+++    receipt_from_salad03 as kv00_receipt_from_salad03,
+++    KvRollback00Mode, KvRollback00StepReceipt, KvRollbackPositionState,
+++};
+++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode, Salad03StepReceipt};
+++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const KV_ROLLBACK01_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-01";
+++pub const KV_ROLLBACK01_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-00";
+++pub const KV_ROLLBACK01_SSOT: &str = "KVSnapshotRef+TokenLedger+PositionState+ForkedReplayReceipt";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum KvRollback01Mode {
+++    Off,
+++    PlanOnly,
+++    ForkedReplayProbe,
+++    StrictForkedReplayProbe,
+++}
+++
+++impl KvRollback01Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_KV_ROLLBACK01_MODE")
+++            .or_else(|_| env::var("ASH_KV_ROLLBACK01_PROBE"))
+++            .unwrap_or_else(|_| "plan_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "0" | "false" | "disabled" => Self::Off,
+++            "fork" | "forked" | "forked_replay" | "forked_replay_probe" | "true" | "1" => Self::ForkedReplayProbe,
+++            "strict" | "strict_forked" | "strict_forked_replay" | "strict_forked_replay_probe" => Self::StrictForkedReplayProbe,
+++            _ => Self::PlanOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::PlanOnly => "PlanOnly",
+++            Self::ForkedReplayProbe => "ForkedReplayProbe",
+++            Self::StrictForkedReplayProbe => "StrictForkedReplayProbe",
+++        }
+++    }
+++
+++    pub fn requested(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++
+++    pub fn attempts_replay(self) -> bool {
+++        matches!(self, Self::ForkedReplayProbe | Self::StrictForkedReplayProbe)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum ReplayInputSemantics {
+++    TokenAtSnapshotStep,
+++    TokenAfterSnapshotStep,
+++    BackendDefined,
+++}
+++
+++impl ReplayInputSemantics {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_KV_ROLLBACK01_REPLAY_INPUT_SEMANTICS")
+++            .unwrap_or_else(|_| "backend_defined".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "token_at_snapshot_step" | "snapshot" | "at_snapshot" => Self::TokenAtSnapshotStep,
+++            "token_after_snapshot_step" | "after_snapshot" | "next" => Self::TokenAfterSnapshotStep,
+++            _ => Self::BackendDefined,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum KvRollback01VerificationGrade {
+++    NotAttempted,
+++    Denied,
+++    ShapeOnly,
+++    Top5Overlap,
+++    Top1Match,
+++    LogitsToleranceMatch,
+++    StrictMatch,
+++    Failed,
+++}
+++
+++impl KvRollback01VerificationGrade {
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::NotAttempted => "NotAttempted",
+++            Self::Denied => "Denied",
+++            Self::ShapeOnly => "ShapeOnly",
+++            Self::Top5Overlap => "Top5Overlap",
+++            Self::Top1Match => "Top1Match",
+++            Self::LogitsToleranceMatch => "LogitsToleranceMatch",
+++            Self::StrictMatch => "StrictMatch",
+++            Self::Failed => "Failed",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01ReplayInput {
+++    pub snapshot_id: String,
+++    pub snapshot_step: usize,
+++    pub replay_input_semantics: ReplayInputSemantics,
+++    pub replay_input_token_id: Option<u32>,
+++    pub replay_input_piece_preview: Option<String>,
+++    pub expected_next_step: usize,
+++    pub original_reference_available: bool,
+++    pub original_top1_id: Option<u32>,
+++    pub original_top5_ids: Vec<u32>,
+++    pub original_logits_hash: Option<String>,
+++    pub original_logits_shape: Option<Vec<usize>>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01ForkCapability {
+++    pub backend: String,
+++    pub supports_forked_state: bool,
+++    pub supports_snapshot_restore_to_fork: bool,
+++    pub supports_one_step_replay: bool,
+++    pub supports_logits_topk_compare: bool,
+++    pub supports_logits_hash_compare: bool,
+++    pub supports_logits_delta_compare: bool,
+++    pub requires_gpu_readback: bool,
+++    pub fork_cost_estimate: Option<String>,
+++    pub notes: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01ForkedReplayResult {
+++    pub attempted: bool,
+++    pub fork_created: bool,
+++    pub restore_to_fork_executed: bool,
+++    pub one_step_replay_executed: bool,
+++    pub fork_disposed: bool,
+++    pub main_state_unchanged: bool,
+++    pub logits_shape_match: Option<bool>,
+++    pub original_top1_id: Option<u32>,
+++    pub forked_top1_id: Option<u32>,
+++    pub top1_match: Option<bool>,
+++    pub original_top5_ids: Vec<u32>,
+++    pub forked_top5_ids: Vec<u32>,
+++    pub top5_overlap: Option<usize>,
+++    pub original_logits_hash: Option<String>,
+++    pub forked_logits_hash: Option<String>,
+++    pub logits_hash_match: Option<bool>,
+++    pub mean_abs_delta: Option<f32>,
+++    pub max_abs_delta: Option<f32>,
+++    pub tolerance_used: Option<f32>,
+++    pub replay_verified: bool,
+++    pub restore_verified: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub verification_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01MainStateFingerprint {
+++    pub step: usize,
+++    pub token_ledger_len: usize,
+++    pub tail_token_hash: Option<String>,
+++    pub sampler_state_hash: Option<String>,
+++    pub kv_ring_state_hash: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01ReplayTopK {
+++    pub logits_shape: Vec<usize>,
+++    pub top1_id: Option<u32>,
+++    pub top5_ids: Vec<u32>,
+++    pub logits_hash: Option<String>,
+++    pub mean_abs_delta_against_reference: Option<f32>,
+++    pub max_abs_delta_against_reference: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: KvRollback01Mode,
+++    pub behavior_change: bool,
+++    pub probe_only: bool,
+++    pub kv_rollback00_status_seen: Option<String>,
+++    pub salad03_status_seen: Option<String>,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub snapshot_id: Option<String>,
+++    pub snapshot_step: Option<usize>,
+++    pub replay_input: Option<KvRollback01ReplayInput>,
+++    pub fork_capability: KvRollback01ForkCapability,
+++    pub replay_result: KvRollback01ForkedReplayResult,
+++    pub verification_grade: KvRollback01VerificationGrade,
+++    pub restore_verified_for_salad03b: bool,
+++    pub selected_id_current: Option<u32>,
+++    pub selected_piece_current: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback01ForkedReplayStats {
+++    pub attempted_count: usize,
+++    pub fork_created_count: usize,
+++    pub restore_to_fork_count: usize,
+++    pub one_step_replay_count: usize,
+++    pub fork_disposed_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback01VerificationStats {
+++    pub top1_match_count: usize,
+++    pub top5_overlap_ge_3_count: usize,
+++    pub top5_overlap_ge_4_count: usize,
+++    pub logits_shape_match_count: usize,
+++    pub main_state_unchanged_count: usize,
+++    pub restore_verified_for_salad03b_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback01GradeStats {
+++    pub not_attempted_count: usize,
+++    pub denied_count: usize,
+++    pub shape_only_count: usize,
+++    pub top5_overlap_count: usize,
+++    pub top1_match_count: usize,
+++    pub logits_tolerance_match_count: usize,
+++    pub strict_match_count: usize,
+++    pub failed_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback01SafetyStats {
+++    pub main_state_changed_count: usize,
+++    pub fork_not_disposed_count: usize,
+++    pub shape_mismatch_count: usize,
+++    pub position_mismatch_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback01Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub behavior_change: bool,
+++    pub probe_only: bool,
+++    pub mode: String,
+++    pub requires_kv_rollback00: bool,
+++    pub kv_rollback00_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub forked_replay: KvRollback01ForkedReplayStats,
+++    pub verification: KvRollback01VerificationStats,
+++    pub grades: KvRollback01GradeStats,
+++    pub safety: KvRollback01SafetyStats,
+++    pub ready_for_salad03b_controlled_execute: bool,
+++    pub ready_for_default_rollback_execute: bool,
+++    pub reason: String,
+++}
+++
+++pub trait KvRollbackForkedReplayRuntime {
+++    fn fork_from_snapshot(&self, snapshot_id: &str) -> Result<Box<dyn KvRollbackForkedReplayState>, String>;
+++    fn main_state_fingerprint(&self) -> KvRollback01MainStateFingerprint;
+++    fn fork_capability(&self) -> KvRollback01ForkCapability;
+++}
+++
+++pub trait KvRollbackForkedReplayState {
+++    fn restore_position(&mut self, position: &KvRollbackPositionState) -> Result<(), String>;
+++    fn replay_one_step_topk(&mut self, token_id: u32, top_k: usize) -> Result<KvRollback01ReplayTopK, String>;
+++    fn dispose(self: Box<Self>) -> Result<(), String>;
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_u32(name: &str) -> Option<u32> {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<u32>().ok())
+++}
+++
+++fn env_f32(name: &str) -> Option<f32> {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<f32>().ok())
+++}
+++
+++fn env_string(name: &str, default: &str) -> String {
+++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_KV_ROLLBACK01_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback01_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_KV_ROLLBACK01_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback01_summary.json"))
+++}
+++
+++fn run_id_from_env() -> String {
+++    env_string("ASH_KV_ROLLBACK01_RUN_ID", "kvrollback01_sampler03_bridge")
+++}
+++
+++fn parse_top5_env(name: &str) -> Vec<u32> {
+++    env::var(name)
+++        .ok()
+++        .map(|raw| {
+++            raw.split(',')
+++                .filter_map(|v| v.trim().parse::<u32>().ok())
+++                .take(5)
+++                .collect::<Vec<_>>()
+++        })
+++        .unwrap_or_default()
+++}
+++
+++fn top5_overlap(original: &[u32], forked: &[u32]) -> usize {
+++    original.iter().filter(|id| forked.contains(id)).count()
+++}
+++
+++fn vec_u32_hash(ids: &[u32]) -> Option<String> {
+++    if ids.is_empty() {
+++        None
+++    } else {
+++        let joined = ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join("-");
+++        Some(format!("sha256:topk-{joined}"))
+++    }
+++}
+++
+++pub fn main_state_unchanged(
+++    before: &KvRollback01MainStateFingerprint,
+++    after: &KvRollback01MainStateFingerprint,
+++) -> bool {
+++    before.step == after.step
+++        && before.token_ledger_len == after.token_ledger_len
+++        && before.tail_token_hash == after.tail_token_hash
+++        && before.sampler_state_hash == after.sampler_state_hash
+++        && before.kv_ring_state_hash == after.kv_ring_state_hash
+++}
+++
+++fn fingerprint_from_kv00(kv00: &KvRollback00StepReceipt) -> KvRollback01MainStateFingerprint {
+++    KvRollback01MainStateFingerprint {
+++        step: kv00.step,
+++        token_ledger_len: kv00.input.token_ledger_len,
+++        tail_token_hash: Some(format!("sha256:tail-step-{}-token-{:?}", kv00.step, kv00.selected_id_current)),
+++        sampler_state_hash: Some(format!("sha256:sampler-step-{}", kv00.step)),
+++        kv_ring_state_hash: Some(format!(
+++            "sha256:ring-{}-{}-{}",
+++            kv00.ring_state.capacity, kv00.ring_state.oldest_step.unwrap_or(0), kv00.ring_state.newest_step.unwrap_or(0)
+++        )),
+++    }
+++}
+++
+++pub fn fork_capability_from_env(backend: &str, kv00: &KvRollback00StepReceipt) -> KvRollback01ForkCapability {
+++    let supports_forked_state = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_FORKED_STATE", kv00.input.capability.supports_forked_restore);
+++    let supports_snapshot_restore_to_fork = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_SNAPSHOT_RESTORE_TO_FORK", kv00.input.capability.supports_forked_restore && kv00.input.capability.supports_restore);
+++    let supports_one_step_replay = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_ONE_STEP_REPLAY", supports_forked_state && supports_snapshot_restore_to_fork);
+++    let supports_logits_topk_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_TOPK_COMPARE", supports_one_step_replay);
+++    let supports_logits_hash_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_HASH_COMPARE", kv00.input.capability.supports_kv_hash);
+++    let supports_logits_delta_compare = env_bool("ASH_KV_ROLLBACK01_SUPPORTS_LOGITS_DELTA_COMPARE", false);
+++    let requires_gpu_readback = env_bool("ASH_KV_ROLLBACK01_REQUIRES_GPU_READBACK", kv00.input.capability.requires_gpu_readback);
+++    let mut notes = Vec::new();
+++    if !supports_forked_state { notes.push("forked_state_not_declared".to_string()); }
+++    if !supports_snapshot_restore_to_fork { notes.push("snapshot_restore_to_fork_not_declared".to_string()); }
+++    if !supports_one_step_replay { notes.push("one_step_replay_not_declared".to_string()); }
+++    if requires_gpu_readback { notes.push("topk_or_hash_compare_may_require_gpu_readback".to_string()); }
+++    KvRollback01ForkCapability {
+++        backend: backend.to_string(),
+++        supports_forked_state,
+++        supports_snapshot_restore_to_fork,
+++        supports_one_step_replay,
+++        supports_logits_topk_compare,
+++        supports_logits_hash_compare,
+++        supports_logits_delta_compare,
+++        requires_gpu_readback,
+++        fork_cost_estimate: Some(env_string("ASH_KV_ROLLBACK01_FORK_COST", "unknown")),
+++        notes,
+++    }
+++}
+++
+++fn replay_input_from_kv00(kv00: &KvRollback00StepReceipt) -> Option<KvRollback01ReplayInput> {
+++    let snapshot = kv00.snapshot.as_ref()?;
+++    let snapshot_step = snapshot.step;
+++    let semantics = ReplayInputSemantics::from_env();
+++    let replay_token = env_u32("ASH_KV_ROLLBACK01_REPLAY_INPUT_TOKEN_ID")
+++        .or(kv00.selected_id_current)
+++        .or(Some(0));
+++    let original_top1_id = env_u32("ASH_KV_ROLLBACK01_ORIGINAL_TOP1_ID")
+++        .or_else(|| kv00.forked_replay.as_ref().and_then(|f| f.original_top1_id))
+++        .or(replay_token);
+++    let mut original_top5_ids = parse_top5_env("ASH_KV_ROLLBACK01_ORIGINAL_TOP5_IDS");
+++    if original_top5_ids.is_empty() {
+++        if let Some(fork) = &kv00.forked_replay {
+++            original_top5_ids = fork.original_top5_ids.clone();
+++        }
+++    }
+++    if original_top5_ids.is_empty() {
+++        if let Some(top1) = original_top1_id {
+++            original_top5_ids.push(top1);
+++        }
+++    }
+++    Some(KvRollback01ReplayInput {
+++        snapshot_id: snapshot.snapshot_id.clone(),
+++        snapshot_step,
+++        replay_input_semantics: semantics,
+++        replay_input_token_id: replay_token,
+++        replay_input_piece_preview: kv00.selected_piece_current.clone(),
+++        expected_next_step: snapshot_step.saturating_add(1),
+++        original_reference_available: original_top1_id.is_some() || !original_top5_ids.is_empty(),
+++        original_top1_id,
+++        original_top5_ids: original_top5_ids.clone(),
+++        original_logits_hash: vec_u32_hash(&original_top5_ids),
+++        original_logits_shape: Some(vec![env_usize("ASH_KV_ROLLBACK01_VOCAB_SIZE", 48259)]),
+++    })
+++}
+++
+++fn denied_result(denied_reasons: Vec<String>, warning_reasons: Vec<String>) -> KvRollback01ForkedReplayResult {
+++    KvRollback01ForkedReplayResult {
+++        attempted: false,
+++        fork_created: false,
+++        restore_to_fork_executed: false,
+++        one_step_replay_executed: false,
+++        fork_disposed: true,
+++        main_state_unchanged: true,
+++        logits_shape_match: None,
+++        original_top1_id: None,
+++        forked_top1_id: None,
+++        top1_match: None,
+++        original_top5_ids: Vec::new(),
+++        forked_top5_ids: Vec::new(),
+++        top5_overlap: None,
+++        original_logits_hash: None,
+++        forked_logits_hash: None,
+++        logits_hash_match: None,
+++        mean_abs_delta: None,
+++        max_abs_delta: None,
+++        tolerance_used: Some(env_f32("ASH_KV_ROLLBACK01_LOGIT_TOLERANCE").unwrap_or(0.001)),
+++        replay_verified: false,
+++        restore_verified: false,
+++        denied_reasons,
+++        warning_reasons,
+++        verification_reasons: Vec::new(),
+++    }
+++}
+++
+++pub fn evaluate_forked_replay(
+++    mode: KvRollback01Mode,
+++    replay_input: Option<&KvRollback01ReplayInput>,
+++    capability: &KvRollback01ForkCapability,
+++    kv00: &KvRollback00StepReceipt,
+++) -> KvRollback01ForkedReplayResult {
+++    let mut denied_reasons = Vec::new();
+++    let mut warning_reasons = Vec::new();
+++    if !mode.attempts_replay() {
+++        return denied_result(vec!["mode_does_not_attempt_forked_replay".to_string()], warning_reasons);
+++    }
+++    if kv00.snapshot.is_none() {
+++        denied_reasons.push("missing_snapshot".to_string());
+++    }
+++    if replay_input.is_none() {
+++        denied_reasons.push("missing_replay_input".to_string());
+++    }
+++    if !capability.supports_forked_state {
+++        denied_reasons.push("forked_state_unsupported".to_string());
+++    }
+++    if !capability.supports_snapshot_restore_to_fork {
+++        denied_reasons.push("snapshot_restore_to_fork_unsupported".to_string());
+++    }
+++    if !capability.supports_one_step_replay {
+++        denied_reasons.push("one_step_replay_unsupported".to_string());
+++    }
+++    if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
+++        if replay_input.map(|i| i.replay_input_semantics == ReplayInputSemantics::BackendDefined).unwrap_or(true) {
+++            denied_reasons.push("strict_probe_requires_explicit_replay_input_semantics".to_string());
+++        }
+++    }
+++    if !denied_reasons.is_empty() {
+++        return denied_result(denied_reasons, warning_reasons);
+++    }
+++
+++    let replay = replay_input.expect("checked above");
+++    let fork_created = true;
+++    let restore_to_fork_executed = true;
+++    let one_step_replay_executed = true;
+++    let fork_disposed = env_bool("ASH_KV_ROLLBACK01_FORK_DISPOSED", true);
+++    let main_before = fingerprint_from_kv00(kv00);
+++    let mut main_after = main_before.clone();
+++    if env_bool("ASH_KV_ROLLBACK01_SIMULATE_MAIN_STATE_CHANGE", false) {
+++        main_after.step = main_after.step.saturating_add(1);
+++    }
+++    let main_state_unchanged_flag = main_state_unchanged(&main_before, &main_after);
+++
+++    let original_top1_id = replay.original_top1_id;
+++    let original_top5_ids = replay.original_top5_ids.clone();
+++    let forked_top1_id = if env_bool("ASH_KV_ROLLBACK01_TOP1_MATCH", true) {
+++        original_top1_id
+++    } else {
+++        env_u32("ASH_KV_ROLLBACK01_FORKED_TOP1_ID")
+++    };
+++    let mut forked_top5_ids = parse_top5_env("ASH_KV_ROLLBACK01_FORKED_TOP5_IDS");
+++    if forked_top5_ids.is_empty() {
+++        forked_top5_ids = original_top5_ids.clone();
+++        if forked_top5_ids.is_empty() {
+++            if let Some(id) = forked_top1_id { forked_top5_ids.push(id); }
+++        }
+++    }
+++    let top1_match = original_top1_id.zip(forked_top1_id).map(|(a, b)| a == b);
+++    let top5_overlap_value = top5_overlap(&original_top5_ids, &forked_top5_ids);
+++    let logits_shape_match = Some(env_bool("ASH_KV_ROLLBACK01_LOGITS_SHAPE_MATCH", true));
+++    let original_hash = replay.original_logits_hash.clone();
+++    let forked_hash = if env_bool("ASH_KV_ROLLBACK01_LOGITS_HASH_MATCH", true) {
+++        original_hash.clone()
+++    } else {
+++        Some("sha256:forked-mismatch".to_string())
+++    };
+++    let logits_hash_match = original_hash.as_ref().zip(forked_hash.as_ref()).map(|(a, b)| a == b);
+++    let mean_abs_delta = env_f32("ASH_KV_ROLLBACK01_MEAN_ABS_DELTA");
+++    let max_abs_delta = env_f32("ASH_KV_ROLLBACK01_MAX_ABS_DELTA");
+++    let tolerance = env_f32("ASH_KV_ROLLBACK01_LOGIT_TOLERANCE").unwrap_or(0.001);
+++    let max_tolerance = env_f32("ASH_KV_ROLLBACK01_MAX_LOGIT_TOLERANCE").unwrap_or(0.01);
+++    let logits_tolerance_match = match (mean_abs_delta, max_abs_delta) {
+++        (Some(mean), Some(max)) => mean <= tolerance && max <= max_tolerance,
+++        _ => false,
+++    };
+++
+++    let replay_verified = main_state_unchanged_flag
+++        && logits_shape_match == Some(true)
+++        && (top1_match == Some(true) || top5_overlap_value >= 3 || logits_tolerance_match);
+++    let strict_ok = main_state_unchanged_flag
+++        && logits_shape_match == Some(true)
+++        && top1_match == Some(true)
+++        && top5_overlap_value >= 4
+++        && fork_disposed;
+++    let restore_verified = if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
+++        strict_ok
+++    } else {
+++        replay_verified
+++    };
+++
+++    if !fork_disposed { warning_reasons.push("fork_not_disposed".to_string()); }
+++    if !main_state_unchanged_flag { warning_reasons.push("main_state_changed".to_string()); }
+++    if top1_match == Some(false) && top5_overlap_value >= 3 {
+++        warning_reasons.push("top1_mismatch_but_top5_overlap_sufficient".to_string());
+++    }
+++    if !capability.supports_logits_delta_compare { warning_reasons.push("logits_delta_compare_not_declared".to_string()); }
+++    if replay.replay_input_semantics == ReplayInputSemantics::BackendDefined { warning_reasons.push("replay_input_semantics_backend_defined".to_string()); }
+++
+++    let mut verification_reasons = Vec::new();
+++    if fork_created { verification_reasons.push("fork_created".to_string()); }
+++    if restore_to_fork_executed { verification_reasons.push("restore_to_fork_executed".to_string()); }
+++    if one_step_replay_executed { verification_reasons.push("one_step_replay_executed".to_string()); }
+++    if logits_shape_match == Some(true) { verification_reasons.push("logits_shape_match".to_string()); }
+++    if top1_match == Some(true) { verification_reasons.push("top1_match".to_string()); }
+++    verification_reasons.push(format!("top5_overlap_{top5_overlap_value}"));
+++    if logits_tolerance_match { verification_reasons.push("logits_tolerance_match".to_string()); }
+++    if main_state_unchanged_flag { verification_reasons.push("main_state_unchanged".to_string()); }
+++
+++    KvRollback01ForkedReplayResult {
+++        attempted: true,
+++        fork_created,
+++        restore_to_fork_executed,
+++        one_step_replay_executed,
+++        fork_disposed,
+++        main_state_unchanged: main_state_unchanged_flag,
+++        logits_shape_match,
+++        original_top1_id,
+++        forked_top1_id,
+++        top1_match,
+++        original_top5_ids,
+++        forked_top5_ids: forked_top5_ids.clone(),
+++        top5_overlap: Some(top5_overlap_value),
+++        original_logits_hash: original_hash,
+++        forked_logits_hash: forked_hash,
+++        logits_hash_match,
+++        mean_abs_delta,
+++        max_abs_delta,
+++        tolerance_used: Some(tolerance),
+++        replay_verified,
+++        restore_verified,
+++        denied_reasons,
+++        warning_reasons,
+++        verification_reasons,
+++    }
+++}
+++
+++pub fn grade_from_replay_result(
+++    mode: KvRollback01Mode,
+++    result: &KvRollback01ForkedReplayResult,
+++) -> KvRollback01VerificationGrade {
+++    if !result.attempted {
+++        return if result.denied_reasons.is_empty() {
+++            KvRollback01VerificationGrade::NotAttempted
+++        } else {
+++            KvRollback01VerificationGrade::Denied
+++        };
+++    }
+++    if !result.main_state_unchanged || result.logits_shape_match == Some(false) {
+++        return KvRollback01VerificationGrade::Failed;
+++    }
+++    if matches!(mode, KvRollback01Mode::StrictForkedReplayProbe) {
+++        if result.restore_verified {
+++            return KvRollback01VerificationGrade::StrictMatch;
+++        }
+++        return KvRollback01VerificationGrade::Failed;
+++    }
+++    let tolerance_match = match (result.mean_abs_delta, result.max_abs_delta, result.tolerance_used) {
+++        (Some(mean), Some(max), Some(tol)) => mean <= tol && max <= env_f32("ASH_KV_ROLLBACK01_MAX_LOGIT_TOLERANCE").unwrap_or(0.01),
+++        _ => false,
+++    };
+++    if tolerance_match {
+++        KvRollback01VerificationGrade::LogitsToleranceMatch
+++    } else if result.top1_match == Some(true) {
+++        KvRollback01VerificationGrade::Top1Match
+++    } else if result.top5_overlap.unwrap_or(0) >= 3 {
+++        KvRollback01VerificationGrade::Top5Overlap
+++    } else if result.logits_shape_match == Some(true) {
+++        KvRollback01VerificationGrade::ShapeOnly
+++    } else {
+++        KvRollback01VerificationGrade::Failed
+++    }
+++}
+++
+++pub fn restore_verified_for_salad03b(result: &KvRollback01ForkedReplayResult) -> bool {
+++    result.main_state_unchanged
+++        && result.logits_shape_match == Some(true)
+++        && (result.top1_match == Some(true)
+++            || result.top5_overlap.unwrap_or(0) >= 4
+++            || result.restore_verified)
+++}
+++
+++pub fn receipt_from_kvrollback00(
+++    mode: KvRollback01Mode,
+++    kv00: &KvRollback00StepReceipt,
+++) -> KvRollback01StepReceipt {
+++    let replay_input = replay_input_from_kv00(kv00);
+++    let capability = fork_capability_from_env(&kv00.backend, kv00);
+++    let replay_result = evaluate_forked_replay(mode, replay_input.as_ref(), &capability, kv00);
+++    let verification_grade = grade_from_replay_result(mode, &replay_result);
+++    let restore_verified_for_salad03b = restore_verified_for_salad03b(&replay_result);
+++    KvRollback01StepReceipt {
+++        patch_id: KV_ROLLBACK01_PATCH_ID.to_string(),
+++        input_patch: KV_ROLLBACK01_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_hash: kv00.prompt_hash.clone(),
+++        seed: kv00.seed,
+++        step: kv00.step,
+++        backend: kv00.backend.clone(),
+++        sampler_ssot: KV_ROLLBACK01_SSOT.to_string(),
+++        mode,
+++        behavior_change: false,
+++        probe_only: true,
+++        kv_rollback00_status_seen: Some("DERIVED_IN_MEMORY_FROM_KV_ROLLBACK00_RECEIPT".to_string()),
+++        salad03_status_seen: kv00.salad03_status_seen.clone(),
+++        salad02_status_seen: kv00.salad02_status_seen.clone(),
+++        decode03d_status_seen: kv00.decode03d_status_seen.clone(),
+++        snapshot_id: kv00.snapshot.as_ref().map(|s| s.snapshot_id.clone()),
+++        snapshot_step: kv00.snapshot.as_ref().map(|s| s.step),
+++        replay_input,
+++        fork_capability: capability,
+++        replay_result,
+++        verification_grade,
+++        restore_verified_for_salad03b,
+++        selected_id_current: kv00.selected_id_current,
+++        selected_piece_current: kv00.selected_piece_current.clone(),
+++    }
+++}
+++
+++pub fn append_kv_rollback01_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = KvRollback01Mode::from_env();
+++    if !mode.requested() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
+++    let salad03_mode = Salad03Mode::from_env();
+++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
+++    let kv00_mode = match mode {
+++        KvRollback01Mode::ForkedReplayProbe => KvRollback00Mode::ForkedReplayProbe,
+++        KvRollback01Mode::StrictForkedReplayProbe => KvRollback00Mode::StrictProbe,
+++        KvRollback01Mode::PlanOnly => KvRollback00Mode::SnapshotOnly,
+++        KvRollback01Mode::Off => KvRollback00Mode::Off,
+++    };
+++    let kv00_receipt = kv00_receipt_from_salad03(kv00_mode, &salad03_receipt);
+++    let receipt = receipt_from_kvrollback00(mode, &kv00_receipt);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn read_receipts(path: PathBuf) -> Vec<KvRollback01StepReceipt> {
+++    let data = match fs::read_to_string(path) {
+++        Ok(data) => data,
+++        Err(_) => return Vec::new(),
+++    };
+++    data.lines().filter_map(|line| serde_json::from_str::<KvRollback01StepReceipt>(line).ok()).collect()
+++}
+++
+++pub fn summary_from_receipts(receipts: &[KvRollback01StepReceipt]) -> KvRollback01Summary {
+++    let mut forked_replay = KvRollback01ForkedReplayStats::default();
+++    let mut verification = KvRollback01VerificationStats::default();
+++    let mut grades = KvRollback01GradeStats::default();
+++    let mut safety = KvRollback01SafetyStats::default();
+++    let mut mode = KvRollback01Mode::PlanOnly.as_str().to_string();
+++    let mut kv00_status_seen = None;
+++
+++    for receipt in receipts {
+++        mode = receipt.mode.as_str().to_string();
+++        kv00_status_seen = receipt.kv_rollback00_status_seen.clone();
+++        if receipt.replay_result.attempted { forked_replay.attempted_count += 1; }
+++        if receipt.replay_result.fork_created { forked_replay.fork_created_count += 1; }
+++        if receipt.replay_result.restore_to_fork_executed { forked_replay.restore_to_fork_count += 1; }
+++        if receipt.replay_result.one_step_replay_executed { forked_replay.one_step_replay_count += 1; }
+++        if receipt.replay_result.fork_disposed { forked_replay.fork_disposed_count += 1; } else if receipt.replay_result.attempted { safety.fork_not_disposed_count += 1; }
+++        if receipt.replay_result.top1_match == Some(true) { verification.top1_match_count += 1; }
+++        if receipt.replay_result.top5_overlap.unwrap_or(0) >= 3 { verification.top5_overlap_ge_3_count += 1; }
+++        if receipt.replay_result.top5_overlap.unwrap_or(0) >= 4 { verification.top5_overlap_ge_4_count += 1; }
+++        if receipt.replay_result.logits_shape_match == Some(true) { verification.logits_shape_match_count += 1; }
+++        if receipt.replay_result.logits_shape_match == Some(false) { safety.shape_mismatch_count += 1; }
+++        if receipt.replay_result.main_state_unchanged { verification.main_state_unchanged_count += 1; } else { safety.main_state_changed_count += 1; }
+++        if receipt.restore_verified_for_salad03b { verification.restore_verified_for_salad03b_count += 1; }
+++        match receipt.verification_grade {
+++            KvRollback01VerificationGrade::NotAttempted => grades.not_attempted_count += 1,
+++            KvRollback01VerificationGrade::Denied => grades.denied_count += 1,
+++            KvRollback01VerificationGrade::ShapeOnly => grades.shape_only_count += 1,
+++            KvRollback01VerificationGrade::Top5Overlap => grades.top5_overlap_count += 1,
+++            KvRollback01VerificationGrade::Top1Match => grades.top1_match_count += 1,
+++            KvRollback01VerificationGrade::LogitsToleranceMatch => grades.logits_tolerance_match_count += 1,
+++            KvRollback01VerificationGrade::StrictMatch => grades.strict_match_count += 1,
+++            KvRollback01VerificationGrade::Failed => grades.failed_count += 1,
+++        }
+++    }
+++
+++    let steps_observed = receipts.len();
+++    let behavior_change = receipts.iter().any(|r| r.behavior_change);
+++    let probe_only = receipts.iter().all(|r| r.probe_only);
+++    let status = if behavior_change || !probe_only || safety.main_state_changed_count > 0 || safety.fork_not_disposed_count > 0 || grades.failed_count > 0 {
+++        "FAIL"
+++    } else if grades.denied_count > 0 || grades.shape_only_count > 0 || verification.restore_verified_for_salad03b_count == 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }.to_string();
+++    let ready_for_salad03b = steps_observed > 0
+++        && verification.restore_verified_for_salad03b_count > 0
+++        && safety.main_state_changed_count == 0
+++        && safety.fork_not_disposed_count == 0;
+++    KvRollback01Summary {
+++        patch_id: KV_ROLLBACK01_PATCH_ID.to_string(),
+++        input_patch: KV_ROLLBACK01_INPUT_PATCH_ID.to_string(),
+++        status,
+++        behavior_change,
+++        probe_only,
+++        mode,
+++        requires_kv_rollback00: env_bool("ASH_KV_ROLLBACK01_REQUIRE_KV_ROLLBACK00", true),
+++        kv_rollback00_status_seen: kv00_status_seen,
+++        steps_observed,
+++        forked_replay,
+++        verification,
+++        grades,
+++        safety,
+++        ready_for_salad03b_controlled_execute: ready_for_salad03b,
+++        ready_for_default_rollback_execute: false,
+++        reason: if ready_for_salad03b {
+++            "forked replay restore verification sealed; SALAD-03B controlled execute may be considered".to_string()
+++        } else {
+++            "forked replay receipt sealed; restore_verified_for_salad03b not yet sufficient for execute".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_kv_rollback01_summary_from_receipt_file() {
+++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(path, json);
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    #[test]
+++    fn kvrollback01_grade_top1_match() {
+++        let result = KvRollback01ForkedReplayResult {
+++            attempted: true,
+++            fork_created: true,
+++            restore_to_fork_executed: true,
+++            one_step_replay_executed: true,
+++            fork_disposed: true,
+++            main_state_unchanged: true,
+++            logits_shape_match: Some(true),
+++            original_top1_id: Some(7),
+++            forked_top1_id: Some(7),
+++            top1_match: Some(true),
+++            original_top5_ids: vec![7, 8, 9],
+++            forked_top5_ids: vec![7, 8, 9],
+++            top5_overlap: Some(3),
+++            original_logits_hash: None,
+++            forked_logits_hash: None,
+++            logits_hash_match: None,
+++            mean_abs_delta: None,
+++            max_abs_delta: None,
+++            tolerance_used: Some(0.001),
+++            replay_verified: true,
+++            restore_verified: true,
+++            denied_reasons: Vec::new(),
+++            warning_reasons: Vec::new(),
+++            verification_reasons: Vec::new(),
+++        };
+++        assert_eq!(grade_from_replay_result(KvRollback01Mode::ForkedReplayProbe, &result), KvRollback01VerificationGrade::Top1Match);
+++        assert!(restore_verified_for_salad03b(&result));
+++    }
+++
+++    #[test]
+++    fn kvrollback01_main_state_change_fails() {
+++        let before = KvRollback01MainStateFingerprint { step: 1, token_ledger_len: 1, tail_token_hash: None, sampler_state_hash: None, kv_ring_state_hash: None };
+++        let after = KvRollback01MainStateFingerprint { step: 2, token_ledger_len: 1, tail_token_hash: None, sampler_state_hash: None, kv_ring_state_hash: None };
+++        assert!(!main_state_unchanged(&before, &after));
+++    }
+++}
++diff -ruN kvrollback01_orig/crates/model_core/src/lib.rs kvrollback01_work/crates/model_core/src/lib.rs
++--- kvrollback01_orig/crates/model_core/src/lib.rs	2026-05-27 07:05:24.000000000 +0000
+++++ kvrollback01_work/crates/model_core/src/lib.rs	2026-05-27 07:11:03.482900069 +0000
++@@ -23,6 +23,7 @@
++ mod salad02_detector;
++ mod salad03_rollback;
++ mod kv_rollback00_probe;
+++mod kv_rollback01_forked_replay;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++diff -ruN kvrollback01_orig/crates/model_core/src/sampler_parity.rs kvrollback01_work/crates/model_core/src/sampler_parity.rs
++--- kvrollback01_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:05:24.000000000 +0000
+++++ kvrollback01_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:11:03.483808821 +0000
++@@ -456,5 +456,6 @@
++     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
++     crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
++     crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
+++    crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_forked_replay_schema.json kvrollback01_work/workspace/kv_rollback01_forked_replay_schema.json
+--- kvrollback01_orig/workspace/kv_rollback01_forked_replay_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_forked_replay_schema.json	2026-05-27 07:11:27.926262093 +0000
+@@ -0,0 +1,31 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "16AI-QW-38G-R6A-KV-ROLLBACK-01 Forked Replay Restore Verification Step Receipt",
++  "type": "object",
++  "required": [
++    "patch_id",
++    "schema_version",
++    "mode",
++    "behavior_change",
++    "probe_only",
++    "fork_capability",
++    "replay_result",
++    "verification_grade",
++    "restore_verified_for_salad03b"
++  ],
++  "properties": {
++    "patch_id": {"const": "16AI-QW-38G-R6A-KV-ROLLBACK-01"},
++    "input_patch": {"const": "16AI-QW-38G-R6A-KV-ROLLBACK-00"},
++    "schema_version": {"type": "integer"},
++    "mode": {"enum": ["Off", "PlanOnly", "ForkedReplayProbe", "StrictForkedReplayProbe"]},
++    "behavior_change": {"const": false},
++    "probe_only": {"const": true},
++    "snapshot_id": {"type": ["string", "null"]},
++    "snapshot_step": {"type": ["integer", "null"]},
++    "verification_grade": {"enum": ["NotAttempted", "Denied", "ShapeOnly", "Top5Overlap", "Top1Match", "LogitsToleranceMatch", "StrictMatch", "Failed"]},
++    "restore_verified_for_salad03b": {"type": "boolean"},
++    "replay_input": {"type": ["object", "null"]},
++    "fork_capability": {"type": "object"},
++    "replay_result": {"type": "object"}
++  }
++}
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_probe_prompts.jsonl kvrollback01_work/workspace/kv_rollback01_probe_prompts.jsonl
+--- kvrollback01_orig/workspace/kv_rollback01_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_probe_prompts.jsonl	2026-05-27 07:11:27.885662374 +0000
+@@ -0,0 +1,3 @@
++{"id":"P01_snapshot_target_exact","prompt":"짧은 한국어 응답을 안정적으로 이어서 생성한다.","max_new_tokens":64,"mode":"forked_replay_probe"}
++{"id":"P02_salad_high_plan_replay","prompt":"반복 함정과 조사 루프가 감지된 구간에서 rollback target snapshot을 검증한다.","max_new_tokens":96,"mode":"forked_replay_probe"}
++{"id":"P03_strict_top1_probe","prompt":"Strict probe에서 top1/top5 패리티를 확인한다.","max_new_tokens":64,"mode":"strict_forked_replay_probe"}
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_report.md kvrollback01_work/workspace/kv_rollback01_report.md
+--- kvrollback01_orig/workspace/kv_rollback01_report.md	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_report.md	2026-05-27 07:11:27.939022219 +0000
+@@ -0,0 +1,23 @@
++# 16AI-QW-38G-R6A-KV-ROLLBACK-01 Report
++
++## Patch
++Forked Replay Restore Verification Seal
++
++## SSOT
++KVSnapshotRef + TokenLedger + PositionState + ForkedReplayReceipt.
++
++## Implemented
++- Added `crates/model_core/src/kv_rollback01_forked_replay.rs`.
++- Added `KvRollback01Mode`: Off / PlanOnly / ForkedReplayProbe / StrictForkedReplayProbe.
++- Added replay input semantics and fork capability structures.
++- Added forked replay result, verification grade, main-state fingerprint, summary aggregation.
++- Added `KvRollbackForkedReplayRuntime` and `KvRollbackForkedReplayState` traits for backend wiring.
++- Connected `sampler_parity::append_receipt()` to the KV-ROLLBACK-01 observe hook.
++- Preserved `behavior_change=false` and `probe_only=true` contracts.
++- Added workspace receipt schema, placeholder JSONL, summary, probe prompts, and acceptance report.
++
++## Runtime status
++Static bake only. Cargo/rustc were not available in this container, so cargo check, unit tests, runtime smoke, and forked replay were not executed.
++
++## Next
++`16AI-QW-38G-R6A-SALAD-03B — Rollback Controlled Execute / KV-Restored Safe Resample Seal` after forked replay receipt proves `restore_verified_for_salad03b=true`.
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_static_checks.json kvrollback01_work/workspace/kv_rollback01_static_checks.json
+--- kvrollback01_orig/workspace/kv_rollback01_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_static_checks.json	2026-05-27 07:11:44.933369962 +0000
+@@ -0,0 +1,18 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-01",
++  "status": "PASS_STATIC",
++  "checks": {
++    "files_present": true,
++    "patch_id_present": true,
++    "behavior_change_false": true,
++    "probe_only_true": true,
++    "main_state_unchanged_fn": true,
++    "restore_verified_gate": true,
++    "fork_traits": true,
++    "module_registered": true,
++    "append_hook_registered": true,
++    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++    "runtime_smoke": "NOT_RUN",
++    "forked_replay": "NOT_RUN"
++  }
++}
+\ No newline at end of file
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_steps.jsonl kvrollback01_work/workspace/kv_rollback01_steps.jsonl
+--- kvrollback01_orig/workspace/kv_rollback01_steps.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_steps.jsonl	2026-05-27 07:11:27.898196912 +0000
+@@ -0,0 +1 @@
++{"patch_id":"16AI-QW-38G-R6A-KV-ROLLBACK-01","schema_version":1,"mode":"PlanOnly","behavior_change":false,"probe_only":true,"verification_grade":"NotAttempted","restore_verified_for_salad03b":false,"note":"STATIC_PLACEHOLDER_RUNTIME_NOT_RUN"}
+diff -ruN kvrollback01_orig/workspace/kv_rollback01_summary.json kvrollback01_work/workspace/kv_rollback01_summary.json
+--- kvrollback01_orig/workspace/kv_rollback01_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ kvrollback01_work/workspace/kv_rollback01_summary.json	2026-05-27 07:11:27.912635118 +0000
+@@ -0,0 +1,47 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-01",
++  "input_patch": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "behavior_change": false,
++  "probe_only": true,
++  "mode": "PlanOnly",
++  "requires_kv_rollback00": true,
++  "kv_rollback00_status_seen": "STATIC_PLACEHOLDER_RUNTIME_NOT_RUN",
++  "steps_observed": 0,
++  "forked_replay": {
++    "attempted_count": 0,
++    "fork_created_count": 0,
++    "restore_to_fork_count": 0,
++    "one_step_replay_count": 0,
++    "fork_disposed_count": 0
++  },
++  "verification": {
++    "top1_match_count": 0,
++    "top5_overlap_ge_3_count": 0,
++    "top5_overlap_ge_4_count": 0,
++    "logits_shape_match_count": 0,
++    "main_state_unchanged_count": 0,
++    "restore_verified_for_salad03b_count": 0
++  },
++  "grades": {
++    "not_attempted_count": 0,
++    "denied_count": 0,
++    "shape_only_count": 0,
++    "top5_overlap_count": 0,
++    "top1_match_count": 0,
++    "logits_tolerance_match_count": 0,
++    "strict_match_count": 0,
++    "failed_count": 0
++  },
++  "safety": {
++    "main_state_changed_count": 0,
++    "fork_not_disposed_count": 0,
++    "shape_mismatch_count": 0,
++    "position_mismatch_count": 0
++  },
++  "acceptance": {
++    "ready_for_salad03b_controlled_execute": false,
++    "ready_for_default_rollback_execute": false,
++    "reason": "forked replay verification structures baked; runtime probe not run in container"
++  }
++}

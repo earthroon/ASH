@@ -1,0 +1,38 @@
+QW-TOK-02 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok02RuntimeInputBindingDryrunConfig: PASS marker: PASS
+QwTok02RuntimeInputSourceCase: PASS marker: PASS
+QwTok02InputIdRangeGuard: PASS marker: PASS
+QwTok02SpecialTokenPositionReport: PASS marker: PASS
+QwTok02RuntimeInputPacket: PASS marker: PASS
+QwTok02RuntimeInputPacketBatch: PASS marker: PASS
+QwTok02NoModelInferenceSeal: PASS marker: PASS
+QwTok02RuntimeInputBindingDryrunReport: PASS marker: PASS
+build_qw_tok02_runtime_input_binding_dryrun_report: PASS marker: PASS
+build_qw_tok02_runtime_input_packet: PASS marker: PASS
+build_qw_tok02_input_id_range_guard: PASS marker: PASS
+build_qw_tok02_no_model_inference_seal: PASS marker: PASS
+build_qw_tok02_default_runtime_input_binding_dryrun_report: PASS marker: PASS
+default blocks allow_model_inference: false: PASS
+default blocks allow_runtime_decode_bind: false: PASS
+default blocks allow_embedding_lookup: false: PASS
+default blocks allow_transformer_forward: false: PASS
+default blocks allow_lm_head_logits: false: PASS
+default blocks allow_sampler_execution: false: PASS
+default blocks allow_qw_selector_execution: false: PASS
+default blocks allow_mcts_execution: false: PASS
+default blocks allow_tokenizer_rewrite: false: PASS
+test qw_tok02_runtime_input_binding_dryrun.rs present: PASS
+test qw_tok02_input_id_range_guard.rs present: PASS
+test qw_tok02_attention_position_mask_contract.rs present: PASS
+test qw_tok02_no_model_inference.rs present: PASS
+artifacts/qw_tok02_runtime_input_binding_dryrun_report.json exists: PASS
+artifacts/qw_tok02_runtime_input_packets.json exists: PASS
+artifacts/qw_tok02_input_id_range_receipt.json exists: PASS
+workspace/runtime_traces/qw_tok02_runtime_input_binding_dryrun_trace.jsonl exists: PASS
+workspace/trace/qw_tok02_runtime_input_binding_dryrun_receipt.json exists: PASS
+tokenizer model not packaged in workdir: PASS
+tokenizer vocab not packaged in workdir: PASS
+no checkpoint/model weight files packaged: PASS
+overall: PASS

@@ -1,0 +1,83 @@
+﻿D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:18: use crate::{NativeWgpuRuntimeHandles, RawWgpuBufferLease};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:798: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:974: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:985: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:1016: resource: logits.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:1267: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:1388: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:1409: resource: logits.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:1483: let lease = RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:18: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:122: pub q: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:123: pub k: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:124: pub v: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:158: pub struct HeadwiseAtlasDispatcher {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:163: impl HeadwiseAtlasDispatcher {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:269: fn describe_active_state(lease: &RawWgpuBufferLease) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:278: prepared_q: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:279: prepared_k: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:280: prepared_v: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:392: pub fn prepare_native_qkv(
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:600: resource: prepared.q.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:604: resource: prepared.k.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:608: resource: prepared.v.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:678: pub fn dispatch_native_qkv_to_cpu_f32(
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\headwise_atlas.rs:685: let prepared = self.prepare_native_qkv(q, k, v, spec)?;
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:123: pub use headwise_atlas::{AtlasActiveTensorSeamSummary, AtlasDispatchOutput, AtlasDispatchTextDensityState, AtlasTextDensityUniform, HeadwiseAtlasDispatcher, HeadwiseAtlasPlan, HeadwiseAtlasRuntimeSpec, PreparedAtlasInputs};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:125: pub use raw_bridge::{ActiveTensorHandleState, ActiveTensorRawHandle, BridgeMode, BridgeStats, BurnToRawWgpuBridge, RawBridgeMiss, RawBridgeMissReason, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:57: pub struct RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:70: impl RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:71: pub fn as_binding_resource(&self) -> BackendBindingResource<'_> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:133: pub lease: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:162: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:171: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:187: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:253: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:294: Ok(RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:353: ) -> Option<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:396: Some(RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:414: ) -> Option<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1129: "[bridge][module_local][runtime] upfront downgrade target_key={} mode={} reason=tensorcube_health_gate severity={} action={} device_source={} existing_id={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1140: status.atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1161: "[bridge][module_local][runtime] upfront downgrade target_key={} mode={} reason=native trace runtime unavailable device_source={} existing_id={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1170: status.atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2453: || self.try_bridge_last_logits_raw_outcome("gpu_sampling.same_device_last_logits", logits, &mut stats),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:4: RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:360: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:362: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:396: resource: logits.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:425: Ok(RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:456: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:496: resource: logits.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:599: logits: &RawWgpuBufferLease,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:648: resource: logits.as_binding_resource(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:749: ) -> Result<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:758: let lease = RawWgpuBufferLease {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:788: pub fn readback_f32(&self, adjusted: &RawWgpuBufferLease) -> Result<Vec<f32>> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:17: use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:492: atlas_dispatcher: Option<HeadwiseAtlasDispatcher>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:705: let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:709: "[native-trace][submit][precheck] target_key={} slot_id={} batch_size={} max_seq_len={} runtime_handles_field_ok={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:716: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:722: "native trace runtime unavailable: target_key={} slot_id={} runtime_handles_field_ok={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:727: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:734: "native same-device raw bridge unavailable: target_key={} slot_id={} runtime_handles_field_ok={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:739: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:942: let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:945: "[native-trace][poll][precheck] target_key={} slot_id={} runtime_handles_field_ok={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} map_requested={} input_ready={} output_ready={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:950: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:957: "native trace poll runtime unavailable: target_key={} slot_id={} runtime_handles_field_ok={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:962: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1330: let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1341: atlas_dispatcher_ok,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1351: pub fn try_bridge_last_logits_raw_outcome(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1369: ) -> Option<RawWgpuBufferLease> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1370: self.try_bridge_last_logits_raw_outcome(label, logits, stats)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1402: let atlas_dispatcher = HeadwiseAtlasDispatcher::try_new_default().ok();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1407: "[native-trace][init] device_source=existing existing_id={} source={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1815: ) -> Option<(RawWgpuBufferLease, GpuRawBridgeStepTelemetry)> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1991: ) -> Option<(RawWgpuBufferLease, GpuRawBridgeStepTelemetry)> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1997: || self.try_bridge_last_logits_raw_outcome("gpu_penalty.same_device_last_logits", logits, &mut stats),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2474: let flat = match dispatcher.dispatch_native_qkv_to_cpu_f32(&q, &k, &v, &spec) {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:763: pub atlas_dispatcher_ok: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:781: if !self.atlas_dispatcher_ok {

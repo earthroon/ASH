@@ -1,0 +1,531 @@
+--- ../r6a_r10_r2_base/crates/model_core/src/native_wgpu.rs	2026-05-23 06:49:15.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-23 07:24:25.154434031 +0000
+@@ -6038,6 +6038,520 @@
+     eprintln!("[16AI-QW-38G-R6A-R10-R1][done] status={}", status);
+ }
+ 
++
++// 16AI-QW-38G-R6A-R10-R2 — Multi-Seed Evidence Field Extraction Repair / Trace-backed Aggregation Seal
++static QW38G_R6A_R10_R2_REPAIR_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r10_r2_enabled() -> bool {
++    env_flag("ASH_MULTI_SEED_EVIDENCE_REPAIR")
++        || env_flag("ASH_QW38G_R6A_R10_R2_TRACE_BACKED_AGGREGATION")
++}
++
++fn qw38g_r6a_r10_r2_mode() -> String {
++    std::env::var("ASH_MULTI_SEED_EVIDENCE_REPAIR_MODE")
++        .unwrap_or_else(|_| "trace_backed_aggregation".to_string())
++        .trim()
++        .to_ascii_lowercase()
++}
++
++fn qw38g_r6a_r10_r2_trace_path() -> String {
++    std::env::var("ASH_MULTI_SEED_REPAIRED_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r10_r2_summary_path() -> String {
++    std::env::var("ASH_MULTI_SEED_REPAIRED_SUMMARY")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_summary.json".to_string())
++}
++
++fn qw38g_r6a_r10_r2_receipt_path() -> String {
++    std::env::var("ASH_MULTI_SEED_REPAIRED_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r10_r2_jsonl_first_matching(path: &str, target_ids: &[u32]) -> Option<serde_json::Value> {
++    let text = std::fs::read_to_string(path).ok()?;
++    let mut first_valid: Option<serde_json::Value> = None;
++    for line in text.lines() {
++        let line = line.trim();
++        if line.is_empty() {
++            continue;
++        }
++        let parsed = serde_json::from_str::<serde_json::Value>(line).ok()?;
++        if first_valid.is_none() {
++            first_valid = Some(parsed.clone());
++        }
++        let token = parsed
++            .get("target_token_id")
++            .and_then(|v| v.as_u64())
++            .map(|v| v as u32);
++        if token.map(|id| target_ids.contains(&id)).unwrap_or(false) {
++            return Some(parsed);
++        }
++    }
++    first_valid
++}
++
++fn qw38g_r6a_r10_r2_opt_u32(value: Option<&serde_json::Value>, key: &str) -> Option<u32> {
++    value.and_then(|v| v.get(key)).and_then(|v| v.as_u64()).map(|v| v as u32)
++}
++
++fn qw38g_r6a_r10_r2_opt_bool(value: Option<&serde_json::Value>, key: &str) -> Option<bool> {
++    value.and_then(|v| v.get(key)).and_then(|v| v.as_bool())
++}
++
++fn qw38g_r6a_r10_r2_opt_string(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
++    value
++        .and_then(|v| v.get(key))
++        .and_then(|v| v.as_str())
++        .map(|s| s.to_string())
++}
++
++fn qw38g_r6a_r10_r2_opt_f32(value: Option<&serde_json::Value>, key: &str) -> Option<f32> {
++    value
++        .and_then(|v| v.get(key))
++        .and_then(|v| v.as_f64())
++        .map(|v| v as f32)
++        .and_then(|v| if v.is_finite() { Some(v) } else { None })
++}
++
++fn qw38g_r6a_r10_r2_bool_fallback(
++    primary: Option<&serde_json::Value>,
++    secondary: Option<&serde_json::Value>,
++    key: &str,
++    default: bool,
++) -> bool {
++    qw38g_r6a_r10_r2_opt_bool(primary, key)
++        .or_else(|| qw38g_r6a_r10_r2_opt_bool(secondary, key))
++        .unwrap_or(default)
++}
++
++fn qw38g_r6a_r10_r2_string_fallback(
++    primary: Option<&serde_json::Value>,
++    secondary: Option<&serde_json::Value>,
++    key: &str,
++    default: &str,
++) -> String {
++    qw38g_r6a_r10_r2_opt_string(primary, key)
++        .or_else(|| qw38g_r6a_r10_r2_opt_string(secondary, key))
++        .unwrap_or_else(|| default.to_string())
++}
++
++fn qw38g_r6a_r10_r2_push_missing<T>(missing: &mut Vec<String>, name: &str, value: &Option<T>) {
++    if value.is_none() {
++        missing.push(name.to_string());
++    }
++}
++
++fn qw38g_r6a_r10_r2_trace_backed_aggregation() {
++    if !qw38g_r6a_r10_r2_enabled() {
++        return;
++    }
++    if QW38G_R6A_R10_R2_REPAIR_DONE.swap(1, Ordering::SeqCst) != 0 {
++        return;
++    }
++
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][start]");
++    let mode = qw38g_r6a_r10_r2_mode();
++    let seeds = qw38g_r6a_r10_r1_seeds();
++    let target_ids = qw38g_r6a_r10_r1_target_ids();
++    let prompt_set = qw38g_r6a_r10_r1_prompt_set();
++    let min_margin_threshold = qw38g_r6a_r10_r1_min_margin();
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][env] mode={} seeds={:?} targets={:?}", mode, seeds, target_ids);
++
++    let trace_path = qw38g_r6a_r10_r2_trace_path();
++    let summary_path = qw38g_r6a_r10_r2_summary_path();
++    let receipt_path = qw38g_r6a_r10_r2_receipt_path();
++
++    if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") || env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") || seeds.len() > 8 || target_ids.len() > 2 {
++        let mut warning_codes = Vec::<String>::new();
++        if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") { warning_codes.push("PRODUCTION_APPLY_NOT_ALLOWED_IN_R10_R2".to_string()); }
++        if env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") { warning_codes.push("FULL_VECTOR_POLICY_VIOLATION".to_string()); }
++        if seeds.len() > 8 { warning_codes.push("MULTI_SEED_COUNT_LIMIT_EXCEEDED".to_string()); }
++        if target_ids.len() > 2 { warning_codes.push("TARGET_LIMIT_EXCEEDED".to_string()); }
++        let status = if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") {
++            "FAIL_PRODUCTION_APPLY_NOT_ALLOWED_IN_R10_R2"
++        } else if env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") {
++            "FAIL_FULL_VECTOR_POLICY_VIOLATION"
++        } else if seeds.len() > 8 {
++            "FAIL_MULTI_SEED_COUNT_LIMIT_EXCEEDED"
++        } else {
++            "FAIL_TARGET_LIMIT_EXCEEDED"
++        };
++        let summary = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R10-R2",
++            "status": status,
++            "timestamp_unix_ms": qw38g_r3_now_ms(),
++            "repair_enabled": true,
++            "repair_mode": mode,
++            "target_ids": target_ids,
++            "seeds_requested": seeds,
++            "valid_seed_count": 0,
++            "partial_seed_count": 0,
++            "invalid_seed_count": 0,
++            "confidence_after_repair": "none",
++            "warning_codes": warning_codes,
++            "recommended_next_patch": "16AI-QW-38G-R6A-R10-R2_CONFIG_RETRY"
++        });
++        qw38g_r6a_r8_write_jsonl(&trace_path, &[]);
++        qw38g_r6a_r2_write_json(&summary_path, &summary);
++        let receipt = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R10-R2",
++            "status": status,
++            "timestamp_unix_ms": qw38g_r3_now_ms(),
++            "trace_path": trace_path,
++            "summary_path": summary_path,
++            "receipt_path": receipt_path,
++            "receipt_written": true,
++            "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++        });
++        qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++        eprintln!("[16AI-QW-38G-R6A-R10-R2][done] status={}", status);
++        return;
++    }
++
++    let mut seed_evidence = Vec::<serde_json::Value>::new();
++    let mut trace_events = Vec::<serde_json::Value>::new();
++    let mut seeds_observed = Vec::<u64>::new();
++    let mut valid_seed_count = 0usize;
++    let mut partial_seed_count = 0usize;
++    let mut invalid_seed_count = 0usize;
++    let mut final_boundary_confirmed_count = 0usize;
++    let mut projection_margin_confirmed_count = 0usize;
++    let mut raw_top1_target_count = 0usize;
++    let mut ban_mask_displacement_count = 0usize;
++    let mut margins_masked = Vec::<f32>::new();
++    let mut margins_raw2 = Vec::<f32>::new();
++    let mut scalar_only_all = true;
++    let mut full_vector_readback_used_any = false;
++    let mut all_normal_path_guards_passed = true;
++    let mut all_rollback_receipts_written = true;
++    let mut field_loss_seed_count = 0usize;
++    let mut warnings = Vec::<String>::new();
++
++    for seed in seeds.iter().copied() {
++        let r10_receipt_path = qw38g_r6a_r10_r1_r10_receipt_path(seed);
++        let r10_summary_path = qw38g_r6a_r10_r1_r10_summary_path(seed);
++        let r10_trace_path = qw38g_r6a_r10_r1_r10_trace_path(seed);
++        let r11_receipt_path = qw38g_r6a_r10_r1_r11_receipt_path(seed);
++        let r11_summary_path = qw38g_r6a_r10_r1_r11_summary_path(seed);
++        let r11_trace_path = qw38g_r6a_r10_r1_r11_trace_path(seed);
++
++        let r10_receipt = qw38g_r6a_r5_load_json(&r10_receipt_path);
++        let r10_summary = qw38g_r6a_r5_load_json(&r10_summary_path);
++        let r11_receipt = qw38g_r6a_r5_load_json(&r11_receipt_path);
++        let r11_summary = qw38g_r6a_r5_load_json(&r11_summary_path);
++        let r11_trace_event = qw38g_r6a_r10_r2_jsonl_first_matching(&r11_trace_path, &target_ids);
++
++        let r10_loaded = r10_receipt.is_some() || r10_summary.is_some();
++        let r11_loaded = r11_receipt.is_some() || r11_summary.is_some();
++        let r11_trace_loaded = r11_trace_event.is_some();
++        if r10_loaded || r11_loaded || r11_trace_loaded {
++            seeds_observed.push(seed);
++        }
++
++        let r10_source = r10_receipt.as_ref().or(r10_summary.as_ref());
++        let r11_source = r11_receipt.as_ref().or(r11_summary.as_ref());
++        let trace_source = r11_trace_event.as_ref();
++
++        let r10_status = qw38g_r6a_r10_r1_json_str(r10_source, "status", "MISSING");
++        let r11_status = qw38g_r6a_r10_r1_json_str(r11_source, "status", "MISSING");
++        let final_boundary_confirmed = qw38g_r6a_r10_r2_bool_fallback(r10_source, None, "final_boundary_confirmed", false);
++        let projection_margin_confirmed = qw38g_r6a_r10_r2_bool_fallback(r11_source, None, "projection_margin_confirmed", false);
++
++        let target_token_id = qw38g_r6a_r10_r2_opt_u32(trace_source, "target_token_id")
++            .or_else(|| qw38g_r6a_r10_r2_opt_u32(r11_source, "target_token_id"))
++            .or_else(|| target_ids.first().copied());
++        let target_piece = qw38g_r6a_r10_r2_opt_string(trace_source, "target_piece")
++            .or_else(|| qw38g_r6a_r10_r2_opt_string(r11_source, "target_piece"));
++        let raw_top1_token_id = qw38g_r6a_r10_r2_opt_u32(trace_source, "raw_top1_token_id");
++        let raw_top1_piece = qw38g_r6a_r10_r2_opt_string(trace_source, "raw_top1_piece");
++        let raw_top1_logit = qw38g_r6a_r10_r2_opt_f32(trace_source, "raw_top1_logit");
++        let masked_top1_token_id = qw38g_r6a_r10_r2_opt_u32(trace_source, "masked_top1_token_id");
++        let masked_top1_piece = qw38g_r6a_r10_r2_opt_string(trace_source, "masked_top1_piece");
++        let masked_top1_logit = qw38g_r6a_r10_r2_opt_f32(trace_source, "masked_top1_logit");
++        let margin_masked = qw38g_r6a_r10_r2_opt_f32(trace_source, "target_minus_masked_top1_margin")
++            .or_else(|| qw38g_r6a_r10_r1_json_f32(r11_source, "mean_target_margin_vs_masked_top1"))
++            .or_else(|| qw38g_r6a_r10_r1_json_f32(r11_source, "min_target_margin_vs_masked_top1"));
++        let margin_raw2 = qw38g_r6a_r10_r2_opt_f32(trace_source, "target_minus_raw_top2_margin")
++            .or_else(|| qw38g_r6a_r10_r1_json_f32(r11_source, "mean_target_margin_vs_raw_top2"))
++            .or_else(|| qw38g_r6a_r10_r1_json_f32(r11_source, "min_target_margin_vs_raw_top2"));
++        let target_is_raw_top1 = qw38g_r6a_r10_r2_opt_bool(trace_source, "target_is_raw_top1");
++        let ban_mask_displaced_target = qw38g_r6a_r10_r2_opt_bool(trace_source, "ban_mask_displaced_target");
++        let scalar_only = qw38g_r6a_r10_r2_bool_fallback(trace_source, r11_source, "scalar_only", false);
++        let full_vector = qw38g_r6a_r10_r2_bool_fallback(trace_source, r11_source, "full_vector_readback_used", false);
++        let guard_passed = qw38g_r6a_r10_r2_bool_fallback(trace_source, r11_source, "normal_path_guard_passed", true);
++        let rollback_written = qw38g_r6a_r10_r2_bool_fallback(trace_source, r11_source, "rollback_receipt_written", true);
++
++        let mut required_field_missing = Vec::<String>::new();
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "target_token_id", &target_token_id);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "target_piece", &target_piece);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "raw_top1_token_id", &raw_top1_token_id);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "raw_top1_logit", &raw_top1_logit);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "masked_top1_token_id", &masked_top1_token_id);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "masked_top1_logit", &masked_top1_logit);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "target_minus_masked_top1_margin", &margin_masked);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "target_is_raw_top1", &target_is_raw_top1);
++        qw38g_r6a_r10_r2_push_missing(&mut required_field_missing, "ban_mask_displaced_target", &ban_mask_displaced_target);
++
++        let mut field_consistency_warnings = Vec::<String>::new();
++        if projection_margin_confirmed && !r11_trace_loaded {
++            field_consistency_warnings.push("SUMMARY_CONFIRMED_BUT_TRACE_FIELDS_MISSING".to_string());
++        }
++        if let (Some(flag), Some(raw), Some(target)) = (target_is_raw_top1, raw_top1_token_id, target_token_id) {
++            if flag && raw != target {
++                field_consistency_warnings.push("RAW_TOP1_FLAG_TOKEN_MISMATCH".to_string());
++            }
++        }
++        if ban_mask_displaced_target == Some(true) && masked_top1_token_id.is_none() {
++            field_consistency_warnings.push("DISPLACEMENT_FLAG_WITHOUT_MASKED_TOP1".to_string());
++        }
++        if full_vector {
++            field_consistency_warnings.push("FULL_VECTOR_POLICY_VIOLATION".to_string());
++        }
++
++        let evidence_status = if !r10_loaded || !r11_loaded || !r11_trace_loaded {
++            "INVALID_SOURCE_MISSING"
++        } else if full_vector || !guard_passed || !rollback_written {
++            "INVALID_GUARD_FAILED"
++        } else if !required_field_missing.is_empty() {
++            "PARTIAL_FIELD_LOSS"
++        } else {
++            "VALID"
++        };
++
++        match evidence_status {
++            "VALID" => {
++                valid_seed_count += 1;
++                if final_boundary_confirmed { final_boundary_confirmed_count += 1; }
++                if projection_margin_confirmed { projection_margin_confirmed_count += 1; }
++                if target_is_raw_top1.unwrap_or(false) { raw_top1_target_count += 1; }
++                if ban_mask_displaced_target.unwrap_or(false) { ban_mask_displacement_count += 1; }
++                if let Some(v) = margin_masked { margins_masked.push(v); }
++                if let Some(v) = margin_raw2 { margins_raw2.push(v); }
++            }
++            "PARTIAL_FIELD_LOSS" => {
++                partial_seed_count += 1;
++                field_loss_seed_count += 1;
++            }
++            _ => {
++                invalid_seed_count += 1;
++            }
++        }
++        scalar_only_all &= scalar_only;
++        full_vector_readback_used_any |= full_vector;
++        all_normal_path_guards_passed &= guard_passed;
++        all_rollback_receipts_written &= rollback_written;
++
++        let extracted_from_trace = r11_trace_loaded;
++        let extracted_from_summary_fallback = !r11_trace_loaded && r11_loaded;
++        let mut seed_warnings = Vec::<String>::new();
++        if !r11_trace_loaded { seed_warnings.push("R11_TRACE_MISSING".to_string()); }
++        if !required_field_missing.is_empty() { seed_warnings.push("REQUIRED_FIELD_MISSING".to_string()); }
++        seed_warnings.extend(field_consistency_warnings.iter().cloned());
++
++        let evidence = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R10-R2",
++            "seed": seed,
++            "prompt_id": prompt_set,
++            "r10_receipt_path": r10_receipt_path,
++            "r10_summary_path": r10_summary_path,
++            "r10_trace_path": r10_trace_path,
++            "r11_receipt_path": r11_receipt_path,
++            "r11_summary_path": r11_summary_path,
++            "r11_trace_path": r11_trace_path,
++            "r10_loaded": r10_loaded,
++            "r11_loaded": r11_loaded,
++            "r11_trace_loaded": r11_trace_loaded,
++            "r10_status": r10_status.clone(),
++            "r11_status": r11_status.clone(),
++            "final_boundary_confirmed": final_boundary_confirmed,
++            "projection_margin_confirmed": projection_margin_confirmed,
++            "target_token_id": target_token_id,
++            "target_piece": target_piece,
++            "raw_top1_token_id": raw_top1_token_id,
++            "raw_top1_piece": raw_top1_piece,
++            "raw_top1_logit": qw38g_r6a_r10_r1_value_f32(raw_top1_logit),
++            "masked_top1_token_id": masked_top1_token_id,
++            "masked_top1_piece": masked_top1_piece,
++            "masked_top1_logit": qw38g_r6a_r10_r1_value_f32(masked_top1_logit),
++            "target_minus_masked_top1_margin": qw38g_r6a_r10_r1_value_f32(margin_masked),
++            "target_minus_raw_top2_margin": qw38g_r6a_r10_r1_value_f32(margin_raw2),
++            "target_is_raw_top1": target_is_raw_top1,
++            "ban_mask_displaced_target": ban_mask_displaced_target,
++            "scalar_only": scalar_only,
++            "full_vector_readback_used": full_vector,
++            "normal_path_guard_passed": guard_passed,
++            "rollback_receipt_written": rollback_written,
++            "extracted_from_trace": extracted_from_trace,
++            "extracted_from_summary_fallback": extracted_from_summary_fallback,
++            "required_field_missing": required_field_missing,
++            "field_consistency_warnings": field_consistency_warnings,
++            "evidence_status": evidence_status,
++            "warning_codes": seed_warnings,
++        });
++        eprintln!("[16AI-QW-38G-R6A-R10-R2][seed] seed={} status={} raw_top1={:?} masked_top1={:?} margin={:?}", seed, evidence_status, raw_top1_token_id, masked_top1_token_id, margin_masked);
++        trace_events.push(evidence.clone());
++        seed_evidence.push(evidence);
++    }
++
++    let total_seed_count = seeds.len();
++    let seeds_observed_sorted = seeds_observed.clone();
++    let raw_top1_target_rate = if valid_seed_count > 0 { raw_top1_target_count as f32 / valid_seed_count as f32 } else { 0.0 };
++    let ban_mask_displacement_rate = if valid_seed_count > 0 { ban_mask_displacement_count as f32 / valid_seed_count as f32 } else { 0.0 };
++    let mean_masked = if margins_masked.is_empty() { None } else { Some(margins_masked.iter().sum::<f32>() / margins_masked.len() as f32) };
++    let min_masked = margins_masked.iter().copied().reduce(f32::min);
++    let max_masked = margins_masked.iter().copied().reduce(f32::max);
++    let mean_raw2 = if margins_raw2.is_empty() { None } else { Some(margins_raw2.iter().sum::<f32>() / margins_raw2.len() as f32) };
++    let min_raw2 = margins_raw2.iter().copied().reduce(f32::min);
++    let field_extraction_complete = valid_seed_count == total_seed_count && partial_seed_count == 0 && invalid_seed_count == 0;
++
++    let confidence_before_repair = "weak";
++    let confidence_after_repair = if valid_seed_count >= 3
++        && partial_seed_count == 0
++        && raw_top1_target_rate >= 0.80
++        && ban_mask_displacement_rate >= 0.80
++        && min_masked.unwrap_or(f32::NEG_INFINITY) >= min_margin_threshold
++        && scalar_only_all
++        && !full_vector_readback_used_any
++        && all_normal_path_guards_passed
++    {
++        "strong"
++    } else if valid_seed_count >= 2
++        && raw_top1_target_rate >= 0.50
++        && mean_masked.unwrap_or(f32::NEG_INFINITY) >= 0.5
++        && ban_mask_displacement_rate >= 0.50
++    {
++        "medium"
++    } else if valid_seed_count >= 1 || partial_seed_count > 0 {
++        "weak"
++    } else {
++        "none"
++    };
++    let status = if valid_seed_count >= 3 && partial_seed_count == 0 && invalid_seed_count == 0 {
++        "PASS_TRACE_BACKED_MULTI_SEED_AGGREGATION"
++    } else if valid_seed_count > 0 || partial_seed_count > 0 {
++        "PARTIAL_TRACE_BACKED_AGGREGATION_FIELD_LOSS"
++    } else {
++        "FAIL_TRACE_BACKED_AGGREGATION"
++    };
++    let repro_confidence_lifted = confidence_after_repair == "strong"
++        || (confidence_before_repair == "weak" && matches!(confidence_after_repair, "medium" | "strong"));
++
++    if partial_seed_count > 0 {
++        warnings.push("FIELD_EXTRACTION_LOSS".to_string());
++        warnings.push("CONFIDENCE_LIFT_BLOCKED_BY_PARTIAL_EVIDENCE".to_string());
++    }
++    if invalid_seed_count > 0 {
++        warnings.push("INVALID_SEED_EVIDENCE_PRESENT".to_string());
++    }
++    if valid_seed_count == 0 {
++        warnings.push("NO_VALID_SEED_TRACE_EVIDENCE".to_string());
++    }
++    if full_vector_readback_used_any {
++        warnings.push("FULL_VECTOR_POLICY_VIOLATION".to_string());
++    }
++
++    let confirmed_candidate = if valid_seed_count > 0 {
++        serde_json::json!("final_norm_or_projection_boundary")
++    } else {
++        serde_json::Value::Null
++    };
++    let recommended_next_patch = if confidence_after_repair == "strong" {
++        "16AI-QW-38G-R6A-R12_ROOT_CAUSE_SPLIT_PLAN"
++    } else if partial_seed_count > 0 {
++        "16AI-QW-38G-R6A-R10-R3_SEED_TRACE_EVENT_SCHEMA_REPAIR"
++    } else if valid_seed_count == 0 {
++        "16AI-QW-38G-R6A-R10-R2-R1_SEED_TRACE_DISCOVERY_REPAIR"
++    } else {
++        "16AI-QW-38G-R6A-R10-R2-RERUN_WITH_MORE_SEEDS"
++    };
++
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10-R2",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "repair_enabled": true,
++        "repair_mode": mode,
++        "target_ids": target_ids,
++        "seeds_requested": seeds,
++        "seeds_observed": seeds_observed_sorted,
++        "prompt_set": prompt_set,
++        "total_seed_count": total_seed_count,
++        "valid_seed_count": valid_seed_count,
++        "partial_seed_count": partial_seed_count,
++        "invalid_seed_count": invalid_seed_count,
++        "final_boundary_confirmed_count": final_boundary_confirmed_count,
++        "projection_margin_confirmed_count": projection_margin_confirmed_count,
++        "raw_top1_target_count": raw_top1_target_count,
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "ban_mask_displacement_count": ban_mask_displacement_count,
++        "ban_mask_displacement_rate": ban_mask_displacement_rate,
++        "mean_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(mean_masked),
++        "min_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(min_masked),
++        "max_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(max_masked),
++        "mean_margin_vs_raw_top2": qw38g_r6a_r10_r1_value_f32(mean_raw2),
++        "min_margin_vs_raw_top2": qw38g_r6a_r10_r1_value_f32(min_raw2),
++        "scalar_only": scalar_only_all,
++        "full_vector_readback_used": full_vector_readback_used_any,
++        "all_normal_path_guards_passed": all_normal_path_guards_passed,
++        "all_rollback_receipts_written": all_rollback_receipts_written,
++        "field_extraction_complete": field_extraction_complete,
++        "field_loss_seed_count": field_loss_seed_count,
++        "confidence_before_repair": confidence_before_repair,
++        "confidence_after_repair": confidence_after_repair,
++        "confirmed_candidate": confirmed_candidate,
++        "repro_confidence_lifted": repro_confidence_lifted,
++        "seed_evidence": seed_evidence,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warnings,
++    });
++    qw38g_r6a_r8_write_jsonl(&trace_path, &trace_events);
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10-R2",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "repair_mode": summary.get("repair_mode").cloned().unwrap_or_else(|| serde_json::json!("trace_backed_aggregation")),
++        "seeds_requested": summary.get("seeds_requested").cloned().unwrap_or_else(|| serde_json::json!([])),
++        "seeds_observed": summary.get("seeds_observed").cloned().unwrap_or_else(|| serde_json::json!([])),
++        "valid_seed_count": valid_seed_count,
++        "partial_seed_count": partial_seed_count,
++        "invalid_seed_count": invalid_seed_count,
++        "field_extraction_complete": field_extraction_complete,
++        "field_loss_seed_count": field_loss_seed_count,
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "ban_mask_displacement_rate": ban_mask_displacement_rate,
++        "mean_margin_vs_masked_top1": summary.get("mean_margin_vs_masked_top1").cloned().unwrap_or(serde_json::Value::Null),
++        "min_margin_vs_masked_top1": summary.get("min_margin_vs_masked_top1").cloned().unwrap_or(serde_json::Value::Null),
++        "confirmed_candidate": summary.get("confirmed_candidate").cloned().unwrap_or(serde_json::Value::Null),
++        "confidence_before_repair": confidence_before_repair,
++        "confidence_after_repair": confidence_after_repair,
++        "repro_confidence_lifted": repro_confidence_lifted,
++        "scalar_only": scalar_only_all,
++        "full_vector_readback_used": full_vector_readback_used_any,
++        "all_normal_path_guards_passed": all_normal_path_guards_passed,
++        "all_rollback_receipts_written": all_rollback_receipts_written,
++        "trace_path": trace_path.clone(),
++        "trace_jsonl_written": qw38g_r6a_r2_path_written(&trace_path),
++        "summary_path": summary_path.clone(),
++        "summary_json_written": qw38g_r6a_r2_path_written(&summary_path),
++        "receipt_path": receipt_path.clone(),
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][field_extraction] complete={} partial={} invalid={}", field_extraction_complete, partial_seed_count, invalid_seed_count);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][aggregate] valid={} raw_top1_rate={} displacement_rate={}", valid_seed_count, raw_top1_target_rate, ban_mask_displacement_rate);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][confidence] before={} after={}", confidence_before_repair, confidence_after_repair);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][trace_written] path={}", trace_path);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][summary_written] path={}", summary_path);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][receipt_written] path={}", receipt_path);
++    eprintln!("[16AI-QW-38G-R6A-R10-R2][done] status={}", status);
++}
++
+ fn qw38g_r6a_r11_projection_boundary_margin_audit(
+     _atlas: &NativeVocabAtlas,
+     global_top_k: &[NativeVocabAtlasCandidate],
+@@ -9390,6 +9904,7 @@
+             &merged_logits,
+         );
+         qw38g_r6a_r10_r1_multi_seed_aggregation();
++        qw38g_r6a_r10_r2_trace_backed_aggregation();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

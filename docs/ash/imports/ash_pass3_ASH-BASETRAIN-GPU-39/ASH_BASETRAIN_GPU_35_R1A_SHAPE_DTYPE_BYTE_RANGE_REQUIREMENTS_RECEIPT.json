@@ -1,0 +1,22 @@
+{
+  "byte_range_inferred_from_full_model_size": false,
+  "byte_range_inferred_from_group_index_only": false,
+  "byte_range_requirements": {
+    "selected_group_weight_byte_end": "integer_gt_start",
+    "selected_group_weight_byte_len": "byte_end_minus_start_and_element_count_times_dtype_byte_size",
+    "selected_group_weight_byte_start": "integer_gte_0"
+  },
+  "dtype_defaulted_to_f32": false,
+  "dtype_requirements": {
+    "selected_group_dtype": "one_of_f16_bf16_f32",
+    "selected_group_dtype_byte_size": "derived_from_dtype_only"
+  },
+  "pass": true,
+  "patch_id": "ASH-BASETRAIN-GPU-35-R1A",
+  "shape_dtype_byte_range_requirements_receipt_created": true,
+  "shape_inferred_from_logits_gradient_shape": false,
+  "shape_requirements": {
+    "selected_group_element_count": "product_of_shape",
+    "selected_group_tensor_shape": "non_empty_array_positive_integers"
+  }
+}

@@ -1,0 +1,7 @@
+Local validation is operator-owned.
+
+Build:
+cargo build -p base_train --bin ash_basetrain_gpu_18_window_2048_logits_readback_determinism_audit --jobs 1
+
+Run:
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_18_window_2048_logits_readback_determinism_audit

@@ -1,0 +1,82 @@
+{
+  "patch_id": "QW-53B",
+  "base_patch": "QW-52B-C3",
+  "entries_before": 18,
+  "entries_after": 19,
+  "added_entry": {
+    "entry_id": "salad_alignment_dataset_receipt",
+    "entry_family": "normal_collapse_alignment_dataset",
+    "available": true,
+    "input_sources": [
+      "QW-52B.DecodeDetectorRegistryTrace",
+      "QW-52B-M1.MirrorResonanceTrace",
+      "QW-52B-M2.SelfEchoDetectorTrace",
+      "QW-52B-M3.ResidualLoopEligibilityTrace",
+      "QW-52B-M4.QWavePhaseEscapeCandidateTrace",
+      "QW-52B-M5.QWaveSignatureRepeatGuardTrace",
+      "QW-52B-M6.StablePhraseQuarantineMemoryReceipt",
+      "QW-52B-C1.CheonjiinXyzTensorProjectionTrace",
+      "QW-52B-C2.CjiCairoCounterexampleTrace",
+      "QW-52B-C3.CjiPlosiveForceFixtureTrace"
+    ],
+    "risk_score": null,
+    "risk_level": "EvidenceOnly",
+    "evidence": {
+      "dataset_schema_version": "salad_alignment_dataset_v1",
+      "dataset_path": "artifacts/qw53a_salad_alignment_dataset.jsonl",
+      "manifest_path": "artifacts/qw53a_salad_alignment_dataset_manifest.json",
+      "sample_count": 5,
+      "normal_count": 1,
+      "salad_count": 1,
+      "collapse_count": 1,
+      "review_count": 1,
+      "unlabeled_count": 1,
+      "supervised_eval_eligible_count": 3
+    },
+    "action_allowed": false,
+    "mutation_allowed": false
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "detectors": [
+    {
+      "entry_id": "dream_cycle_probe_receipt",
+      "entry_family": "legacy_dream_idle_association_sandbox",
+      "available": true,
+      "input_sources": [
+        "QW-53A.SaladAlignmentDataset",
+        "QW-53A.DatasetManifest"
+      ],
+      "risk_score": 0.88,
+      "risk_level": "Critical",
+      "evidence": {
+        "triplet_count": 4,
+        "stable_association_count": 1,
+        "risk_association_count": 1,
+        "collapse_association_count": 1,
+        "review_association_count": 1,
+        "dream_insight_apply_allowed": false,
+        "live_decode_intervention": false
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  ],
+  "latest_entry": "dream_cycle_probe_receipt",
+  "summary": {
+    "registry_entry_count_after": 19,
+    "dream_insight_apply_allowed": false
+  }
+}

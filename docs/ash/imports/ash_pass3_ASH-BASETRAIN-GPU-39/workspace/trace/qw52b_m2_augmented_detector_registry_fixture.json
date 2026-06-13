@@ -1,0 +1,382 @@
+{
+  "patch_id": "QW-52B-M2",
+  "title": "Self Echo / Reflection Lock Detector Seal",
+  "base_patch": "QW-52B-M1",
+  "semantic_base": "QW-52A-R4",
+  "run_id": "qw52b_static_registry_bake",
+  "input_sources": {
+    "r0w_native_decode_topk_trace_available": true,
+    "r0w_a_prefix_trace_available": true,
+    "qw52a_candidate_awareness_available": true,
+    "qw52a_r1_facade_available": true,
+    "qw52a_r2_projection_bridge_available": true,
+    "qw52a_r3_alignment_trace_available": true,
+    "qw52a_r4_gated_fusion_candidate_available": true,
+    "missing_sources": [],
+    "unavailable_sources": []
+  },
+  "detectors": [
+    {
+      "detector_id": "token_repeat_detector",
+      "detector_family": "lexical_repeat",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedTokenIds",
+        "R0W.top1Trace"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "same_token_streak_max": 0,
+        "repeated_token_ids": [],
+        "repeat_windows": [],
+        "top1_reentry_count": 0,
+        "mode": "trace_only_static_fixture"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "piece_repeat_detector",
+      "detector_family": "surface_repeat",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedPieces",
+        "R0W.generatedPieceTrace"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "same_piece_streak_max": 0,
+        "normalized_repeated_pieces": [],
+        "piece_repeat_windows": [],
+        "mode": "trace_only_static_fixture"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "ngram_repeat_detector",
+      "detector_family": "sequence_repeat",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedTokenIds",
+        "R0W.generatedPieces"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "repeated_ngrams": [],
+        "max_ngram_repeat_count": 0,
+        "mode": "trace_only_static_fixture"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "korean_morph_loop_detector",
+      "detector_family": "korean_surface_morph_loop",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedPieces",
+        "QW-52A.HangulFeatureRow"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "short_piece_loop_count": 0,
+        "suffix_like_loop_count": 0,
+        "particle_like_loop_count": 0,
+        "morph_ping_pong_windows": [],
+        "mode": "surface_loop_only_no_new_morph_math"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "hangul_structure_detector",
+      "detector_family": "hangul_integrity",
+      "available": true,
+      "input_sources": [
+        "QW-52A.HangulFeatureRow",
+        "QW-52A.candidateSurface"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "jamo_leak_count": 0,
+        "byte_fallback_count": 0,
+        "invalid_hangul_surface_count": 0,
+        "hangul_integrity_risk": 0.0,
+        "mode": "existing_hangul_awareness_only"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "cheonjiin_qwave_detector",
+      "detector_family": "structural_qwave",
+      "available": true,
+      "input_sources": [
+        "QW-52A-R1.CheonjiinJasoStrokeFacade",
+        "QW-52A.QWavePulseVector",
+        "QW-52A.QWaveSyllableTransition"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "phase_lock_score": 0.0,
+        "transition_collapse_score": 0.0,
+        "closure_pressure_anomaly": 0.0,
+        "flow_continuity_drop": 0.0,
+        "transition_energy_spike": 0.0,
+        "mode": "evidence_only_no_new_qwave_math"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "context_attractor_detector",
+      "detector_family": "semantic_surface_attractor",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedPieces",
+        "R0W.topKCandidatesByStep",
+        "R0W.repeatAnalysis"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "attractor_piece_candidates": [],
+        "contextless_reentry_count": 0,
+        "topk_reentry_steps": [],
+        "attractor_risk_score": 0.0,
+        "normal_word_token_ban_allowed": false
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "projection_alignment_detector",
+      "detector_family": "projection_hidden_alignment",
+      "available": true,
+      "input_sources": [
+        "QW-52A-R3.CheonjiinProjectionAlignmentTrace"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "alignment_available": true,
+        "dim_match": true,
+        "projection_norm": null,
+        "hidden_norm": null,
+        "cosine_similarity": null,
+        "alignment_risk_score": 0.0,
+        "mode": "pipeline_health_not_correction"
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "gated_fusion_candidate_policy_detector",
+      "detector_family": "gated_fusion_policy",
+      "available": true,
+      "input_sources": [
+        "QW-52A-R4.CheonjiinGatedFusionCandidateTrace",
+        "QW-52A-R4.mutationPolicy"
+      ],
+      "risk_score": 0.0,
+      "risk_level": "None",
+      "evidence": {
+        "gate_default": 0.0,
+        "gate_runtime_value": 0.0,
+        "runtime_default_apply": false,
+        "controlled_enable_required": true,
+        "operator_approval_required": true,
+        "policy_violation_count": 0,
+        "violations": []
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "mirror_resonance_detector",
+      "detector_family": "input_output_reflection",
+      "available": true,
+      "input_sources": [
+        "QW-52A.HangulQWaveCandidateAwarenessTrace",
+        "QW-52A-R1.CheonjiinJasoStrokeFacade",
+        "R0W.generatedPieces"
+      ],
+      "risk_score": 0.142182,
+      "risk_level": "None",
+      "evidence": {
+        "patch_id": "QW-52B-M1",
+        "detector_id": "mirror_resonance_detector",
+        "decode_step": 0,
+        "candidate_rank": 0,
+        "token_id": 0,
+        "piece": "normal_input_output_resonance",
+        "input_trace_available": true,
+        "output_trace_available": true,
+        "recent_window_available": true,
+        "input_output_closeness": 0.981972,
+        "self_echo_similarity": 0.266336,
+        "self_echo_penalty": 0.266336,
+        "mirror_resonance_score": 0.715636,
+        "risk_score": 0.142182,
+        "risk_level": "None",
+        "evidence": {
+          "input_summary_digest": "qwv8:1c858bed741d9eeb",
+          "output_summary_digest": "qwv8:3c93e87fd6d17069",
+          "recent_window_digest": "recent_window:1",
+          "available_dims": 8,
+          "missing_dims": [],
+          "distance_scale": 1.0,
+          "self_echo_weight": 1.0,
+          "nearest_recent_step": 0,
+          "nearest_recent_similarity": 0.266336,
+          "summary_vector_order": [
+            "phase_mean",
+            "phase_delta_mean",
+            "pressure_mean",
+            "closure_mean",
+            "curvature_mean",
+            "transition_energy_mean",
+            "flow_continuity_mean",
+            "qwave_signature_hash_scalar"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    },
+    {
+      "detector_id": "self_echo_detector",
+      "detector_family": "output_self_reflection_lock",
+      "available": true,
+      "input_sources": [
+        "R0W.generatedTokenIds",
+        "R0W.generatedPieces",
+        "QW-52B-M1.MirrorResonanceTrace",
+        "QW-52A.HangulQWaveCandidateAwarenessTrace"
+      ],
+      "risk_score": 0.8,
+      "risk_level": "High",
+      "evidence": {
+        "patch_id": "QW-52B-M2",
+        "detector_id": "self_echo_detector",
+        "decode_step": 1,
+        "candidate_rank": 0,
+        "token_id": 901,
+        "piece": "나오죠",
+        "recent_window_available": true,
+        "qwave_trace_available": true,
+        "cji_xyz_trace_available": false,
+        "token_echo_score": 0.8,
+        "piece_echo_score": 0.8,
+        "ngram_echo_score": 0.55,
+        "qwave_echo_score": 0.45,
+        "cji_xyz_echo_score": null,
+        "phase_lock_score": 0.3375,
+        "contextless_reentry_score": 0.0,
+        "reflection_lock_score": 0.59,
+        "self_echo_score": 0.8,
+        "risk_score": 0.8,
+        "risk_level": "High",
+        "evidence": {
+          "token_window": [
+            900,
+            901,
+            901,
+            901
+          ],
+          "piece_window": [
+            "있고",
+            "나오죠",
+            "나오죠",
+            "나오죠"
+          ],
+          "repeated_token_ids": [
+            901
+          ],
+          "repeated_pieces": [
+            "나오죠"
+          ],
+          "repeated_ngrams": [
+            "나오죠|나오죠",
+            "나오죠|나오죠|나오죠"
+          ],
+          "max_same_token_streak": 4,
+          "max_same_piece_streak": 4,
+          "max_ngram_repeat_count": 2,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": 0.59,
+          "qwave_signature_repeat_count": 3,
+          "cji_xyz_repeat_count": null,
+          "input_output_resonance_hint": 0.21,
+          "missing_channels": [
+            "cji_xyz_trace"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      },
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  ],
+  "summary": {
+    "detector_count": 11,
+    "available_detector_count": 11,
+    "unavailable_detector_count": 0,
+    "max_risk_score": 0.8,
+    "aggregate_risk_score": 0.8,
+    "aggregate_risk_level": "High",
+    "highest_risk_detector_ids": [
+      "self_echo_detector"
+    ],
+    "word_salad_risk_detected": true,
+    "context_attractor_risk_detected": false,
+    "hangul_structure_risk_detected": false,
+    "projection_policy_risk_detected": false,
+    "action_recommendation": "TraceOnly"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "residual_stream_mutation": false,
+    "lm_head_input_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "lora_scale_mutation": false,
+    "webgpu_shader_added": false,
+    "python_detector_allowed": false
+  },
+  "receipt_status": "PASS_STATIC_SELF_ECHO_DETECTOR",
+  "next_candidates": [
+    "QW-52B-M3",
+    "QW-52B-M4",
+    "QW-52B-C1"
+  ],
+  "notes": [
+    "QW-52B is detector registry only.",
+    "No correction, rerank, retry, logit mutation, sampler mutation, hidden mutation, or token ban is allowed.",
+    "Detector outputs are evidence only."
+  ]
+}

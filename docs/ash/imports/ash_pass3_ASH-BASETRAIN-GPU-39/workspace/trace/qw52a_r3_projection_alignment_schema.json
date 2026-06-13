@@ -1,0 +1,41 @@
+{
+  "patch_id": "QW-52A-R3",
+  "title": "Cheonjiin Projection Alignment Probe / Hidden-Space Similarity Receipt",
+  "base_patch": "QW-52A-R2",
+  "projection_source": "model_core::cheonjiin_projection_input_bridge + lora_train::qwave_conditioning_projection_dry_run",
+  "hidden_snapshot_source": "model_core::native_forward_read_only_snapshot",
+  "steps": [
+    {
+      "step": 0,
+      "selected_token_id": 0,
+      "selected_piece": "",
+      "snapshot_point": "lm_head_input",
+      "hidden_snapshot": {
+        "backend": "vulkan_native",
+        "layer_index": null,
+        "token_position": 0,
+        "hidden_dim": 2048,
+        "norm_l2": 0.0,
+        "max_abs": 0.0,
+        "vector_digest": "",
+        "vector_materialized": false
+      },
+      "candidates": []
+    }
+  ],
+  "summary": {
+    "steps_inspected": 0,
+    "candidates_inspected": 0,
+    "hidden_snapshots_present": true,
+    "projection_outputs_present": true,
+    "dim_match_count": 0,
+    "dim_mismatch_count": 0,
+    "alignment_available_count": 0,
+    "alignment_unavailable_count": 0,
+    "selected_candidate_alignment_count": 0,
+    "hidden_state_fusion_detected": false,
+    "logit_mutation_detected": false,
+    "sampler_mutation_detected": false,
+    "recommended_next_patch": "QW-52A-R4"
+  }
+}

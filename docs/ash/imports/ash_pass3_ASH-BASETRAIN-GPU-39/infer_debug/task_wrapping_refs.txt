@@ -1,0 +1,355 @@
+﻿D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:2: use ash_core::{AshCore, AshLegacyGateProjection, AshPromptAnalysis};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:13: PromptShapingBackend, RuntimeControlConfig, RuntimeLoadedModel,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:647: fn infer_role_profile(system_prompt: Option<&str>, prompt: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:649: {}", system_prompt.unwrap_or(""), prompt).to_lowercase();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:668: fn infer_cue_profile(analysis: &AshPromptAnalysis) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:687: analysis: &AshPromptAnalysis,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:840: analysis: &AshPromptAnalysis,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:846: PromptShapingBackend::NativeControl
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:848: PromptShapingBackend::TextInjection
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:851: let role_profile = infer_role_profile(cfg.system_prompt.as_deref(), &cfg.prompt);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:887: prompt: legacy_gate.gated_prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:888: system_prompt: legacy_gate.gated_system_prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:959: vendor_text_control: matches!(shaping_backend, PromptShapingBackend::NativeControl),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\bootstrap.rs:967: include_prompt_in_output: cfg.include_prompt_in_output,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:2: use ash_core::{derive_gate, AshGateInput};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:49: let analysis = state.ash_core.analyze_prompt(
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:51: &cfg.prompt,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:52: cfg.system_prompt.as_deref(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:56: let gate_input = AshGateInput {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:57: system_prompt: cfg.system_prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:58: prompt: cfg.prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:68: let gate = derive_gate(&analysis, &gate_input);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:69: let legacy_gate = gate.flatten_legacy(&gate_input);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:80: text: cfg.prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:127: gated_system_prompt: legacy_gate.gated_system_prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:128: gated_prompt_preview: preview_text(&legacy_gate.gated_prompt, 220),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_runner.rs:136: prompt_prefix: legacy_gate.prompt_prefix.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:56: let prompt_len = result.prompt_ids.len();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:57: let generated_token_count = result.generated_ids.len().saturating_sub(prompt_len);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:135: route_used: result.decision.resolved_task.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\output_text.rs:13: if piece.starts_with("<task:")
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\output_text.rs:171: pub(crate) fn postprocess_output_text(task: &str, raw_output_text: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\output_text.rs:172: if task == "dialogue.continue" {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:37: pub task: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:38: pub input_text: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:73: let task = req
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:74: .task
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:77: .or_else(|| runtime_profile.as_ref().map(|profile| profile.default_task.clone()))
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:95: task,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\request_resolution.rs:96: input_text: req.input_text,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:136: pub formatted_prompt: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:279: task: None,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:280: input_text: exec_cfg.prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:524: let _formatted = tokenizer.format_prompt(cfg.system_prompt.as_deref(), &cfg.prompt);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:759: let formatted = tokenizer.format_prompt(cfg.system_prompt.as_deref(), &cfg.prompt);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:773: let prompt = formatted.clone();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:811: &prompt,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:838: formatted_prompt: formatted,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2: use ash_core::{AshDecision, AshDecisionEngine, AshDecisionInput, BackendStatus, HotCacheStatus, LoraSummary};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:109: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:113: if !matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:122: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:124: if matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:419: pub task: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:420: pub input_text: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:482: pub freeze_prompt: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:500: pub fn candidate_plan_profile_for_task(task: &str) -> StandardInferCandidatePlanProfile {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:501: match task {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:503: "subtitle_polish" => StandardInferCandidatePlanProfile::SubtitlePolish,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:742: freeze_prompt: true,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:746: pub fn build_candidate_plan_for_task(
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:747: task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:751: build_candidate_plan_for_profile(candidate_plan_profile_for_task(task), seed, max_new_tokens)
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:786: pub prompt_len: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:907: pub prompt_ids: Vec<u32>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:916: pub runtime_profile_id: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:996: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1010: let (policy, reason) = resolve_sampling_rollout_policy(resolved_task, &cfg);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1013: cfg.parity_gate_policy = Some(default_gpu_sampling_parity_gate_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1014: cfg.parity_enforcement_policy = Some(default_gpu_sampling_parity_enforcement_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1015: cfg.recovery_policy = Some(default_gpu_sampling_recovery_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1016: cfg.persistent_state_policy = Some(default_gpu_sampling_persistent_state_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1017: cfg.profile_durability_overrides = Some(default_gpu_sampling_profile_durability_overrides(resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1018: cfg.adaptive_tuning_policy = Some(default_gpu_sampling_adaptive_tuning_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1019: cfg.auto_calibration_policy = Some(default_gpu_sampling_auto_calibration_policy(resolved_task, policy));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1087: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1091: if matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1098: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1102: if !matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1110: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1114: if !matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1133: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1137: if !matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1152: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1156: if !matches!(resolved_task, "analysis") {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1175: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1188: match resolved_task {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1189: "subtitle_polish" => (
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1191: "task_default_subtitle_polish".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1195: "task_default_translation_assist".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1199: "task_default_analysis".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1203: "task_default_generic".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1209: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1212: let (policy, reason) = resolve_sampling_rollout_policy(resolved_task, sampling);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1321: fn classify_task_from_lora_id(id: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1324: "subtitle_polish".to_string()
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1346: primary_task: classify_task_from_lora_id(&lora_id),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1357: fn derive_task_hint(
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1358: task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1362: if task != "freeform" {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1363: return task.to_string();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1367: return "subtitle_polish".to_string();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1382: return "subtitle_polish".to_string();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1391: task.to_string()
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1415: fn emit_audio_bucket_tags(prompt: &mut String, hints: &QWaveInferenceHints) {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1416: prompt.push_str("<audio:risk>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1417: prompt.push_str(bucket4(hints.risk_ratio, 0.10, 0.25, 0.45, "low", "guarded", "high", "critical"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1418: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1419: prompt.push_str("<audio:boundary>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1420: prompt.push_str(bucket4(
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1430: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1431: prompt.push_str("<audio:cairo_mean>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1432: prompt.push_str(bucket4(hints.cairo_loss_mean, 0.20, 0.60, 1.10, "clean", "mixed", "noisy", "unstable"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1433: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1434: prompt.push_str("<audio:cairo_p95>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1435: prompt.push_str(bucket4(hints.cairo_loss_p95, 0.35, 0.90, 1.60, "clean", "mixed", "noisy", "unstable"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1436: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1437: prompt.push_str("<audio:delta_k_mean>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1438: prompt.push_str(bucket4(hints.delta_k_mean, 0.15, 0.35, 0.60, "quiet", "aligned", "active", "surged"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1439: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1440: prompt.push_str("<audio:delta_k_p95>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1441: prompt.push_str(bucket4(hints.delta_k_p95, 0.25, 0.55, 0.90, "quiet", "edged", "active", "spiked"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1442: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1443: prompt.push_str("<audio:delta_k_confidence>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1444: prompt.push_str(bucket4(hints.delta_k_confidence, 0.35, 0.60, 0.82, "low", "usable", "high", "locked"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1445: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1446: prompt.push_str("<audio:quantum_gate>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1447: prompt.push_str(bucket4(hints.quantum_gate_mean, 0.12, 0.30, 0.55, "closed", "ready", "open", "wide"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1448: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1449: prompt.push_str("<audio:control_gain>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1450: prompt.push_str(bucket4(hints.control_gain, 0.85, 1.05, 1.25, "soft", "steady", "assertive", "aggressive"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1451: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1454: fn emit_text_prior_tags(prompt: &mut String, prior: &StructureRoutingPrior) {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1455: prompt.push_str("<text:rerank_bias>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1456: prompt.push_str(bucket4(prior.rerank_bias, 0.18, 0.36, 0.54, "quiet", "present", "active", "strong"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1457: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1458: prompt.push_str("<text:honorific_route_bias>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1459: prompt.push_str(bucket4(prior.honorific_route_bias, 0.08, 0.18, 0.30, "low", "guarded", "marked", "high"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1460: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1461: prompt.push_str("<text:ambiguity_gate>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1462: prompt.push_str(bucket4(prior.ambiguity_gate, 0.16, 0.34, 0.52, "clear", "mixed", "ambiguous", "unstable"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1463: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1466: fn build_response_anchor(resolved_task: &str) -> &'static str {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1467: match resolved_task {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1469: "subtitle_polish" => "<response:subtitle>",
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1475: fn build_prompt(
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1477: input_text: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1483: let mut prompt = format!("<task:{}>\n", decision.resolved_task);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1485: emit_audio_bucket_tags(&mut prompt, h);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1487: prompt.push_str("<audio:delta_k_observer>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1488: prompt.push_str(observer_id);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1489: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1492: prompt.push_str("<audio:fallback_hint>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1493: prompt.push_str(reason);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1494: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1497: prompt.push_str("<audio:segment_span>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1498: prompt.push_str(bucket4(h.boundary_segments.len() as f32, 1.0, 3.0, 7.0, "tiny", "short", "mixed", "broad"));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1499: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1503: emit_text_prior_tags(&mut prompt, prior);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1506: prompt.push_str("<glossary:on>\n");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1508: prompt.push_str("<glossary:item>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1509: prompt.push_str(item);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1510: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1514: prompt.push_str("<tm:on>\n");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1516: prompt.push_str("<tm:item>");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1517: prompt.push_str(item);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1518: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1521: prompt.push_str(input_text);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1522: if !prompt.ends_with('\n') {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1523: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1525: prompt.push_str("<response:start>\n");
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1526: prompt.push_str(build_response_anchor(&decision.resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1527: prompt.push('\n');
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1528: prompt
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1692: fn delta_k_profile_gain(profile: &DeltaKLoraProfile, hints: &QWaveInferenceHints, resolved_task: &str) -> f32 {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1694: let task_bonus = match resolved_task {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1696: "subtitle_polish" => 0.05,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1706: + task_bonus,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1713: + task_bonus,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1734: resolved_task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1744: delta_k_profile_gain(&profile, h, resolved_task)
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1774: task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1775: prompt_len: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1787: let postprocessed_tail_text = postprocess_output_text(task, &manifest_piece_decode);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1793: prompt_len,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1998: let task_hint = derive_task_hint(&req.task, req.qwave_hints.as_ref(), req.text_routing_prior.as_ref());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1999: let decision_input = AshDecisionInput {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2001: task_hint: Some(task_hint),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2002: input_text: req.input_text.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2030: let decision = decision_engine.decide(&decision_input);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2044: let attached_lora_scales = apply_delta_k_lora_scaling(&mut attached, req.qwave_hints.as_ref(), &decision.resolved_task);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2057: let prompt = build_prompt(&decision, &req.input_text, &req.glossary, &req.tm, req.qwave_hints.as_ref(), req.text_routing_prior.as_ref());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2059: let prompt_ids = tokenizer.encode(&prompt)?;
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2096: let (sampling_cfg, mut gpu_sampling_persistent_meta) = build_generation_sampling_config(req.seed, decode, &decision.resolved_task, &spec.model_spec_id);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2136: repeated_recently: infer_recent_repeat_ratio(&prompt_ids) > 0.12,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2137: recent_repeat_ratio: infer_recent_repeat_ratio(&prompt_ids),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2138: opening_repeat_ratio: infer_opening_repeat_ratio(&prompt_ids),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2139: dominant_token_ratio: infer_dominant_token_ratio(&prompt_ids),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2171: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2182: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2194: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2205: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2235: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2246: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2272: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2283: &prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2296: let prompt_len = prompt_ids.len();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2315: let generated_tail_ids: Vec<u32> = if generated_ids.len() > prompt_len {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2316: generated_ids[prompt_len..].to_vec()
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2321: eprintln!("[debug] prompt_len = {}", prompt_len);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2334: let initial_output_text = postprocess_output_text(&decision.resolved_task, &raw_output_text);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2362: let retry_tail_ids: Vec<u32> = if retry_generated_ids.len() > prompt_len {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2363: retry_generated_ids[prompt_len..].to_vec()
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2373: let retry_output_text = postprocess_output_text(&decision.resolved_task, &retry_raw_output_text);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2434: let generated_token_count = final_generated_ids.len().saturating_sub(prompt_len);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2446: &decision.resolved_task,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2447: prompt_len,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2476: resolve_sampling_policy_compact(&decision.resolved_task, &sampling_cfg);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2621: prompt_ids,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2630: runtime_profile_id: req.runtime_profile.as_ref().map(|profile| profile.runtime_profile_id.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2696: let task = req.task.clone().unwrap_or_else(|| "freeform".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2697: plan = build_candidate_plan_for_task(&task, req.seed, req.max_new_tokens);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lib.rs:34: GenerateTask,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lib.rs:39: PromptShapingBackend,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lib.rs:75: build_candidate_plan_for_task,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lib.rs:76: candidate_plan_profile_for_task,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:50: pub prompt: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:57: pub prompt: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:74: pub task: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:105: prompt: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:114: task: req.task.clone().or_else(|| Some("freeform".to_string())),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:115: input_text: prompt.to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:136: prompt: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:148: prompt,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:261: prompt: scenario.prompt.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:271: &scenario.prompt,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\lora_smoke.rs:289: &scenario.prompt,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:23: pub input_token_ids: Vec<u32>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:75: if request.input_token_ids.is_empty() {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:76: return Err("runtime_logit_probe_input_tokens_empty".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:88: let input_sum = request.input_token_ids.iter().fold(0u64, |acc, token| acc + *token as u64) as f32;
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:92: .map(|token| (*token as f32 * 0.01) + input_sum * 0.0001 + rev_component)
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\native_lora_runtime_smoke.rs:140: input_token_ids: request.probe_input_token_ids.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:12: fn collapse_ascii_spacing(input: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:13: let chars: Vec<char> = input.chars().collect();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:14: let mut out = String::with_capacity(input.len());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:31: fn collapse_whitespace(input: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:32: input.split_whitespace().collect::<Vec<_>>().join(" ")
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:80: "prompt\n",
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:165: if spec.forbid_meta_prompt_leak
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\output_guard.rs:168: reasons.push("meta_prompt_leak".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:91: pub task: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:103: pub task: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:544: &req.input_text,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:600: fn profile_from_task(task: &str) -> TelemetryRerankProfile {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:601: match task {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:603: "subtitle_polish" => TelemetryRerankProfile::SubtitlePolish,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:907: task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:914: let profile = profile_from_task(task);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:963: task: task.to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1111: let profile = profile_from_task(route);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1186: task: &str,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1215: let mut score = score_candidate(idx, task, request_id, request, &result, weights, loop_pressure);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1225: let jitter_key = format!("{}::{}::{}", task, request_id, idx);
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1270: let task = req.base.task.clone().unwrap_or_else(|| "freeform".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1290: select_best_candidate(&task, &request_id, Some(&req.base), candidates, &weights, loop_pressure.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\rerank.rs:1297: let route = req.base.task.clone().unwrap_or_else(|| "freeform".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:10: pub runtime_profile_id: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:22: pub default_task: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:24: pub default_prompt_template: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:57: pub runtime_profile_id: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:69: pub default_task: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:71: pub default_prompt_template: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:102: runtime_profile_id: self.runtime_profile_id,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:114: default_task: self.default_task.unwrap_or_else(|| "freeform".to_string()),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\runtime_profile.rs:116: default_prompt_template: self.default_prompt_template,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:6: fn format_prompt(&self, system_prompt: Option<&str>, user_prompt: &str) -> String;
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:19: fn format_prompt(&self, system_prompt: Option<&str>, user_prompt: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:21: if let Some(system) = system_prompt {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:29: out.push_str(user_prompt.trim());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:74: fn format_prompt(&self, system_prompt: Option<&str>, user_prompt: &str) -> String {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:76: if let Some(system) = system_prompt {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\tokenizer.rs:86: out.push_str(user_prompt.trim());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:14: pub enum GenerateTask {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:63: pub prompt: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:64: pub system_prompt: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:74: pub include_prompt_in_output: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:77: #[serde(default = "default_generate_task")]
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:78: pub task: GenerateTask,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:81: fn default_generate_task() -> GenerateTask {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:82: GenerateTask::Freeform
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:88: pub prompt: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:89: pub system_prompt: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:96: pub include_prompt_in_output: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:216: pub enum PromptShapingBackend {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:221: impl PromptShapingBackend {
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:232: pub shaping_backend: PromptShapingBackend,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:293: gated_system_prompt: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:294: gated_prompt_preview: String,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:302: prompt_prefix: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:2: use ash_core::{profile_input, AshDecisionTrace};
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:28: fn create_trace(run_id: &str, task: &str, learnable_sample: bool, workspace_root: &Path, runtime_profile_path: Option<&str>) -> Result<PathBuf> {
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:29: let input_profile = profile_input(task, 0, 0);
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:38: runtime_profile_id: loaded_bundle
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:40: .map(|bundle| bundle.runtime_profile.runtime_profile_id.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:51: input_profile,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:52: task_reason: format!("orchestrator bootstrap trace for task={task}"),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:72: let task = payload
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:73: .get("task")
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\cli_or_request_parse.rs:81: let trace_path = create_trace(&run_id, &task, kind == "train", &state.workspace_root, runtime_profile_path)?;
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:13: use runtime::{build_candidate_plan_for_task, run_standard_infer, run_standard_infer_candidate_pool, run_standard_infer_with_decode, StandardInferDecodeOverride, StandardInferRequest};
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:121: let input = incoming
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:123: .get("input")
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:127: let task = incoming
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:129: .get("task")
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:224: input_text: input.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:264: task: task.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:265: input_text: input.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:307: output_json.insert("task".to_string(), json!(&result.decision.resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:310: output_json.insert("input".to_string(), json!(input));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:311: output_json.insert("prompt_ids".to_string(), json!(&result.prompt_ids));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:314: output_json.insert("prompt_len".to_string(), json!(result.tail_decode_probe.prompt_len));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:336: output_json.insert("runtime_profile_id".to_string(), json!(&result.runtime_profile_id));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:564: &result.decision.resolved_task,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:567: let candidate_plan = build_candidate_plan_for_task(
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:568: &result.decision.resolved_task,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:656: run.message = Some(format!("runtime standard infer completed: {}", result.decision.resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:667: response_json.insert("promptLen".to_string(), json!(result.tail_decode_probe.prompt_len));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:685: response_json.insert("resolvedTask".to_string(), json!(result.decision.resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:973: task_hint: incoming.payload.get("task").and_then(|v| v.as_str()).map(ToString::to_string),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:993: infer_input_text: incoming.payload.get("input").and_then(|v| v.as_str()).map(ToString::to_string),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:1065: run.message = Some(format!("audio qwave completed: {}", decision.resolved_task));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:1074: "resolvedTask": decision.resolved_task,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:3: use ash_core::{profile_input, AshDecisionTrace};
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:30: build_candidate_plan_for_task, load_runtime_profile_toml, run_standard_infer,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:421: "runtime_profile_id": runtime_profile.as_ref().map(|profile| profile.runtime_profile_id.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:437: let prompt = incoming
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:439: .get("prompt")
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:445: json!({"session_id": session_id, "text": prompt}),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:450: json!({"session_id": session_id, "text": prompt}),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:504: pub task_override: Option<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:524: task_override: None,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:552: input_text: example.source_text.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:561: example.task,
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:567: task: Some(
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:569: .task_override
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:571: .unwrap_or_else(|| example.task.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:573: input_text: example.source_text.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:600: let candidate_plan = build_candidate_plan_for_task(
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\lib.rs:601: result.decision.resolved_task.as_str(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\main.rs:25: --task-override <task>
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\main.rs:63: "--task-override" => {
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\main.rs:64: config.task_override = args.next();
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\main.rs:65: if config.task_override.is_none() {
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\main.rs:66: return Err(anyhow!("missing value for --task-override"));

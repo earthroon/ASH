@@ -1,0 +1,72 @@
+[
+  {
+    "violation_type": "PoliteToCasualDrift",
+    "cue_id": "mock-cue-0003",
+    "candidate_id": "candidate-politeness-drift",
+    "expected_register": "Polite",
+    "detected_register": "Casual",
+    "expected_term_hash": null,
+    "detected_term_hash": null,
+    "severity_score": 0.55,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "RequireRegisterReview"
+  },
+  {
+    "violation_type": "TermMemoryDrift",
+    "cue_id": "mock-cue-0004",
+    "candidate_id": "candidate-term-memory-drift",
+    "expected_register": null,
+    "detected_register": null,
+    "expected_term_hash": "sha256:060565eef6fad5540ddfc0c3b574c58e1f243c89e902feda082aa78fd33f05a3",
+    "detected_term_hash": "sha256:d6dc4614f392ddd55605aceb8bf3b79ed218a0dfd4625704d41a3d7aa809e0b2",
+    "severity_score": 0.48,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "RequireTranslationMemoryReview"
+  },
+  {
+    "violation_type": "HonorificMismatch",
+    "cue_id": "mock-cue-0005",
+    "candidate_id": "candidate-honorific-mismatch",
+    "expected_register": "Polite",
+    "detected_register": "Rough",
+    "expected_term_hash": null,
+    "detected_term_hash": null,
+    "severity_score": 0.72,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": true,
+    "action_hint": "RewriteCandidate"
+  },
+  {
+    "violation_type": "AbruptToneShift",
+    "cue_id": "mock-cue-0006",
+    "candidate_id": "candidate-abrupt-tone-shift",
+    "expected_register": "Polite",
+    "detected_register": "Rough",
+    "expected_term_hash": null,
+    "detected_term_hash": null,
+    "severity_score": 0.5,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "RequireRegisterReview"
+  },
+  {
+    "violation_type": "PreviousContextMissing",
+    "cue_id": "mock-cue-0007",
+    "candidate_id": "candidate-missing-previous-context",
+    "expected_register": null,
+    "detected_register": null,
+    "expected_term_hash": null,
+    "detected_term_hash": null,
+    "severity_score": 0.4,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "RequireSpeakerContextReview"
+  }
+]

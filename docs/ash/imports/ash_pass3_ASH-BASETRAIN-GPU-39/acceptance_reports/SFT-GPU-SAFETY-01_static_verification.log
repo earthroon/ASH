@@ -1,0 +1,39 @@
+# SFT-GPU-SAFETY-01 Static Verification Log
+
+## File inclusion
+- crates/ash_core/src/sft_gpu_safety_recovery.rs: present
+- crates/ash_core/tests/sft_gpu_safety_01_recovery.rs: present
+- crates/lora_train/src/gpu_train_failure_recovery.rs: present
+- crates/lora_train/tests/gpu_train_failure_recovery.rs: present
+- crates/burn_webgpu_backend/src/gpu_fault_recovery.rs: present
+- crates/burn_webgpu_backend/tests/gpu_fault_recovery.rs: present
+- acceptance_reports/SFT-GPU-SAFETY-01_fault_recovery.md: present
+- docs/roadmap/SFT-GPU-SAFETY-01_to_SAFETY-02_after_bake.md: present
+- patch_reports/SFT-GPU-SAFETY-01_bake_report.md: present
+
+## Export wiring
+- crates/ash_core/src/lib.rs: wired
+- crates/lora_train/src/lib.rs: wired
+- crates/burn_webgpu_backend/src/lib.rs: wired
+
+## Delimiter balance
+- crates/ash_core/src/sft_gpu_safety_recovery.rs: ok
+- crates/ash_core/tests/sft_gpu_safety_01_recovery.rs: ok
+- crates/lora_train/src/gpu_train_failure_recovery.rs: ok
+- crates/lora_train/tests/gpu_train_failure_recovery.rs: ok
+- crates/burn_webgpu_backend/src/gpu_fault_recovery.rs: ok
+- crates/burn_webgpu_backend/tests/gpu_fault_recovery.rs: ok
+
+## Cargo availability
+- cargo: unavailable in this container
+- rustc: unavailable in this container
+
+## Contract checks encoded in tests
+- rejects CPU fallback success after OOM
+- holds timeout without registry intake
+- fails device lost without promotion/current update
+- requires GPU backend fingerprint
+- blocks partial artifact intake
+- detects silent backend switch
+- forbids training/gradient/optimizer after fault
+- keeps current pointer update closed

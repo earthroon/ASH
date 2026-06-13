@@ -1,0 +1,8 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-22-R2",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-22_RERUN_LOSS_SCALAR_AUDIT",
+  "next_patch_after_22_pass": "ASH-BASETRAIN-GPU-23",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-22-R2A",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit --jobs 1",
+  "recommended_loss_scalar_audit_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit"
+}

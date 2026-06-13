@@ -1,0 +1,21 @@
+SFT-GPU-STREAM-03 STATIC VALIDATION
+
+Checked:
+- Added stream transport intake module.
+- Added stream transport intake tests.
+- Added lib.rs module and public export lines.
+- Added acceptance report.
+- Added bake report.
+- Confirmed brace/paren/bracket balance for new module and test file.
+- Confirmed no runner process spawn flag is opened by default.
+- Confirmed no SFT training, gradient write, optimizer step, artifact write, slot ready, runtime attach, promotion, or current pointer update flags are opened by default.
+
+Not executed:
+- cargo test -p ash_core sft_gpu_stream_03 -- --nocapture
+- cargo test -p ash_core sft_gpu_stream_01 -- --nocapture
+- cargo test -p ash_core sft_gpu_stream_02 -- --nocapture
+- cargo test -p ash_core sft_run_02 -- --nocapture
+- cargo test -p ash_core sft_run_03 -- --nocapture
+
+Reason:
+- cargo/rustc/rustfmt are unavailable in this environment.

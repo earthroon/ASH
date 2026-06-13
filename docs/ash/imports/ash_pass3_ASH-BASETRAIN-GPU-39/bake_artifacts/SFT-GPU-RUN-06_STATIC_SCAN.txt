@@ -1,0 +1,20 @@
+SFT-GPU-RUN-06 STATIC SCAN
+
+New module exports:
+- crates/ash_core/src/lib.rs: sft_gpu_runtime_attach_dry_run
+- crates/lora_train/src/lib.rs: gpu_trained_runtime_attach_dry_run
+- crates/burn_webgpu_backend/src/lib.rs: gpu_trained_runtime_attach_dry_run
+
+Closed runtime mutation boundaries confirmed by static literals:
+- promotion_apply_allowed: false
+- runtime_current_pointer_update_allowed: false
+- current_pointer_switch_allowed: false
+- lifecycle_mutation_allowed: false
+- slot_action_apply_allowed: false
+- rollback_execution_allowed: false
+- ash_binding_allowed: false
+- sft_training_execution_in_runtime_allowed: false
+- gradient_write_in_runtime_allowed: false
+- optimizer_step_in_runtime_allowed: false
+
+Runtime acceptance remains pending.

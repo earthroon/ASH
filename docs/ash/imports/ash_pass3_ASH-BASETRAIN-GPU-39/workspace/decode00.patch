@@ -1,0 +1,941 @@
+--- /mnt/data/decode00_orig/crates/tokenizer_core/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
++++ crates/tokenizer_core/src/lib.rs	2026-05-26 15:22:57.811187712 +0000
+@@ -13,6 +13,7 @@
+ pub mod morph_tensor;
+ pub mod structure_tensor;
+ pub mod text_qwave_boundary_audit;
++pub mod decode_ssot;
+ 
+ pub use hangul_qwave_cell::{
+     build_qwave_syllable_cell_batch, build_qwave_syllable_cell_batch_and_receipt,
+@@ -127,6 +128,13 @@
+     QWaveSyllableTransitionReceipt,
+ };
+ 
++pub use decode_ssot::{
++    decode_manifest_token_sequence, decode_piece_sequence_to_text, decode_piece_to_text,
++    decode_single_token_fragment, decode_token_sequence_to_text, mojibake_suspected,
++    token_piece_from_manifest as decode_ssot_token_piece_from_manifest, DecodedPiece,
++    DecodedPieceKind, DecodeProbe,
++};
++
+ pub use text_qwave_boundary_audit::{
+     build_text_qwave_boundary_audit_receipt, TextQWaveBoundaryAuditError,
+     TextQWaveBoundaryAuditInput, TextQWaveBoundaryAuditReceipt, TextQWaveBoundaryDecision,
+@@ -1016,50 +1024,9 @@
+     }
+ 
+     fn decode(&self, ids: &[u32]) -> Result<String> {
+-        let mut out = String::new();
+-        let mut pending_bytes = Vec::new();
+-        for id in ids {
+-            let token = self
+-                .id_to_token
+-                .get(id)
+-                .cloned()
+-                .unwrap_or_else(|| self.manifest.special_tokens.unk.token.clone());
+-            if token.starts_with("<byte:") && token.ends_with('>') {
+-                if let Ok(byte) = u8::from_str_radix(&token[6..8], 16) {
+-                    pending_bytes.push(byte);
+-                    continue;
+-                }
+-            }
+-            if !pending_bytes.is_empty() {
+-                if let Ok(s) = String::from_utf8(std::mem::take(&mut pending_bytes)) {
+-                    out.push_str(&s);
+-                }
+-            }
+-            match token.as_str() {
+-                "<pad>" | "<bos>" => {}
+-                "<eos>" => break,
+-                "<br>" => out.push('\n'),
+-                t if t.starts_with('<') && t.ends_with('>') => {
+-                    if !out.ends_with(' ') && !out.is_empty() {
+-                        out.push(' ');
+-                    }
+-                    out.push_str(t);
+-                }
+-                text => {
+-                    let ends_with_hard_boundary = out.ends_with('\n') || out.ends_with(' ') || out.ends_with('/');
+-                    if !out.is_empty() && !ends_with_hard_boundary && !text.chars().all(|ch| !is_word_like(ch)) {
+-                        out.push(' ');
+-                    }
+-                    out.push_str(text);
+-                }
+-            }
+-        }
+-        if !pending_bytes.is_empty() {
+-            if let Ok(s) = String::from_utf8(pending_bytes) {
+-                out.push_str(&s);
+-            }
+-        }
+-        Ok(out)
++        // 16AI-QW-38G-R6A-DECODE-00:
++        // Native tokenizer decode is now a thin wrapper over the shared decode SSOT.
++        Ok(crate::decode_ssot::decode_manifest_token_sequence(&self.manifest, ids).text)
+     }
+ 
+     fn manifest(&self) -> &TokenizerManifest {
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ crates/tokenizer_core/src/decode_ssot.rs	2026-05-26 15:23:58.298007050 +0000
+@@ -0,0 +1,311 @@
++use serde::{Deserialize, Serialize};
++
++use crate::TokenizerManifest;
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum DecodedPieceKind {
++    Text,
++    SentencePieceText,
++    Byte,
++    Control,
++    Unknown,
++    InvalidUtf8,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct DecodedPiece {
++    pub id: u32,
++    pub piece: String,
++    pub text: String,
++    pub kind: DecodedPieceKind,
++    pub suppressed_in_output: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct DecodeProbe {
++    pub token_ids: Vec<u32>,
++    pub pieces: Vec<DecodedPiece>,
++    pub text: String,
++    pub mojibake_suspected: bool,
++    pub control_count: usize,
++    pub invalid_utf8_count: usize,
++}
++
++pub fn token_piece_from_manifest(manifest: &TokenizerManifest, id: u32) -> Option<String> {
++    manifest
++        .vocab
++        .iter()
++        .find(|entry| entry.id == id)
++        .map(|entry| entry.token.clone())
++        .or_else(|| {
++            manifest
++                .reserved_tokens
++                .iter()
++                .find(|entry| entry.id == id)
++                .map(|entry| entry.token.clone())
++        })
++}
++
++pub fn decode_manifest_token_sequence(manifest: &TokenizerManifest, token_ids: &[u32]) -> DecodeProbe {
++    decode_token_sequence_to_text(token_ids, |id| token_piece_from_manifest(manifest, id))
++}
++
++pub fn decode_piece_sequence_to_text(pieces: &[String]) -> DecodeProbe {
++    let ids: Vec<u32> = (0..pieces.len()).map(|idx| idx as u32).collect();
++    decode_token_sequence_to_text(&ids, |id| pieces.get(id as usize).cloned())
++}
++
++pub fn decode_single_token_fragment(
++    manifest: &TokenizerManifest,
++    token_id: u32,
++    at_text_start: bool,
++) -> Option<String> {
++    let piece = token_piece_from_manifest(manifest, token_id)?;
++    let probe = decode_token_sequence_to_text(&[token_id], |_| Some(piece.clone()));
++    let mut text = probe.text;
++    if !at_text_start && !text.is_empty() && !text.starts_with(' ') && piece.starts_with('▁') {
++        text.insert(0, ' ');
++    }
++    if text.is_empty() { None } else { Some(text) }
++}
++
++pub fn decode_piece_to_text(piece: &str) -> String {
++    decode_piece_sequence_to_text(&[piece.to_string()]).text
++}
++
++pub fn is_control_piece(piece: &str) -> bool {
++    if piece.is_empty() {
++        return true;
++    }
++
++    if matches!(
++        piece,
++        "<pad>" | "<bos>" | "<eos>" | "<unk>" | "<s>" | "</s>"
++    ) {
++        return true;
++    }
++
++    if piece.starts_with("<task:")
++        || piece.starts_with("<lang:")
++        || piece.starts_with("<glossary:")
++        || piece.starts_with("<tm:")
++        || piece.starts_with("<cue")
++        || piece.starts_with("</cue")
++        || piece.starts_with("<line")
++        || piece.starts_with("</line")
++        || piece.starts_with("<time")
++        || piece.starts_with("</time")
++        || piece.starts_with("<json:")
++        || piece.starts_with("<id:")
++        || piece.starts_with("<bridge:")
++        || piece.starts_with("<guard:")
++        || piece.starts_with("<style:")
++        || piece.starts_with("<qwave:")
++        || piece.starts_with("<delta_k:")
++        || piece.starts_with("<morph:")
++        || piece.starts_with("<cheon:")
++        || piece.starts_with("<ji:")
++        || piece.starts_with("<in:")
++        || piece.starts_with("<trace:")
++        || piece.starts_with("<probe:")
++    {
++        return true;
++    }
++
++    piece.starts_with("[SD24")
++        || piece.starts_with("▁[SD24")
++        || piece == "SYSTEM"
++        || piece == "PRO"
++        || piece == "MP"
++        || piece == "Runner"
++        || piece == "greedy-search-decoder"
++        || piece == "decode-file"
++        || piece == "lexicon"
++        || piece == "sherpa-onnx-wasm"
++}
++
++fn parse_byte_piece(piece: &str) -> Option<u8> {
++    if let Some(hex) = piece
++        .strip_prefix("<byte:")
++        .and_then(|s| s.strip_suffix('>'))
++    {
++        return u8::from_str_radix(hex, 16).ok();
++    }
++
++    if let Some(hex) = piece.strip_prefix("<0x").and_then(|s| s.strip_suffix('>')) {
++        return u8::from_str_radix(hex, 16).ok();
++    }
++
++    None
++}
++
++fn flush_pending_bytes(
++    out: &mut String,
++    pieces: &mut Vec<DecodedPiece>,
++    pending_bytes: &mut Vec<u8>,
++    pending_entries: &mut Vec<(u32, String)>,
++) -> usize {
++    if pending_bytes.is_empty() {
++        return 0;
++    }
++
++    match String::from_utf8(std::mem::take(pending_bytes)) {
++        Ok(text) => {
++            out.push_str(&text);
++            for (id, piece) in std::mem::take(pending_entries) {
++                pieces.push(DecodedPiece {
++                    id,
++                    piece,
++                    text: text.clone(),
++                    kind: DecodedPieceKind::Byte,
++                    suppressed_in_output: false,
++                });
++            }
++            0
++        }
++        Err(err) => {
++            let recovered = err.into_bytes();
++            let text = String::from_utf8_lossy(&recovered).to_string();
++            out.push_str(&text);
++            let invalid_count = pending_entries.len().max(1);
++            for (id, piece) in std::mem::take(pending_entries) {
++                pieces.push(DecodedPiece {
++                    id,
++                    piece,
++                    text: text.clone(),
++                    kind: DecodedPieceKind::InvalidUtf8,
++                    suppressed_in_output: false,
++                });
++            }
++            invalid_count
++        }
++    }
++}
++
++fn append_space_if_needed(out: &mut String) {
++    if !out.is_empty() && !out.ends_with(' ') && !out.ends_with('\n') {
++        out.push(' ');
++    }
++}
++
++pub fn decode_token_sequence_to_text(
++    token_ids: &[u32],
++    mut id_to_piece: impl FnMut(u32) -> Option<String>,
++) -> DecodeProbe {
++    let mut out = String::new();
++    let mut pieces = Vec::new();
++    let mut control_count = 0usize;
++    let mut invalid_utf8_count = 0usize;
++    let mut pending_bytes: Vec<u8> = Vec::new();
++    let mut pending_entries: Vec<(u32, String)> = Vec::new();
++
++    for &id in token_ids {
++        let piece = id_to_piece(id).unwrap_or_else(|| "<unk>".to_string());
++
++        if let Some(byte) = parse_byte_piece(&piece) {
++            pending_bytes.push(byte);
++            pending_entries.push((id, piece.clone()));
++            continue;
++        }
++
++        invalid_utf8_count += flush_pending_bytes(
++            &mut out,
++            &mut pieces,
++            &mut pending_bytes,
++            &mut pending_entries,
++        );
++
++        if is_control_piece(&piece) {
++            control_count += 1;
++            pieces.push(DecodedPiece {
++                id,
++                piece,
++                text: String::new(),
++                kind: DecodedPieceKind::Control,
++                suppressed_in_output: true,
++            });
++            continue;
++        }
++
++        let (text, kind) = if piece == "▁" {
++            append_space_if_needed(&mut out);
++            (String::new(), DecodedPieceKind::SentencePieceText)
++        } else if let Some(rest) = piece.strip_prefix('▁') {
++            let had_text = !out.is_empty();
++            if had_text {
++                append_space_if_needed(&mut out);
++            }
++            out.push_str(rest);
++            let text = if had_text { format!(" {}", rest) } else { rest.to_string() };
++            (text, DecodedPieceKind::SentencePieceText)
++        } else if piece == "<br>" {
++            out.push('\n');
++            ("\n".to_string(), DecodedPieceKind::Text)
++        } else {
++            out.push_str(&piece);
++            (piece.clone(), DecodedPieceKind::Text)
++        };
++
++        pieces.push(DecodedPiece {
++            id,
++            piece,
++            text,
++            kind,
++            suppressed_in_output: false,
++        });
++    }
++
++    invalid_utf8_count += flush_pending_bytes(
++        &mut out,
++        &mut pieces,
++        &mut pending_bytes,
++        &mut pending_entries,
++    );
++
++    let mut cleaned = out.trim().to_string();
++    while cleaned.contains("  ") {
++        cleaned = cleaned.replace("  ", " ");
++    }
++
++    DecodeProbe {
++        token_ids: token_ids.to_vec(),
++        pieces,
++        mojibake_suspected: mojibake_suspected(&cleaned),
++        text: cleaned,
++        control_count,
++        invalid_utf8_count,
++    }
++}
++
++pub fn mojibake_suspected(text: &str) -> bool {
++    const PATTERNS: &[&str] = &["�", "?댁", "媛", "怨", "Ã", "ì", "ê"];
++    PATTERNS.iter().any(|pattern| text.contains(pattern))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn decodes_sentencepiece_and_suppresses_eos() {
++        let ids = [29899, 2];
++        let probe = decode_token_sequence_to_text(&ids, |id| match id {
++            29899 => Some("▁이어가고".to_string()),
++            2 => Some("<eos>".to_string()),
++            _ => None,
++        });
++        assert_eq!(probe.text, "이어가고");
++        assert_eq!(probe.control_count, 1);
++        assert!(probe.pieces[1].suppressed_in_output);
++    }
++
++    #[test]
++    fn decodes_utf8_byte_run() {
++        let ids = [10, 11, 12];
++        let bytes = ["<byte:EC>", "<byte:9D>", "<byte:B4>"];
++        let probe = decode_token_sequence_to_text(&ids, |id| bytes.get((id - 10) as usize).map(|s| s.to_string()));
++        assert_eq!(probe.text, "이");
++        assert_eq!(probe.invalid_utf8_count, 0);
++    }
++}
+--- /mnt/data/decode00_orig/crates/runtime/src/infer/output_text.rs	2026-05-24 04:08:30.000000000 +0000
++++ crates/runtime/src/infer/output_text.rs	2026-05-26 15:22:57.811965711 +0000
+@@ -1,139 +1,14 @@
+ use policy::OutputGuardSpec;
+-use tokenizer_core::TokenizerManifest;
+-
+-fn is_runtime_control_piece(piece: &str) -> bool {
+-    if piece.is_empty() {
+-        return true;
+-    }
+-
+-    if matches!(
+-        piece,
+-        "<pad>" | "<bos>" | "<eos>" | "<unk>" | "<s>" | "</s>"
+-    ) {
+-        return true;
+-    }
+-
+-    if piece.starts_with("<task:")
+-        || piece.starts_with("<lang:")
+-        || piece.starts_with("<glossary:")
+-        || piece.starts_with("<tm:")
+-        || piece.starts_with("<cue")
+-        || piece.starts_with("</cue")
+-        || piece.starts_with("<line")
+-        || piece.starts_with("</line")
+-        || piece.starts_with("<time")
+-        || piece.starts_with("</time")
+-        || piece.starts_with("<json:")
+-        || piece.starts_with("<id:")
+-        || piece.starts_with("<bridge:")
+-        || piece.starts_with("<guard:")
+-        || piece.starts_with("<style:")
+-        || piece.starts_with("<qwave:")
+-        || piece.starts_with("<delta_k:")
+-        || piece.starts_with("<morph:")
+-        || piece.starts_with("<cheon:")
+-        || piece.starts_with("<ji:")
+-        || piece.starts_with("<in:")
+-        || piece.starts_with("<trace:")
+-        || piece.starts_with("<probe:")
+-    {
+-        return true;
+-    }
+-
+-    if piece.starts_with("[SD24")
+-        || piece.starts_with("▁[SD24")
+-        || piece == "SYSTEM"
+-        || piece == "PRO"
+-        || piece == "MP"
+-        || piece == "Runner"
+-        || piece == "greedy-search-decoder"
+-        || piece == "decode-file"
+-        || piece == "lexicon"
+-        || piece == "sherpa-onnx-wasm"
+-    {
+-        return true;
+-    }
+-
+-    false
+-}
++use tokenizer_core::{decode_ssot, TokenizerManifest};
+ 
+ pub(crate) fn token_piece_from_manifest(manifest: &TokenizerManifest, id: u32) -> String {
+-    manifest
+-        .vocab
+-        .get(id as usize)
+-        .map(|entry| entry.token.clone())
+-        .unwrap_or_else(|| "<unk>".to_string())
++    decode_ssot::token_piece_from_manifest(manifest, id).unwrap_or_else(|| "<unk>".to_string())
+ }
+ 
+ pub(crate) fn detokenize_sentencepiece_like(pieces: &[String]) -> String {
+-    let mut out = String::new();
+-    let mut pending_bytes: Vec<u8> = Vec::new();
+-
+-    let flush_bytes = |out: &mut String, pending_bytes: &mut Vec<u8>| {
+-        if pending_bytes.is_empty() {
+-            return;
+-        }
+-
+-        match String::from_utf8(std::mem::take(pending_bytes)) {
+-            Ok(text) => out.push_str(&text),
+-            Err(err) => {
+-                let recovered = err.into_bytes();
+-                for b in recovered {
+-                    out.push(char::from(b));
+-                }
+-            }
+-        }
+-    };
+-
+-    for piece in pieces {
+-        if is_runtime_control_piece(piece) {
+-            continue;
+-        }
+-
+-        if let Some(hex) = piece
+-            .strip_prefix("<byte:")
+-            .and_then(|s| s.strip_suffix('>'))
+-        {
+-            if let Ok(byte) = u8::from_str_radix(hex, 16) {
+-                pending_bytes.push(byte);
+-                continue;
+-            }
+-        }
+-
+-        if let Some(hex) = piece.strip_prefix("<0x").and_then(|s| s.strip_suffix('>')) {
+-            if let Ok(byte) = u8::from_str_radix(hex, 16) {
+-                pending_bytes.push(byte);
+-                continue;
+-            }
+-        }
+-
+-        flush_bytes(&mut out, &mut pending_bytes);
+-
+-        if piece == "▁" {
+-            if !out.is_empty() && !out.ends_with(' ') && !out.ends_with('\n') {
+-                out.push(' ');
+-            }
+-            continue;
+-        }
+-
+-        if let Some(rest) = piece.strip_prefix('▁') {
+-            if !out.is_empty() && !out.ends_with(' ') && !out.ends_with('\n') {
+-                out.push(' ');
+-            }
+-            out.push_str(rest);
+-            continue;
+-        }
+-
+-        out.push_str(piece);
+-    }
+-
+-    flush_bytes(&mut out, &mut pending_bytes);
+-
+-    let mut cleaned = out.trim().to_string();
+-    while cleaned.contains("  ") {
+-        cleaned = cleaned.replace("  ", " ");
+-    }
+-    cleaned
++    // 16AI-QW-38G-R6A-DECODE-00:
++    // Final output decode is a thin wrapper over tokenizer_core::decode_ssot.
++    decode_ssot::decode_piece_sequence_to_text(pieces).text
+ }
+ 
+ fn sanitize_dialogue_output(text: &str) -> String {
+--- /mnt/data/decode00_orig/crates/model_core/src/sampling_helpers.rs	2026-05-24 04:08:30.000000000 +0000
++++ crates/model_core/src/sampling_helpers.rs	2026-05-26 15:22:57.813037806 +0000
+@@ -4,7 +4,8 @@
+ };
+ 
+ use anyhow::{anyhow, Result};
+-use tokenizer_core::TokenizerManifest;
++use serde::{Deserialize, Serialize};
++use tokenizer_core::{decode_ssot, TokenizerManifest};
+ 
+ pub(crate) fn apply_repetition_penalty(logits: &mut [f32], ids: &[u32], window: usize, penalty: f32) {
+     if penalty <= 1.0 || logits.is_empty() || ids.is_empty() {
+@@ -64,30 +65,62 @@
+ }
+ 
+ fn token_piece_from_manifest(manifest: &TokenizerManifest, id: u32) -> String {
+-    manifest
+-        .vocab
+-        .iter()
+-        .find(|entry| entry.id == id)
+-        .map(|entry| entry.token.clone())
+-        .or_else(|| manifest.reserved_tokens.iter().find(|entry| entry.id == id).map(|entry| entry.token.clone()))
+-        .unwrap_or_default()
++    decode_ssot::token_piece_from_manifest(manifest, id).unwrap_or_default()
+ }
+ 
+ fn detokenize_sentencepiece_like(pieces: &[String]) -> String {
+-    let mut out = String::new();
+-    for piece in pieces {
+-        if let Some(rest) = piece.strip_prefix("▁") {
+-            if !out.is_empty() {
+-                out.push(' ');
+-            }
+-            out.push_str(rest);
+-        } else if piece == "<br>" {
+-            out.push('\n');
+-        } else {
+-            out.push_str(piece);
+-        }
+-    }
+-    out
++    // 16AI-QW-38G-R6A-DECODE-00:
++    // Streaming decode follows the same tokenizer_core::decode_ssot rule as final output.
++    decode_ssot::decode_piece_sequence_to_text(pieces).text
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub(crate) struct TopTokenProbe {
++    pub rank: usize,
++    pub id: u32,
++    pub piece: String,
++    pub text: String,
++    pub logit: f32,
++    pub is_eos: bool,
++    pub is_pad: bool,
++    pub is_control: bool,
++    pub is_banned: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub(crate) struct DecodeStepProbe {
++    pub step: usize,
++    pub selected_id: u32,
++    pub selected_piece: String,
++    pub selected_text: String,
++    pub top_n: Vec<TopTokenProbe>,
++    pub eos_rank: Option<usize>,
++    pub eos_logit: Option<f32>,
++    pub pad_rank: Option<usize>,
++    pub pad_logit: Option<f32>,
++    pub decode_mode: String,
++    pub sampler_requested: bool,
++    pub sampler_applied: bool,
++    pub fallback_applied: bool,
++    pub fallback_reason: Option<String>,
++    pub finite_logits: bool,
++    pub nan_count: usize,
++    pub inf_count: usize,
++    pub entropy_estimate: Option<f32>,
++    pub top1_top2_margin: Option<f32>,
++    pub min_p: f32,
++    pub top_p: f32,
++    pub top_k: u32,
++    pub temperature: f32,
++}
++
++pub(crate) fn decode_piece_for_probe(manifest: Option<&TokenizerManifest>, token_id: u32) -> (String, String) {
++    let Some(manifest) = manifest else {
++        return (String::new(), String::new());
++    };
++    let piece = token_piece_from_manifest(manifest, token_id);
++    let text = decode_ssot::decode_manifest_token_sequence(manifest, &[token_id]).text;
++    (piece, text)
+ }
+ 
+ #[derive(Debug, Clone)]
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ workspace/decode00_decode_ssot_summary.json	2026-05-26 15:24:47.019090711 +0000
+@@ -0,0 +1,75 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-00",
++  "status": "DECODE_SSOT_AND_WORD_SALAD_PROBE_BAKED_STATIC",
++  "decode_ssot_owner": "tokenizer_core::decode_ssot",
++  "canonical_decode_functions": [
++    "decode_token_sequence_to_text",
++    "decode_manifest_token_sequence",
++    "decode_piece_sequence_to_text",
++    "decode_piece_to_text",
++    "decode_single_token_fragment"
++  ],
++  "unified_decode_paths": [
++    "runtime final output -> tokenizer_core::decode_ssot",
++    "model_core streaming output -> tokenizer_core::decode_ssot",
++    "tokenizer direct decode -> tokenizer_core::decode_ssot"
++  ],
++  "probe_outputs": [
++    "workspace/decode00_distribution_probe.jsonl"
++  ],
++  "probe_top_n_default": 20,
++  "required_probe_fields": [
++    "selected_id",
++    "selected_piece",
++    "selected_text",
++    "top_n",
++    "eos_rank",
++    "eos_logit",
++    "decode_mode",
++    "sampler_requested",
++    "sampler_applied",
++    "fallback_applied",
++    "fallback_reason",
++    "finite_logits",
++    "nan_count",
++    "inf_count"
++  ],
++  "implemented_files": [
++    "crates/tokenizer_core/src/decode_ssot.rs",
++    "crates/tokenizer_core/src/lib.rs",
++    "crates/runtime/src/infer/output_text.rs",
++    "crates/model_core/src/sampling_helpers.rs"
++  ],
++  "artifact_files": [
++    "workspace/decode00_decode_ssot_summary.json",
++    "workspace/decode00_distribution_probe_schema.json",
++    "workspace/decode00_distribution_probe.jsonl",
++    "workspace/decode00_report.md",
++    "workspace/decode00.patch",
++    "acceptance_reports/16AI-QW-38G-R6A-DECODE-00_acceptance.md"
++  ],
++  "acceptance_static_checks": {
++    "decode_ssot_module_exists": true,
++    "tokenizer_core_exports_decode_ssot": true,
++    "native_decode_uses_decode_ssot": true,
++    "runtime_output_uses_decode_ssot": true,
++    "model_core_streaming_uses_decode_ssot": true,
++    "decode_step_probe_struct_exists": true,
++    "top_token_probe_struct_exists": true,
++    "sampler_requested_field_exists": true,
++    "sampler_applied_field_exists": true,
++    "fallback_reason_field_exists": true
++  },
++  "non_scope": [
++    "full_cpu_oracle_sampler",
++    "webgpu_active_set_renormalization",
++    "deltak_qwave_weighted_minp",
++    "context_router_training"
++  ],
++  "tooling_limits": [
++    "cargo_not_available",
++    "rustc_not_available",
++    "rustfmt_not_available"
++  ],
++  "static_check_status": "PASS"
++}
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ workspace/decode00_distribution_probe_schema.json	2026-05-26 15:24:47.019650262 +0000
+@@ -0,0 +1,164 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "16AI-QW-38G-R6A-DECODE-00 Decode Distribution Probe Step",
++  "type": "object",
++  "required": [
++    "step",
++    "selected_id",
++    "selected_piece",
++    "selected_text",
++    "top_n",
++    "decode_mode",
++    "sampler_requested",
++    "sampler_applied",
++    "fallback_applied",
++    "finite_logits",
++    "nan_count",
++    "inf_count",
++    "min_p",
++    "top_p",
++    "top_k",
++    "temperature"
++  ],
++  "properties": {
++    "step": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "selected_id": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "selected_piece": {
++      "type": "string"
++    },
++    "selected_text": {
++      "type": "string"
++    },
++    "top_n": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": [
++          "rank",
++          "id",
++          "piece",
++          "text",
++          "logit",
++          "is_eos",
++          "is_pad",
++          "is_control",
++          "is_banned"
++        ],
++        "properties": {
++          "rank": {
++            "type": "integer",
++            "minimum": 1
++          },
++          "id": {
++            "type": "integer",
++            "minimum": 0
++          },
++          "piece": {
++            "type": "string"
++          },
++          "text": {
++            "type": "string"
++          },
++          "logit": {
++            "type": "number"
++          },
++          "is_eos": {
++            "type": "boolean"
++          },
++          "is_pad": {
++            "type": "boolean"
++          },
++          "is_control": {
++            "type": "boolean"
++          },
++          "is_banned": {
++            "type": "boolean"
++          }
++        }
++      }
++    },
++    "eos_rank": {
++      "type": [
++        "integer",
++        "null"
++      ]
++    },
++    "eos_logit": {
++      "type": [
++        "number",
++        "null"
++      ]
++    },
++    "pad_rank": {
++      "type": [
++        "integer",
++        "null"
++      ]
++    },
++    "pad_logit": {
++      "type": [
++        "number",
++        "null"
++      ]
++    },
++    "decode_mode": {
++      "type": "string"
++    },
++    "sampler_requested": {
++      "type": "boolean"
++    },
++    "sampler_applied": {
++      "type": "boolean"
++    },
++    "fallback_applied": {
++      "type": "boolean"
++    },
++    "fallback_reason": {
++      "type": [
++        "string",
++        "null"
++      ]
++    },
++    "finite_logits": {
++      "type": "boolean"
++    },
++    "nan_count": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "inf_count": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "entropy_estimate": {
++      "type": [
++        "number",
++        "null"
++      ]
++    },
++    "top1_top2_margin": {
++      "type": [
++        "number",
++        "null"
++      ]
++    },
++    "min_p": {
++      "type": "number"
++    },
++    "top_p": {
++      "type": "number"
++    },
++    "top_k": {
++      "type": "integer"
++    },
++    "temperature": {
++      "type": "number"
++    }
++  }
++}
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ workspace/decode00_distribution_probe.jsonl	2026-05-26 15:24:47.020393560 +0000
+@@ -0,0 +1 @@
++{"step": 0, "selected_id": 29899, "selected_piece": "▁이어가고", "selected_text": "이어가고", "top_n": [{"rank": 1, "id": 29899, "piece": "▁이어가고", "text": "이어가고", "logit": 12.381, "is_eos": false, "is_pad": false, "is_control": false, "is_banned": false}, {"rank": 2, "id": 2, "piece": "<eos>", "text": "", "logit": 11.972, "is_eos": true, "is_pad": false, "is_control": true, "is_banned": false}], "eos_rank": 2, "eos_logit": 11.972, "pad_rank": null, "pad_logit": null, "decode_mode": "cpu_greedy_fallback", "sampler_requested": true, "sampler_applied": false, "fallback_applied": true, "fallback_reason": "gpu_sampler_unavailable_or_not_applied", "finite_logits": true, "nan_count": 0, "inf_count": 0, "entropy_estimate": null, "top1_top2_margin": 0.409, "min_p": 0.05, "top_p": 0.9, "top_k": 64, "temperature": 0.8}
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ workspace/decode00_report.md	2026-05-26 15:24:47.020753492 +0000
+@@ -0,0 +1,27 @@
++# 16AI-QW-38G-R6A-DECODE-00 — Token Decode SSOT / Word Salad Distribution Probe Seal
++
++## 확정
++
++- `tokenizer_core::decode_ssot`를 추가해 token id / piece / text 변환 규칙의 canonical owner로 지정했다.
++- `NativeTokenizer::decode`는 자체 decode 로직을 유지하지 않고 `decode_manifest_token_sequence()` thin wrapper로 낮췄다.
++- `runtime/src/infer/output_text.rs`의 final output detokenize 경로는 `decode_ssot::decode_piece_sequence_to_text()`를 사용한다.
++- `model_core/src/sampling_helpers.rs`의 streaming detokenize 경로도 같은 `decode_ssot`를 사용한다.
++- `DecodeStepProbe` / `TopTokenProbe` 구조를 추가해 selected id/piece/text, top-N, eos rank/logit, sampler requested/applied/fallback 여부를 같은 영수증에 담을 수 있게 했다.
++- `workspace/decode00_distribution_probe_schema.json`과 `workspace/decode00_distribution_probe.jsonl` 샘플을 추가했다.
++
++## 추정
++
++- `[29899, 2]` 류의 tail은 이제 `▁이어가고 + <eos>`를 output text에서는 `이어가고`로, probe에서는 `<eos>` control token으로 분리해 볼 수 있다.
++- `?댁뼱媛怨?` 같은 mojibake preview는 decode SSOT의 `mojibake_suspected` 플래그로 감지 가능하다.
++
++## 판단불가
++
++- 컨테이너에 `cargo`, `rustc`, `rustfmt`가 없어 컴파일/테스트/포맷 검증은 실행하지 못했다.
++- 실제 top-N logits dump 연결은 후속 런타임 실행 환경에서 검증해야 한다.
++
++## 비범위
++
++- CPU oracle sampler 구현
++- WebGPU active-set renormalization
++- ΔK/QWave weighted Min-P
++- context router 학습
+--- /dev/null	2026-05-26 14:20:28.527254491 +0000
++++ acceptance_reports/16AI-QW-38G-R6A-DECODE-00_acceptance.md	2026-05-26 15:24:47.021083926 +0000
+@@ -0,0 +1,24 @@
++# 16AI-QW-38G-R6A-DECODE-00 Acceptance
++
++## Static acceptance
++
++| Check | Result |
++|---|---|
++| decode SSOT module exists | PASS |
++| tokenizer_core exports decode_ssot | PASS |
++| NativeTokenizer::decode uses decode_ssot | PASS |
++| runtime final output uses decode_ssot | PASS |
++| model_core streaming output uses decode_ssot | PASS |
++| DecodeStepProbe exists | PASS |
++| TopTokenProbe exists | PASS |
++| sampler_requested / sampler_applied separated in schema | PASS |
++| fallback_applied / fallback_reason fields exist | PASS |
++| summary/report/schema/probe artifacts created | PASS |
++
++## Execution acceptance
++
++`cargo`, `rustc`, and `rustfmt` were not available in the container, so compile-time and runtime execution acceptance is marked **NOT_RUN** rather than PASS.
++
++## Scope note
++
++This patch seals decode SSOT and probe schema. It does not claim to fix CPU greedy fallback, WebGPU top-p/min-p renormalization, or ΔK/QWave weighted sampling.

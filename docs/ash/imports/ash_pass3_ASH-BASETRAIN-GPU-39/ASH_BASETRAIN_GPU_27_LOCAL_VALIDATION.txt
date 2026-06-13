@@ -1,0 +1,13 @@
+ASH-BASETRAIN-GPU-27 LOCAL VALIDATION
+
+container_cargo_available = false
+local_cargo_build = NOT_EXECUTED_IN_CONTAINER
+local_runtime_pass = USER_LOCAL_SSOT_REQUIRED
+zip_integrity = CHECKED_DURING_BAKE
+
+Expected operator commands:
+  cargo build -p base_train --bin ash_basetrain_gpu_27_gpu_backward_preflight --jobs 1
+  cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_27_gpu_backward_preflight
+
+Expected verdict:
+  PASS_ASH_BASETRAIN_GPU_27_GPU_BACKWARD_PREFLIGHT_STABLE_GPU_LOSS_CANDIDATE_TO_GRADIENT_BUFFER_CONTRACT_NO_BACKWARD_NO_OPTIMIZER

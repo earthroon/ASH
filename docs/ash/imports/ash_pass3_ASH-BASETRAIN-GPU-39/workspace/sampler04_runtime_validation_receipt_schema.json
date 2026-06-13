@@ -1,0 +1,58 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-04",
+  "file": "workspace/sampler04_runtime_validation_receipt.jsonl",
+  "jsonl": true,
+  "fields": {
+    "patch_id": "string",
+    "input_patch": "string",
+    "step": "number",
+    "fixture": "string",
+    "mode": "Off|ValidateProbe|PromoteStrictCandidate",
+    "trace_top_n": "number",
+    "cpu": {
+      "active_ids": "number[]",
+      "final_ids": "number[]",
+      "active_count": "number",
+      "final_count": "number",
+      "min_p_threshold": "number|null"
+    },
+    "gpu": {
+      "trace_readback_ok": "bool",
+      "trace_completeness": "string",
+      "active_ids": "number[]",
+      "final_ids": "number[]",
+      "active_count_total": "number|null",
+      "final_count_total": "number|null",
+      "active_overflow": "bool",
+      "final_overflow": "bool",
+      "min_p_threshold": "number|null",
+      "recovery_mode": "string|null"
+    },
+    "parity": {
+      "active_set_match": "bool|null",
+      "final_set_match": "bool|null",
+      "threshold_match": "bool|null",
+      "recovery_match": "bool|null",
+      "trace_readback_ok": "bool",
+      "status": "string",
+      "promotion_blocking": "bool"
+    }
+  },
+  "status_values": [
+    "PASS",
+    "WARN_SELECTED_ONLY",
+    "WARN_TRACE_TRUNCATED",
+    "FAIL_ACTIVE_SET_MISMATCH",
+    "FAIL_FINAL_SET_MISMATCH",
+    "FAIL_THRESHOLD_MISMATCH",
+    "FAIL_RECOVERY_MISMATCH",
+    "STRICT_CANDIDATE_BLOCKED_TRACE_READBACK",
+    "PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE"
+  ],
+  "promotion_status_values": [
+    "NOT_RUN",
+    "VALIDATION_COLLECTING",
+    "STRICT_CANDIDATE_READY",
+    "STRICT_CANDIDATE_BLOCKED"
+  ]
+}

@@ -1,0 +1,22 @@
+ASH-BASETRAIN-GPU-19 STATIC CHECKS
+
+patch_id = ASH-BASETRAIN-GPU-19
+source_patch = ASH-BASETRAIN-GPU-18
+execution_class = static_readback_stability_promotion_gate
+source_file_present = true
+bin_file_present = true
+direct_bin_rebind = true
+new_wgpu_device_acquired = false
+new_compute_dispatch_executed = false
+new_readback_executed = false
+loss_computed = false
+softmax_computed = false
+cross_entropy_computed = false
+backward_executed = false
+optimizer_step_executed = false
+safetensors_mutation_present = false
+control_flow_lut_used = true
+match_statement_used = false
+if_keyword_used = false
+early_return_used = false
+expected_pass_verdict = PASS_ASH_BASETRAIN_GPU_19_WINDOW_2048_READBACK_STABILITY_PROMOTION_GATE_REPEATED_RAW_DIGEST_STABILITY_TO_LOSS_CANDIDATE_READINESS_NO_BACKWARD_NO_OPTIMIZER

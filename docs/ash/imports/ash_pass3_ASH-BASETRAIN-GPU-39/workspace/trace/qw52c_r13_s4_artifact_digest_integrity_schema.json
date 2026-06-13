@@ -1,0 +1,41 @@
+{
+  "patch_id": "QW-52C-R13-S4",
+  "title": "Artifact Digest Integrity / Content Address Seal",
+  "required_top_level_keys": [
+    "patch_id",
+    "base_patch",
+    "parent_ssot",
+    "status",
+    "summary",
+    "records"
+  ],
+  "record_required_keys": [
+    "artifact_path",
+    "reference_kind",
+    "resolution_status",
+    "computed_sha256",
+    "content_sha256",
+    "historical_artifact_mutated",
+    "digest_rewritten_in_source"
+  ],
+  "digest_reference_kinds": [
+    "ContentAddress",
+    "SymbolicStaticDigest",
+    "DeclaredDigest",
+    "ComputedDigest",
+    "MissingSource",
+    "UnresolvedSymbolic"
+  ],
+  "forbidden_permissions": [
+    "runtime_apply",
+    "runtime_default_apply",
+    "promotion",
+    "weight_commit",
+    "safe_profile_apply",
+    "policy_promotion",
+    "token_selection_mutation",
+    "token_rank_mutation",
+    "logit_mutation",
+    "sampler_mutation"
+  ]
+}

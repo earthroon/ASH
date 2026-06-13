@@ -1,0 +1,23 @@
+SFT-FFN-LORA-04 static validation
+
+Checks performed:
+- added ash_core delta smoke module
+- added ash_core delta smoke tests
+- added burn_webgpu_backend delta smoke backend shell
+- updated ash_core lib.rs module/export wiring
+- updated burn_webgpu_backend lib.rs module/export wiring
+- verified brace balance for added/modified Rust files
+- generated acceptance report
+- generated bake report
+
+Runtime validation:
+- cargo unavailable in this environment
+- rustc unavailable in this environment
+- rustfmt unavailable in this environment
+
+Expected local commands:
+- cargo test -p ash_core sft_ffn_lora_04 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_03 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_02 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_01 -- --nocapture
+- cargo test -p burn_webgpu_backend ffn_lora_delta_smoke -- --nocapture

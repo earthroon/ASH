@@ -1,0 +1,223 @@
+--- /mnt/data/qw38d_base/crates/model_core/src/native_wgpu.rs	2026-05-22 08:42:03.000000000 +0000
++++ /mnt/data/qw38d_work/crates/model_core/src/native_wgpu.rs	2026-05-22 09:07:52.696684243 +0000
+@@ -624,6 +624,212 @@
+     }
+ }
+ 
++
++// 16AI-QW-38D — Hidden State to Reserved Row Projection Audit / Final Norm Direction Seal
++static QW38D_HIDDEN_PROJECTION_STEP: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38d_l2_norm(values: &[f32]) -> f32 {
++    values
++        .iter()
++        .map(|v| (*v as f64) * (*v as f64))
++        .sum::<f64>()
++        .sqrt() as f32
++}
++
++fn qw38d_dot(a: &[f32], b: &[f32]) -> f32 {
++    a.iter()
++        .zip(b.iter())
++        .map(|(x, y)| (*x as f64) * (*y as f64))
++        .sum::<f64>() as f32
++}
++
++fn qw38d_cosine(dot: f32, a_norm: f32, b_norm: f32) -> Option<f32> {
++    if a_norm.is_finite() && b_norm.is_finite() && a_norm > 0.0 && b_norm > 0.0 {
++        Some(dot / (a_norm * b_norm))
++    } else {
++        None
++    }
++}
++
++fn qw38d_token_row_from_atlas(atlas: &NativeVocabAtlas, token_id: usize) -> Option<Vec<f32>> {
++    let tile = atlas
++        .tiles
++        .iter()
++        .find(|tile| token_id >= tile.token_start && token_id < tile.token_start + tile.token_len)?;
++    let local = token_id.saturating_sub(tile.token_start);
++    let tile_rows = tile
++        .weight
++        .clone()
++        .into_data()
++        .to_vec::<f32>()
++        .ok()?;
++    let start = local.checked_mul(atlas.hidden_size)?;
++    let end = start.checked_add(atlas.hidden_size)?;
++    if end <= tile_rows.len() {
++        Some(tile_rows[start..end].to_vec())
++    } else {
++        None
++    }
++}
++
++fn qw38d_projection_metric(
++    token_id: usize,
++    logit: Option<f32>,
++    hidden_vec: &[f32],
++    hidden_norm: f32,
++    atlas: &NativeVocabAtlas,
++    meta: &Qw38ATokenMeta,
++) -> serde_json::Value {
++    if let Some(row) = qw38d_token_row_from_atlas(atlas, token_id) {
++        let row_norm = qw38d_l2_norm(&row);
++        let dot = qw38d_dot(hidden_vec, &row);
++        let cosine = qw38d_cosine(dot, hidden_norm, row_norm);
++        serde_json::json!({
++            "token_id": token_id,
++            "piece": qw38a_piece(meta, token_id),
++            "is_reserved": qw38a_is_reserved(meta, token_id),
++            "logit": logit,
++            "dot": dot,
++            "cosine": cosine,
++            "lm_head_row_norm": row_norm,
++            "hidden_norm": hidden_norm,
++        })
++    } else {
++        serde_json::json!({
++            "token_id": token_id,
++            "piece": qw38a_piece(meta, token_id),
++            "is_reserved": qw38a_is_reserved(meta, token_id),
++            "logit": logit,
++            "dot": null,
++            "cosine": null,
++            "lm_head_row_norm": null,
++            "hidden_norm": hidden_norm,
++            "warning": "LM_HEAD_ROW_UNAVAILABLE",
++        })
++    }
++}
++
++fn qw38d_log_hidden_projection_trace(
++    global_top_k: &[NativeVocabAtlasCandidate],
++    raw_top1_token_id: usize,
++    raw_top1_logit: f32,
++    atlas: &NativeVocabAtlas,
++    last_hidden: &Tensor<NativeInferenceBackend, 2>,
++) {
++    if !env_flag("ASH_HIDDEN_PROJECTION_TRACE") {
++        return;
++    }
++    let step = QW38D_HIDDEN_PROJECTION_STEP.fetch_add(1, Ordering::SeqCst);
++    let max_steps = qw38a_env_usize("ASH_HIDDEN_PROJECTION_TRACE_MAX_STEPS", 32);
++    if step >= max_steps {
++        return;
++    }
++    let top_n = qw38a_env_usize("ASH_HIDDEN_PROJECTION_TOP_N", 16).max(1);
++    let meta = qw38a_token_meta();
++    let Ok(hidden_vec) = last_hidden
++        .clone()
++        .reshape([atlas.hidden_size])
++        .into_data()
++        .to_vec::<f32>() else {
++        eprintln!("[16AI-QW-38D][hidden_proj_error] step={} warning=HIDDEN_VECTOR_MATERIALIZE_FAILED", step);
++        return;
++    };
++    let hidden_norm = qw38d_l2_norm(&hidden_vec);
++    let raw_top1_piece = qw38a_piece(meta, raw_top1_token_id);
++    let raw_top1_ban_reason = meta.banned_reasons.get(&raw_top1_token_id).cloned();
++    let raw_top1_is_banned = raw_top1_ban_reason.is_some();
++    let masked_top1 = global_top_k
++        .iter()
++        .find(|c| !meta.banned_reasons.contains_key(&c.token_id));
++    let masked_top1_token_id = masked_top1.map(|c| c.token_id);
++    let masked_top1_piece = masked_top1.map(|c| qw38a_piece(meta, c.token_id));
++    let masked_top1_logit = masked_top1.map(|c| c.logit);
++    let token_13_metric = qw38d_projection_metric(13, global_top_k.iter().find(|c| c.token_id == 13).map(|c| c.logit), &hidden_vec, hidden_norm, atlas, meta);
++    let masked_metric = masked_top1.map(|c| qw38d_projection_metric(c.token_id, Some(c.logit), &hidden_vec, hidden_norm, atlas, meta));
++    let chosen_metric = masked_metric.clone();
++    let eos_metric = qw38d_projection_metric(2, global_top_k.iter().find(|c| c.token_id == 2).map(|c| c.logit), &hidden_vec, hidden_norm, atlas, meta);
++    let token_13_dot = token_13_metric.get("dot").and_then(|v| v.as_f64());
++    let masked_dot = masked_metric.as_ref().and_then(|m| m.get("dot")).and_then(|v| v.as_f64());
++    let token_13_cosine = token_13_metric.get("cosine").and_then(|v| v.as_f64());
++    let masked_cosine = masked_metric.as_ref().and_then(|m| m.get("cosine")).and_then(|v| v.as_f64());
++    let margin = masked_top1_logit.map(|l| raw_top1_logit - l);
++    let reserved_projection_dominant = token_13_dot
++        .zip(masked_dot)
++        .map(|(a, b)| a >= b)
++        .unwrap_or(raw_top1_token_id == 13);
++    let hidden_direction_collapse_suspect = raw_top1_token_id == 13 && reserved_projection_dominant;
++    let mut warning_codes = Vec::new();
++    if hidden_direction_collapse_suspect {
++        warning_codes.push("HIDDEN_TO_TOKEN_13_PROJECTION_DOMINANT");
++    }
++    if margin.map(|m| m > 1.0).unwrap_or(false) {
++        warning_codes.push("TOKEN_13_DOT_MARGIN_HIGH");
++    }
++    if token_13_cosine.zip(masked_cosine).map(|(a, b)| a >= b).unwrap_or(false) {
++        warning_codes.push("TOKEN_13_COSINE_HIGH");
++    }
++
++    eprintln!(
++        "[16AI-QW-38D][hidden_proj] step={} raw_top1={} piece={:?} logit={} hidden_norm={} dot13={:?} cos13={:?} masked_top1={:?} masked_piece={:?} dot_masked={:?} cos_masked={:?} margin={:?} collapse={} warnings={:?}",
++        step,
++        raw_top1_token_id,
++        raw_top1_piece,
++        raw_top1_logit,
++        hidden_norm,
++        token_13_dot,
++        token_13_cosine,
++        masked_top1_token_id,
++        masked_top1_piece,
++        masked_dot,
++        masked_cosine,
++        margin,
++        hidden_direction_collapse_suspect,
++        warning_codes,
++    );
++
++    let raw_topk_token_ids = global_top_k.iter().take(top_n).map(|c| c.token_id).collect::<Vec<_>>();
++    let raw_topk_projection_metrics = global_top_k
++        .iter()
++        .take(top_n)
++        .map(|c| qw38d_projection_metric(c.token_id, Some(c.logit), &hidden_vec, hidden_norm, atlas, meta))
++        .collect::<Vec<_>>();
++    let record = serde_json::json!({
++        "patch_id": "16AI-QW-38D",
++        "decode_step": step,
++        "raw_top1_token_id": raw_top1_token_id,
++        "raw_top1_piece": raw_top1_piece,
++        "raw_top1_logit": raw_top1_logit,
++        "raw_top1_is_banned": raw_top1_is_banned,
++        "raw_top1_ban_reason": raw_top1_ban_reason,
++        "masked_top1_token_id": masked_top1_token_id,
++        "masked_top1_piece": masked_top1_piece,
++        "masked_top1_logit": masked_top1_logit,
++        "chosen_token_id": masked_top1_token_id,
++        "chosen_token_piece": masked_top1_piece,
++        "hidden_norm_before_final_norm": null,
++        "hidden_norm_after_final_norm": hidden_norm,
++        "projection_to_token_13": token_13_metric,
++        "projection_to_masked_top1": masked_metric,
++        "projection_to_chosen": chosen_metric,
++        "projection_to_eos": eos_metric,
++        "token_13_minus_masked_top1_logit_margin": margin,
++        "raw_topk_token_ids": raw_topk_token_ids,
++        "raw_topk_projection_metrics": raw_topk_projection_metrics,
++        "reserved_projection_dominant": reserved_projection_dominant,
++        "hidden_direction_collapse_suspect": hidden_direction_collapse_suspect,
++        "warning_codes": warning_codes,
++    });
++
++    let jsonl_path = std::env::var("ASH_HIDDEN_PROJECTION_TRACE_JSONL")
++        .unwrap_or_else(|_| "workspace/qw38d_hidden_projection_trace.jsonl".to_string());
++    if let Some(parent) = std::path::Path::new(&jsonl_path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
++        let _ = writeln!(file, "{}", record);
++    }
++}
++
+ fn build_native_vocab_atlas(
+     lm_head_cpu: &[f32],
+     vocab_size: usize,
+@@ -2169,6 +2375,7 @@
+         }
+         let global_top_k = merge_atlas_top_k(atlas_top_k_candidates, tile_top_k);
+         qw38a_log_raw_topk_trace(&global_top_k, best_token_id, best_logit, atlas);
++        qw38d_log_hidden_projection_trace(&global_top_k, best_token_id, best_logit, atlas, &last_hidden);
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

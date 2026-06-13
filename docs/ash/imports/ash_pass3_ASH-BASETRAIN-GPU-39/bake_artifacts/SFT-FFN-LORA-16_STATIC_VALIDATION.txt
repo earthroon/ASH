@@ -1,0 +1,19 @@
+SFT-FFN-LORA-16 STATIC VALIDATION
+
+PASS file generated: crates/ash_core/src/sft_ffn_lora_slot_action_apply.rs
+PASS file generated: crates/ash_core/tests/sft_ffn_lora_16_slot_action_apply.rs
+PASS file generated: crates/burn_webgpu_backend/src/ffn_lora_slot_action_apply.rs
+PASS file generated: crates/burn_webgpu_backend/tests/ffn_lora_slot_action_apply.rs
+PASS ash_core lib.rs exports sft_ffn_lora_slot_action_apply
+PASS burn_webgpu_backend lib.rs exports ffn_lora_slot_action_apply
+PASS operator review receipt gate present
+PASS action/recommendation match guard present
+PASS apply preflight guard present
+PASS apply receipt guard present
+PASS lifecycle transition append guard present
+PASS textureSample weight fetch guard present
+PASS unreviewed action guard present
+PASS promotion apply rerun closed by default
+PASS rollback execution closed by default
+PASS SFT training / gradient / optimizer closed by default
+PENDING cargo/rustc compile validation unavailable in current environment

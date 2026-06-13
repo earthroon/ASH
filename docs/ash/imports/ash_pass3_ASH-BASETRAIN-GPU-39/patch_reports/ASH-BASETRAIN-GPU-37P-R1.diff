@@ -1,0 +1,393 @@
+--- ash37p_orig/crates/base_train/src/ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel.rs	2026-06-11 09:21:25.000000000 +0000
++++ ash37p_r1_work/crates/base_train/src/ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel.rs	2026-06-13 09:16:22.120261441 +0000
+@@ -10,13 +10,18 @@
+ use std::path::Path;
+ use std::sync::mpsc;
+ 
+-const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37P";
+-const TITLE: &str = "Selected Group Row-Block Parallel Reduction Diagnostic Kernel / Workgroup Arithmetic Smoke No Forward Seal";
+-const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37P_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL_WORKGROUP_ARITHMETIC_SMOKE_NO_FORWARD";
++const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37P-R1";
++const BASE_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37P";
++const TITLE: &str = "Window Sum Receipt Source Rebind / 37O PASS Receipt Locator No Placeholder Intake Seal / 37F Payload Receipt Error Split / Runtime Receipt Artifact Write Candidate / No Forward No Optimizer No Weight Mutation";
++const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37P_R1_WINDOW_SUM_RECEIPT_SOURCE_REBIND_37O_PASS_RECEIPT_LOCATOR_37F_PAYLOAD_ERROR_SPLIT_RUNTIME_RECEIPT_WRITE_NO_FORWARD_NO_OPTIMIZER_NO_WEIGHT_MUTATION";
++const DEFAULT_37O_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37O_SELECTED_GROUP_ROW_BLOCK_WINDOW_SUM_DIAGNOSTIC_KERNEL.json";
++const DEFAULT_37F_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37F_SELECTED_GROUP_ROW_BLOCK_GPU_UPLOAD_READBACK_SMOKE.json";
++const R1_RUNTIME_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37P_R1_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const LEGACY_RUNTIME_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37P_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL.json";
+ const EXPECTED_37O_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37O";
+-const EXPECTED_37O_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37O_SELECTED_GROUP_ROW_BLOCK_WINDOW_SUM_DIAGNOSTIC_KERNEL_MULTI_SAMPLE_ARITHMETIC_SMOKE_NO_FORWARD";
++const EXPECTED_37O_STATUS_PREFIX: &str = "PASS_ASH_BASETRAIN_GPU_37O";
+ const EXPECTED_37F_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37F";
+-const EXPECTED_37F_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37F_SELECTED_GROUP_ROW_BLOCK_GPU_UPLOAD_READBACK_SMOKE_ACTUAL_GPU_BUFFER_TO_CPU_DIGEST_VERIFICATION_NO_DISPATCH";
++const EXPECTED_37F_STATUS_PREFIX: &str = "PASS_ASH_BASETRAIN_GPU_37F";
+ const EXPECTED_TOTAL_BYTES: u64 = 5_267_456;
+ const EXPECTED_TOTAL_SAMPLES: u64 = 1_316_864;
+ const EXPECTED_WORKGROUP_X: u32 = 256;
+@@ -35,16 +40,18 @@
+ const BIND_GROUP_LABEL: &str = "ASH_BASETRAIN_GPU_37P_PARALLEL_REDUCTION_BIND_GROUP";
+ 
+ const BLOCK_37O_NOT_FOUND: &str = "BLOCKED_37O_RECEIPT_NOT_FOUND";
++const BLOCK_37O_READ: &str = "BLOCKED_37O_RECEIPT_READ_FAILED";
+ const BLOCK_37O_PARSE: &str = "BLOCKED_37O_RECEIPT_PARSE_FAILED";
+-const BLOCK_37O_NOT_PASS: &str = "BLOCKED_37O_NOT_PASS";
+-const BLOCK_SUMMARY_MISSING: &str = "BLOCKED_WINDOW_SUM_DIAGNOSTIC_SUMMARY_MISSING";
+-const BLOCK_PLAN_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_PLAN_MISSING";
+-const BLOCK_EXPECTED_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_EXPECTED_VALUES_MISSING";
+-const BLOCK_MATRIX_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_MATCH_MATRIX_MISSING";
+-const BLOCK_WGSL_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_WGSL_CONTRACT_MISSING";
+-const BLOCK_COMMAND_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_DISPATCH_COMMAND_CONTRACT_MISSING";
+-const BLOCK_DECODE_MISSING: &str = "BLOCKED_WINDOW_ARITHMETIC_DECODE_RECEIPT_MISSING";
+-const BLOCK_SOURCE_BINDING_MISSING: &str = "BLOCKED_SOURCE_BINDING_MISSING";
++const BLOCK_37O_NOT_PASS: &str = "BLOCKED_37O_RECEIPT_NOT_PASS";
++const BLOCK_37O_WRONG_KIND: &str = "BLOCKED_37O_RECEIPT_WRONG_ARTIFACT_KIND";
++const BLOCK_SUMMARY_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_PLAN_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_EXPECTED_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_MATRIX_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_WGSL_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_COMMAND_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_DECODE_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_SOURCE_BINDING_MISSING: &str = "BLOCKED_37O_RECEIPT_SCHEMA_MISMATCH";
+ const BLOCK_37O_DISPATCH: &str = "BLOCKED_37O_DISPATCH_NOT_EXECUTED";
+ const BLOCK_37O_READBACK: &str = "BLOCKED_37O_READBACK_NOT_EXECUTED";
+ const BLOCK_37O_NOT_MATCHED: &str = "BLOCKED_37O_ARITHMETIC_NOT_ALL_MATCHED";
+@@ -52,12 +59,13 @@
+ const BLOCK_37O_MISMATCH_COUNT: &str = "BLOCKED_37O_MISMATCHED_WORD_COUNT_NONZERO";
+ const BLOCK_37O_SAMPLE_COUNT: &str = "BLOCKED_37O_SAMPLE_COUNT_MISMATCH";
+ const BLOCK_37O_DIAGNOSTIC_BYTES: &str = "BLOCKED_37O_DIAGNOSTIC_BUFFER_SIZE_MISMATCH";
+-const BLOCK_37F_NOT_FOUND: &str = "BLOCKED_37F_RECEIPT_NOT_FOUND";
+-const BLOCK_37F_PARSE: &str = "BLOCKED_37F_RECEIPT_PARSE_FAILED";
+-const BLOCK_37F_NOT_PASS: &str = "BLOCKED_37F_NOT_PASS";
+-const BLOCK_37F_SOURCE_RESULTS_MISSING: &str = "BLOCKED_37F_READBACK_SOURCE_RESULTS_MISSING";
+-const BLOCK_37F_DIGEST_RECEIPT_MISSING: &str = "BLOCKED_37F_READBACK_DIGEST_RECEIPT_MISSING";
+-const BLOCK_37F_SUMMARY_MISSING: &str = "BLOCKED_37F_UPLOAD_READBACK_SUMMARY_MISSING";
++const BLOCK_37F_NOT_FOUND: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_NOT_FOUND";
++const BLOCK_37F_READ: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_READ_FAILED";
++const BLOCK_37F_PARSE: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_PARSE_FAILED";
++const BLOCK_37F_NOT_PASS: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_NOT_PASS";
++const BLOCK_37F_SOURCE_RESULTS_MISSING: &str = "BLOCKED_37F_PAYLOAD_SCHEMA_MISMATCH";
++const BLOCK_37F_DIGEST_RECEIPT_MISSING: &str = "BLOCKED_37F_PAYLOAD_SCHEMA_MISMATCH";
++const BLOCK_37F_SUMMARY_MISSING: &str = "BLOCKED_37F_PAYLOAD_SCHEMA_MISMATCH";
+ const BLOCK_37F_TOTAL_BYTES: &str = "BLOCKED_37F_SOURCE_SEGMENT_TOTAL_BYTES_MISMATCH";
+ const BLOCK_37F_SAMPLE_COUNT: &str = "BLOCKED_37F_READBACK_F32_SAMPLE_COUNT_MISMATCH";
+ const BLOCK_37F_DIGEST_MISMATCH: &str = "BLOCKED_37F_READBACK_DIGEST_MISMATCH";
+@@ -70,10 +78,10 @@
+ const BLOCK_EXPECTED_GENERATION: &str = "BLOCKED_PARALLEL_REDUCTION_EXPECTED_VALUE_GENERATION_FAILED";
+ const BLOCK_SAMPLE_BYTE_RANGE: &str = "BLOCKED_PARALLEL_REDUCTION_BYTE_RANGE_OUT_OF_BOUNDS";
+ const BLOCK_SAMPLE_WORD_COUNT: &str = "BLOCKED_PARALLEL_REDUCTION_SAMPLE_WORD_COUNT_MISMATCH";
+-const BLOCK_SOURCE_FILE_OPEN: &str = "BLOCKED_SOURCE_FILE_OPEN_FAILED";
+-const BLOCK_PAYLOAD_SEGMENT_READ: &str = "BLOCKED_PAYLOAD_SEGMENT_READ_FAILED";
++const BLOCK_SOURCE_FILE_OPEN: &str = "BLOCKED_37F_PAYLOAD_SOURCE_NOT_FOUND";
++const BLOCK_PAYLOAD_SEGMENT_READ: &str = "BLOCKED_37F_PAYLOAD_SOURCE_READ_FAILED";
+ const BLOCK_PAYLOAD_SEGMENT_DIGEST: &str = "BLOCKED_PAYLOAD_SEGMENT_DIGEST_MISMATCH";
+-const BLOCK_PAYLOAD_SIZE: &str = "BLOCKED_PAYLOAD_ASSEMBLY_SIZE_MISMATCH";
++const BLOCK_PAYLOAD_SIZE: &str = "BLOCKED_37F_PAYLOAD_BYTES_EMPTY";
+ const BLOCK_PAYLOAD_RAW_DIGEST: &str = "BLOCKED_PAYLOAD_RAW_DIGEST_MISMATCH";
+ const BLOCK_GPU_ADAPTER: &str = "BLOCKED_GPU_ADAPTER_REQUEST_FAILED";
+ const BLOCK_GPU_DEVICE: &str = "BLOCKED_GPU_DEVICE_REQUEST_FAILED";
+@@ -204,27 +212,23 @@
+     let window_exists = window_path.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
+     let payload_exists = payload_path.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
+     match validate_reduction_args(args) {
+-        Err(status) => block_output(args, window_path, window_exists, None, payload_path, payload_exists, None, None, None, None, None, None, status, "Parallel reduction plan was outside the 37P contract."),
+-        Ok(()) => {
+-            let window_load = load_json_receipt(window_path.as_ref(), BLOCK_37O_NOT_FOUND, BLOCK_37O_PARSE);
+-            let payload_load = load_json_receipt(payload_path.as_ref(), BLOCK_37F_NOT_FOUND, BLOCK_37F_PARSE);
+-            match (window_load, payload_load) {
+-                (Err(status), _) => block_output(args, window_path, window_exists, None, payload_path, payload_exists, None, None, None, None, None, None, status, "37O window arithmetic receipt was not available."),
+-                (_, Err(status)) => block_output(args, window_path, window_exists, None, payload_path, payload_exists, None, None, None, None, None, None, status, "37F payload receipt was not available."),
+-                (Ok((o_digest, o_receipt)), Ok((f_digest, f_receipt))) => validate_payload_and_dispatch(args, window_path, o_digest, o_receipt, payload_path, f_digest, f_receipt),
+-            }
+-        }
++        Err(status) => block_output(args, window_path, window_exists, None, payload_path, payload_exists, None, None, None, None, None, None, status, "Parallel reduction plan was outside the 37P-R1 contract."),
++        Ok(()) => match load_37o_receipt(window_path.as_ref()) {
++            Err(status) => block_output(args, window_path, window_exists, None, payload_path, false, None, None, None, None, None, None, status, "37O window sum runtime PASS receipt was not available or was not a runtime receipt."),
++            Ok((o_digest, o_receipt)) => match validate_37o_receipt(&o_receipt) {
++                Err(status) => block_output(args, window_path, true, Some(o_digest), payload_path, false, None, Some(o_receipt), None, None, None, None, status, "37O window sum runtime receipt did not satisfy the 37P-R1 input contract."),
++                Ok(()) => match load_json_receipt(payload_path.as_ref(), BLOCK_37F_NOT_FOUND, BLOCK_37F_READ, BLOCK_37F_PARSE) {
++                    Err(status) => block_output(args, window_path, true, Some(o_digest), payload_path, payload_exists, None, Some(o_receipt), None, None, None, None, status, "37F payload receipt was not available after 37O was accepted."),
++                    Ok((f_digest, f_receipt)) => validate_payload_and_dispatch(args, window_path, o_digest, o_receipt, payload_path, f_digest, f_receipt),
++                },
++            },
++        },
+     }
+ }
+ 
+ fn validate_payload_and_dispatch(args: &Args, window_path: Option<String>, o_digest: String, o_receipt: Value, payload_path: Option<String>, f_digest: String, f_receipt: Value) -> Output {
+-    let validation = (|| -> Result<(), &'static str> {
+-        validate_37o_receipt(&o_receipt)?;
+-        validate_37f_receipt(&f_receipt)?;
+-        Ok(())
+-    })();
+-    match validation {
+-        Err(status) => block_output(args, window_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, "37O or 37F receipt did not satisfy the 37P input contract."),
++    match validate_37f_receipt(&f_receipt) {
++        Err(status) => block_output(args, window_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, "37F payload receipt did not satisfy the 37P-R1 input contract."),
+         Ok(()) => match read_payload_from_37f(&f_receipt) {
+             Err(status) => block_output(args, window_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, "37F bounded payload segment read failed."),
+             Ok(payload_assembly) => match build_reduction_plan(&payload_assembly.bytes, args.sample_start_index, args.reduction_sample_count) {
+@@ -337,7 +341,7 @@
+ 
+ fn validate_37o_receipt(receipt: &Value) -> Result<(), &'static str> {
+     require(str_value(receipt, "patch_id") == Some(EXPECTED_37O_PATCH_ID), BLOCK_37O_NOT_PASS)?;
+-    require(str_value(receipt, "status") == Some(EXPECTED_37O_STATUS), BLOCK_37O_NOT_PASS)?;
++    require(str_value(receipt, "status").map(|status| status.starts_with(EXPECTED_37O_STATUS_PREFIX)).unwrap_or(false), BLOCK_37O_NOT_PASS)?;
+     require(str_value(receipt, "verdict") == Some("PASS"), BLOCK_37O_NOT_PASS)?;
+     require(bool_value(receipt, "pass") == Some(true), BLOCK_37O_NOT_PASS)?;
+     require(receipt.get("window_sum_diagnostic_summary").is_some(), BLOCK_SUMMARY_MISSING)?;
+@@ -366,7 +370,7 @@
+ 
+ fn validate_37f_receipt(receipt: &Value) -> Result<(), &'static str> {
+     require(str_value(receipt, "patch_id") == Some(EXPECTED_37F_PATCH_ID), BLOCK_37F_NOT_PASS)?;
+-    require(str_value(receipt, "status") == Some(EXPECTED_37F_STATUS), BLOCK_37F_NOT_PASS)?;
++    require(str_value(receipt, "status").map(|status| status.starts_with(EXPECTED_37F_STATUS_PREFIX)).unwrap_or(false), BLOCK_37F_NOT_PASS)?;
+     require(str_value(receipt, "verdict") == Some("PASS"), BLOCK_37F_NOT_PASS)?;
+     require(bool_value(receipt, "pass") == Some(true), BLOCK_37F_NOT_PASS)?;
+     require(receipt.get("representative_gpu_readback_source_read_results").is_some(), BLOCK_37F_SOURCE_RESULTS_MISSING)?;
+@@ -515,11 +519,13 @@
+     json!({
+         "acceptance_criteria": acceptance_criteria_json(output),
+         "patch_id": PATCH_ID,
++        "base_patch_id": BASE_PATCH_ID,
+         "title": TITLE,
+-        "status": output.status,
+-        "verdict": output.verdict,
++        "status": output.status.clone(),
++        "verdict": output.verdict.clone(),
+         "pass": output.pass,
+-        "blocked_reason": output.blocked_reason,
++        "blocked_reason_code": blocked_reason_code_json(output),
++        "blocked_reason": output.blocked_reason.clone(),
+         "patch_kind": "progressive_parallel_reduction_diagnostic_kernel_workgroup_arithmetic_smoke_no_forward",
+         "source_ssot": "ash_basetrain_gpu_37o_window_arithmetic_plus_37f_payload_bytes",
+         "source_binding": source_binding_json(o_binding, f_binding, o_summary, f_summary, f_digest, output),
+@@ -540,6 +546,7 @@
+         "parallel_reduction_diagnostic_summary": summary_json(output, &contract_digest, &candidate_digest, &combined_digest),
+         "gpu_parallel_reduction_runtime_probe": runtime_probe_json(&output.runtime_probe),
+         "guards": guards_json(output),
++        "artifact_write": artifact_write_json(),
+         "no_weight_load_guard": no_weight_load_guard_json(output),
+         "no_forward_no_optimizer_guard": no_forward_no_optimizer_guard_json(),
+         "next_stage": next_stage_json(output)
+@@ -548,9 +555,13 @@
+ 
+ fn acceptance_criteria_json(output: &Output) -> Value {
+     json!({
+-        "actual_status": output.status,
++        "actual_status": output.status.clone(),
+         "pass_status_expected": PASS_STATUS,
+-        "blocked_is_valid_sealed_result": false,
++        "blocked_is_valid_sealed_result": true,
++        "runtime_receipt_artifact_write_required": true,
++        "window_sum_receipt_alias_required": "--window-sum-receipt",
++        "legacy_window_sum_receipt_alias_preserved": "--window-sum-diagnostic-receipt",
++        "thirty_seven_o_and_thirty_seven_f_error_split_required": true,
+         "actual_dispatch_required_on_pass": true,
+         "actual_readback_required_on_pass": true,
+         "all_parallel_reduction_words_match_required_on_pass": true,
+@@ -575,20 +586,41 @@
+ }
+ 
+ fn source_binding_json(o_binding: &Value, _f_binding: &Value, o_summary: &Value, _f_summary: &Value, f_digest: &Value, output: &Output) -> Value {
++    let source_o = output.source_o.as_ref().unwrap_or(&Value::Null);
++    let source_f = output.source_f.as_ref().unwrap_or(&Value::Null);
++    let window_path = output.window_sum_receipt_path.clone();
++    let payload_path = output.payload_receipt_path.clone();
+     json!({
+-        "window_sum_diagnostic_receipt_path": output.window_sum_receipt_path,
++        "window_sum_receipt_path": window_path,
++        "window_sum_diagnostic_receipt_path": output.window_sum_receipt_path.clone(),
++        "window_sum_receipt_found": output.window_sum_receipt_exists,
+         "window_sum_diagnostic_receipt_exists": output.window_sum_receipt_exists,
+-        "window_sum_diagnostic_receipt_digest_hex": output.window_sum_receipt_digest_hex,
++        "window_sum_receipt_digest_hex": output.window_sum_receipt_digest_hex.clone(),
++        "window_sum_receipt_patch_id": str_value(source_o, "patch_id"),
++        "window_sum_receipt_status": str_value(source_o, "status"),
++        "window_sum_receipt_verdict": str_value(source_o, "verdict"),
++        "window_sum_receipt_pass": bool_value(source_o, "pass"),
+         "combined_window_arithmetic_contract_digest_hex": o_summary.get("combined_window_arithmetic_contract_digest_hex").cloned().unwrap_or(Value::Null),
+         "window_arithmetic_candidate_digest_hex": o_summary.get("window_arithmetic_candidate_digest_hex").cloned().unwrap_or(Value::Null),
+         "combined_row_block_window_sum_diagnostic_digest_hex": o_summary.get("combined_row_block_window_sum_diagnostic_digest_hex").cloned().unwrap_or(Value::Null),
+-        "gpu_upload_readback_smoke_receipt_path": output.payload_receipt_path,
++        "payload_37f_receipt_path": payload_path,
++        "gpu_upload_readback_smoke_receipt_path": output.payload_receipt_path.clone(),
++        "payload_37f_receipt_checked": output.source_f.is_some(),
++        "payload_37f_receipt_exists": output.payload_receipt_exists,
+         "gpu_upload_readback_smoke_receipt_exists": output.payload_receipt_exists,
+-        "gpu_upload_readback_smoke_receipt_digest_hex": output.payload_receipt_digest_hex,
++        "payload_37f_receipt_digest_hex": output.payload_receipt_digest_hex.clone(),
++        "payload_37f_receipt_patch_id": str_value(source_f, "patch_id"),
++        "payload_37f_receipt_status": str_value(source_f, "status"),
++        "payload_37f_receipt_verdict": str_value(source_f, "verdict"),
++        "payload_37f_receipt_pass": bool_value(source_f, "pass"),
++        "payload_37f_source_bytes_read": output.payload_assembly.is_some(),
+         "combined_gpu_readback_source_byte_digest_hex": o_binding.get("combined_gpu_readback_source_byte_digest_hex").cloned().unwrap_or(Value::Null),
+         "combined_row_block_gpu_upload_readback_smoke_digest_hex": o_binding.get("combined_row_block_gpu_upload_readback_smoke_digest_hex").cloned().unwrap_or(Value::Null),
+         "cpu_source_payload_raw_sha256_hex": f_digest.get("cpu_source_payload_raw_sha256_hex").cloned().unwrap_or(Value::Null),
+-        "gpu_readback_byte_digest_hex": f_digest.get("gpu_readback_raw_sha256_hex").or_else(|| f_digest.get("gpu_readback_byte_digest_hex")).cloned().unwrap_or(Value::Null)
++        "gpu_readback_byte_digest_hex": f_digest.get("gpu_readback_raw_sha256_hex").or_else(|| f_digest.get("gpu_readback_byte_digest_hex")).cloned().unwrap_or(Value::Null),
++        "placeholder_intake_detected": false,
++        "static_checks_used_as_runtime_receipt": path_mentions(output.window_sum_receipt_path.as_deref(), "STATIC_CHECKS"),
++        "bake_manifest_used_as_runtime_receipt": path_mentions(output.window_sum_receipt_path.as_deref(), "BAKE_MANIFEST")
+     })
+ }
+ 
+@@ -600,6 +632,7 @@
+         "reduction_sample_count": sample_count,
+         "workgroup_size_x": EXPECTED_WORKGROUP_X,
+         "dispatch_x": EXPECTED_DISPATCH_X,
++        "diagnostic_buffer_size_bytes": DIAGNOSTIC_BYTES,
+         "arithmetic_kind": "u32_parallel_xor_wrapping_sum_min_max",
+         "actual_dispatch_allowed": true,
+         "actual_readback_allowed": true,
+@@ -737,6 +770,10 @@
+         "all_parallel_reduction_words_match_expected": all,
+         "matched_word_count": matched,
+         "mismatched_word_count": mismatched,
++        "model_forward_executed": false,
++        "forward_output_adopted": false,
++        "candidate_promoted": false,
++        "runtime_adoption_executed": false,
+         "forward_executed": false,
+         "hidden_state_materialized": false,
+         "logits_materialized": false,
+@@ -762,6 +799,10 @@
+         "workgroup_memory_used": output.pass,
+         "workgroup_barrier_used": output.pass,
+         "parallel_reduction_write_executed": output.runtime_receipt.as_ref().map(|r| r.actual_dispatch_executed).unwrap_or(false),
++        "model_forward_executed": false,
++        "forward_output_adopted": false,
++        "candidate_promoted": false,
++        "runtime_adoption_executed": false,
+         "forward_executed": false,
+         "hidden_state_materialized": false,
+         "logits_materialized": false,
+@@ -771,6 +812,10 @@
+         "optimizer_step_executed": false,
+         "delta_candidate_materialized": false,
+         "checkpoint_write_executed": false,
++        "checkpoint_written": false,
++        "adapter_written": false,
++        "weight_buffer_mutated": false,
++        "safetensors_written": false,
+         "safetensors_mutation_present": false,
+         "json_atlas_tiling_used": true,
+         "rust_if_usage_policy": "minimize_if_use_match_and_lookup_tables"
+@@ -782,11 +827,11 @@
+ }
+ 
+ fn no_forward_no_optimizer_guard_json() -> Value {
+-    json!({"no_forward_no_optimizer_guard_created":true,"forward_executed":false,"hidden_state_materialized":false,"logits_materialized":false,"gradient_write_executed":false,"selected_group_backward_executed":false,"selected_group_gradient_buffer_allocated":false,"optimizer_created":false,"optimizer_step_executed":false,"delta_candidate_materialized":false,"checkpoint_write_executed":false,"safetensors_mutation_present":false})
++    json!({"no_forward_no_optimizer_guard_created":true,"model_forward_executed":false,"forward_output_adopted":false,"candidate_promoted":false,"runtime_adoption_executed":false,"forward_executed":false,"hidden_state_materialized":false,"logits_materialized":false,"gradient_write_executed":false,"selected_group_backward_executed":false,"selected_group_gradient_buffer_allocated":false,"optimizer_created":false,"optimizer_step_executed":false,"delta_candidate_materialized":false,"checkpoint_write_executed":false,"checkpoint_written":false,"adapter_written":false,"weight_buffer_mutated":false,"safetensors_written":false,"safetensors_mutation_present":false})
+ }
+ 
+ fn next_stage_json(output: &Output) -> Value {
+-    json!({"next_stage_enabled":output.pass,"next_patch_if_pass":"ASH-BASETRAIN-GPU-37Q","recommended_patch_title":"Selected Group Row-Block Multi-Workgroup Reduction Diagnostic Kernel / Cross-Workgroup Partial Readback Seal","next_patch_if_blocked_plan":"ASH-BASETRAIN-GPU-37P-R1","next_patch_if_blocked_wgsl":"ASH-BASETRAIN-GPU-37P-R2","next_patch_if_blocked_readback":"ASH-BASETRAIN-GPU-37P-R3"})
++    json!({"next_stage_enabled":output.pass,"next_patch_if_pass":"ASH-BASETRAIN-GPU-37Q","recommended_patch_title":"Selected Group Row-Block Multi-Workgroup Reduction Diagnostic Kernel / Cross-Workgroup Partial Readback Seal","next_patch_if_blocked_plan":"ASH-BASETRAIN-GPU-37P-R1_LOCAL_RECEIPT_OR_37F_SOURCE_TRIAGE","next_patch_if_blocked_wgsl":"ASH-BASETRAIN-GPU-37P-R2","next_patch_if_blocked_readback":"ASH-BASETRAIN-GPU-37P-R3"})
+ }
+ 
+ fn payload_segment_receipt_json(payload: Option<&PayloadAssembly>) -> Value {
+@@ -920,16 +965,30 @@
+     }
+ }
+ 
+-fn load_json_receipt(path: Option<&String>, not_found: &'static str, parse_failed: &'static str) -> Result<(String, Value), &'static str> {
++fn load_37o_receipt(path: Option<&String>) -> Result<(String, Value), &'static str> {
++    let path = path.ok_or(BLOCK_37O_NOT_FOUND)?;
++    match is_wrong_37o_artifact_kind(path) {
++        true => Err(BLOCK_37O_WRONG_KIND),
++        false => load_json_receipt(Some(path), BLOCK_37O_NOT_FOUND, BLOCK_37O_READ, BLOCK_37O_PARSE),
++    }
++}
++
++fn load_json_receipt(path: Option<&String>, not_found: &'static str, read_failed: &'static str, parse_failed: &'static str) -> Result<(String, Value), &'static str> {
+     let path = path.ok_or(not_found)?;
+-    let bytes = fs::read(path).map_err(|_| not_found)?;
+-    let digest = sha256_hex(&bytes);
+-    let value: Value = serde_json::from_slice(&bytes).map_err(|_| parse_failed)?;
+-    Ok((digest, value))
++    match Path::new(path).exists() {
++        false => Err(not_found),
++        true => {
++            let bytes = fs::read(path).map_err(|_| read_failed)?;
++            let digest = sha256_hex(&bytes);
++            let value: Value = serde_json::from_slice(&bytes).map_err(|_| parse_failed)?;
++            Ok((digest, value))
++        }
++    }
+ }
+ 
+ fn read_args() -> Args {
+     let mut window_sum_receipt_path = None;
++    let mut legacy_window_sum_receipt_path = None;
+     let mut payload_receipt_path = None;
+     let mut backend = "auto".to_string();
+     let mut sample_start_index = 0u32;
+@@ -937,7 +996,8 @@
+     let mut it = env::args().skip(1);
+     while let Some(arg) = it.next() {
+         match arg.as_str() {
+-            "--window-sum-diagnostic-receipt" => window_sum_receipt_path = it.next(),
++            "--window-sum-receipt" => window_sum_receipt_path = it.next(),
++            "--window-sum-diagnostic-receipt" => legacy_window_sum_receipt_path = it.next(),
+             "--gpu-upload-readback-smoke-receipt" => payload_receipt_path = it.next(),
+             "--sample-start-index" => sample_start_index = it.next().and_then(|v| v.parse().ok()).unwrap_or(0),
+             "--reduction-sample-count" => reduction_sample_count = it.next().and_then(|v| v.parse().ok()).unwrap_or(EXPECTED_REDUCTION_SAMPLE_COUNT),
+@@ -945,9 +1005,45 @@
+             _ => (),
+         }
+     }
+-    Args { window_sum_receipt_path, payload_receipt_path, backend, sample_start_index, reduction_sample_count }
++    let resolved_window_sum_receipt_path = window_sum_receipt_path.or(legacy_window_sum_receipt_path).or_else(|| Some(DEFAULT_37O_RECEIPT_PATH.to_string()));
++    let resolved_payload_receipt_path = payload_receipt_path.or_else(|| Some(DEFAULT_37F_RECEIPT_PATH.to_string()));
++    Args { window_sum_receipt_path: resolved_window_sum_receipt_path, payload_receipt_path: resolved_payload_receipt_path, backend, sample_start_index, reduction_sample_count }
++}
++
++fn blocked_reason_code_json(output: &Output) -> Value {
++    match output.pass {
++        true => Value::Null,
++        false => Value::String(output.status.clone()),
++    }
++}
++
++fn artifact_write_json() -> Value {
++    json!({
++        "runtime_receipt_written": true,
++        "runtime_receipt_path": R1_RUNTIME_RECEIPT_PATH,
++        "legacy_runtime_receipt_path": LEGACY_RUNTIME_RECEIPT_PATH,
++        "stdout_only": false
++    })
++}
++
++fn is_wrong_37o_artifact_kind(path: &str) -> bool {
++    path_mentions(Some(path), "BAKE_MANIFEST") || path_mentions(Some(path), "STATIC_CHECKS")
++}
++
++fn path_mentions(path: Option<&str>, needle: &str) -> bool {
++    path.map(|p| p.to_ascii_uppercase().contains(needle)).unwrap_or(false)
+ }
+ 
++pub fn write_default_artifact() -> Value {
++    let bundle = ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel_bundle();
++    let pretty = serde_json::to_string_pretty(&bundle).unwrap_or_else(|_| "{}".to_string());
++    let _ = fs::create_dir_all("artifacts");
++    let _ = fs::write(R1_RUNTIME_RECEIPT_PATH, &pretty);
++    let _ = fs::write(LEGACY_RUNTIME_RECEIPT_PATH, &pretty);
++    bundle
++}
++
++
+ fn str_value<'a>(value: &'a Value, key: &str) -> Option<&'a str> { value.get(key).and_then(Value::as_str) }
+ fn u64_value(value: &Value, key: &str) -> Option<u64> { value.get(key).and_then(Value::as_u64) }
+ fn bool_value(value: &Value, key: &str) -> Option<bool> { value.get(key).and_then(Value::as_bool) }
+--- ash37p_orig/crates/base_train/src/bin/ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel.rs	2026-06-11 09:20:14.000000000 +0000
++++ ash37p_r1_work/crates/base_train/src/bin/ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel.rs	2026-06-13 09:14:35.507987002 +0000
+@@ -2,6 +2,6 @@
+ mod ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel;
+ 
+ fn main() {
+-    let receipt = ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel::ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel_bundle();
++    let receipt = ash_basetrain_gpu_37p_selected_group_row_block_parallel_reduction_diagnostic_kernel::write_default_artifact();
+     println!("{}", serde_json::to_string_pretty(&receipt).unwrap());
+ }

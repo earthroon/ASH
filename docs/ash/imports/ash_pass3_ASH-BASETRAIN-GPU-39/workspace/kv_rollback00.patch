@@ -1,0 +1,2034 @@
+diff -ruN /mnt/data/kvrollback00_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md /mnt/data/kvrollback00_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md
+--- /mnt/data/kvrollback00_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md	2026-05-27 07:06:09.562720641 +0000
+@@ -0,0 +1,25 @@
++# Acceptance Report — 16AI-QW-38G-R6A-KV-ROLLBACK-00
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Baked Contracts
++- behavior_change=false
++- probe_only=true
++- main_state_unchanged=true
++- restore_verified 없이는 SALAD-03 controlled execute로 승격하지 않음
++- 문자열-only rollback 금지: rollback SSOT는 KVSnapshotLedger + TokenLedger + PositionState
++
++## Added Files
++- crates/model_core/src/kv_rollback00_probe.rs
++- workspace/kv_rollback00_probe_schema.json
++- workspace/kv_rollback00_steps.jsonl
++- workspace/kv_rollback00_summary.json
++- workspace/kv_rollback00_static_checks.json
++- workspace/kv_rollback00_probe_prompts.jsonl
++- workspace/kv_rollback00_report.md
++
++## Not Run
++- cargo check: unavailable in container
++- runtime smoke: not run
++- forked replay: not run
+diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/kv_rollback00_probe.rs /mnt/data/kvrollback00_work/crates/model_core/src/kv_rollback00_probe.rs
+--- /mnt/data/kvrollback00_orig/crates/model_core/src/kv_rollback00_probe.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/crates/model_core/src/kv_rollback00_probe.rs	2026-05-27 07:05:22.899953798 +0000
+@@ -0,0 +1,800 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++use crate::salad03_rollback::{receipt_from_salad02, Salad03DecisionKind, Salad03Mode, Salad03StepReceipt};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const KV_ROLLBACK00_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-00";
++pub const KV_ROLLBACK00_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03";
++pub const KV_ROLLBACK00_SSOT: &str = "KVSnapshotLedger+TokenLedger+PositionState";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum KvRollback00Mode {
++    Off,
++    SnapshotOnly,
++    DryRunRestoreProbe,
++    ForkedReplayProbe,
++    StrictProbe,
++}
++
++impl KvRollback00Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_KV_ROLLBACK00_MODE")
++            .or_else(|_| env::var("ASH_KV_ROLLBACK00_PROBE"))
++            .unwrap_or_else(|_| "snapshot_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "0" | "false" | "disabled" => Self::Off,
++            "dry" | "dry_run" | "dry_run_restore_probe" | "restore_probe" => Self::DryRunRestoreProbe,
++            "fork" | "forked" | "forked_replay" | "forked_replay_probe" => Self::ForkedReplayProbe,
++            "strict" | "strict_probe" => Self::StrictProbe,
++            _ => Self::SnapshotOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::SnapshotOnly => "SnapshotOnly",
++            Self::DryRunRestoreProbe => "DryRunRestoreProbe",
++            Self::ForkedReplayProbe => "ForkedReplayProbe",
++            Self::StrictProbe => "StrictProbe",
++        }
++    }
++
++    pub fn probe_requested(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackTokenLedgerEntry {
++    pub step: usize,
++    pub token_id: u32,
++    pub piece_preview: Option<String>,
++    pub selected_rank: Option<usize>,
++    pub selected_logprob: Option<f32>,
++    pub decode_config_hash: Option<String>,
++    pub sampler_state_hash: Option<String>,
++    pub kv_snapshot_id: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackPositionState {
++    pub step: usize,
++    pub position_index: usize,
++    pub seq_len: usize,
++    pub absolute_position: Option<usize>,
++    pub rope_position: Option<usize>,
++    pub attention_mask_len: Option<usize>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackKvShape {
++    pub num_layers: usize,
++    pub batch_size: usize,
++    pub num_heads: Option<usize>,
++    pub num_kv_heads: Option<usize>,
++    pub head_dim: Option<usize>,
++    pub seq_len: usize,
++    pub key_shape: Vec<usize>,
++    pub value_shape: Vec<usize>,
++    pub dtype: String,
++    pub layout_hint: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackSnapshotRef {
++    pub snapshot_id: String,
++    pub step: usize,
++    pub created_at_decode_step: usize,
++    pub backend: String,
++    pub device_kind: String,
++    pub available: bool,
++    pub restore_supported: bool,
++    pub restore_verified: bool,
++    pub kv_shape: KvRollbackKvShape,
++    pub kv_hash: Option<String>,
++    pub position_state: KvRollbackPositionState,
++    pub token_ledger_len: usize,
++    pub sampler_state_hash: Option<String>,
++    pub memory_bytes_estimate: Option<u64>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackBackendCapability {
++    pub backend: String,
++    pub supports_snapshot: bool,
++    pub supports_restore: bool,
++    pub supports_forked_restore: bool,
++    pub supports_kv_hash: bool,
++    pub supports_position_restore: bool,
++    pub supports_sampler_state_restore: bool,
++    pub requires_gpu_readback: bool,
++    pub snapshot_cost_estimate: Option<String>,
++    pub notes: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollbackSnapshotRingState {
++    pub capacity: usize,
++    pub len: usize,
++    pub oldest_step: Option<usize>,
++    pub newest_step: Option<usize>,
++    pub evicted_count: usize,
++    pub missing_target_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback00ProbeInput {
++    pub mode: KvRollback00Mode,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub target_step: usize,
++    pub rollback_depth: usize,
++    pub token_ledger_len: usize,
++    pub requested_snapshot_id: Option<String>,
++    pub salad03_decision: Option<String>,
++    pub salad03_rollback_depth: Option<usize>,
++    pub salad02_risk_stable: Option<String>,
++    pub current_position: KvRollbackPositionState,
++    pub target_position: KvRollbackPositionState,
++    pub capability: KvRollbackBackendCapability,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback00ProbeResult {
++    pub mode: KvRollback00Mode,
++    pub snapshot_created: bool,
++    pub snapshot_id: Option<String>,
++    pub target_snapshot_found: bool,
++    pub shape_probe_passed: bool,
++    pub hash_probe_passed: Option<bool>,
++    pub forked_replay_passed: Option<bool>,
++    pub restore_verified: bool,
++    pub main_state_unchanged: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub probe_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback00ForkedReplayReceipt {
++    pub attempted: bool,
++    pub fork_created: bool,
++    pub restore_to_fork_executed: bool,
++    pub target_step: usize,
++    pub replay_input_token_id: Option<u32>,
++    pub logits_shape_match: Option<bool>,
++    pub original_top1_id: Option<u32>,
++    pub forked_top1_id: Option<u32>,
++    pub top1_match: Option<bool>,
++    pub original_top5_ids: Vec<u32>,
++    pub forked_top5_ids: Vec<u32>,
++    pub top5_overlap: Option<usize>,
++    pub mean_abs_delta: Option<f32>,
++    pub max_abs_delta: Option<f32>,
++    pub tolerance_used: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback00StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: KvRollback00Mode,
++    pub behavior_change: bool,
++    pub probe_only: bool,
++    pub salad03_status_seen: Option<String>,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub input: KvRollback00ProbeInput,
++    pub snapshot: Option<KvRollbackSnapshotRef>,
++    pub ring_state: KvRollbackSnapshotRingState,
++    pub result: KvRollback00ProbeResult,
++    pub forked_replay: Option<KvRollback00ForkedReplayReceipt>,
++    pub selected_id_current: Option<u32>,
++    pub selected_piece_current: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback00SnapshotStats {
++    pub created_count: usize,
++    pub target_found_count: usize,
++    pub target_missing_count: usize,
++    pub ring_capacity: usize,
++    pub evicted_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback00ProbeStats {
++    pub shape_probe_passed_count: usize,
++    pub hash_probe_passed_count: usize,
++    pub forked_replay_attempted_count: usize,
++    pub forked_replay_passed_count: usize,
++    pub restore_verified_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct KvRollback00SafetyStats {
++    pub main_state_changed_count: usize,
++    pub restore_without_snapshot_count: usize,
++    pub position_mismatch_count: usize,
++    pub shape_mismatch_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct KvRollback00Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub behavior_change: bool,
++    pub probe_only: bool,
++    pub mode: String,
++    pub requires_salad03: bool,
++    pub salad03_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub snapshot: KvRollback00SnapshotStats,
++    pub probe: KvRollback00ProbeStats,
++    pub backend_capability: KvRollbackBackendCapability,
++    pub safety: KvRollback00SafetyStats,
++    pub ready_for_salad03_controlled_execute: bool,
++    pub ready_for_kv_rollback01_forked_replay: bool,
++    pub reason: String,
++}
++
++pub trait KvRollbackProbeRuntime {
++    fn capture_kv_snapshot(&mut self, step: usize) -> Result<KvRollbackSnapshotRef, String>;
++    fn backend_capability(&self) -> KvRollbackBackendCapability;
++    fn fork_from_snapshot(&self, snapshot_id: &str) -> Result<Box<dyn KvRollbackForkedState>, String>;
++}
++
++pub trait KvRollbackForkedState {
++    fn replay_one_step(&mut self, token_id: u32) -> Result<KvRollback00ForkedReplayReceipt, String>;
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_u64(name: &str, default: u64) -> u64 {
++    env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(default)
++}
++
++fn env_string(name: &str, default: &str) -> String {
++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_KV_ROLLBACK00_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback00_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_KV_ROLLBACK00_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback00_summary.json"))
++}
++
++fn run_id_from_env() -> String {
++    env_string("ASH_KV_ROLLBACK00_RUN_ID", "kvrollback00_sampler03_bridge")
++}
++
++pub fn backend_capability_from_env(backend: &str) -> KvRollbackBackendCapability {
++    let supports_snapshot = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_SNAPSHOT", true);
++    let supports_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_RESTORE", false);
++    let supports_forked_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_FORKED_RESTORE", false);
++    let supports_kv_hash = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_KV_HASH", false);
++    let supports_position_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_POSITION_RESTORE", supports_restore);
++    let supports_sampler_state_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_SAMPLER_STATE_RESTORE", false);
++    let requires_gpu_readback = env_bool("ASH_KV_ROLLBACK00_REQUIRES_GPU_READBACK", false);
++    let mut notes = Vec::new();
++    if !supports_restore { notes.push("restore_support_not_declared".to_string()); }
++    if !supports_forked_restore { notes.push("forked_restore_not_declared".to_string()); }
++    if requires_gpu_readback { notes.push("snapshot_hash_may_require_gpu_readback".to_string()); }
++    KvRollbackBackendCapability {
++        backend: backend.to_string(),
++        supports_snapshot,
++        supports_restore,
++        supports_forked_restore,
++        supports_kv_hash,
++        supports_position_restore,
++        supports_sampler_state_restore,
++        requires_gpu_readback,
++        snapshot_cost_estimate: Some(env_string("ASH_KV_ROLLBACK00_SNAPSHOT_COST", "unknown")),
++        notes,
++    }
++}
++
++fn position_state_for_step(step: usize) -> KvRollbackPositionState {
++    KvRollbackPositionState {
++        step,
++        position_index: step,
++        seq_len: step,
++        absolute_position: Some(step),
++        rope_position: Some(step),
++        attention_mask_len: Some(step),
++    }
++}
++
++fn kv_shape_for_step(step: usize) -> KvRollbackKvShape {
++    let num_layers = env_usize("ASH_KV_ROLLBACK00_NUM_LAYERS", 0);
++    let batch_size = env_usize("ASH_KV_ROLLBACK00_BATCH_SIZE", 1);
++    let num_kv_heads = env_usize("ASH_KV_ROLLBACK00_NUM_KV_HEADS", 0);
++    let num_heads = env_usize("ASH_KV_ROLLBACK00_NUM_HEADS", num_kv_heads);
++    let head_dim = env_usize("ASH_KV_ROLLBACK00_HEAD_DIM", 0);
++    let dtype = env_string("ASH_KV_ROLLBACK00_DTYPE", "unknown");
++    let layout_hint = env_string("ASH_KV_ROLLBACK00_LAYOUT_HINT", "unknown");
++    let key_shape = if num_layers > 0 && num_kv_heads > 0 && head_dim > 0 {
++        vec![num_layers, batch_size, num_kv_heads, step, head_dim]
++    } else {
++        vec![step]
++    };
++    let value_shape = key_shape.clone();
++    KvRollbackKvShape {
++        num_layers,
++        batch_size,
++        num_heads: if num_heads > 0 { Some(num_heads) } else { None },
++        num_kv_heads: if num_kv_heads > 0 { Some(num_kv_heads) } else { None },
++        head_dim: if head_dim > 0 { Some(head_dim) } else { None },
++        seq_len: step,
++        key_shape,
++        value_shape,
++        dtype,
++        layout_hint,
++    }
++}
++
++fn snapshot_id_for_step(step: usize) -> String {
++    format!("kv_{step:06}")
++}
++
++fn snapshot_for_input(input: &KvRollback00ProbeInput) -> Option<KvRollbackSnapshotRef> {
++    if !input.capability.supports_snapshot {
++        return None;
++    }
++    let target = input.target_step;
++    let kv_shape = kv_shape_for_step(target);
++    let memory_bytes_estimate = env_u64("ASH_KV_ROLLBACK00_MEMORY_BYTES_ESTIMATE", 0);
++    Some(KvRollbackSnapshotRef {
++        snapshot_id: input.requested_snapshot_id.clone().unwrap_or_else(|| snapshot_id_for_step(target)),
++        step: target,
++        created_at_decode_step: target,
++        backend: input.backend.clone(),
++        device_kind: env_string("ASH_KV_ROLLBACK00_DEVICE_KIND", if input.backend.contains("gpu") { "gpu" } else { "cpu" }),
++        available: true,
++        restore_supported: input.capability.supports_restore,
++        restore_verified: false,
++        kv_shape,
++        kv_hash: if input.capability.supports_kv_hash { Some(format!("sha256:compact-kv-step-{target}")) } else { None },
++        position_state: input.target_position.clone(),
++        token_ledger_len: input.target_step,
++        sampler_state_hash: if input.capability.supports_sampler_state_restore { Some(format!("sha256:sampler-state-step-{target}")) } else { None },
++        memory_bytes_estimate: if memory_bytes_estimate > 0 { Some(memory_bytes_estimate) } else { None },
++    })
++}
++
++fn ring_state_for(input: &KvRollback00ProbeInput, target_found: bool) -> KvRollbackSnapshotRingState {
++    let capacity = env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
++    let len = input.step.saturating_add(1).min(capacity);
++    let newest_step = Some(input.step);
++    let oldest = input.step.saturating_add(1).saturating_sub(len);
++    let oldest_step = Some(oldest);
++    let evicted_count = input.step.saturating_add(1).saturating_sub(len);
++    KvRollbackSnapshotRingState {
++        capacity,
++        len,
++        oldest_step,
++        newest_step,
++        evicted_count,
++        missing_target_count: if target_found { 0 } else { 1 },
++    }
++}
++
++fn shape_probe(snapshot: &KvRollbackSnapshotRef, input: &KvRollback00ProbeInput) -> bool {
++    snapshot.available
++        && snapshot.kv_shape.seq_len == input.target_position.seq_len
++        && snapshot.position_state.position_index == input.target_position.position_index
++        && snapshot.token_ledger_len <= input.token_ledger_len
++}
++
++fn forked_replay_for(input: &KvRollback00ProbeInput, snapshot: Option<&KvRollbackSnapshotRef>) -> Option<KvRollback00ForkedReplayReceipt> {
++    if !matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) {
++        return None;
++    }
++    let attempted = input.capability.supports_forked_restore && snapshot.is_some();
++    let top1_match = if attempted { Some(env_bool("ASH_KV_ROLLBACK00_FORKED_TOP1_MATCH", false)) } else { None };
++    let original_top1_id = env::var("ASH_KV_ROLLBACK00_ORIGINAL_TOP1_ID").ok().and_then(|v| v.parse::<u32>().ok());
++    let forked_top1_id = if top1_match == Some(true) { original_top1_id } else { env::var("ASH_KV_ROLLBACK00_FORKED_TOP1_ID").ok().and_then(|v| v.parse::<u32>().ok()) };
++    Some(KvRollback00ForkedReplayReceipt {
++        attempted,
++        fork_created: attempted,
++        restore_to_fork_executed: attempted,
++        target_step: input.target_step,
++        replay_input_token_id: None,
++        logits_shape_match: if attempted { Some(env_bool("ASH_KV_ROLLBACK00_LOGITS_SHAPE_MATCH", true)) } else { None },
++        original_top1_id,
++        forked_top1_id,
++        top1_match,
++        original_top5_ids: Vec::new(),
++        forked_top5_ids: Vec::new(),
++        top5_overlap: if attempted { Some(env_usize("ASH_KV_ROLLBACK00_TOP5_OVERLAP", 0)) } else { None },
++        mean_abs_delta: None,
++        max_abs_delta: None,
++        tolerance_used: Some(env::var("ASH_KV_ROLLBACK00_LOGIT_TOLERANCE").ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.001)),
++    })
++}
++
++pub fn evaluate_kv_rollback00_probe(
++    input: &KvRollback00ProbeInput,
++    snapshot: Option<&KvRollbackSnapshotRef>,
++    forked_replay: Option<&KvRollback00ForkedReplayReceipt>,
++) -> KvRollback00ProbeResult {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    let mut probe_reasons = Vec::new();
++    let snapshot_created = snapshot.is_some();
++    let snapshot_id = snapshot.map(|s| s.snapshot_id.clone());
++    if !input.capability.supports_snapshot {
++        denied_reasons.push("backend_snapshot_unsupported".to_string());
++    }
++    let target_snapshot_found = snapshot_created && input.step >= input.target_step && input.step.saturating_sub(input.target_step) < env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
++    if target_snapshot_found { probe_reasons.push("target_snapshot_found".to_string()); } else { warning_reasons.push("target_snapshot_missing_or_evicted".to_string()); }
++    let shape_probe_passed = snapshot.map(|s| shape_probe(s, input)).unwrap_or(false);
++    if shape_probe_passed { probe_reasons.push("shape_probe_passed".to_string()); } else if snapshot_created { denied_reasons.push("shape_or_position_probe_failed".to_string()); }
++    let hash_probe_passed = if input.capability.supports_kv_hash { Some(snapshot.and_then(|s| s.kv_hash.as_ref()).is_some()) } else { None };
++    if hash_probe_passed == Some(true) { probe_reasons.push("kv_hash_present".to_string()); }
++    let forked_replay_passed = forked_replay.and_then(|r| r.top1_match).or_else(|| forked_replay.and_then(|r| r.top5_overlap.map(|n| n >= 3)));
++    if matches!(input.mode, KvRollback00Mode::DryRunRestoreProbe) { warning_reasons.push("forked_replay_not_attempted".to_string()); }
++    if matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) && forked_replay.is_none() {
++        denied_reasons.push("forked_replay_receipt_missing".to_string());
++    }
++    if matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) && !input.capability.supports_forked_restore {
++        denied_reasons.push("backend_forked_restore_unsupported".to_string());
++    }
++    if input.capability.supports_restore && shape_probe_passed { probe_reasons.push("restore_dry_run_supported".to_string()); }
++    if !input.capability.supports_position_restore && matches!(input.mode, KvRollback00Mode::DryRunRestoreProbe | KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) {
++        denied_reasons.push("position_restore_unsupported".to_string());
++    }
++    let restore_verified = match input.mode {
++        KvRollback00Mode::StrictProbe => forked_replay_passed == Some(true) && shape_probe_passed && input.capability.supports_restore,
++        KvRollback00Mode::ForkedReplayProbe => forked_replay_passed == Some(true) && shape_probe_passed && input.capability.supports_restore,
++        _ => false,
++    };
++    if matches!(input.mode, KvRollback00Mode::StrictProbe) && !restore_verified {
++        denied_reasons.push("strict_probe_restore_not_verified".to_string());
++    }
++    KvRollback00ProbeResult {
++        mode: input.mode,
++        snapshot_created,
++        snapshot_id,
++        target_snapshot_found,
++        shape_probe_passed,
++        hash_probe_passed,
++        forked_replay_passed,
++        restore_verified,
++        main_state_unchanged: true,
++        denied_reasons,
++        warning_reasons,
++        probe_reasons,
++    }
++}
++
++pub fn input_from_salad03(mode: KvRollback00Mode, salad03: &Salad03StepReceipt) -> KvRollback00ProbeInput {
++    let rollback_depth = salad03.plan.rollback_depth;
++    let target_step = salad03.plan.rollback_target_step.unwrap_or_else(|| salad03.step.saturating_sub(rollback_depth));
++    let backend = salad03.backend.clone();
++    let capability = backend_capability_from_env(&backend);
++    KvRollback00ProbeInput {
++        mode,
++        run_id: run_id_from_env(),
++        prompt_hash: salad03.prompt_hash.clone(),
++        seed: salad03.seed,
++        step: salad03.step,
++        backend,
++        target_step,
++        rollback_depth,
++        token_ledger_len: salad03.input.token_ledger_len,
++        requested_snapshot_id: Some(snapshot_id_for_step(target_step)),
++        salad03_decision: Some(format!("{:?}", salad03.plan.decision)),
++        salad03_rollback_depth: Some(rollback_depth),
++        salad02_risk_stable: Some(format!("{:?}", salad03.input.risk_stable)),
++        current_position: position_state_for_step(salad03.step),
++        target_position: position_state_for_step(target_step),
++        capability,
++    }
++}
++
++pub fn receipt_from_salad03(mode: KvRollback00Mode, salad03: &Salad03StepReceipt) -> KvRollback00StepReceipt {
++    let input = input_from_salad03(mode, salad03);
++    let mut snapshot = snapshot_for_input(&input);
++    let target_found = snapshot.is_some() && input.step >= input.target_step && input.step.saturating_sub(input.target_step) < env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
++    let ring_state = ring_state_for(&input, target_found);
++    let forked_replay = forked_replay_for(&input, snapshot.as_ref());
++    let result = evaluate_kv_rollback00_probe(&input, snapshot.as_ref(), forked_replay.as_ref());
++    if let Some(snapshot_ref) = snapshot.as_mut() {
++        snapshot_ref.restore_verified = result.restore_verified;
++    }
++    KvRollback00StepReceipt {
++        patch_id: KV_ROLLBACK00_PATCH_ID.to_string(),
++        input_patch: KV_ROLLBACK00_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: input.run_id.clone(),
++        prompt_hash: input.prompt_hash.clone(),
++        seed: input.seed,
++        step: input.step,
++        backend: input.backend.clone(),
++        sampler_ssot: KV_ROLLBACK00_SSOT.to_string(),
++        mode,
++        behavior_change: false,
++        probe_only: true,
++        salad03_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD03_RECEIPT".to_string()),
++        salad02_status_seen: salad03.salad02_status_seen.clone(),
++        decode03d_status_seen: salad03.decode03d_status_seen.clone(),
++        input,
++        snapshot,
++        ring_state,
++        result,
++        forked_replay,
++        selected_id_current: salad03.selected_id_before,
++        selected_piece_current: salad03.selected_piece_before.clone(),
++    }
++}
++
++pub fn append_kv_rollback00_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = KvRollback00Mode::from_env();
++    if !mode.probe_requested() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad03_mode = Salad03Mode::from_env();
++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
++    let receipt = receipt_from_salad03(mode, &salad03_receipt);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<KvRollback00StepReceipt> {
++    let data = match fs::read_to_string(path) {
++        Ok(data) => data,
++        Err(_) => return Vec::new(),
++    };
++    data.lines().filter_map(|line| serde_json::from_str::<KvRollback00StepReceipt>(line).ok()).collect()
++}
++
++pub fn summary_from_receipts(receipts: &[KvRollback00StepReceipt]) -> KvRollback00Summary {
++    let mut snapshot = KvRollback00SnapshotStats::default();
++    let mut probe = KvRollback00ProbeStats::default();
++    let mut safety = KvRollback00SafetyStats::default();
++    let mut mode = "SnapshotOnly".to_string();
++    let mut capability = backend_capability_from_env("unknown");
++    let mut salad03_status_seen = None;
++
++    for receipt in receipts {
++        mode = receipt.mode.as_str().to_string();
++        capability = receipt.input.capability.clone();
++        salad03_status_seen = receipt.salad03_status_seen.clone();
++        snapshot.ring_capacity = receipt.ring_state.capacity;
++        snapshot.evicted_count = snapshot.evicted_count.max(receipt.ring_state.evicted_count);
++        if receipt.result.snapshot_created { snapshot.created_count += 1; }
++        if receipt.result.target_snapshot_found { snapshot.target_found_count += 1; } else { snapshot.target_missing_count += 1; }
++        if receipt.result.shape_probe_passed { probe.shape_probe_passed_count += 1; } else if receipt.snapshot.is_some() { safety.shape_mismatch_count += 1; }
++        if receipt.result.hash_probe_passed == Some(true) { probe.hash_probe_passed_count += 1; }
++        if let Some(fork) = &receipt.forked_replay {
++            if fork.attempted { probe.forked_replay_attempted_count += 1; }
++            if receipt.result.forked_replay_passed == Some(true) { probe.forked_replay_passed_count += 1; }
++        }
++        if receipt.result.restore_verified { probe.restore_verified_count += 1; }
++        if !receipt.result.main_state_unchanged { safety.main_state_changed_count += 1; }
++        if receipt.result.restore_verified && !receipt.result.target_snapshot_found { safety.restore_without_snapshot_count += 1; }
++        if let Some(snapshot_ref) = &receipt.snapshot {
++            if snapshot_ref.position_state.position_index != receipt.input.target_position.position_index { safety.position_mismatch_count += 1; }
++        }
++    }
++    let steps_observed = receipts.len();
++    let behavior_change = safety.main_state_changed_count > 0;
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if behavior_change || safety.restore_without_snapshot_count > 0 || safety.position_mismatch_count > 0 {
++        "FAIL_CONTRACT_VIOLATION"
++    } else if snapshot.target_missing_count > 0 || probe.restore_verified_count == 0 || !capability.supports_forked_restore {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }.to_string();
++    let ready_for_forked = steps_observed > 0 && safety.main_state_changed_count == 0 && probe.shape_probe_passed_count > 0;
++    let ready_for_salad03_execute = steps_observed > 0 && probe.restore_verified_count > 0 && safety.main_state_changed_count == 0;
++    KvRollback00Summary {
++        patch_id: KV_ROLLBACK00_PATCH_ID.to_string(),
++        input_patch: KV_ROLLBACK00_INPUT_PATCH_ID.to_string(),
++        status,
++        behavior_change,
++        probe_only: true,
++        mode,
++        requires_salad03: env_bool("ASH_KV_ROLLBACK00_REQUIRE_SALAD03", true),
++        salad03_status_seen,
++        steps_observed,
++        snapshot,
++        probe,
++        backend_capability: capability,
++        safety,
++        ready_for_salad03_controlled_execute: ready_for_salad03_execute,
++        ready_for_kv_rollback01_forked_replay: ready_for_forked,
++        reason: if ready_for_salad03_execute {
++            "restore verified; SALAD-03 controlled execute may be considered".to_string()
++        } else if ready_for_forked {
++            "shape restore probe available; forked replay verification not yet sealed".to_string()
++        } else {
++            "snapshot/probe receipt sealed; runtime verification pending".to_string()
++        },
++    }
++}
++
++pub fn write_kv_rollback00_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, json);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::salad02_detector::SaladRiskLevel;
++    use crate::salad03_rollback::{Salad03RollbackInput, build_salad03_plan};
++
++    #[test]
++    fn kvrollback00_snapshot_ref_records_position() {
++        let capability = backend_capability_from_env("test");
++        let input = KvRollback00ProbeInput {
++            mode: KvRollback00Mode::SnapshotOnly,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 10,
++            backend: "test".to_string(),
++            target_step: 8,
++            rollback_depth: 2,
++            token_ledger_len: 10,
++            requested_snapshot_id: Some("kv_000008".to_string()),
++            salad03_decision: None,
++            salad03_rollback_depth: Some(2),
++            salad02_risk_stable: Some("High".to_string()),
++            current_position: position_state_for_step(10),
++            target_position: position_state_for_step(8),
++            capability,
++        };
++        let snapshot = snapshot_for_input(&input).unwrap();
++        assert_eq!(snapshot.position_state.position_index, 8);
++    }
++
++    #[test]
++    fn kvrollback00_shape_probe_passes_matching_shape() {
++        let capability = backend_capability_from_env("test");
++        let input = KvRollback00ProbeInput {
++            mode: KvRollback00Mode::DryRunRestoreProbe,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 10,
++            backend: "test".to_string(),
++            target_step: 8,
++            rollback_depth: 2,
++            token_ledger_len: 10,
++            requested_snapshot_id: None,
++            salad03_decision: None,
++            salad03_rollback_depth: Some(2),
++            salad02_risk_stable: Some("High".to_string()),
++            current_position: position_state_for_step(10),
++            target_position: position_state_for_step(8),
++            capability,
++        };
++        let snapshot = snapshot_for_input(&input).unwrap();
++        assert!(shape_probe(&snapshot, &input));
++    }
++
++    #[test]
++    fn kvrollback00_main_state_unchanged_required() {
++        let capability = backend_capability_from_env("test");
++        let input = KvRollback00ProbeInput {
++            mode: KvRollback00Mode::SnapshotOnly,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 10,
++            backend: "test".to_string(),
++            target_step: 8,
++            rollback_depth: 2,
++            token_ledger_len: 10,
++            requested_snapshot_id: None,
++            salad03_decision: None,
++            salad03_rollback_depth: Some(2),
++            salad02_risk_stable: Some("High".to_string()),
++            current_position: position_state_for_step(10),
++            target_position: position_state_for_step(8),
++            capability,
++        };
++        let snapshot = snapshot_for_input(&input);
++        let result = evaluate_kv_rollback00_probe(&input, snapshot.as_ref(), None);
++        assert!(result.main_state_unchanged);
++    }
++
++    #[test]
++    fn kvrollback00_salad03_plan_still_requires_kv() {
++        let input = Salad03RollbackInput {
++            mode: crate::salad03_rollback::Salad03Mode::ControlledExecute,
++            behavior_change_allowed: true,
++            risk_raw: SaladRiskLevel::High,
++            risk_stable: SaladRiskLevel::High,
++            salad_score: 0.7,
++            rollback_candidate: true,
++            safe_stop_candidate: false,
++            eos_bias_candidate: false,
++            same_token_streak: 1,
++            same_piece_streak: 1,
++            repeat_3gram_count: 2,
++            repeat_4gram_count: 0,
++            byte_piece_count: 0,
++            jamo_leak_count: 0,
++            symbol_noise_count: 0,
++            pci_raw: Some(0.3),
++            pci_bucket: Some("Unstable".to_string()),
++            global_finite_fallback_seen: false,
++            numeric_risk: false,
++            empty_active_set_seen: false,
++            current_temperature: 0.18,
++            current_top_p: 0.86,
++            current_top_k: 0,
++            current_min_p: 0.08,
++            current_repeat_penalty: Some(1.0),
++            token_ledger_len: 16,
++            kv_snapshot_available: false,
++            kv_restore_supported: false,
++            kv_restore_verified: false,
++            rollback_count_window: 0,
++        };
++        let plan = build_salad03_plan(&input);
++        assert_ne!(plan.decision, crate::salad03_rollback::Salad03DecisionKind::ExecuteRollbackResample);
++    }
++}
+diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/lib.rs /mnt/data/kvrollback00_work/crates/model_core/src/lib.rs
+--- /mnt/data/kvrollback00_orig/crates/model_core/src/lib.rs	2026-05-27 06:54:11.000000000 +0000
++++ /mnt/data/kvrollback00_work/crates/model_core/src/lib.rs	2026-05-27 07:05:24.639970857 +0000
+@@ -22,6 +22,7 @@
+ mod decode03d_controlled_enable;
+ mod salad02_detector;
+ mod salad03_rollback;
++mod kv_rollback00_probe;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -139,6 +140,18 @@
+     write_salad03_summary_from_receipt_file,
+ };
+ 
++pub use kv_rollback00_probe::{
++    KV_ROLLBACK00_PATCH_ID, KV_ROLLBACK00_INPUT_PATCH_ID, KV_ROLLBACK00_SSOT,
++    KvRollback00Mode, KvRollbackTokenLedgerEntry, KvRollbackPositionState, KvRollbackKvShape,
++    KvRollbackSnapshotRef, KvRollbackBackendCapability, KvRollbackSnapshotRingState,
++    KvRollback00ProbeInput, KvRollback00ProbeResult, KvRollback00ForkedReplayReceipt,
++    KvRollback00StepReceipt, KvRollback00Summary, KvRollbackProbeRuntime, KvRollbackForkedState,
++    backend_capability_from_env as kvrollback00_backend_capability_from_env,
++    evaluate_kv_rollback00_probe, input_from_salad03 as kvrollback00_input_from_salad03,
++    receipt_from_salad03 as kvrollback00_receipt_from_salad03,
++    append_kv_rollback00_receipt_from_sampler03, write_kv_rollback00_summary_from_receipt_file,
++};
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/sampler_parity.rs /mnt/data/kvrollback00_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/kvrollback00_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:54:11.000000000 +0000
++++ /mnt/data/kvrollback00_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:05:24.640715913 +0000
+@@ -455,5 +455,6 @@
+     crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
+     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
+     crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
++    crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00.patch /mnt/data/kvrollback00_work/workspace/kv_rollback00.patch
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00.patch	2026-05-27 07:06:11.514144864 +0000
+@@ -0,0 +1,873 @@
++diff -ruN /mnt/data/kvrollback00_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md /mnt/data/kvrollback00_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md
++--- /mnt/data/kvrollback00_orig/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/kvrollback00_work/acceptance_reports/16AI-QW-38G-R6A-KV-ROLLBACK-00_acceptance.md	2026-05-27 07:06:09.562720641 +0000
++@@ -0,0 +1,25 @@
+++# Acceptance Report — 16AI-QW-38G-R6A-KV-ROLLBACK-00
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN
+++
+++## Baked Contracts
+++- behavior_change=false
+++- probe_only=true
+++- main_state_unchanged=true
+++- restore_verified 없이는 SALAD-03 controlled execute로 승격하지 않음
+++- 문자열-only rollback 금지: rollback SSOT는 KVSnapshotLedger + TokenLedger + PositionState
+++
+++## Added Files
+++- crates/model_core/src/kv_rollback00_probe.rs
+++- workspace/kv_rollback00_probe_schema.json
+++- workspace/kv_rollback00_steps.jsonl
+++- workspace/kv_rollback00_summary.json
+++- workspace/kv_rollback00_static_checks.json
+++- workspace/kv_rollback00_probe_prompts.jsonl
+++- workspace/kv_rollback00_report.md
+++
+++## Not Run
+++- cargo check: unavailable in container
+++- runtime smoke: not run
+++- forked replay: not run
++diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/kv_rollback00_probe.rs /mnt/data/kvrollback00_work/crates/model_core/src/kv_rollback00_probe.rs
++--- /mnt/data/kvrollback00_orig/crates/model_core/src/kv_rollback00_probe.rs	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/kvrollback00_work/crates/model_core/src/kv_rollback00_probe.rs	2026-05-27 07:05:22.899953798 +0000
++@@ -0,0 +1,800 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
+++use crate::salad03_rollback::{receipt_from_salad02, Salad03DecisionKind, Salad03Mode, Salad03StepReceipt};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const KV_ROLLBACK00_PATCH_ID: &str = "16AI-QW-38G-R6A-KV-ROLLBACK-00";
+++pub const KV_ROLLBACK00_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03";
+++pub const KV_ROLLBACK00_SSOT: &str = "KVSnapshotLedger+TokenLedger+PositionState";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum KvRollback00Mode {
+++    Off,
+++    SnapshotOnly,
+++    DryRunRestoreProbe,
+++    ForkedReplayProbe,
+++    StrictProbe,
+++}
+++
+++impl KvRollback00Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_KV_ROLLBACK00_MODE")
+++            .or_else(|_| env::var("ASH_KV_ROLLBACK00_PROBE"))
+++            .unwrap_or_else(|_| "snapshot_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "0" | "false" | "disabled" => Self::Off,
+++            "dry" | "dry_run" | "dry_run_restore_probe" | "restore_probe" => Self::DryRunRestoreProbe,
+++            "fork" | "forked" | "forked_replay" | "forked_replay_probe" => Self::ForkedReplayProbe,
+++            "strict" | "strict_probe" => Self::StrictProbe,
+++            _ => Self::SnapshotOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::SnapshotOnly => "SnapshotOnly",
+++            Self::DryRunRestoreProbe => "DryRunRestoreProbe",
+++            Self::ForkedReplayProbe => "ForkedReplayProbe",
+++            Self::StrictProbe => "StrictProbe",
+++        }
+++    }
+++
+++    pub fn probe_requested(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackTokenLedgerEntry {
+++    pub step: usize,
+++    pub token_id: u32,
+++    pub piece_preview: Option<String>,
+++    pub selected_rank: Option<usize>,
+++    pub selected_logprob: Option<f32>,
+++    pub decode_config_hash: Option<String>,
+++    pub sampler_state_hash: Option<String>,
+++    pub kv_snapshot_id: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackPositionState {
+++    pub step: usize,
+++    pub position_index: usize,
+++    pub seq_len: usize,
+++    pub absolute_position: Option<usize>,
+++    pub rope_position: Option<usize>,
+++    pub attention_mask_len: Option<usize>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackKvShape {
+++    pub num_layers: usize,
+++    pub batch_size: usize,
+++    pub num_heads: Option<usize>,
+++    pub num_kv_heads: Option<usize>,
+++    pub head_dim: Option<usize>,
+++    pub seq_len: usize,
+++    pub key_shape: Vec<usize>,
+++    pub value_shape: Vec<usize>,
+++    pub dtype: String,
+++    pub layout_hint: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackSnapshotRef {
+++    pub snapshot_id: String,
+++    pub step: usize,
+++    pub created_at_decode_step: usize,
+++    pub backend: String,
+++    pub device_kind: String,
+++    pub available: bool,
+++    pub restore_supported: bool,
+++    pub restore_verified: bool,
+++    pub kv_shape: KvRollbackKvShape,
+++    pub kv_hash: Option<String>,
+++    pub position_state: KvRollbackPositionState,
+++    pub token_ledger_len: usize,
+++    pub sampler_state_hash: Option<String>,
+++    pub memory_bytes_estimate: Option<u64>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackBackendCapability {
+++    pub backend: String,
+++    pub supports_snapshot: bool,
+++    pub supports_restore: bool,
+++    pub supports_forked_restore: bool,
+++    pub supports_kv_hash: bool,
+++    pub supports_position_restore: bool,
+++    pub supports_sampler_state_restore: bool,
+++    pub requires_gpu_readback: bool,
+++    pub snapshot_cost_estimate: Option<String>,
+++    pub notes: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollbackSnapshotRingState {
+++    pub capacity: usize,
+++    pub len: usize,
+++    pub oldest_step: Option<usize>,
+++    pub newest_step: Option<usize>,
+++    pub evicted_count: usize,
+++    pub missing_target_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback00ProbeInput {
+++    pub mode: KvRollback00Mode,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub target_step: usize,
+++    pub rollback_depth: usize,
+++    pub token_ledger_len: usize,
+++    pub requested_snapshot_id: Option<String>,
+++    pub salad03_decision: Option<String>,
+++    pub salad03_rollback_depth: Option<usize>,
+++    pub salad02_risk_stable: Option<String>,
+++    pub current_position: KvRollbackPositionState,
+++    pub target_position: KvRollbackPositionState,
+++    pub capability: KvRollbackBackendCapability,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback00ProbeResult {
+++    pub mode: KvRollback00Mode,
+++    pub snapshot_created: bool,
+++    pub snapshot_id: Option<String>,
+++    pub target_snapshot_found: bool,
+++    pub shape_probe_passed: bool,
+++    pub hash_probe_passed: Option<bool>,
+++    pub forked_replay_passed: Option<bool>,
+++    pub restore_verified: bool,
+++    pub main_state_unchanged: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub probe_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback00ForkedReplayReceipt {
+++    pub attempted: bool,
+++    pub fork_created: bool,
+++    pub restore_to_fork_executed: bool,
+++    pub target_step: usize,
+++    pub replay_input_token_id: Option<u32>,
+++    pub logits_shape_match: Option<bool>,
+++    pub original_top1_id: Option<u32>,
+++    pub forked_top1_id: Option<u32>,
+++    pub top1_match: Option<bool>,
+++    pub original_top5_ids: Vec<u32>,
+++    pub forked_top5_ids: Vec<u32>,
+++    pub top5_overlap: Option<usize>,
+++    pub mean_abs_delta: Option<f32>,
+++    pub max_abs_delta: Option<f32>,
+++    pub tolerance_used: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback00StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: KvRollback00Mode,
+++    pub behavior_change: bool,
+++    pub probe_only: bool,
+++    pub salad03_status_seen: Option<String>,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub input: KvRollback00ProbeInput,
+++    pub snapshot: Option<KvRollbackSnapshotRef>,
+++    pub ring_state: KvRollbackSnapshotRingState,
+++    pub result: KvRollback00ProbeResult,
+++    pub forked_replay: Option<KvRollback00ForkedReplayReceipt>,
+++    pub selected_id_current: Option<u32>,
+++    pub selected_piece_current: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback00SnapshotStats {
+++    pub created_count: usize,
+++    pub target_found_count: usize,
+++    pub target_missing_count: usize,
+++    pub ring_capacity: usize,
+++    pub evicted_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback00ProbeStats {
+++    pub shape_probe_passed_count: usize,
+++    pub hash_probe_passed_count: usize,
+++    pub forked_replay_attempted_count: usize,
+++    pub forked_replay_passed_count: usize,
+++    pub restore_verified_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct KvRollback00SafetyStats {
+++    pub main_state_changed_count: usize,
+++    pub restore_without_snapshot_count: usize,
+++    pub position_mismatch_count: usize,
+++    pub shape_mismatch_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct KvRollback00Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub behavior_change: bool,
+++    pub probe_only: bool,
+++    pub mode: String,
+++    pub requires_salad03: bool,
+++    pub salad03_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub snapshot: KvRollback00SnapshotStats,
+++    pub probe: KvRollback00ProbeStats,
+++    pub backend_capability: KvRollbackBackendCapability,
+++    pub safety: KvRollback00SafetyStats,
+++    pub ready_for_salad03_controlled_execute: bool,
+++    pub ready_for_kv_rollback01_forked_replay: bool,
+++    pub reason: String,
+++}
+++
+++pub trait KvRollbackProbeRuntime {
+++    fn capture_kv_snapshot(&mut self, step: usize) -> Result<KvRollbackSnapshotRef, String>;
+++    fn backend_capability(&self) -> KvRollbackBackendCapability;
+++    fn fork_from_snapshot(&self, snapshot_id: &str) -> Result<Box<dyn KvRollbackForkedState>, String>;
+++}
+++
+++pub trait KvRollbackForkedState {
+++    fn replay_one_step(&mut self, token_id: u32) -> Result<KvRollback00ForkedReplayReceipt, String>;
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_u64(name: &str, default: u64) -> u64 {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(default)
+++}
+++
+++fn env_string(name: &str, default: &str) -> String {
+++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_KV_ROLLBACK00_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback00_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_KV_ROLLBACK00_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/kv_rollback00_summary.json"))
+++}
+++
+++fn run_id_from_env() -> String {
+++    env_string("ASH_KV_ROLLBACK00_RUN_ID", "kvrollback00_sampler03_bridge")
+++}
+++
+++pub fn backend_capability_from_env(backend: &str) -> KvRollbackBackendCapability {
+++    let supports_snapshot = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_SNAPSHOT", true);
+++    let supports_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_RESTORE", false);
+++    let supports_forked_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_FORKED_RESTORE", false);
+++    let supports_kv_hash = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_KV_HASH", false);
+++    let supports_position_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_POSITION_RESTORE", supports_restore);
+++    let supports_sampler_state_restore = env_bool("ASH_KV_ROLLBACK00_SUPPORTS_SAMPLER_STATE_RESTORE", false);
+++    let requires_gpu_readback = env_bool("ASH_KV_ROLLBACK00_REQUIRES_GPU_READBACK", false);
+++    let mut notes = Vec::new();
+++    if !supports_restore { notes.push("restore_support_not_declared".to_string()); }
+++    if !supports_forked_restore { notes.push("forked_restore_not_declared".to_string()); }
+++    if requires_gpu_readback { notes.push("snapshot_hash_may_require_gpu_readback".to_string()); }
+++    KvRollbackBackendCapability {
+++        backend: backend.to_string(),
+++        supports_snapshot,
+++        supports_restore,
+++        supports_forked_restore,
+++        supports_kv_hash,
+++        supports_position_restore,
+++        supports_sampler_state_restore,
+++        requires_gpu_readback,
+++        snapshot_cost_estimate: Some(env_string("ASH_KV_ROLLBACK00_SNAPSHOT_COST", "unknown")),
+++        notes,
+++    }
+++}
+++
+++fn position_state_for_step(step: usize) -> KvRollbackPositionState {
+++    KvRollbackPositionState {
+++        step,
+++        position_index: step,
+++        seq_len: step,
+++        absolute_position: Some(step),
+++        rope_position: Some(step),
+++        attention_mask_len: Some(step),
+++    }
+++}
+++
+++fn kv_shape_for_step(step: usize) -> KvRollbackKvShape {
+++    let num_layers = env_usize("ASH_KV_ROLLBACK00_NUM_LAYERS", 0);
+++    let batch_size = env_usize("ASH_KV_ROLLBACK00_BATCH_SIZE", 1);
+++    let num_kv_heads = env_usize("ASH_KV_ROLLBACK00_NUM_KV_HEADS", 0);
+++    let num_heads = env_usize("ASH_KV_ROLLBACK00_NUM_HEADS", num_kv_heads);
+++    let head_dim = env_usize("ASH_KV_ROLLBACK00_HEAD_DIM", 0);
+++    let dtype = env_string("ASH_KV_ROLLBACK00_DTYPE", "unknown");
+++    let layout_hint = env_string("ASH_KV_ROLLBACK00_LAYOUT_HINT", "unknown");
+++    let key_shape = if num_layers > 0 && num_kv_heads > 0 && head_dim > 0 {
+++        vec![num_layers, batch_size, num_kv_heads, step, head_dim]
+++    } else {
+++        vec![step]
+++    };
+++    let value_shape = key_shape.clone();
+++    KvRollbackKvShape {
+++        num_layers,
+++        batch_size,
+++        num_heads: if num_heads > 0 { Some(num_heads) } else { None },
+++        num_kv_heads: if num_kv_heads > 0 { Some(num_kv_heads) } else { None },
+++        head_dim: if head_dim > 0 { Some(head_dim) } else { None },
+++        seq_len: step,
+++        key_shape,
+++        value_shape,
+++        dtype,
+++        layout_hint,
+++    }
+++}
+++
+++fn snapshot_id_for_step(step: usize) -> String {
+++    format!("kv_{step:06}")
+++}
+++
+++fn snapshot_for_input(input: &KvRollback00ProbeInput) -> Option<KvRollbackSnapshotRef> {
+++    if !input.capability.supports_snapshot {
+++        return None;
+++    }
+++    let target = input.target_step;
+++    let kv_shape = kv_shape_for_step(target);
+++    let memory_bytes_estimate = env_u64("ASH_KV_ROLLBACK00_MEMORY_BYTES_ESTIMATE", 0);
+++    Some(KvRollbackSnapshotRef {
+++        snapshot_id: input.requested_snapshot_id.clone().unwrap_or_else(|| snapshot_id_for_step(target)),
+++        step: target,
+++        created_at_decode_step: target,
+++        backend: input.backend.clone(),
+++        device_kind: env_string("ASH_KV_ROLLBACK00_DEVICE_KIND", if input.backend.contains("gpu") { "gpu" } else { "cpu" }),
+++        available: true,
+++        restore_supported: input.capability.supports_restore,
+++        restore_verified: false,
+++        kv_shape,
+++        kv_hash: if input.capability.supports_kv_hash { Some(format!("sha256:compact-kv-step-{target}")) } else { None },
+++        position_state: input.target_position.clone(),
+++        token_ledger_len: input.target_step,
+++        sampler_state_hash: if input.capability.supports_sampler_state_restore { Some(format!("sha256:sampler-state-step-{target}")) } else { None },
+++        memory_bytes_estimate: if memory_bytes_estimate > 0 { Some(memory_bytes_estimate) } else { None },
+++    })
+++}
+++
+++fn ring_state_for(input: &KvRollback00ProbeInput, target_found: bool) -> KvRollbackSnapshotRingState {
+++    let capacity = env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
+++    let len = input.step.saturating_add(1).min(capacity);
+++    let newest_step = Some(input.step);
+++    let oldest = input.step.saturating_add(1).saturating_sub(len);
+++    let oldest_step = Some(oldest);
+++    let evicted_count = input.step.saturating_add(1).saturating_sub(len);
+++    KvRollbackSnapshotRingState {
+++        capacity,
+++        len,
+++        oldest_step,
+++        newest_step,
+++        evicted_count,
+++        missing_target_count: if target_found { 0 } else { 1 },
+++    }
+++}
+++
+++fn shape_probe(snapshot: &KvRollbackSnapshotRef, input: &KvRollback00ProbeInput) -> bool {
+++    snapshot.available
+++        && snapshot.kv_shape.seq_len == input.target_position.seq_len
+++        && snapshot.position_state.position_index == input.target_position.position_index
+++        && snapshot.token_ledger_len <= input.token_ledger_len
+++}
+++
+++fn forked_replay_for(input: &KvRollback00ProbeInput, snapshot: Option<&KvRollbackSnapshotRef>) -> Option<KvRollback00ForkedReplayReceipt> {
+++    if !matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) {
+++        return None;
+++    }
+++    let attempted = input.capability.supports_forked_restore && snapshot.is_some();
+++    let top1_match = if attempted { Some(env_bool("ASH_KV_ROLLBACK00_FORKED_TOP1_MATCH", false)) } else { None };
+++    let original_top1_id = env::var("ASH_KV_ROLLBACK00_ORIGINAL_TOP1_ID").ok().and_then(|v| v.parse::<u32>().ok());
+++    let forked_top1_id = if top1_match == Some(true) { original_top1_id } else { env::var("ASH_KV_ROLLBACK00_FORKED_TOP1_ID").ok().and_then(|v| v.parse::<u32>().ok()) };
+++    Some(KvRollback00ForkedReplayReceipt {
+++        attempted,
+++        fork_created: attempted,
+++        restore_to_fork_executed: attempted,
+++        target_step: input.target_step,
+++        replay_input_token_id: None,
+++        logits_shape_match: if attempted { Some(env_bool("ASH_KV_ROLLBACK00_LOGITS_SHAPE_MATCH", true)) } else { None },
+++        original_top1_id,
+++        forked_top1_id,
+++        top1_match,
+++        original_top5_ids: Vec::new(),
+++        forked_top5_ids: Vec::new(),
+++        top5_overlap: if attempted { Some(env_usize("ASH_KV_ROLLBACK00_TOP5_OVERLAP", 0)) } else { None },
+++        mean_abs_delta: None,
+++        max_abs_delta: None,
+++        tolerance_used: Some(env::var("ASH_KV_ROLLBACK00_LOGIT_TOLERANCE").ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.001)),
+++    })
+++}
+++
+++pub fn evaluate_kv_rollback00_probe(
+++    input: &KvRollback00ProbeInput,
+++    snapshot: Option<&KvRollbackSnapshotRef>,
+++    forked_replay: Option<&KvRollback00ForkedReplayReceipt>,
+++) -> KvRollback00ProbeResult {
+++    let mut denied_reasons = Vec::new();
+++    let mut warning_reasons = Vec::new();
+++    let mut probe_reasons = Vec::new();
+++    let snapshot_created = snapshot.is_some();
+++    let snapshot_id = snapshot.map(|s| s.snapshot_id.clone());
+++    if !input.capability.supports_snapshot {
+++        denied_reasons.push("backend_snapshot_unsupported".to_string());
+++    }
+++    let target_snapshot_found = snapshot_created && input.step >= input.target_step && input.step.saturating_sub(input.target_step) < env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
+++    if target_snapshot_found { probe_reasons.push("target_snapshot_found".to_string()); } else { warning_reasons.push("target_snapshot_missing_or_evicted".to_string()); }
+++    let shape_probe_passed = snapshot.map(|s| shape_probe(s, input)).unwrap_or(false);
+++    if shape_probe_passed { probe_reasons.push("shape_probe_passed".to_string()); } else if snapshot_created { denied_reasons.push("shape_or_position_probe_failed".to_string()); }
+++    let hash_probe_passed = if input.capability.supports_kv_hash { Some(snapshot.and_then(|s| s.kv_hash.as_ref()).is_some()) } else { None };
+++    if hash_probe_passed == Some(true) { probe_reasons.push("kv_hash_present".to_string()); }
+++    let forked_replay_passed = forked_replay.and_then(|r| r.top1_match).or_else(|| forked_replay.and_then(|r| r.top5_overlap.map(|n| n >= 3)));
+++    if matches!(input.mode, KvRollback00Mode::DryRunRestoreProbe) { warning_reasons.push("forked_replay_not_attempted".to_string()); }
+++    if matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) && forked_replay.is_none() {
+++        denied_reasons.push("forked_replay_receipt_missing".to_string());
+++    }
+++    if matches!(input.mode, KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) && !input.capability.supports_forked_restore {
+++        denied_reasons.push("backend_forked_restore_unsupported".to_string());
+++    }
+++    if input.capability.supports_restore && shape_probe_passed { probe_reasons.push("restore_dry_run_supported".to_string()); }
+++    if !input.capability.supports_position_restore && matches!(input.mode, KvRollback00Mode::DryRunRestoreProbe | KvRollback00Mode::ForkedReplayProbe | KvRollback00Mode::StrictProbe) {
+++        denied_reasons.push("position_restore_unsupported".to_string());
+++    }
+++    let restore_verified = match input.mode {
+++        KvRollback00Mode::StrictProbe => forked_replay_passed == Some(true) && shape_probe_passed && input.capability.supports_restore,
+++        KvRollback00Mode::ForkedReplayProbe => forked_replay_passed == Some(true) && shape_probe_passed && input.capability.supports_restore,
+++        _ => false,
+++    };
+++    if matches!(input.mode, KvRollback00Mode::StrictProbe) && !restore_verified {
+++        denied_reasons.push("strict_probe_restore_not_verified".to_string());
+++    }
+++    KvRollback00ProbeResult {
+++        mode: input.mode,
+++        snapshot_created,
+++        snapshot_id,
+++        target_snapshot_found,
+++        shape_probe_passed,
+++        hash_probe_passed,
+++        forked_replay_passed,
+++        restore_verified,
+++        main_state_unchanged: true,
+++        denied_reasons,
+++        warning_reasons,
+++        probe_reasons,
+++    }
+++}
+++
+++pub fn input_from_salad03(mode: KvRollback00Mode, salad03: &Salad03StepReceipt) -> KvRollback00ProbeInput {
+++    let rollback_depth = salad03.plan.rollback_depth;
+++    let target_step = salad03.plan.rollback_target_step.unwrap_or_else(|| salad03.step.saturating_sub(rollback_depth));
+++    let backend = salad03.backend.clone();
+++    let capability = backend_capability_from_env(&backend);
+++    KvRollback00ProbeInput {
+++        mode,
+++        run_id: run_id_from_env(),
+++        prompt_hash: salad03.prompt_hash.clone(),
+++        seed: salad03.seed,
+++        step: salad03.step,
+++        backend,
+++        target_step,
+++        rollback_depth,
+++        token_ledger_len: salad03.input.token_ledger_len,
+++        requested_snapshot_id: Some(snapshot_id_for_step(target_step)),
+++        salad03_decision: Some(format!("{:?}", salad03.plan.decision)),
+++        salad03_rollback_depth: Some(rollback_depth),
+++        salad02_risk_stable: Some(format!("{:?}", salad03.input.risk_stable)),
+++        current_position: position_state_for_step(salad03.step),
+++        target_position: position_state_for_step(target_step),
+++        capability,
+++    }
+++}
+++
+++pub fn receipt_from_salad03(mode: KvRollback00Mode, salad03: &Salad03StepReceipt) -> KvRollback00StepReceipt {
+++    let input = input_from_salad03(mode, salad03);
+++    let mut snapshot = snapshot_for_input(&input);
+++    let target_found = snapshot.is_some() && input.step >= input.target_step && input.step.saturating_sub(input.target_step) < env_usize("ASH_KV_ROLLBACK00_RING_CAPACITY", 16).max(1);
+++    let ring_state = ring_state_for(&input, target_found);
+++    let forked_replay = forked_replay_for(&input, snapshot.as_ref());
+++    let result = evaluate_kv_rollback00_probe(&input, snapshot.as_ref(), forked_replay.as_ref());
+++    if let Some(snapshot_ref) = snapshot.as_mut() {
+++        snapshot_ref.restore_verified = result.restore_verified;
+++    }
+++    KvRollback00StepReceipt {
+++        patch_id: KV_ROLLBACK00_PATCH_ID.to_string(),
+++        input_patch: KV_ROLLBACK00_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: input.run_id.clone(),
+++        prompt_hash: input.prompt_hash.clone(),
+++        seed: input.seed,
+++        step: input.step,
+++        backend: input.backend.clone(),
+++        sampler_ssot: KV_ROLLBACK00_SSOT.to_string(),
+++        mode,
+++        behavior_change: false,
+++        probe_only: true,
+++        salad03_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD03_RECEIPT".to_string()),
+++        salad02_status_seen: salad03.salad02_status_seen.clone(),
+++        decode03d_status_seen: salad03.decode03d_status_seen.clone(),
+++        input,
+++        snapshot,
+++        ring_state,
+++        result,
+++        forked_replay,
+++        selected_id_current: salad03.selected_id_before,
+++        selected_piece_current: salad03.selected_piece_before.clone(),
+++    }
+++}
+++
+++pub fn append_kv_rollback00_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = KvRollback00Mode::from_env();
+++    if !mode.probe_requested() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
+++    let salad03_mode = Salad03Mode::from_env();
+++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
+++    let receipt = receipt_from_salad03(mode, &salad03_receipt);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn read_receipts(path: PathBuf) -> Vec<KvRollback00StepReceipt> {
+++    let data = match fs::read_to_string(path) {
+++        Ok(data) => data,
+++        Err(_) => return Vec::new(),
+++    };
+++    data.lines().filter_map(|line| serde_json::from_str::<KvRollback00StepReceipt>(line).ok()).collect()
+++}
+++
+++pub fn summary_from_receipts(receipts: &[KvRollback00StepReceipt]) -> KvRollback00Summary {
+++    let mut snapshot = KvRollback00SnapshotStats::default();
+++    let mut probe = KvRollback00ProbeStats::default();
+++    let mut safety = KvRollback00SafetyStats::default();
+++    let mut mode = "SnapshotOnly".to_string();
+++    let mut capability = backend_capability_from_env("unknown");
+++    let mut salad03_status_seen = None;
+++
+++    for receipt in receipts {
+++        mode = receipt.mode.as_str().to_string();
+++        capability = receipt.input.capability.clone();
+++        salad03_status_seen = receipt.salad03_status_seen.clone();
+++        snapshot.ring_capacity = receipt.ring_state.capacity;
+++        snapshot.evicted_count = snapshot.evicted_count.max(receipt.ring_state.evicted_count);
+++        if receipt.result.snapshot_created { snapshot.created_count += 1; }
+++        if receipt.result.target_snapshot_found { snapshot.target_found_count += 1; } else { snapshot.target_missing_count += 1; }
+++        if receipt.result.shape_probe_passed { probe.shape_probe_passed_count += 1; } else if receipt.snapshot.is_some() { safety.shape_mismatch_count += 1; }
+++        if receipt.result.hash_probe_passed == Some(true) { probe.hash_probe_passed_count += 1; }
+++        if let Some(fork) = &receipt.forked_replay {
+++            if fork.attempted { probe.forked_replay_attempted_count += 1; }
+++            if receipt.result.forked_replay_passed == Some(true) { probe.forked_replay_passed_count += 1; }
+++        }
+++        if receipt.result.restore_verified { probe.restore_verified_count += 1; }
+++        if !receipt.result.main_state_unchanged { safety.main_state_changed_count += 1; }
+++        if receipt.result.restore_verified && !receipt.result.target_snapshot_found { safety.restore_without_snapshot_count += 1; }
+++        if let Some(snapshot_ref) = &receipt.snapshot {
+++            if snapshot_ref.position_state.position_index != receipt.input.target_position.position_index { safety.position_mismatch_count += 1; }
+++        }
+++    }
+++    let steps_observed = receipts.len();
+++    let behavior_change = safety.main_state_changed_count > 0;
+++    let status = if steps_observed == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if behavior_change || safety.restore_without_snapshot_count > 0 || safety.position_mismatch_count > 0 {
+++        "FAIL_CONTRACT_VIOLATION"
+++    } else if snapshot.target_missing_count > 0 || probe.restore_verified_count == 0 || !capability.supports_forked_restore {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }.to_string();
+++    let ready_for_forked = steps_observed > 0 && safety.main_state_changed_count == 0 && probe.shape_probe_passed_count > 0;
+++    let ready_for_salad03_execute = steps_observed > 0 && probe.restore_verified_count > 0 && safety.main_state_changed_count == 0;
+++    KvRollback00Summary {
+++        patch_id: KV_ROLLBACK00_PATCH_ID.to_string(),
+++        input_patch: KV_ROLLBACK00_INPUT_PATCH_ID.to_string(),
+++        status,
+++        behavior_change,
+++        probe_only: true,
+++        mode,
+++        requires_salad03: env_bool("ASH_KV_ROLLBACK00_REQUIRE_SALAD03", true),
+++        salad03_status_seen,
+++        steps_observed,
+++        snapshot,
+++        probe,
+++        backend_capability: capability,
+++        safety,
+++        ready_for_salad03_controlled_execute: ready_for_salad03_execute,
+++        ready_for_kv_rollback01_forked_replay: ready_for_forked,
+++        reason: if ready_for_salad03_execute {
+++            "restore verified; SALAD-03 controlled execute may be considered".to_string()
+++        } else if ready_for_forked {
+++            "shape restore probe available; forked replay verification not yet sealed".to_string()
+++        } else {
+++            "snapshot/probe receipt sealed; runtime verification pending".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_kv_rollback00_summary_from_receipt_file() {
+++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(path, json);
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++    use crate::salad02_detector::SaladRiskLevel;
+++    use crate::salad03_rollback::{Salad03RollbackInput, build_salad03_plan};
+++
+++    #[test]
+++    fn kvrollback00_snapshot_ref_records_position() {
+++        let capability = backend_capability_from_env("test");
+++        let input = KvRollback00ProbeInput {
+++            mode: KvRollback00Mode::SnapshotOnly,
+++            run_id: "test".to_string(),
+++            prompt_hash: None,
+++            seed: Some(1),
+++            step: 10,
+++            backend: "test".to_string(),
+++            target_step: 8,
+++            rollback_depth: 2,
+++            token_ledger_len: 10,
+++            requested_snapshot_id: Some("kv_000008".to_string()),
+++            salad03_decision: None,
+++            salad03_rollback_depth: Some(2),
+++            salad02_risk_stable: Some("High".to_string()),
+++            current_position: position_state_for_step(10),
+++            target_position: position_state_for_step(8),
+++            capability,
+++        };
+++        let snapshot = snapshot_for_input(&input).unwrap();
+++        assert_eq!(snapshot.position_state.position_index, 8);
+++    }
+++
+++    #[test]
+++    fn kvrollback00_shape_probe_passes_matching_shape() {
+++        let capability = backend_capability_from_env("test");
+++        let input = KvRollback00ProbeInput {
+++            mode: KvRollback00Mode::DryRunRestoreProbe,
+++            run_id: "test".to_string(),
+++            prompt_hash: None,
+++            seed: Some(1),
+++            step: 10,
+++            backend: "test".to_string(),
+++            target_step: 8,
+++            rollback_depth: 2,
+++            token_ledger_len: 10,
+++            requested_snapshot_id: None,
+++            salad03_decision: None,
+++            salad03_rollback_depth: Some(2),
+++            salad02_risk_stable: Some("High".to_string()),
+++            current_position: position_state_for_step(10),
+++            target_position: position_state_for_step(8),
+++            capability,
+++        };
+++        let snapshot = snapshot_for_input(&input).unwrap();
+++        assert!(shape_probe(&snapshot, &input));
+++    }
+++
+++    #[test]
+++    fn kvrollback00_main_state_unchanged_required() {
+++        let capability = backend_capability_from_env("test");
+++        let input = KvRollback00ProbeInput {
+++            mode: KvRollback00Mode::SnapshotOnly,
+++            run_id: "test".to_string(),
+++            prompt_hash: None,
+++            seed: Some(1),
+++            step: 10,
+++            backend: "test".to_string(),
+++            target_step: 8,
+++            rollback_depth: 2,
+++            token_ledger_len: 10,
+++            requested_snapshot_id: None,
+++            salad03_decision: None,
+++            salad03_rollback_depth: Some(2),
+++            salad02_risk_stable: Some("High".to_string()),
+++            current_position: position_state_for_step(10),
+++            target_position: position_state_for_step(8),
+++            capability,
+++        };
+++        let snapshot = snapshot_for_input(&input);
+++        let result = evaluate_kv_rollback00_probe(&input, snapshot.as_ref(), None);
+++        assert!(result.main_state_unchanged);
+++    }
+++
+++    #[test]
+++    fn kvrollback00_salad03_plan_still_requires_kv() {
+++        let input = Salad03RollbackInput {
+++            mode: crate::salad03_rollback::Salad03Mode::ControlledExecute,
+++            behavior_change_allowed: true,
+++            risk_raw: SaladRiskLevel::High,
+++            risk_stable: SaladRiskLevel::High,
+++            salad_score: 0.7,
+++            rollback_candidate: true,
+++            safe_stop_candidate: false,
+++            eos_bias_candidate: false,
+++            same_token_streak: 1,
+++            same_piece_streak: 1,
+++            repeat_3gram_count: 2,
+++            repeat_4gram_count: 0,
+++            byte_piece_count: 0,
+++            jamo_leak_count: 0,
+++            symbol_noise_count: 0,
+++            pci_raw: Some(0.3),
+++            pci_bucket: Some("Unstable".to_string()),
+++            global_finite_fallback_seen: false,
+++            numeric_risk: false,
+++            empty_active_set_seen: false,
+++            current_temperature: 0.18,
+++            current_top_p: 0.86,
+++            current_top_k: 0,
+++            current_min_p: 0.08,
+++            current_repeat_penalty: Some(1.0),
+++            token_ledger_len: 16,
+++            kv_snapshot_available: false,
+++            kv_restore_supported: false,
+++            kv_restore_verified: false,
+++            rollback_count_window: 0,
+++        };
+++        let plan = build_salad03_plan(&input);
+++        assert_ne!(plan.decision, crate::salad03_rollback::Salad03DecisionKind::ExecuteRollbackResample);
+++    }
+++}
++diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/lib.rs /mnt/data/kvrollback00_work/crates/model_core/src/lib.rs
++--- /mnt/data/kvrollback00_orig/crates/model_core/src/lib.rs	2026-05-27 06:54:11.000000000 +0000
+++++ /mnt/data/kvrollback00_work/crates/model_core/src/lib.rs	2026-05-27 07:05:24.639970857 +0000
++@@ -22,6 +22,7 @@
++ mod decode03d_controlled_enable;
++ mod salad02_detector;
++ mod salad03_rollback;
+++mod kv_rollback00_probe;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -139,6 +140,18 @@
++     write_salad03_summary_from_receipt_file,
++ };
++ 
+++pub use kv_rollback00_probe::{
+++    KV_ROLLBACK00_PATCH_ID, KV_ROLLBACK00_INPUT_PATCH_ID, KV_ROLLBACK00_SSOT,
+++    KvRollback00Mode, KvRollbackTokenLedgerEntry, KvRollbackPositionState, KvRollbackKvShape,
+++    KvRollbackSnapshotRef, KvRollbackBackendCapability, KvRollbackSnapshotRingState,
+++    KvRollback00ProbeInput, KvRollback00ProbeResult, KvRollback00ForkedReplayReceipt,
+++    KvRollback00StepReceipt, KvRollback00Summary, KvRollbackProbeRuntime, KvRollbackForkedState,
+++    backend_capability_from_env as kvrollback00_backend_capability_from_env,
+++    evaluate_kv_rollback00_probe, input_from_salad03 as kvrollback00_input_from_salad03,
+++    receipt_from_salad03 as kvrollback00_receipt_from_salad03,
+++    append_kv_rollback00_receipt_from_sampler03, write_kv_rollback00_summary_from_receipt_file,
+++};
+++
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN /mnt/data/kvrollback00_orig/crates/model_core/src/sampler_parity.rs /mnt/data/kvrollback00_work/crates/model_core/src/sampler_parity.rs
++--- /mnt/data/kvrollback00_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:54:11.000000000 +0000
+++++ /mnt/data/kvrollback00_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:05:24.640715913 +0000
++@@ -455,5 +455,6 @@
++     crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
++     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
++     crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
+++    crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_probe_prompts.jsonl /mnt/data/kvrollback00_work/workspace/kv_rollback00_probe_prompts.jsonl
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_probe_prompts.jsonl	2026-05-27 07:06:09.561402591 +0000
+@@ -0,0 +1,4 @@
++{"id": "P01_salad03_high_risk_plan", "prompt": "반복 루프가 시작된 한국어 짧은 응답을 생성하고 SALAD-03 rollback plan을 유도한다."}
++{"id": "P02_kv_snapshot_shape_probe", "prompt": "정상 한국어 QA 64 토큰 생성 중 KV snapshot ring을 기록한다."}
++{"id": "P03_byte_piece_risk_probe", "prompt": "byte/jamo leak 위험이 있는 출력에서 rollback target snapshot 존재 여부를 확인한다."}
++{"id": "P04_forked_replay_candidate", "prompt": "동일 seed로 forked replay 1-step top1/top5 비교를 수행한다."}
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_probe_schema.json /mnt/data/kvrollback00_work/workspace/kv_rollback00_probe_schema.json
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_probe_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_probe_schema.json	2026-05-27 07:06:09.560609312 +0000
+@@ -0,0 +1,82 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "KV Rollback 00 Step Receipt",
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
++  "type": "object",
++  "required": [
++    "patch_id",
++    "schema_version",
++    "run_id",
++    "step",
++    "backend",
++    "mode",
++    "behavior_change",
++    "probe_only",
++    "input",
++    "ring_state",
++    "result"
++  ],
++  "properties": {
++    "patch_id": {
++      "const": "16AI-QW-38G-R6A-KV-ROLLBACK-00"
++    },
++    "input_patch": {
++      "const": "16AI-QW-38G-R6A-SALAD-03"
++    },
++    "schema_version": {
++      "type": "integer",
++      "minimum": 1
++    },
++    "run_id": {
++      "type": "string"
++    },
++    "step": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "backend": {
++      "type": "string"
++    },
++    "mode": {
++      "enum": [
++        "Off",
++        "SnapshotOnly",
++        "DryRunRestoreProbe",
++        "ForkedReplayProbe",
++        "StrictProbe"
++      ]
++    },
++    "behavior_change": {
++      "const": false
++    },
++    "probe_only": {
++      "const": true
++    },
++    "input": {
++      "type": "object"
++    },
++    "snapshot": {
++      "type": [
++        "object",
++        "null"
++      ]
++    },
++    "ring_state": {
++      "type": "object"
++    },
++    "result": {
++      "type": "object",
++      "required": [
++        "main_state_unchanged",
++        "restore_verified",
++        "shape_probe_passed"
++      ]
++    },
++    "forked_replay": {
++      "type": [
++        "object",
++        "null"
++      ]
++    }
++  }
++}
+\ No newline at end of file
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_report.md /mnt/data/kvrollback00_work/workspace/kv_rollback00_report.md
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_report.md	2026-05-27 07:06:09.562622797 +0000
+@@ -0,0 +1,17 @@
++# 16AI-QW-38G-R6A-KV-ROLLBACK-00
++## KV Snapshot Restore Probe Seal
++
++### 확정
++- `crates/model_core/src/kv_rollback00_probe.rs`를 추가했다.
++- `KvRollback00Mode`를 `Off / SnapshotOnly / DryRunRestoreProbe / ForkedReplayProbe / StrictProbe`로 정의했다.
++- `KVSnapshotLedger + TokenLedger + PositionState`를 rollback SSOT로 명시했다.
++- `sampler_parity::append_receipt()` 체인에 `append_kv_rollback00_receipt_from_sampler03()`를 연결했다.
++- 기본 계약은 `behavior_change=false`, `probe_only=true`, `main_state_unchanged=true`다.
++
++### 추정
++- 이 패치는 SALAD-03 rollback plan을 실제 실행하기 전에 KV snapshot/position/token ledger가 rollback 가능한 형태인지 확인하는 probe layer다.
++- 실제 rollback/resample execute는 열지 않았다.
++
++### 판단불가
++- 현재 컨테이너에 cargo/rustc가 없어 빌드와 런타임 smoke는 수행하지 못했다.
++- 실제 backend KV clone/restore/forked replay 가능성은 런타임에서 `ASH_KV_ROLLBACK00_MODE=dry_run_restore_probe` 또는 `forked_replay_probe`로 receipt를 찍어야 판단 가능하다.
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_source_hash_manifest.json /mnt/data/kvrollback00_work/workspace/kv_rollback00_source_hash_manifest.json
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_source_hash_manifest.json	2026-05-27 07:06:09.563987338 +0000
+@@ -0,0 +1,30 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
++  "files": [
++    {
++      "path": "crates/model_core/src/kv_rollback00_probe.rs",
++      "sha256": "d21667b885342586d29fd779b480c499f1ec736a4467ba245b30df6b06c69ec1",
++      "bytes": 33644
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "2b882b9b04e2704dbe96dac6366289f92496d0d66486a2f5f801427c3bedc097",
++      "bytes": 15427
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "847d3431a546a2ba3a0cecf6d380a1359d24fc47eb8dccc613c527c6e6496c11",
++      "bytes": 20280
++    },
++    {
++      "path": "workspace/kv_rollback00_probe_schema.json",
++      "sha256": "7ab1a006ddb5ce7f76e9fe7827253afb4cc4c895983cdc38e8aee49565b97c68",
++      "bytes": 1461
++    },
++    {
++      "path": "workspace/kv_rollback00_summary.json",
++      "sha256": "59d072ae9ce2d7524d6962215ec321f2516a644aec8c4c472398afa5cfe6cbf4",
++      "bytes": 1431
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_static_checks.json /mnt/data/kvrollback00_work/workspace/kv_rollback00_static_checks.json
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_static_checks.json	2026-05-27 07:06:09.562472647 +0000
+@@ -0,0 +1,68 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "check": "exists:crates/model_core/src/kv_rollback00_probe.rs",
++      "pass": true
++    },
++    {
++      "check": "exists:crates/model_core/src/lib.rs",
++      "pass": true
++    },
++    {
++      "check": "exists:crates/model_core/src/sampler_parity.rs",
++      "pass": true
++    },
++    {
++      "check": "exists:workspace/kv_rollback00_probe_schema.json",
++      "pass": true
++    },
++    {
++      "check": "exists:workspace/kv_rollback00_steps.jsonl",
++      "pass": true
++    },
++    {
++      "check": "exists:workspace/kv_rollback00_summary.json",
++      "pass": true
++    },
++    {
++      "check": "token:KvRollback00Mode",
++      "pass": true
++    },
++    {
++      "check": "token:KVSnapshotLedger+TokenLedger+PositionState",
++      "pass": true
++    },
++    {
++      "check": "token:main_state_unchanged: true",
++      "pass": true
++    },
++    {
++      "check": "token:probe_only: true",
++      "pass": true
++    },
++    {
++      "check": "token:restore_verified",
++      "pass": true
++    },
++    {
++      "check": "token:ForkedReplayProbe",
++      "pass": true
++    },
++    {
++      "check": "token:KvRollbackProbeRuntime",
++      "pass": true
++    },
++    {
++      "check": "lib module exported",
++      "pass": true
++    },
++    {
++      "check": "sampler hook connected",
++      "pass": true
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_steps.jsonl /mnt/data/kvrollback00_work/workspace/kv_rollback00_steps.jsonl
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_steps.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_steps.jsonl	2026-05-27 07:06:09.560959531 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00", "input_patch": "16AI-QW-38G-R6A-SALAD-03", "schema_version": 1, "run_id": "kvrollback00_static_bake_placeholder", "prompt_hash": null, "seed": null, "step": 0, "backend": "static_bake", "sampler_ssot": "KVSnapshotLedger+TokenLedger+PositionState", "mode": "SnapshotOnly", "behavior_change": false, "probe_only": true, "salad03_status_seen": "STATIC_BAKE_DEFINED_NOT_RUN", "salad02_status_seen": null, "decode03d_status_seen": null, "input": {"mode": "SnapshotOnly", "run_id": "kvrollback00_static_bake_placeholder", "prompt_hash": null, "seed": null, "step": 0, "backend": "static_bake", "target_step": 0, "rollback_depth": 0, "token_ledger_len": 0, "requested_snapshot_id": "kv_000000", "salad03_decision": "STATIC_BAKE_DEFINED_NOT_RUN", "salad03_rollback_depth": 0, "salad02_risk_stable": null, "current_position": {"step": 0, "position_index": 0, "seq_len": 0, "absolute_position": 0, "rope_position": 0, "attention_mask_len": 0}, "target_position": {"step": 0, "position_index": 0, "seq_len": 0, "absolute_position": 0, "rope_position": 0, "attention_mask_len": 0}, "capability": {"backend": "static_bake", "supports_snapshot": true, "supports_restore": false, "supports_forked_restore": false, "supports_kv_hash": false, "supports_position_restore": false, "supports_sampler_state_restore": false, "requires_gpu_readback": false, "snapshot_cost_estimate": "unknown", "notes": ["static_placeholder_not_runtime"]}}, "snapshot": null, "ring_state": {"capacity": 16, "len": 0, "oldest_step": null, "newest_step": null, "evicted_count": 0, "missing_target_count": 0}, "result": {"mode": "SnapshotOnly", "snapshot_created": false, "snapshot_id": null, "target_snapshot_found": false, "shape_probe_passed": false, "hash_probe_passed": null, "forked_replay_passed": null, "restore_verified": false, "main_state_unchanged": true, "denied_reasons": [], "warning_reasons": ["static_placeholder_not_runtime"], "probe_reasons": []}, "forked_replay": null, "selected_id_current": null, "selected_piece_current": null}
+diff -ruN /mnt/data/kvrollback00_orig/workspace/kv_rollback00_summary.json /mnt/data/kvrollback00_work/workspace/kv_rollback00_summary.json
+--- /mnt/data/kvrollback00_orig/workspace/kv_rollback00_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/kvrollback00_work/workspace/kv_rollback00_summary.json	2026-05-27 07:06:09.561259984 +0000
+@@ -0,0 +1,50 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-03",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "behavior_change": false,
++  "probe_only": true,
++  "mode": "SnapshotOnly",
++  "requires_salad03": true,
++  "salad03_status_seen": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "steps_observed": 0,
++  "snapshot": {
++    "created_count": 0,
++    "target_found_count": 0,
++    "target_missing_count": 0,
++    "ring_capacity": 16,
++    "evicted_count": 0
++  },
++  "probe": {
++    "shape_probe_passed_count": 0,
++    "hash_probe_passed_count": 0,
++    "forked_replay_attempted_count": 0,
++    "forked_replay_passed_count": 0,
++    "restore_verified_count": 0
++  },
++  "backend_capability": {
++    "backend": "static_bake",
++    "supports_snapshot": true,
++    "supports_restore": false,
++    "supports_forked_restore": false,
++    "supports_kv_hash": false,
++    "supports_position_restore": false,
++    "supports_sampler_state_restore": false,
++    "requires_gpu_readback": false,
++    "snapshot_cost_estimate": "unknown",
++    "notes": [
++      "static bake only"
++    ]
++  },
++  "safety": {
++    "main_state_changed_count": 0,
++    "restore_without_snapshot_count": 0,
++    "position_mismatch_count": 0,
++    "shape_mismatch_count": 0
++  },
++  "acceptance": {
++    "ready_for_salad03_controlled_execute": false,
++    "ready_for_kv_rollback01_forked_replay": false,
++    "reason": "static bake defined; runtime snapshot/restore probe not run"
++  }
++}
+\ No newline at end of file

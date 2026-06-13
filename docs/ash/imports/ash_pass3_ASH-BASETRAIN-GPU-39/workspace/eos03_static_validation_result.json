@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EOS-03",
+  "status": "PASS_STATIC_EOS_SUPPRESSION_GUARD_BAKED_PENDING_LOCAL_CARGO_BUILD",
+  "adjudication": "PASS_STATIC_EOS03_ORCHESTRATOR_BOUNDARY_ENFORCEMENT_PATCHED",
+  "cargo_check": "not_run_cargo_unavailable_in_bake_environment",
+  "changed_files": [
+    "crates/orchestrator_local/src/infer_entry.rs"
+  ],
+  "enforcement_strategy": "detect illegal EOS before min_new_tokens after generation, rerun once with request-local EOS token ban, write eos03 receipt and step trace",
+  "audit_only": false,
+  "model_mutation": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "required_local_validation": [
+    "cargo build -p orchestrator_local --bin orchestrator_local",
+    "run eos03_greeting_01 with eosGuardEnabled=true",
+    "inspect eos03 receipt and step trace"
+  ]
+}

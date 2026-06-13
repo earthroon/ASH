@@ -1,0 +1,20 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-RUN-00",
+  "cargo_check": {
+    "workspace": "NOT_RUN",
+    "model_core": "NOT_RUN",
+    "runtime": "NOT_RUN",
+    "burn_webgpu_backend": "NOT_RUN",
+    "orchestrator_local": "NOT_RUN"
+  },
+  "commands": {
+    "workspace": "cargo check --workspace",
+    "model_core": "cargo check -p model_core",
+    "runtime": "cargo check -p runtime",
+    "burn_webgpu_backend": "cargo check -p burn_webgpu_backend",
+    "orchestrator_local": "cargo check -p orchestrator_local"
+  },
+  "failures": [],
+  "status": "NOT_RUN",
+  "reason": "NO_CARGO_IN_BAKE_ENVIRONMENT"
+}

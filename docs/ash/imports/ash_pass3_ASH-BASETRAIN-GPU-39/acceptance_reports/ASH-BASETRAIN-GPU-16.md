@@ -1,0 +1,8 @@
+# ASH-BASETRAIN-GPU-16 Acceptance
+
+Status: BAKED_PENDING_LOCAL_RUNTIME
+
+Scope: Window 2048 dispatch smoke only. No readback, no loss, no backward, no optimizer, no mutation.
+
+PASS target:
+`PASS_ASH_BASETRAIN_GPU_16_CHUNK_WINDOW_LOGITS_EXPANSION_DISPATCH_SMOKE_WINDOW_2048_CANDIDATE_TO_DISPATCH_STATE_NO_BACKWARD_NO_OPTIMIZER`

@@ -1,0 +1,50 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-RUN-00",
+  "status": "CONSOLIDATED_SMOKE_DEFINED_EXECUTION_NOT_RUN",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-02D",
+  "cargo": {
+    "check_status": "NOT_RUN",
+    "test_status": "NOT_RUN"
+  },
+  "wgsl": {
+    "compile_status": "NOT_RUN",
+    "binding_layout_status": "STATIC_CHECKED_NO_COMPILE"
+  },
+  "runtime": {
+    "smoke_status": "NOT_RUN",
+    "sampler04_status": "NOT_RUN",
+    "decode02d_status": "NOT_RUN",
+    "minp_c2a_status": "NOT_RUN"
+  },
+  "artifact_inventory": {
+    "status": "PASS",
+    "missing_count": 0
+  },
+  "promotion_gates": {
+    "sampler_strict_ready": false,
+    "transition_on_candidate_ready": false,
+    "semantic_prior_enable_ready": false,
+    "gate_inputs": {
+      "sampler04_status": "NOT_RUN",
+      "decode02d_status": "NOT_RUN",
+      "minp_c2a_status": "NOT_RUN",
+      "cargo_check": "NOT_RUN",
+      "wgsl_compile": "NOT_RUN",
+      "runtime_smoke": "NOT_RUN"
+    }
+  },
+  "default_modes_changed": false,
+  "blocking_reasons": [
+    "NO_CARGO_IN_BAKE_ENVIRONMENT",
+    "NO_WGPU_VALIDATOR_OR_RUNTIME",
+    "RUNTIME_NOT_AVAILABLE_IN_BAKE_ENVIRONMENT"
+  ],
+  "non_scope": [
+    "new_sampler_feature",
+    "dynamic_qwave_deltak",
+    "transition_default_on",
+    "semantic_prior_default_on",
+    "lora_training",
+    "context_router"
+  ]
+}

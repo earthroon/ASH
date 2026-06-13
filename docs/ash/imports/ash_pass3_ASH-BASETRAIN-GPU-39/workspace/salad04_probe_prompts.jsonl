@@ -1,0 +1,6 @@
+{"id": "P01_josa_repeat_probe", "prompt": "은 는 은 는 같은 조사 반복을 유도하는 짧은 한국어 생성 검사", "expected": "JosaRepeat/JosaChain risk overlay only"}
+{"id": "P02_eomi_repeat_probe", "prompt": "합니다 합니다 합니다 식의 어미 루프 감지 검사", "expected": "EomiRepeat risk overlay only"}
+{"id": "P03_jamo_leak_probe", "prompt": "ㄱ ㄴ ㅏ 같은 자모 누출 검사", "expected": "JamoLeak high candidate"}
+{"id": "P04_byte_jamo_mixed_probe", "prompt": "byte fallback + 자모 조각 혼합 검사", "expected": "ByteJamoMixedLeak critical candidate"}
+{"id": "P05_normal_korean_sentence", "prompt": "정상 한국어 문장에서 조사와 어미가 자연스럽게 나오는 경우", "expected": "false positive cap under stable/confident PCI"}
+{"id": "P06_eojeol_boundary_collapse", "prompt": "조사/어미가 명사·용언 없이 이어지는 어절 경계 붕괴 검사", "expected": "EojeolBoundaryCollapse candidate"}

@@ -1,0 +1,62 @@
+# 16AI-QW-38G-R6A-WCTX-02 Acceptance Report
+
+## Patch
+EN-KO Subtitle QWave Source-Target Span to WordContextHit Shadow Bridge Seal
+
+## SSOT
+Ash is an EN-to-KO translation subtitle-machine domain component.
+
+## Status
+PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE
+
+## Scope
+This patch adds a Rust-native shadow bridge that observes source English cue spans, target Korean subtitle candidate spans, and virtual timing cue spans, then converts them into WCTX-00 WordContextHit records using WordContextSource::QWaveShadow.
+
+## Files
+- crates/ash_core/src/word_context_subtitle_qwave.rs
+- crates/ash_core/src/bin/ash_word_context_subtitle_qwave_shadow.rs
+- workspace/word_context_probe/wctx_02_enko_subtitle_qwave_shadow_cases.json
+- workspace/word_context_probe/wctx_02_enko_subtitle_qwave_shadow_matrix.json
+- workspace/word_context_probe/wctx_02_enko_subtitle_qwave_shadow_summary.json
+- workspace/word_context_probe/wctx_02_enko_subtitle_qwave_shadow_sample_receipt.json
+- workspace/word_context_probe/wctx_02_static_validation.json
+
+## Summary
+```json
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-02",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "total_cases": 24,
+  "pass_cases": 24,
+  "fail_cases": 0,
+  "deterministic_failures": 0,
+  "source_span_failures": 0,
+  "target_span_failures": 0,
+  "timing_preservation_failures": 0,
+  "risk_failures": 0,
+  "token_id_mutation_count": 0,
+  "generation_mutation_count": 0,
+  "source_text_mutation_count": 0,
+  "target_text_mutation_count": 0,
+  "timing_mutation_count": 0,
+  "total_source_candidates": 122,
+  "total_target_candidates": 92,
+  "total_timing_candidates": 24,
+  "total_word_context_hits": 238,
+  "total_unknown_relations": 0
+}
+```
+
+## Guard Invariants
+- token_id_mutated=false
+- generation_mutated=false
+- source_text_mutated=false
+- target_text_mutated=false
+- timing_mutated=false
+- runtime_default_apply=false
+- LexGraph long-term write=false
+- ContextPlan creation=false
+- candidate rerank=false
+
+## Notes
+Rust cargo/rustc are unavailable in the bake container, so this report seals static integration and generated matrix receipts only. Run `cargo run -p ash_core --bin ash_word_context_subtitle_qwave_shadow` in a Rust toolchain environment to reproduce runtime JSON outputs.

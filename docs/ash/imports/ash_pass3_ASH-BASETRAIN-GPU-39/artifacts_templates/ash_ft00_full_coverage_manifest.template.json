@@ -1,0 +1,65 @@
+{
+  "patch_id": "ASH-FT-00",
+  "title": "Full Safetensors Trainable Coverage Manifest / Atlas Group Plan / No Weight Mutation Seal",
+  "manifest_kind": "full_safetensors_trainable_coverage",
+  "source_candidate": {
+    "path": "tokenizer_v5/artifacts/ash_v5_native_genesis.forge01_smoke.safetensors",
+    "sha256_expected": "cecd088c8830d2c2c4ace4f684b9a06d119c0e00eda54f5d33f4016524c13537",
+    "sha256_actual": null,
+    "sha256_matches": false,
+    "slot": "forge01_smoke_shadow",
+    "file_size_bytes": null,
+    "header_length_bytes": null,
+    "runtime_default_apply_allowed": false
+  },
+  "model_contract": {
+    "model_vocab_size": 48259,
+    "tokenizer_vocab_size": 48259,
+    "hidden_size": 2048
+  },
+  "coverage": {
+    "total_tensor_count": 0,
+    "covered_tensor_count": 0,
+    "coverage_ratio": 0.0,
+    "all_tensors_registered": false,
+    "unknown_tensor_count": 0,
+    "family_counts": {}
+  },
+  "memory_budget_summary": {
+    "total_weight_bytes": 0,
+    "total_trainable_weight_bytes": 0,
+    "estimated_gradient_bytes": 0,
+    "estimated_optimizer_state_bytes": 0,
+    "optimizer_mode": "adamw_plan",
+    "dtype_policy": "f32",
+    "vram_budget_mb": 10240,
+    "max_group_bytes": 536870912,
+    "largest_tensor_key": null,
+    "largest_tensor_bytes": 0,
+    "largest_group_id": null,
+    "largest_group_budget_bytes": 0,
+    "full_load_required": false,
+    "atlas_grouping_required": true
+  },
+  "tensors": [],
+  "guards": {
+    "safetensors_header_read_executed": true,
+    "tensor_value_materialized": false,
+    "full_tensor_load_executed": false,
+    "mmap_materialization_executed": false,
+    "gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "backward_executed": false,
+    "loss_calculation_executed": false,
+    "optimizer_created": false,
+    "optimizer_step_executed": false,
+    "gradient_write_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "runtime_config_mutation_executed": false
+  }
+}

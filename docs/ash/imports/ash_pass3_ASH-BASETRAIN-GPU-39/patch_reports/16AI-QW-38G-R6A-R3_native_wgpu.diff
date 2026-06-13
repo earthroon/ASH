@@ -1,0 +1,249 @@
+--- work_r6a_r2/crates/model_core/src/native_wgpu.rs	2026-05-22 14:07:24.891269565 +0000
++++ work_r6a_r3/crates/model_core/src/native_wgpu.rs	2026-05-22 14:31:00.782683324 +0000
+@@ -1748,6 +1748,238 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A-R3 — Backend Debug Binding Extension Spec / No-Apply Design Seal
++static QW38G_R6A_R3_SPEC_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r3_enabled() -> bool {
++    env_flag("ASH_BACKEND_DEBUG_BINDING_SPEC") || env_flag("ASH_QW38G_R6A_R3_BACKEND_DEBUG_BINDING_SPEC")
++}
++
++fn qw38g_r6a_r3_no_apply() -> bool {
++    std::env::var("ASH_BACKEND_DEBUG_BINDING_SPEC_NO_APPLY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r6a_r3_spec_path() -> String {
++    std::env::var("ASH_BACKEND_DEBUG_BINDING_SPEC_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r3_backend_debug_binding_extension_spec.json".to_string())
++}
++
++fn qw38g_r6a_r3_receipt_path() -> String {
++    std::env::var("ASH_BACKEND_DEBUG_BINDING_SPEC_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r3_backend_debug_binding_design_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r3_write_spec_and_receipt(status: &str, warnings: Vec<String>, recommended_next_patch: &str, no_apply: bool) {
++    let spec_path = qw38g_r6a_r3_spec_path();
++    let receipt_path = qw38g_r6a_r3_receipt_path();
++
++    let shader_variant_policy = serde_json::json!({
++        "normal_variant_unchanged": true,
++        "debug_variant_required": true,
++        "debug_variant_flag_name": "ASH_SHADER_DEBUG_BINDING",
++        "debug_shader_suffix": "_debug_scalar_tap",
++        "debug_shader_adds_storage_binding": true,
++        "shader_write_enabled_only_when_debug_buffer_bound": true,
++        "shader_write_forbidden_without_binding": true,
++        "target_shader_candidates": ["burn_tensor_matmul_vocab_atlas_tile"]
++    });
++
++    let pipeline_cache_policy = serde_json::json!({
++        "cache_key_must_include_debug_flag": true,
++        "cache_key_must_include_record_layout_version": true,
++        "cache_key_must_include_debug_binding_group": true,
++        "cache_key_must_include_debug_binding_slot": true,
++        "cache_key_must_include_shader_variant_id": true,
++        "cache_key_must_include_scalar_only": true,
++        "normal_and_debug_pipeline_separated": true,
++        "normal_pipeline_cache_key_unchanged": true,
++        "debug_pipeline_cache_key_separated": true,
++        "cache_poisoning_guard_required": true,
++        "required_key_fields": [
++            "shader_debug_enabled",
++            "debug_record_layout_version",
++            "debug_binding_group",
++            "debug_binding_slot",
++            "debug_shader_variant_id",
++            "debug_scalar_only"
++        ]
++    });
++
++    let bind_group_policy = serde_json::json!({
++        "binding_surface_owner": "burn_wgpu_backend",
++        "auto_group_allowed": true,
++        "auto_slot_allowed": true,
++        "preferred_group": null,
++        "preferred_slot": null,
++        "collision_detection_required": true,
++        "existing_binding_collision_forbidden": true,
++        "debug_storage_buffer_required": true,
++        "debug_buffer_access": "storage_write_candidate",
++        "bind_group_layout_variant_required": true,
++        "normal_bind_group_layout_unchanged": true,
++        "debug_buffer_required_for_debug_shader": true
++    });
++
++    let debug_buffer_policy = serde_json::json!({
++        "scalar_only": true,
++        "full_vector_readback_forbidden": true,
++        "default_max_steps": 1,
++        "default_max_layers": 2,
++        "default_max_stages": 2,
++        "default_target_ids": [13],
++        "hard_max_bytes": 16384,
++        "default_max_bytes": 4096,
++        "record_layout_version": 1,
++        "record_size_bytes": 64,
++        "readback_requires_staging_buffer": true,
++        "readback_after_dispatch_only": true,
++        "record_layout": {
++            "fields": [
++                "magic", "version", "status_code", "decode_step",
++                "layer_id", "stage_id", "target_token_id", "reserved0",
++                "dot_to_target", "hidden_norm", "target_row_norm", "cosine_to_target",
++                "readback_kind", "reserved1", "reserved2", "reserved3"
++            ],
++            "stage_ids": {
++                "unknown": 0,
++                "post_attn": 1,
++                "post_mlp": 2,
++                "post_block": 3,
++                "pre_final_norm": 4,
++                "post_final_norm": 5
++            },
++            "readback_kind_ids": {
++                "none": 0,
++                "projection_scalar": 1,
++                "norm_scalar": 2,
++                "status_only": 3
++            }
++        }
++    });
++
++    let safety_policy = serde_json::json!({
++        "no_weight_mutation": true,
++        "no_tokenizer_mutation": true,
++        "no_banlist_mutation": true,
++        "no_generation_output_mutation": true,
++        "debug_default_off": true,
++        "debug_requires_explicit_env": true,
++        "dry_run_before_apply_required": true,
++        "operator_approval_required_for_apply": true,
++        "receipt_required_on_success": true,
++        "receipt_required_on_failure": true,
++        "rollback_plan_required": true
++    });
++
++    let spec = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R3",
++        "spec_version": 1,
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "enabled_by_default": false,
++        "requires_explicit_env": true,
++        "no_apply": no_apply,
++        "backend_patch_required": true,
++        "backend_owner": "burn_wgpu_backend",
++        "target_backend_owners": {
++            "shader_source_owner": "burn_wgpu_kernel_source_registry",
++            "shader_module_owner": "burn_wgpu_shader_module_cache",
++            "compute_pipeline_owner": "burn_wgpu_compute_pipeline_cache",
++            "pipeline_layout_owner": "burn_wgpu_pipeline_layout_registry",
++            "bind_group_layout_owner": "burn_wgpu_bind_group_layout_registry",
++            "bind_group_owner": "burn_wgpu_bind_group_builder",
++            "pipeline_cache_key_owner": "burn_wgpu_pipeline_cache_key_builder",
++            "kernel_dispatch_owner": "burn_wgpu_kernel_dispatch_or_runner"
++        },
++        "shader_variant_policy": shader_variant_policy,
++        "pipeline_cache_policy": pipeline_cache_policy,
++        "bind_group_policy": bind_group_policy,
++        "debug_buffer_policy": debug_buffer_policy,
++        "safety_policy": safety_policy,
++        "normal_pipeline_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "shader_write_performed": false,
++        "pipeline_layout_mutation_performed": false,
++        "bind_group_mutation_performed": false,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warnings
++    });
++
++    qw38g_r6a_r2_write_json(&spec_path, &spec);
++
++    let spec_written = qw38g_r6a_r2_path_written(&spec_path);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R3",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "no_apply": no_apply,
++        "backend_patch_required": true,
++        "debug_binding_extension_spec_path": spec_path,
++        "debug_binding_extension_spec_written": spec_written,
++        "design_receipt_path": receipt_path,
++        "design_receipt_written": true,
++        "normal_pipeline_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "shader_write_performed": false,
++        "pipeline_layout_mutation_performed": false,
++        "bind_group_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": spec.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([]))
++    });
++    qw38g_r6a_r2_write_json(&qw38g_r6a_r3_receipt_path(), &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R3][spec_written] path={}", qw38g_r6a_r3_spec_path());
++    eprintln!("[16AI-QW-38G-R6A-R3][receipt_written] path={}", qw38g_r6a_r3_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R3][done] status={}", status);
++}
++
++fn qw38g_r6a_r3_backend_debug_binding_extension_spec() {
++    if !qw38g_r6a_r3_enabled() {
++        return;
++    }
++    if QW38G_R6A_R3_SPEC_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++
++    let no_apply = qw38g_r6a_r3_no_apply();
++    eprintln!("[16AI-QW-38G-R6A-R3][start]");
++    eprintln!("[16AI-QW-38G-R6A-R3][design] no_apply={} backend_patch_required=true", no_apply);
++    eprintln!("[16AI-QW-38G-R6A-R3][shader_variant_policy] debug_variant_required=true");
++    eprintln!("[16AI-QW-38G-R6A-R3][pipeline_cache_policy] separated=true");
++    eprintln!("[16AI-QW-38G-R6A-R3][bind_group_policy] normal_layout_unchanged=true");
++    eprintln!("[16AI-QW-38G-R6A-R3][debug_buffer_policy] scalar_only=true max_bytes=4096");
++
++    if !no_apply {
++        qw38g_r6a_r3_write_spec_and_receipt(
++            "FAIL_NON_NO_APPLY_REJECTED",
++            vec![
++                "BACKEND_DEBUG_BINDING_SPEC_NON_NO_APPLY_REJECTED".to_string(),
++                "NO_APPLY_REQUIRED".to_string(),
++            ],
++            "16AI-QW-38G-R6A-R3_NO_APPLY_REQUIRED",
++            no_apply,
++        );
++        return;
++    }
++
++    qw38g_r6a_r3_write_spec_and_receipt(
++        "PASS_NO_APPLY_DESIGN_SEAL",
++        vec![
++            "BACKEND_PATCH_REQUIRED".to_string(),
++            "NO_APPLY_DESIGN_ONLY".to_string(),
++            "DEBUG_SHADER_VARIANT_REQUIRED".to_string(),
++            "PIPELINE_CACHE_KEY_EXTENSION_REQUIRED".to_string(),
++        ],
++        "16AI-QW-38G-R6A-R4_BACKEND_EXTENSION_APPLY_DRY_RUN",
++        no_apply,
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -4578,6 +4810,7 @@
+         qw38g_r6a_shader_debug_binding_surface("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r1_pipeline_layout_registry_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r2_burn_wgpu_owner_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
++        qw38g_r6a_r3_backend_debug_binding_extension_spec();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

@@ -1,0 +1,61 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-P1",
+  "status": "DESKTOP_MODEL_GENERATE_MINP_PIPELINE_WIRED_STATIC_BAKE",
+  "source_ssot": "RuntimeSamplingConfig.min_p",
+  "desktop_payload_key": "min_p",
+  "canonical_field": "min_p",
+  "external_aliases_supported": [
+    "minP",
+    "min_p",
+    "samplingMinP",
+    "sampling_min_p"
+  ],
+  "route": [
+    "apps/desktop model.generate payload",
+    "orchestrator_local model.generate handler",
+    "model_generate_bridge_payload normalization",
+    "run.start/infer-compatible payload",
+    "RuntimeSamplingConfig.min_p",
+    "GenerationSamplingConfig.min_p"
+  ],
+  "default_value": 0.0,
+  "clamp_min": 0.0,
+  "clamp_max": 0.95,
+  "changed_files": [
+    "apps/desktop/src/App.vue",
+    "crates/orchestrator_local/src/lib.rs",
+    "crates/orchestrator_local/src/infer_entry.rs"
+  ],
+  "added_artifacts": [
+    "workspace/minp_p1_desktop_model_generate_summary.json",
+    "workspace/minp_p1_desktop_model_generate_report.md",
+    "workspace/minp_p1.patch",
+    "acceptance_reports/16AI-QW-38G-R6A-MINP-P1_acceptance.md"
+  ],
+  "static_validation": {
+    "desktop_min_p_ref": "PASS",
+    "desktop_min_p_payload_run_generate": "PASS",
+    "desktop_min_p_payload_translation": "PASS",
+    "desktop_boundary_clamp_helper": "PASS",
+    "orchestrator_model_generate_echo_stub_removed": "PASS",
+    "orchestrator_model_generate_bridge_to_infer": "PASS",
+    "bridge_prompt_to_input": "PASS",
+    "bridge_max_new_tokens_to_maxNewTokens": "PASS",
+    "bridge_min_p_alias_normalization": "PASS",
+    "infer_generate_output_event": "PASS",
+    "infer_generate_done_event": "PASS"
+  },
+  "execution_validation": {
+    "cargo_check": "NOT_RUN_NO_CARGO_IN_CONTAINER",
+    "cargo_test": "NOT_RUN_NO_CARGO_IN_CONTAINER",
+    "rustfmt": "NOT_RUN_NO_RUSTFMT_IN_CONTAINER",
+    "npm_ssot_check": "SKIPPED_NO_NODE_MODULES",
+    "vite_build": "NOT_RUN_NO_NODE_MODULES"
+  },
+  "non_scope": [
+    "gpu_shader_semantics_change",
+    "cpu_fallback_sampler",
+    "top_p_active_set_renormalization",
+    "full_sampling_telemetry_proof"
+  ]
+}

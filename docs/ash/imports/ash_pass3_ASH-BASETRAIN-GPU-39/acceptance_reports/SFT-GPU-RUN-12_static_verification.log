@@ -1,0 +1,196 @@
+# SFT-GPU-RUN-12 static verification log
+
+verified_at_utc=2026-05-19T05:29:13Z
+
+## Toolchain availability
+cargo=unavailable
+rustc=unavailable
+
+## Required files
+present crates/ash_core/src/sft_gpu_lifecycle_merge.rs
+present crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs
+present crates/lora_train/src/gpu_trained_lifecycle_merge.rs
+present crates/lora_train/tests/gpu_trained_lifecycle_merge.rs
+present crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs
+present crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs
+present acceptance_reports/SFT-GPU-RUN-12_lifecycle_merge.md
+present docs/roadmap/SFT-GPU-RUN-12_to_RUN-13_after_bake.md
+present patch_reports/SFT-GPU-RUN-12_bake_report.md
+
+## Module exports
+crates/ash_core/src/lib.rs:438:pub mod sft_gpu_lifecycle_merge;
+crates/ash_core/src/lib.rs:439:pub use sft_gpu_lifecycle_merge::*;
+crates/lora_train/src/lib.rs:311:pub mod gpu_trained_lifecycle_merge;
+crates/lora_train/src/lib.rs:312:pub use gpu_trained_lifecycle_merge::*;
+crates/burn_webgpu_backend/src/lib.rs:271:pub mod gpu_trained_lifecycle_merge;
+crates/burn_webgpu_backend/src/lib.rs:272:pub use gpu_trained_lifecycle_merge::*;
+
+## Keyword scan
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:pub const SFT_GPU_RUN_12_LIFECYCLE_MERGE_STATUS: &str =
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:pub const SFT_GPU_RUN_12_HELD_STATUS: &str = "PASS_GPU_TRAINED_LIFECYCLE_MERGE_HELD";
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:pub const SFT_GPU_RUN_12_REJECTED_STATUS: &str = "REJECTED_GPU_TRAINED_LIFECYCLE_MERGE";
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:pub const SFT_GPU_RUN_12_AUDIT_STATUS: &str =
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    LifecycleMergeAccepted,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub append_only: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub recommendation_apply_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub reject_append_only_violation: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:            reject_append_only_violation: true,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub append_only: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub gpu_trained_lifecycle_merge_seal_id: String,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub lifecycle_event_append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub recommendation_apply_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub gpu_trained_lifecycle_merge_seal_id: Option<String>,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub lifecycle_event_append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub lifecycle_event_append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub recommendation_apply_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    pub current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    if *decision == AshSftGpuLifecycleMergeDecision::LifecycleMergeAccepted {
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    let mut decision = AshSftGpuLifecycleMergeDecision::LifecycleMergeAccepted;
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    if config.reject_append_only_violation
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        && (!guard.append_only
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    if !config.allow_recommendation_apply && guard.recommendation_apply_performed {
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    if !config.allow_current_pointer_update && guard.current_pointer_update_performed {
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    let gpu_trained_lifecycle_merge_seal_id = format!(
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:    if decision != AshSftGpuLifecycleMergeDecision::LifecycleMergeAccepted {
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:            status: SFT_GPU_RUN_12_HELD_STATUS.to_string(),
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:                gpu_trained_lifecycle_merge_seal_id: None,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:                lifecycle_event_append_only_confirmed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:                current_pointer_update_performed: guard.current_pointer_update_performed,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:            lifecycle_event_append_only_confirmed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:            recommendation_apply_performed: guard.recommendation_apply_performed,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:            current_pointer_update_performed: guard.current_pointer_update_performed,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        append_only: true,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        gpu_trained_lifecycle_merge_seal_id: gpu_trained_lifecycle_merge_seal_id.clone(),
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        lifecycle_event_append_only_confirmed: true,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        recommendation_apply_performed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        current_pointer_update_performed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        gpu_trained_lifecycle_merge_seal_id: Some(gpu_trained_lifecycle_merge_seal_id),
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        lifecycle_event_append_only_confirmed: true,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        current_pointer_update_performed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        status: SFT_GPU_RUN_12_LIFECYCLE_MERGE_STATUS.to_string(),
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        lifecycle_event_append_only_confirmed: true,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        recommendation_apply_performed: false,
+crates/ash_core/src/sft_gpu_lifecycle_merge.rs:        current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:            append_only: true,
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:            current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:            recommendation_apply_performed: false,
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:    assert_eq!(report.decision, AshSftGpuLifecycleMergeDecision::LifecycleMergeAccepted);
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:    assert!(report.lifecycle_event_append_only_confirmed);
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:fn sft_gpu_run_12_requires_append_only_event() {
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:    input.no_mutation_guard.append_only = false;
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:    assert!(!report.current_pointer_update_performed);
+crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs:    assert!(!report.recommendation_apply_performed);
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    SFT_GPU_RUN_12_LIFECYCLE_MERGE_STATUS,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    gpu_trained_lifecycle_merge_receipt_is_append_only,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    summarize_gpu_trained_lifecycle_merge,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:        status: SFT_GPU_RUN_12_LIFECYCLE_MERGE_STATUS.to_string(),
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:        decision: AshSftGpuLifecycleMergeDecision::LifecycleMergeAccepted,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:        lifecycle_event_append_only_confirmed: true,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:        recommendation_apply_performed: false,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:        current_pointer_update_performed: false,
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_exports_receipt_summary() {
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    let receipt = summarize_gpu_trained_lifecycle_merge(&lifecycle_merge_report());
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_preserves_previous_ledger_digest() {
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    let receipt = summarize_gpu_trained_lifecycle_merge(&lifecycle_merge_report());
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_requires_slot_arbitration_source() {
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    let receipt = summarize_gpu_trained_lifecycle_merge(&report);
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    assert!(!gpu_trained_lifecycle_merge_receipt_is_append_only(&receipt));
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_does_not_mutate_registry() {
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    let receipt = summarize_gpu_trained_lifecycle_merge(&lifecycle_merge_report());
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    assert!(gpu_trained_lifecycle_merge_receipt_is_append_only(&receipt));
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    assert!(!receipt.current_pointer_update_performed);
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_does_not_apply_recommendations() {
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    let receipt = summarize_gpu_trained_lifecycle_merge(&lifecycle_merge_report());
+crates/lora_train/tests/gpu_trained_lifecycle_merge.rs:    assert!(!receipt.recommendation_apply_performed);
+crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs:    pub lifecycle_event_append_only_allowed: bool,
+crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs:            lifecycle_event_append_only_allowed: true,
+crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs:pub fn backend_gpu_trained_lifecycle_merge_boundary() -> BackendGpuTrainedLifecycleMergeBoundary {
+crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs:pub fn gpu_trained_lifecycle_merge_boundary_is_append_only(
+crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs:        && boundary.lifecycle_event_append_only_allowed
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:    pub lifecycle_event_append_only_confirmed: bool,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:    pub recommendation_apply_performed: bool,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:    pub current_pointer_update_performed: bool,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:pub fn build_gpu_trained_lifecycle_merge_report(
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:pub fn summarize_gpu_trained_lifecycle_merge(
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        lifecycle_event_append_only_confirmed: report.lifecycle_event_append_only_confirmed,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        recommendation_apply_performed: report.recommendation_apply_performed,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        current_pointer_update_performed: report.current_pointer_update_performed,
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:pub fn gpu_trained_lifecycle_merge_receipt_is_append_only(
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        && receipt.lifecycle_event_append_only_confirmed
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        && !receipt.recommendation_apply_performed
+crates/lora_train/src/gpu_trained_lifecycle_merge.rs:        && !receipt.current_pointer_update_performed
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    backend_gpu_trained_lifecycle_merge_boundary,
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    gpu_trained_lifecycle_merge_boundary_is_append_only,
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_backend_boundary_reports_lineage() {
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    let boundary = backend_gpu_trained_lifecycle_merge_boundary();
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_backend_boundary_forbids_texture_sample_weight_fetch() {
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    let boundary = backend_gpu_trained_lifecycle_merge_boundary();
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_backend_boundary_keeps_cpu_fallback_closed() {
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    let boundary = backend_gpu_trained_lifecycle_merge_boundary();
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:fn gpu_trained_lifecycle_merge_backend_boundary_does_not_execute_runtime_training() {
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    let boundary = backend_gpu_trained_lifecycle_merge_boundary();
+crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs:    assert!(gpu_trained_lifecycle_merge_boundary_is_append_only(&boundary));
+crates/ash_core/tests/sft_gpu_run_11_slot_arbitration.rs:            new_current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_11_slot_arbitration.rs:        new_current_pointer_update_performed: false,
+crates/ash_core/src/sft_gpu_rollback_drill.rs:    pub new_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_rollback_drill.rs:        if guard.actual_current_pointer_rollback_performed || input.rollback_simulation.actual_current_pointer_rollback_performed || guard.new_current_pointer_update_performed {
+crates/lora_train/tests/gpu_trained_post_switch_health.rs:        new_current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_10_rollback_drill.rs:        runtime_current_pointer_update_performed: true,
+crates/ash_core/tests/sft_gpu_run_10_rollback_drill.rs:            new_current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_10_rollback_drill.rs:            new_current_pointer_update_performed: false,
+crates/ash_core/src/sft_gpu_post_switch_health.rs:    pub new_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_post_switch_health.rs:    pub new_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_post_switch_health.rs:    pub new_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_post_switch_health.rs:        if config.reject_new_current_pointer_update && guard.new_current_pointer_update_performed {
+crates/ash_core/src/sft_gpu_post_switch_health.rs:        new_current_pointer_update_performed: input.no_forbidden_mutation_guard.new_current_pointer_update_performed,
+crates/ash_core/src/sft_gpu_post_switch_health.rs:        new_current_pointer_update_performed: input.no_forbidden_mutation_guard.new_current_pointer_update_performed,
+crates/lora_train/tests/gpu_trained_current_pointer_switch.rs:        runtime_current_pointer_update_performed: true,
+crates/ash_core/tests/sft_gpu_run_09_post_switch_health.rs:        runtime_current_pointer_update_performed: true,
+crates/ash_core/tests/sft_gpu_run_09_post_switch_health.rs:            new_current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_09_post_switch_health.rs:    i.no_forbidden_mutation_guard.new_current_pointer_update_performed = true;
+crates/lora_train/src/gpu_trained_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/lora_train/src/gpu_trained_current_pointer_switch.rs:        runtime_current_pointer_update_performed: report.runtime_current_pointer_update_performed,
+crates/lora_train/src/gpu_trained_current_pointer_switch.rs:        && receipt.runtime_current_pointer_update_performed
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub rollback_ledger_append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:            || !input.pointer_switch.runtime_current_pointer_update_performed)
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:        if !input.rollback_ledger_commit.rollback_ledger_append_only_confirmed {
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:        runtime_current_pointer_update_performed: input.no_forbidden_mutation_guard.runtime_current_pointer_update_performed,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:        runtime_current_pointer_update_performed: input.no_forbidden_mutation_guard.runtime_current_pointer_update_performed,
+crates/ash_core/src/sft_gpu_current_pointer_switch.rs:        runtime_current_pointer_update_performed: input.no_forbidden_mutation_guard.runtime_current_pointer_update_performed,
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:        runtime_current_pointer_update_performed: false,
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:            runtime_current_pointer_update_performed: true,
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:            rollback_ledger_append_only_confirmed: true,
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:            runtime_current_pointer_update_performed: true,
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:    assert!(report.runtime_current_pointer_update_performed);
+crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs:    i.rollback_ledger_commit.rollback_ledger_append_only_confirmed = false;
+crates/lora_train/tests/gpu_trained_promotion_apply_candidate.rs:        runtime_current_pointer_update_performed: false,
+crates/lora_train/tests/gpu_trained_promotion_apply_candidate.rs:            runtime_current_pointer_update_performed: false,
+crates/lora_train/tests/gpu_trained_promotion_apply_candidate.rs:            runtime_current_pointer_update_performed: false,
+crates/lora_train/tests/gpu_trained_promotion_apply_candidate.rs:    i.no_mutation_guard.runtime_current_pointer_update_performed = true;
+crates/ash_core/src/tensorcube_health_recommendation_review.rs:    pub append_only_chain_valid: bool,
+crates/ash_core/src/tensorcube_health_recommendation_review.rs:    let append_only_chain_valid = review_item_chain_valid(&items, &mut failures);
+crates/ash_core/src/tensorcube_health_recommendation_review.rs:        append_only_chain_valid,
+crates/lora_train/src/gpu_trained_promotion_apply_candidate.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/lora_train/src/gpu_trained_promotion_apply_candidate.rs:        runtime_current_pointer_update_performed: report.runtime_current_pointer_update_performed,
+crates/lora_train/src/gpu_trained_promotion_apply_candidate.rs:        && !receipt.runtime_current_pointer_update_performed
+crates/ash_core/src/plasticity_rollback.rs:    pub lineage_append_only_candidate: bool,
+crates/ash_core/src/plasticity_rollback.rs:    let lineage_append_only_candidate = report.lineage_ledger.as_ref().map(|l| !l.events.is_empty() && l.version == ASH_44_LINEAGE_VERSION).unwrap_or(false);
+crates/ash_core/src/plasticity_rollback.rs:        lineage_append_only_candidate,
+crates/ash_core/src/sft_gpu_promotion_apply_candidate.rs:    pub runtime_current_pointer_update_performed: bool,
+crates/ash_core/src/sft_gpu_promotion_apply_candidate.rs:    pub runtime_current_pointer_update_performed: bool,
+
+## Delimiter balance
+PASS crates/ash_core/src/sft_gpu_lifecycle_merge.rs
+PASS crates/ash_core/tests/sft_gpu_run_12_lifecycle_merge.rs
+PASS crates/lora_train/src/gpu_trained_lifecycle_merge.rs
+PASS crates/lora_train/tests/gpu_trained_lifecycle_merge.rs
+PASS crates/burn_webgpu_backend/src/gpu_trained_lifecycle_merge.rs
+PASS crates/burn_webgpu_backend/tests/gpu_trained_lifecycle_merge.rs

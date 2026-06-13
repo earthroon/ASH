@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-FT-11",
+  "kind": "required_tensor_lookup_receipt",
+  "strict_required_keys": [
+    "model.embed_tokens.weight",
+    "lm_head.weight"
+  ],
+  "found_required_key_count": 0,
+  "missing_required_key_count": 0,
+  "missing_required_keys": [],
+  "family_coverage": {
+    "embedding": false,
+    "lm_head": false,
+    "attention": false,
+    "mlp": false,
+    "norm": false
+  },
+  "unknown_tensor_count": 0,
+  "operator_review_required": false,
+  "lookup_status": "PENDING"
+}

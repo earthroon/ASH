@@ -1,0 +1,212 @@
+{
+  "patch_id": "QW-52B-M1",
+  "title": "Input-Output Mirror Resonance Detector / Trace Only Seal",
+  "base_patch": "QW-52B",
+  "status": "PASS_STATIC_MIRROR_RESONANCE_DETECTOR",
+  "detector_added": {
+    "detector_id": "mirror_resonance_detector",
+    "detector_family": "input_output_reflection",
+    "registry_detector_count_before": 9,
+    "registry_detector_count_after": 10
+  },
+  "config": {
+    "distance_scale": 1.0,
+    "self_echo_weight": 1.0,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85,
+    "min_available_dims": 3,
+    "recent_window_size": 8
+  },
+  "fixture_results": [
+    {
+      "case_id": "normal_input_output_resonance",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M1",
+        "detector_id": "mirror_resonance_detector",
+        "decode_step": 0,
+        "candidate_rank": 0,
+        "token_id": 0,
+        "piece": "normal_input_output_resonance",
+        "input_trace_available": true,
+        "output_trace_available": true,
+        "recent_window_available": true,
+        "input_output_closeness": 0.981972,
+        "self_echo_similarity": 0.266336,
+        "self_echo_penalty": 0.266336,
+        "mirror_resonance_score": 0.715636,
+        "risk_score": 0.142182,
+        "risk_level": "None",
+        "evidence": {
+          "input_summary_digest": "qwv8:1c858bed741d9eeb",
+          "output_summary_digest": "qwv8:3c93e87fd6d17069",
+          "recent_window_digest": "recent_window:1",
+          "available_dims": 8,
+          "missing_dims": [],
+          "distance_scale": 1.0,
+          "self_echo_weight": 1.0,
+          "nearest_recent_step": 0,
+          "nearest_recent_similarity": 0.266336,
+          "summary_vector_order": [
+            "phase_mean",
+            "phase_delta_mean",
+            "pressure_mean",
+            "closure_mean",
+            "curvature_mean",
+            "transition_energy_mean",
+            "flow_continuity_mean",
+            "qwave_signature_hash_scalar"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "self_echo_reflection_lock",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M1",
+        "detector_id": "mirror_resonance_detector",
+        "decode_step": 1,
+        "candidate_rank": 0,
+        "token_id": 0,
+        "piece": "self_echo_reflection_lock",
+        "input_trace_available": true,
+        "output_trace_available": true,
+        "recent_window_available": true,
+        "input_output_closeness": 0.520104,
+        "self_echo_similarity": 0.99,
+        "self_echo_penalty": 0.99,
+        "mirror_resonance_score": -0.469896,
+        "risk_score": 0.734948,
+        "risk_level": "High",
+        "evidence": {
+          "input_summary_digest": "qwv8:1c858bed741d9eeb",
+          "output_summary_digest": "qwv8:002ce62d2983cdcd",
+          "recent_window_digest": "recent_window:2",
+          "available_dims": 8,
+          "missing_dims": [],
+          "distance_scale": 1.0,
+          "self_echo_weight": 1.0,
+          "nearest_recent_step": 1,
+          "nearest_recent_similarity": 0.99,
+          "summary_vector_order": [
+            "phase_mean",
+            "phase_delta_mean",
+            "pressure_mean",
+            "closure_mean",
+            "curvature_mean",
+            "transition_energy_mean",
+            "flow_continuity_mean",
+            "qwave_signature_hash_scalar"
+          ],
+          "note": [
+            "trace only; no rerank, logit, sampler, hidden, or token mutation"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "missing_input_qwave_trace",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M1",
+        "detector_id": "mirror_resonance_detector",
+        "decode_step": 2,
+        "candidate_rank": 0,
+        "token_id": 0,
+        "piece": "missing_input_qwave_trace",
+        "input_trace_available": false,
+        "output_trace_available": true,
+        "recent_window_available": false,
+        "input_output_closeness": null,
+        "self_echo_similarity": null,
+        "self_echo_penalty": null,
+        "mirror_resonance_score": null,
+        "risk_score": null,
+        "risk_level": "Unavailable",
+        "evidence": {
+          "input_summary_digest": null,
+          "output_summary_digest": "qwv8:002ce62d2983cdcd",
+          "recent_window_digest": null,
+          "available_dims": 0,
+          "missing_dims": [
+            "phase_mean",
+            "phase_delta_mean",
+            "pressure_mean",
+            "closure_mean",
+            "curvature_mean",
+            "transition_energy_mean",
+            "flow_continuity_mean",
+            "qwave_signature_hash_scalar"
+          ],
+          "distance_scale": 1.0,
+          "self_echo_weight": 1.0,
+          "nearest_recent_step": null,
+          "nearest_recent_similarity": null,
+          "summary_vector_order": [
+            "phase_mean",
+            "phase_delta_mean",
+            "pressure_mean",
+            "closure_mean",
+            "curvature_mean",
+            "transition_energy_mean",
+            "flow_continuity_mean",
+            "qwave_signature_hash_scalar"
+          ],
+          "note": [
+            "input or output qwave summary unavailable; detector sealed as Unavailable"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false
+  },
+  "next_candidates": [
+    "QW-52B-M2",
+    "QW-52B-M3",
+    "QW-52B-C1"
+  ],
+  "validator": {
+    "rust_owned_validation": true,
+    "python_injector_only": true,
+    "cargo_check": "NOT RUN - cargo unavailable in bake container",
+    "runtime_probe": "NOT RUN - cargo unavailable in bake container",
+    "strict": true,
+    "checks": {
+      "detector_count_after_10": true,
+      "all_fixture_results_pass": true,
+      "all_traces_action_disallowed": true,
+      "all_traces_mutation_disallowed": true,
+      "missing_trace_unavailable": true
+    },
+    "warnings": [
+      "cargo check not executed in bake container",
+      "runtime probe not executed in bake container"
+    ]
+  },
+  "notes": [
+    "Mirror resonance is trace-only.",
+    "Input-output closeness increases healthy resonance.",
+    "Self echo penalty increases repetition risk.",
+    "No candidate selection is changed."
+  ]
+}

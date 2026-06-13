@@ -1,0 +1,29 @@
+{
+  "patch_id": "ASH-FT-01",
+  "title": "Atlas Group Memory Budget Planner / Optimizer State Shard Estimate / No Tensor Load Seal",
+  "kind": "optimizer_state_shard_estimate",
+  "optimizer_mode": "adamw_plan",
+  "base": {
+    "ft00_manifest_path": "artifacts\\ash_ft\\ash_ft00_full_coverage_manifest.json",
+    "ft00_manifest_sha256": "",
+    "ft00_atlas_plan_path": "artifacts\\ash_ft\\ash_ft00_atlas_group_plan.json",
+    "ft00_atlas_plan_sha256": ""
+  },
+  "shard_policy": {
+    "location": "cpu",
+    "commit_policy": "sequential",
+    "load_policy": "on_group_enter",
+    "evict_policy": "on_group_commit",
+    "disk_backing_planned": false
+  },
+  "summary": {
+    "total_trainable_weight_bytes": 0,
+    "total_gradient_bytes": 0,
+    "total_optimizer_state_bytes": 0,
+    "peak_single_group_optimizer_bytes": 0,
+    "peak_single_group_total_budget_bytes": 0,
+    "global_optimizer_state_resident_required": false,
+    "sharded_optimizer_required": true
+  },
+  "shards": []
+}

@@ -1,0 +1,129 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-P0",
+  "source_patch_id": "16AI-QW-38G-R6A-LORA-RT-02B-F",
+  "status": "MINP_SSOT_DEFINED",
+  "adjudication": "MINP_CANONICAL_SSOT_BOUNDARY_DEFINED",
+  "canonical_field": "min_p",
+  "canonical_owner": "RuntimeSamplingConfig.min_p",
+  "external_aliases": [
+    "minP",
+    "min_p",
+    "samplingMinP",
+    "sampling_min_p"
+  ],
+  "default_value": 0.0,
+  "clamp_min": 0.0,
+  "clamp_max": 0.95,
+  "nan_policy": "coerce_to_0_0",
+  "state_affinity": {
+    "request_boundary": "GenerateConfig.min_p / StandardInferDecodeOverride.min_p",
+    "canonical_runtime": "RuntimeSamplingConfig.min_p",
+    "execution_lowering": "GenerationSamplingConfig.min_p",
+    "backend_lowering": "GpuSamplingConfig.min_p"
+  },
+  "modified_files": [
+    "crates/runtime/src/types.rs",
+    "crates/runtime/src/lib.rs",
+    "crates/runtime/src/engine/bootstrap.rs",
+    "crates/runtime/src/engine/generation_runner.rs",
+    "crates/runtime/src/causal_lm.rs",
+    "crates/runtime/src/infer.rs",
+    "crates/orchestrator_local/src/infer_entry.rs",
+    "crates/runtime_unz/src/types.rs",
+    "crates/runtime_unz/src/engine.rs"
+  ],
+  "non_scope": [
+    "gpu_shader_semantics_change",
+    "cpu_fallback_sampler",
+    "desktop_ui_control",
+    "model_generate_infer_rewire",
+    "top_p_active_set_renormalization"
+  ],
+  "validation": {
+    "static_pattern_checks": [
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "pub min_p: Option<f32>",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "alias = \"minP\"",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "alias = \"samplingMinP\"",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "pub fn normalize_min_p(value: f32) -> f32",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "pub min_p: AppliedField<f32>",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "min_p: f32",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/types.rs",
+        "pattern": "applied_min_p: bool",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/engine/bootstrap.rs",
+        "pattern": "min_p: AppliedField::Applied(normalize_min_p(cfg.min_p.unwrap_or(0.0)))",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/engine/generation_runner.rs",
+        "pattern": "min_p: *execution_cfg.sampling.min_p.resolved()",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/engine/generation_runner.rs",
+        "pattern": "applied_min_p: execution_cfg.sampling.min_p.is_applied()",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/causal_lm.rs",
+        "pattern": "min_p: Some(normalize_min_p(*exec_cfg.sampling.min_p.resolved()))",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/infer.rs",
+        "pattern": "cfg.min_p = normalize_min_p(v);",
+        "ok": true
+      },
+      {
+        "path": "crates/orchestrator_local/src/infer_entry.rs",
+        "pattern": "normalize_min_p(v as f32)",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/lib.rs",
+        "pattern": "normalize_min_p",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime_unz/src/engine.rs",
+        "pattern": "normalize_min_p",
+        "ok": true
+      },
+      {
+        "path": "crates/runtime/src/causal_lm.rs",
+        "pattern": "min_p: None",
+        "ok": true,
+        "negative": true
+      }
+    ],
+    "cargo_check": "NOT_RUN: cargo is not installed in this execution container",
+    "rustfmt": "NOT_RUN: cargo/rustfmt is not installed in this execution container"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-03",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-02",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "PlanOnly",
+  "behavior_change": false,
+  "requires_salad02": true,
+  "salad02_status_seen": null,
+  "decode03d_status_seen": null,
+  "steps_observed": 0,
+  "decisions": {
+    "no_action_count": 0,
+    "plan_rollback_count": 0,
+    "execute_rollback_resample_count": 0,
+    "safe_stop_candidate_count": 0,
+    "denied_count": 0,
+    "strict_fail_count": 0
+  },
+  "rollback": {
+    "max_rollback_depth": 0,
+    "mean_rollback_depth": null,
+    "kv_snapshot_required_count": 0,
+    "kv_snapshot_available_count": 0,
+    "kv_restore_verified_count": 0
+  },
+  "execution": {
+    "executed_count": 0,
+    "rollback_executed_count": 0,
+    "kv_restore_executed_count": 0,
+    "resample_executed_count": 0,
+    "safe_stop_executed_count": 0
+  },
+  "safe_resample": {
+    "temperature_min": null,
+    "temperature_mean": null,
+    "min_p_max": null,
+    "top_p_min": null
+  },
+  "acceptance": {
+    "ready_for_controlled_execute_trial": false,
+    "ready_for_salad04_korean_morph_loop_guard": false,
+    "reason": "static bake only; run ASH_SALAD03_MODE=plan_only after SALAD-02 detector evidence"
+  }
+}

@@ -1,0 +1,1764 @@
+diff -ruN decode02_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md decode02_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md
+--- decode02_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md	2026-05-27 00:12:51.880464314 +0000
+@@ -0,0 +1,11 @@
++# 16AI-QW-38G-R6A-DECODE-02 Acceptance
++
++- static_patch: PASS
++- decode_transition_guard_module_exists: PASS
++- cpu_oracle_transition_trace_fields: PASS
++- runtime_env_gate: PASS
++- probe_schema_artifact: PASS
++- gpu_shader_transition_parity: DEFERRED_TO_DECODE_02A
++- cargo_check: NOT_RUN
++- cargo_test: NOT_RUN
++- rustfmt: NOT_RUN
+diff -ruN decode02_orig/crates/model_core/src/cpu_oracle_sampler.rs decode02_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- decode02_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:43:04.000000000 +0000
++++ decode02_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 00:12:51.872657608 +0000
+@@ -1,6 +1,10 @@
+ use serde::{Deserialize, Serialize};
+ 
+ use crate::generation_sampling::GenerationSamplingConfig;
++use crate::decode_transition_guard::{
++    CandidateTokenView, TransitionAction, TransitionContext, TransitionDecision, TransitionReason,
++    evaluate_token_transition, piece_for_known_special, mojibake_suspected,
++};
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum SamplingApplyMode {
+@@ -18,6 +22,10 @@
+     pub pad_token_id: Option<u32>,
+     pub banned_token_ids: Vec<u32>,
+     pub recent_token_ids: Vec<u32>,
++    pub recent_token_pieces: Vec<String>,
++    pub prev_piece: Option<String>,
++    pub prev_text: Option<String>,
++    pub token_piece_hints: Vec<(u32, String)>,
+     pub min_new_tokens: usize,
+ }
+ 
+@@ -93,6 +101,15 @@
+     pub semantic_bias_min: Option<f32>,
+     pub semantic_bias_max: Option<f32>,
+     pub semantic_bias_mean: Option<f32>,
++    pub transition_guard_enabled: bool,
++    pub transition_guard_probe_only: bool,
++    pub transition_penalized_count: usize,
++    pub transition_hard_blocked_count: usize,
++    pub transition_unavailable_count: usize,
++    pub selected_transition_risk: Option<f32>,
++    pub selected_transition_penalty: Option<f32>,
++    pub selected_transition_action: Option<String>,
++    pub selected_transition_reasons: Vec<String>,
+ }
+ 
+ impl Default for CpuOracleCandidateTrace {
+@@ -120,6 +137,15 @@
+             semantic_bias_min: None,
+             semantic_bias_max: None,
+             semantic_bias_mean: None,
++            transition_guard_enabled: false,
++            transition_guard_probe_only: true,
++            transition_penalized_count: 0,
++            transition_hard_blocked_count: 0,
++            transition_unavailable_count: 0,
++            selected_transition_risk: None,
++            selected_transition_penalty: None,
++            selected_transition_action: None,
++            selected_transition_reasons: Vec::new(),
+         }
+     }
+ }
+@@ -149,11 +175,13 @@
+     semantic_bias: f32,
+     weighted: f32,
+     prob: f32,
++    transition: TransitionDecision,
+ }
+ 
+ fn candidate_trace_from(
+     active: &[Candidate],
+     final_candidates: &[Candidate],
++    selected: Option<&Candidate>,
+     pre_min_p_count: usize,
+     post_min_p_count: usize,
+     min_p_threshold: Option<f32>,
+@@ -171,6 +199,13 @@
+     let semantic_bias_min = bias_values.iter().copied().reduce(f32::min);
+     let semantic_bias_max = bias_values.iter().copied().reduce(f32::max);
+     let semantic_bias_mean = if bias_values.is_empty() { None } else { Some(bias_values.iter().sum::<f32>() / bias_values.len() as f32) };
++    let transition_penalized_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::Penalize | TransitionAction::ProbeOnly)).count();
++    let transition_hard_blocked_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::HardBlock)).count();
++    let transition_unavailable_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::Unavailable)).count();
++    let selected_transition_risk = selected.map(|c| c.transition.risk);
++    let selected_transition_penalty = selected.map(|c| c.transition.penalty);
++    let selected_transition_action = selected.map(|c| format!("{:?}", c.transition.action));
++    let selected_transition_reasons = selected.map(|c| c.transition.reason_strings()).unwrap_or_default();
+     CpuOracleCandidateTrace {
+         active_ids: active.iter().map(|c| c.id).collect(),
+         final_ids: final_candidates.iter().map(|c| c.id).collect(),
+@@ -194,6 +229,15 @@
+         semantic_bias_min,
+         semantic_bias_max,
+         semantic_bias_mean,
++        transition_guard_enabled: config.transition_guard.enabled,
++        transition_guard_probe_only: config.transition_guard.probe_only,
++        transition_penalized_count,
++        transition_hard_blocked_count,
++        transition_unavailable_count,
++        selected_transition_risk,
++        selected_transition_penalty,
++        selected_transition_action,
++        selected_transition_reasons,
+     }
+ }
+ 
+@@ -213,6 +257,41 @@
+     (Some(max_scaled), Some(sum))
+ }
+ 
++
++fn token_piece_hint(ctx: &CpuOracleContext, id: u32) -> Option<String> {
++    ctx.token_piece_hints
++        .iter()
++        .find(|(token_id, _)| *token_id == id)
++        .map(|(_, piece)| piece.clone())
++        .or_else(|| piece_for_known_special(id, ctx.eos_token_id, ctx.pad_token_id))
++}
++
++fn transition_context_from_cpu_context(ctx: &CpuOracleContext) -> TransitionContext {
++    TransitionContext {
++        step: ctx.step,
++        prev_token_id: ctx.recent_token_ids.last().copied(),
++        prev_piece: ctx.prev_piece.clone(),
++        prev_text: ctx.prev_text.clone().or_else(|| ctx.prev_piece.clone()),
++        recent_token_ids: ctx.recent_token_ids.clone(),
++        recent_token_pieces: ctx.recent_token_pieces.clone(),
++        eos_token_id: ctx.eos_token_id,
++        pad_token_id: ctx.pad_token_id,
++        min_new_tokens: ctx.min_new_tokens,
++    }
++}
++
++fn candidate_view_from_context(ctx: &CpuOracleContext, id: u32) -> CandidateTokenView {
++    let piece = token_piece_hint(ctx, id);
++    let text = piece.as_ref().map(|p| p.trim_start_matches('▁').to_string()).unwrap_or_default();
++    let is_eos = ctx.eos_token_id == Some(id) || piece.as_deref() == Some("<eos>");
++    let is_pad = ctx.pad_token_id == Some(id) || piece.as_deref() == Some("<pad>");
++    let is_byte = piece.as_deref().map(|p| p.starts_with("<byte:") || p.starts_with("<0x")).unwrap_or(false);
++    let is_unknown = piece.as_deref() == Some("<unk>");
++    let is_control = is_eos || is_pad || is_unknown || piece.as_deref().map(|p| p.starts_with('<') && p.ends_with('>')).unwrap_or(false);
++    let mojibake = piece.as_deref().map(mojibake_suspected).unwrap_or(false) || mojibake_suspected(&text);
++    CandidateTokenView { token_id: id, piece, text: if text.is_empty() { None } else { Some(text) }, is_eos, is_pad, is_control, is_byte, is_unknown, mojibake_suspected: mojibake }
++}
++
+ pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
+     config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
+ }
+@@ -286,13 +365,24 @@
+             } else {
+                 0.0
+             };
++            let transition_context = transition_context_from_cpu_context(ctx);
++            let candidate_view = candidate_view_from_context(ctx, id);
++            let transition = evaluate_token_transition(&config.transition_guard, &transition_context, &candidate_view);
++            if matches!(transition.action, TransitionAction::HardBlock) {
++                return None;
++            }
++            let mut weighted = scaled + semantic_bias;
++            if matches!(transition.action, TransitionAction::Penalize) {
++                weighted -= transition.penalty;
++            }
+             Some(Candidate {
+                 id,
+                 logit,
+                 scaled,
+                 semantic_bias,
+-                weighted: scaled + semantic_bias,
++                weighted,
+                 prob: 0.0,
++                transition,
+             })
+         })
+         .collect::<Vec<_>>();
+@@ -374,6 +464,7 @@
+         trace: candidate_trace_from(
+             &active_candidates_for_trace,
+             &candidates,
++            Some(&selected),
+             active_count_before_min_p,
+             active_count_after_min_p,
+             min_p_threshold,
+@@ -514,6 +605,10 @@
+             pad_token_id: None,
+             banned_token_ids: Vec::new(),
+             recent_token_ids: Vec::new(),
++            recent_token_pieces: Vec::new(),
++            prev_piece: None,
++            prev_text: None,
++            token_piece_hints: Vec::new(),
+             min_new_tokens: 0,
+         };
+         let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
+@@ -532,6 +627,10 @@
+             pad_token_id: None,
+             banned_token_ids: vec![0],
+             recent_token_ids: Vec::new(),
++            recent_token_pieces: Vec::new(),
++            prev_piece: None,
++            prev_text: None,
++            token_piece_hints: Vec::new(),
+             min_new_tokens: 0,
+         };
+         let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
+diff -ruN decode02_orig/crates/model_core/src/decode_state.rs decode02_work/crates/model_core/src/decode_state.rs
+--- decode02_orig/crates/model_core/src/decode_state.rs	2026-05-26 10:54:20.000000000 +0000
++++ decode02_work/crates/model_core/src/decode_state.rs	2026-05-27 00:12:51.875781677 +0000
+@@ -1,4 +1,5 @@
+ use super::*;
++use crate::decode_transition_guard::TransitionRuntimeContext;
+ use crate::generation_telemetry::with_tensorcube_runtime_splice_label;
+ use crate::model_layers::grouped_query_attention;
+ 
+@@ -825,7 +826,15 @@
+                 )?;
+                 let first = with_runtime_splice_telemetry_label(
+                     "model_core.prefill.sampled.select".to_string(),
+-                    || self.select_next_token_with_sampling(&logits, sampling),
++                    || {
++                        let mut sampling_with_transition = sampling.clone();
++                        sampling_with_transition.transition_context = Some(TransitionRuntimeContext::from_recent_ids(
++                            0,
++                            seed_ids.clone(),
++                            sampling.transition_guard.recent_window,
++                        ));
++                        self.select_next_token_with_sampling(&logits, &sampling_with_transition)
++                    },
+                 )?;
+                 Ok((kv, logits, first))
+             },
+@@ -945,7 +954,15 @@
+                 )?;
+                 let next = with_runtime_splice_telemetry_label(
+                     "model_core.decode.sampled.select".to_string(),
+-                    || self.select_next_token_with_sampling(&logits, sampling),
++                    || {
++                        let mut sampling_with_transition = sampling.clone();
++                        sampling_with_transition.transition_context = Some(TransitionRuntimeContext::from_recent_ids(
++                            state.generated.len(),
++                            generated_prefix.clone(),
++                            sampling.transition_guard.recent_window,
++                        ));
++                        self.select_next_token_with_sampling(&logits, &sampling_with_transition)
++                    },
+                 )?;
+                 Ok((generated_prefix, logits, next))
+             },
+diff -ruN decode02_orig/crates/model_core/src/decode_transition_guard.rs decode02_work/crates/model_core/src/decode_transition_guard.rs
+--- decode02_orig/crates/model_core/src/decode_transition_guard.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:14:07.638421734 +0000
+@@ -0,0 +1,404 @@
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionGuardConfig {
++    pub enabled: bool,
++    pub probe_only: bool,
++    pub recent_window: usize,
++    pub soft_penalty_scale: f32,
++    pub max_soft_penalty: f32,
++    pub hard_block_control_tokens: bool,
++    pub hard_block_pad_token: bool,
++    pub hard_block_mojibake_tokens: bool,
++    pub hard_block_invalid_byte_tokens: bool,
++    pub penalize_generic_continuation_eos: bool,
++    pub penalize_double_particle_like: bool,
++    pub penalize_repeated_punctuation: bool,
++    pub penalize_byte_text_boundary: bool,
++    pub min_new_tokens_for_eos: usize,
++}
++
++impl Default for TransitionGuardConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            probe_only: true,
++            recent_window: 8,
++            soft_penalty_scale: 1.0,
++            max_soft_penalty: 2.0,
++            hard_block_control_tokens: true,
++            hard_block_pad_token: true,
++            hard_block_mojibake_tokens: true,
++            hard_block_invalid_byte_tokens: true,
++            penalize_generic_continuation_eos: true,
++            penalize_double_particle_like: true,
++            penalize_repeated_punctuation: true,
++            penalize_byte_text_boundary: true,
++            min_new_tokens_for_eos: 8,
++        }
++    }
++}
++
++impl TransitionGuardConfig {
++    pub fn sanitized(mut self) -> Self {
++        if self.recent_window == 0 { self.recent_window = 8; }
++        if !self.soft_penalty_scale.is_finite() || self.soft_penalty_scale < 0.0 { self.soft_penalty_scale = 1.0; }
++        if !self.max_soft_penalty.is_finite() || self.max_soft_penalty < 0.0 { self.max_soft_penalty = 2.0; }
++        self.max_soft_penalty = self.max_soft_penalty.min(8.0);
++        self
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionAction {
++    Allow,
++    Penalize,
++    HardBlock,
++    ProbeOnly,
++    Unavailable,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionReason {
++    None,
++    PieceContextUnavailable,
++    PadToken,
++    ControlToken,
++    EosBeforeMinNewTokens,
++    GenericContinuationImmediateEos,
++    InvalidByteToken,
++    ByteTextBoundaryRisk,
++    MojibakeSuspected,
++    DoubleParticleLike,
++    DoubleSentenceEndingLike,
++    RepeatedPunctuation,
++    UnbalancedOpenCloseSymbol,
++    WhitespaceOnlyToken,
++    UnknownToken,
++    RecentLoopRisk,
++}
++
++impl TransitionReason {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::None => "none",
++            Self::PieceContextUnavailable => "piece_context_unavailable",
++            Self::PadToken => "pad_token",
++            Self::ControlToken => "control_token",
++            Self::EosBeforeMinNewTokens => "eos_before_min_new_tokens",
++            Self::GenericContinuationImmediateEos => "generic_continuation_immediate_eos",
++            Self::InvalidByteToken => "invalid_byte_token",
++            Self::ByteTextBoundaryRisk => "byte_text_boundary_risk",
++            Self::MojibakeSuspected => "mojibake_suspected",
++            Self::DoubleParticleLike => "double_particle_like",
++            Self::DoubleSentenceEndingLike => "double_sentence_ending_like",
++            Self::RepeatedPunctuation => "repeated_punctuation",
++            Self::UnbalancedOpenCloseSymbol => "unbalanced_open_close_symbol",
++            Self::WhitespaceOnlyToken => "whitespace_only_token",
++            Self::UnknownToken => "unknown_token",
++            Self::RecentLoopRisk => "recent_loop_risk",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionDecision {
++    pub risk: f32,
++    pub penalty: f32,
++    pub action: TransitionAction,
++    pub reasons: Vec<TransitionReason>,
++}
++
++impl Default for TransitionDecision {
++    fn default() -> Self {
++        Self { risk: 0.0, penalty: 0.0, action: TransitionAction::Allow, reasons: vec![TransitionReason::None] }
++    }
++}
++
++impl TransitionDecision {
++    pub fn unavailable() -> Self {
++        Self { risk: 0.0, penalty: 0.0, action: TransitionAction::Unavailable, reasons: vec![TransitionReason::PieceContextUnavailable] }
++    }
++
++    pub fn reason_strings(&self) -> Vec<String> {
++        self.reasons.iter().map(|r| r.as_str().to_string()).collect()
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct TransitionRuntimeContext {
++    pub step: usize,
++    pub prev_token_id: Option<u32>,
++    pub prev_piece: Option<String>,
++    pub prev_text: Option<String>,
++    pub recent_token_ids: Vec<u32>,
++    pub recent_token_pieces: Vec<String>,
++}
++
++impl TransitionRuntimeContext {
++    pub fn from_recent_ids(step: usize, recent_token_ids: Vec<u32>, recent_window: usize) -> Self {
++        let prev_token_id = recent_token_ids.last().copied();
++        let start = recent_token_ids.len().saturating_sub(recent_window.max(1));
++        Self {
++            step,
++            prev_token_id,
++            prev_piece: None,
++            prev_text: None,
++            recent_token_ids: recent_token_ids[start..].to_vec(),
++            recent_token_pieces: Vec::new(),
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct TransitionContext {
++    pub step: usize,
++    pub prev_token_id: Option<u32>,
++    pub prev_piece: Option<String>,
++    pub prev_text: Option<String>,
++    pub recent_token_ids: Vec<u32>,
++    pub recent_token_pieces: Vec<String>,
++    pub eos_token_id: Option<u32>,
++    pub pad_token_id: Option<u32>,
++    pub min_new_tokens: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct CandidateTokenView {
++    pub token_id: u32,
++    pub piece: Option<String>,
++    pub text: Option<String>,
++    pub is_eos: bool,
++    pub is_pad: bool,
++    pub is_control: bool,
++    pub is_byte: bool,
++    pub is_unknown: bool,
++    pub mojibake_suspected: bool,
++}
++
++pub fn piece_for_known_special(token_id: u32, eos_token_id: Option<u32>, pad_token_id: Option<u32>) -> Option<String> {
++    if pad_token_id == Some(token_id) { return Some("<pad>".to_string()); }
++    if eos_token_id == Some(token_id) { return Some("<eos>".to_string()); }
++    None
++}
++
++fn is_generic_continuation(text_or_piece: &str) -> bool {
++    let s = text_or_piece.trim().trim_start_matches('▁');
++    matches!(s, "이어가고" | "그리고" | "하지만" | "그러나" | "때문에" | "즉" | "그래서" | "따라서" | "그러므로" | "또한")
++}
++
++fn is_particle_like(s: &str) -> bool {
++    let s = s.trim().trim_start_matches('▁');
++    matches!(s, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "의")
++}
++
++fn is_sentence_ending_like(s: &str) -> bool {
++    let s = s.trim().trim_start_matches('▁');
++    matches!(s, "다" | "요" | "죠" | "까" | "네" | "습니다" | "합니다" | "했다" | "한다")
++}
++
++fn is_punctuation_repeat_piece(s: &str) -> bool {
++    let t = s.trim();
++    matches!(t, "!" | "?" | "." | "," | "。" | "…")
++}
++
++fn is_korean_emotional_repeat_piece(s: &str) -> bool {
++    let t = s.trim();
++    matches!(t, "ㅋ" | "ㅠ" | "ㅜ" | ";")
++}
++
++fn looks_like_byte_piece(s: &str) -> bool {
++    s.starts_with("<byte:") || s.starts_with("<0x")
++}
++
++fn looks_like_control_piece(s: &str) -> bool {
++    matches!(s, "<pad>" | "<bos>" | "<eos>" | "<unk>" | "<s>" | "</s>")
++        || s.starts_with("<glossary:")
++        || s.starts_with("<task:")
++        || s.starts_with("<lang:")
++        || s.starts_with("<qwave:")
++        || s.starts_with("<delta_k:")
++}
++
++pub fn mojibake_suspected(piece_or_text: &str) -> bool {
++    let s = piece_or_text;
++    s.contains('�') || s.contains("?댁") || s.contains('媛') || s.contains('怨') || s.contains('Ã') || s.contains('ì') || s.contains('ê')
++}
++
++fn push_reason(reasons: &mut Vec<TransitionReason>, reason: TransitionReason) {
++    if !reasons.contains(&reason) {
++        reasons.push(reason);
++    }
++}
++
++pub fn evaluate_token_transition(
++    config: &TransitionGuardConfig,
++    ctx: &TransitionContext,
++    candidate: &CandidateTokenView,
++) -> TransitionDecision {
++    let cfg = config.clone().sanitized();
++    if !cfg.enabled {
++        return TransitionDecision::default();
++    }
++
++    let mut risk = 0.0f32;
++    let mut action = TransitionAction::Allow;
++    let mut reasons: Vec<TransitionReason> = Vec::new();
++
++    let candidate_piece = candidate.piece.as_deref().unwrap_or("");
++    let candidate_text = candidate.text.as_deref().unwrap_or(candidate_piece);
++    let prev_text = ctx.prev_text.as_deref().or(ctx.prev_piece.as_deref()).unwrap_or("");
++    let piece_available = !candidate_piece.is_empty() || candidate.is_eos || candidate.is_pad;
++
++    if !piece_available {
++        push_reason(&mut reasons, TransitionReason::PieceContextUnavailable);
++    }
++
++    if candidate.is_pad && cfg.hard_block_pad_token {
++        risk = risk.max(1.0);
++        action = TransitionAction::HardBlock;
++        push_reason(&mut reasons, TransitionReason::PadToken);
++    }
++
++    if candidate.is_eos && ctx.step < cfg.min_new_tokens_for_eos.max(ctx.min_new_tokens) {
++        risk = risk.max(1.0);
++        action = TransitionAction::HardBlock;
++        push_reason(&mut reasons, TransitionReason::EosBeforeMinNewTokens);
++    }
++
++    if candidate.is_control && !candidate.is_eos && !candidate.is_pad && cfg.hard_block_control_tokens {
++        risk = risk.max(1.0);
++        action = TransitionAction::HardBlock;
++        push_reason(&mut reasons, TransitionReason::ControlToken);
++    }
++
++    if (candidate.mojibake_suspected || mojibake_suspected(candidate_piece) || mojibake_suspected(candidate_text)) && cfg.hard_block_mojibake_tokens {
++        risk = risk.max(0.95);
++        action = TransitionAction::HardBlock;
++        push_reason(&mut reasons, TransitionReason::MojibakeSuspected);
++    }
++
++    if candidate.is_byte && cfg.hard_block_invalid_byte_tokens {
++        risk = risk.max(0.8);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::InvalidByteToken);
++    }
++
++    if cfg.penalize_generic_continuation_eos && candidate.is_eos && !prev_text.is_empty() && is_generic_continuation(prev_text) {
++        risk = risk.max(0.95);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::GenericContinuationImmediateEos);
++    }
++
++    if cfg.penalize_double_particle_like && !prev_text.is_empty() && is_particle_like(prev_text) && is_particle_like(candidate_text) {
++        risk = risk.max(0.65);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::DoubleParticleLike);
++    }
++
++    if !prev_text.is_empty() && is_sentence_ending_like(prev_text) && is_sentence_ending_like(candidate_text) {
++        risk = risk.max(0.55);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::DoubleSentenceEndingLike);
++    }
++
++    if cfg.penalize_byte_text_boundary && !prev_text.is_empty() && (looks_like_byte_piece(prev_text) || candidate.is_byte) {
++        risk = risk.max(0.6);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::ByteTextBoundaryRisk);
++    }
++
++    if cfg.penalize_repeated_punctuation && is_punctuation_repeat_piece(candidate_text) {
++        let repeated = ctx.recent_token_pieces.iter().rev().take(3).all(|p| p.trim() == candidate_text.trim());
++        if repeated && !is_korean_emotional_repeat_piece(candidate_text) {
++            risk = risk.max(0.7);
++            if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++            push_reason(&mut reasons, TransitionReason::RepeatedPunctuation);
++        }
++    }
++
++    if candidate_text.trim().is_empty() && !candidate.is_eos {
++        risk = risk.max(0.25);
++        if action == TransitionAction::Allow { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::WhitespaceOnlyToken);
++    }
++
++    if candidate.is_unknown || candidate_piece == "<unk>" {
++        risk = risk.max(0.5);
++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
++        push_reason(&mut reasons, TransitionReason::UnknownToken);
++    }
++
++    if reasons.is_empty() {
++        reasons.push(TransitionReason::None);
++    }
++
++    if action == TransitionAction::Allow && reasons.len() == 1 && reasons[0] == TransitionReason::PieceContextUnavailable {
++        return TransitionDecision { risk: 0.0, penalty: 0.0, action: TransitionAction::Unavailable, reasons };
++    }
++
++    if cfg.probe_only && action != TransitionAction::Allow {
++        let penalty = (risk * cfg.soft_penalty_scale).min(cfg.max_soft_penalty);
++        return TransitionDecision { risk, penalty, action: TransitionAction::ProbeOnly, reasons };
++    }
++
++    let penalty = match action {
++        TransitionAction::HardBlock => cfg.max_soft_penalty,
++        TransitionAction::Penalize => (risk * cfg.soft_penalty_scale).min(cfg.max_soft_penalty),
++        _ => 0.0,
++    };
++
++    TransitionDecision { risk, penalty, action, reasons }
++}
++
++pub fn transition_guard_config_from_env() -> TransitionGuardConfig {
++    let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
++    let parse_usize = |key: &str, default: usize| -> usize { std::env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default) };
++    let parse_f32 = |key: &str, default: f32| -> f32 { std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default) };
++    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true");
++    let probe_only = !matches!(mode.as_str(), "on" | "1" | "true");
++    TransitionGuardConfig {
++        enabled,
++        probe_only,
++        recent_window: parse_usize("ASH_DECODE_TRANSITION_RECENT_WINDOW", 8),
++        soft_penalty_scale: parse_f32("ASH_DECODE_TRANSITION_SOFT_PENALTY_SCALE", 1.0),
++        max_soft_penalty: parse_f32("ASH_DECODE_TRANSITION_MAX_PENALTY", 2.0),
++        min_new_tokens_for_eos: parse_usize("ASH_DECODE_TRANSITION_MIN_NEW_TOKENS", 8),
++        ..TransitionGuardConfig::default()
++    }.sanitized()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn cfg_on() -> TransitionGuardConfig {
++        TransitionGuardConfig { enabled: true, probe_only: false, ..TransitionGuardConfig::default() }
++    }
++
++    #[test]
++    fn generic_continuation_eos_is_risky() {
++        let ctx = TransitionContext { step: 9, prev_text: Some("이어가고".to_string()), ..Default::default() };
++        let cand = CandidateTokenView { token_id: 2, piece: Some("<eos>".to_string()), text: Some(String::new()), is_eos: true, ..Default::default() };
++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
++        assert!(d.risk >= 0.9);
++        assert!(d.reasons.contains(&TransitionReason::GenericContinuationImmediateEos));
++    }
++
++    #[test]
++    fn eos_before_min_new_tokens_is_hard_blocked() {
++        let ctx = TransitionContext { step: 2, min_new_tokens: 8, ..Default::default() };
++        let cand = CandidateTokenView { token_id: 2, piece: Some("<eos>".to_string()), text: Some(String::new()), is_eos: true, ..Default::default() };
++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
++        assert_eq!(d.action, TransitionAction::HardBlock);
++        assert!(d.reasons.contains(&TransitionReason::EosBeforeMinNewTokens));
++    }
++
++    #[test]
++    fn korean_emotional_repeat_not_hard_blocked() {
++        let ctx = TransitionContext { recent_token_pieces: vec!["ㅠ".to_string(), "ㅠ".to_string(), "ㅠ".to_string()], ..Default::default() };
++        let cand = CandidateTokenView { token_id: 42, piece: Some("ㅠ".to_string()), text: Some("ㅠ".to_string()), ..Default::default() };
++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
++        assert_ne!(d.action, TransitionAction::HardBlock);
++    }
++}
+diff -ruN decode02_orig/crates/model_core/src/generation_sampling.rs decode02_work/crates/model_core/src/generation_sampling.rs
+--- decode02_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 23:43:04.000000000 +0000
++++ decode02_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:12:51.876575109 +0000
+@@ -1,6 +1,7 @@
+ use super::*;
+ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
++use crate::decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext};
+ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
+ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
+ use std::collections::BTreeMap;
+@@ -695,6 +696,8 @@
+     pub semantic_prior_enabled: Option<bool>,
+     pub semantic_prior_effective: Option<bool>,
+     pub semantic_bias_cap: Option<f32>,
++    pub transition_guard_enabled: Option<bool>,
++    pub transition_guard_probe_only: Option<bool>,
+     pub compare_score_eps: Option<f32>,
+     pub compare_logprob_eps: Option<f32>,
+     pub fallback_on_mismatch: Option<bool>,
+@@ -711,6 +714,8 @@
+     pub min_p: f32,
+     pub semantic_prior: SemanticPriorConfig,
+     pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
++    pub transition_guard: TransitionGuardConfig,
++    pub transition_context: Option<TransitionRuntimeContext>,
+     pub seed: Option<u64>,
+     pub stop_sequences: Vec<String>,
+     pub min_new_tokens: usize,
+@@ -744,6 +749,8 @@
+             min_p: 0.0,
+             semantic_prior: SemanticPriorConfig::default(),
+             semantic_score_snapshot: None,
++            transition_guard: TransitionGuardConfig::default(),
++            transition_context: None,
+             seed: None,
+             stop_sequences: Vec::new(),
+             min_new_tokens: 0,
+@@ -787,6 +794,8 @@
+             semantic_prior_enabled: Some(self.semantic_prior.enabled),
+             semantic_prior_effective: Some(self.semantic_prior.enabled && self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false)),
+             semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
++            transition_guard_enabled: Some(self.transition_guard.enabled),
++            transition_guard_probe_only: Some(self.transition_guard.probe_only),
+             compare_score_eps: self.compare_score_eps,
+             compare_logprob_eps: self.compare_logprob_eps,
+             fallback_on_mismatch: self.fallback_on_mismatch,
+@@ -2375,13 +2384,18 @@
+         step: usize,
+         fallback_reason: &'static str,
+     ) -> NextTokenChoice {
++        let transition_context = sampling.transition_context.clone().unwrap_or_default();
+         let ctx = CpuOracleContext {
+             step,
+             seed: sampling.seed.unwrap_or(0),
+             eos_token_id: Some(self.spec.token_ids.eos_id),
+             pad_token_id: Some(self.spec.token_ids.pad_id),
+             banned_token_ids: Vec::new(),
+-            recent_token_ids: Vec::new(),
++            recent_token_ids: if transition_context.recent_token_ids.is_empty() { Vec::new() } else { transition_context.recent_token_ids.clone() },
++            recent_token_pieces: transition_context.recent_token_pieces.clone(),
++            prev_piece: transition_context.prev_piece.clone(),
++            prev_text: transition_context.prev_text.clone(),
++            token_piece_hints: Vec::new(),
+             min_new_tokens: sampling.min_new_tokens,
+         };
+         let result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
+@@ -2433,13 +2447,18 @@
+         if !mode.enabled() || step >= sampler_parity::max_steps() {
+             return None;
+         }
++        let transition_context = sampling.transition_context.clone().unwrap_or_default();
+         let ctx = CpuOracleContext {
+             step,
+             seed: sampling.seed.unwrap_or(0),
+             eos_token_id: Some(self.spec.token_ids.eos_id),
+             pad_token_id: Some(self.spec.token_ids.pad_id),
+             banned_token_ids: Vec::new(),
+-            recent_token_ids: Vec::new(),
++            recent_token_ids: if transition_context.recent_token_ids.is_empty() { Vec::new() } else { transition_context.recent_token_ids.clone() },
++            recent_token_pieces: transition_context.recent_token_pieces.clone(),
++            prev_piece: transition_context.prev_piece.clone(),
++            prev_text: transition_context.prev_text.clone(),
++            token_piece_hints: Vec::new(),
+             min_new_tokens: sampling.min_new_tokens,
+         };
+         let cpu_result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
+diff -ruN decode02_orig/crates/model_core/src/lib.rs decode02_work/crates/model_core/src/lib.rs
+--- decode02_orig/crates/model_core/src/lib.rs	2026-05-26 23:50:27.000000000 +0000
++++ decode02_work/crates/model_core/src/lib.rs	2026-05-27 00:12:51.873223397 +0000
+@@ -10,6 +10,7 @@
+ mod generation_sampling;
+ mod sampling_helpers;
+ mod cpu_oracle_sampler;
++mod decode_transition_guard;
+ mod sampler_parity;
+ mod sampler_parity_validation;
+ mod minp_c1a_smoke;
+@@ -63,6 +64,7 @@
+ };
+ 
+ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
++pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, transition_guard_config_from_env, evaluate_token_transition};
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+diff -ruN decode02_orig/crates/model_core/src/minp_c1a_smoke.rs decode02_work/crates/model_core/src/minp_c1a_smoke.rs
+--- decode02_orig/crates/model_core/src/minp_c1a_smoke.rs	2026-05-26 23:33:31.000000000 +0000
++++ decode02_work/crates/model_core/src/minp_c1a_smoke.rs	2026-05-27 00:13:19.878376596 +0000
+@@ -28,6 +28,10 @@
+         pad_token_id: Some(0),
+         banned_token_ids: Vec::new(),
+         recent_token_ids: Vec::new(),
++        recent_token_pieces: Vec::new(),
++        prev_piece: None,
++        prev_text: None,
++        token_piece_hints: Vec::new(),
+         min_new_tokens: 0,
+     }
+ }
+diff -ruN decode02_orig/crates/model_core/src/reference_checkpoint.rs decode02_work/crates/model_core/src/reference_checkpoint.rs
+--- decode02_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-26 15:34:10.000000000 +0000
++++ decode02_work/crates/model_core/src/reference_checkpoint.rs	2026-05-27 00:12:51.879611899 +0000
+@@ -768,6 +768,10 @@
+                     pad_token_id: Some(self.spec.token_ids.pad_id),
+                     banned_token_ids: banned_token_ids.to_vec(),
+                     recent_token_ids: ids.clone(),
++                    recent_token_pieces: Vec::new(),
++                    prev_piece: None,
++                    prev_text: None,
++                    token_piece_hints: Vec::new(),
+                     min_new_tokens: sampling.min_new_tokens,
+                 };
+                 sample_with_cpu_oracle(&logits, &sampling, &ctx).selected_id
+diff -ruN decode02_orig/crates/runtime/src/infer.rs decode02_work/crates/runtime/src/infer.rs
+--- decode02_orig/crates/runtime/src/infer.rs	2026-05-26 23:50:27.000000000 +0000
++++ decode02_work/crates/runtime/src/infer.rs	2026-05-27 00:12:51.875232779 +0000
+@@ -18,7 +18,7 @@
+     GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
+     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
+     GpuSamplingTelemetryCompact, GpuSamplingTelemetrySummary, ModelSpec, NativeWgpuModel,
+-    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig,
++    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig, TransitionGuardConfig, transition_guard_config_from_env,
+     TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary,
+     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
+     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
+@@ -1623,6 +1623,7 @@
+ ) {
+     let mut cfg = GenerationSamplingConfig::default();
+     cfg.semantic_prior = semantic_prior_config_from_env();
++    cfg.transition_guard = transition_guard_config_from_env();
+     if cfg.semantic_prior.require_sampler04_strict_ready {
+         let sampler04_ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
+             .map(|v| v == "STRICT_CANDIDATE_READY")
+diff -ruN decode02_orig/workspace/decode02.patch decode02_work/workspace/decode02.patch
+--- decode02_orig/workspace/decode02.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02.patch	2026-05-27 00:14:36.138844662 +0000
+@@ -0,0 +1,819 @@
++diff -ruN decode02_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md decode02_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md
++--- decode02_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ decode02_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md	2026-05-27 00:12:51.880464314 +0000
++@@ -0,0 +1,11 @@
+++# 16AI-QW-38G-R6A-DECODE-02 Acceptance
+++
+++- static_patch: PASS
+++- decode_transition_guard_module_exists: PASS
+++- cpu_oracle_transition_trace_fields: PASS
+++- runtime_env_gate: PASS
+++- probe_schema_artifact: PASS
+++- gpu_shader_transition_parity: DEFERRED_TO_DECODE_02A
+++- cargo_check: NOT_RUN
+++- cargo_test: NOT_RUN
+++- rustfmt: NOT_RUN
++diff -ruN decode02_orig/crates/model_core/src/cpu_oracle_sampler.rs decode02_work/crates/model_core/src/cpu_oracle_sampler.rs
++--- decode02_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:43:04.000000000 +0000
+++++ decode02_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 00:12:51.872657608 +0000
++@@ -1,6 +1,10 @@
++ use serde::{Deserialize, Serialize};
++ 
++ use crate::generation_sampling::GenerationSamplingConfig;
+++use crate::decode_transition_guard::{
+++    CandidateTokenView, TransitionAction, TransitionContext, TransitionDecision, TransitionReason,
+++    evaluate_token_transition, piece_for_known_special, mojibake_suspected,
+++};
++ 
++ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++ pub enum SamplingApplyMode {
++@@ -18,6 +22,10 @@
++     pub pad_token_id: Option<u32>,
++     pub banned_token_ids: Vec<u32>,
++     pub recent_token_ids: Vec<u32>,
+++    pub recent_token_pieces: Vec<String>,
+++    pub prev_piece: Option<String>,
+++    pub prev_text: Option<String>,
+++    pub token_piece_hints: Vec<(u32, String)>,
++     pub min_new_tokens: usize,
++ }
++ 
++@@ -93,6 +101,15 @@
++     pub semantic_bias_min: Option<f32>,
++     pub semantic_bias_max: Option<f32>,
++     pub semantic_bias_mean: Option<f32>,
+++    pub transition_guard_enabled: bool,
+++    pub transition_guard_probe_only: bool,
+++    pub transition_penalized_count: usize,
+++    pub transition_hard_blocked_count: usize,
+++    pub transition_unavailable_count: usize,
+++    pub selected_transition_risk: Option<f32>,
+++    pub selected_transition_penalty: Option<f32>,
+++    pub selected_transition_action: Option<String>,
+++    pub selected_transition_reasons: Vec<String>,
++ }
++ 
++ impl Default for CpuOracleCandidateTrace {
++@@ -120,6 +137,15 @@
++             semantic_bias_min: None,
++             semantic_bias_max: None,
++             semantic_bias_mean: None,
+++            transition_guard_enabled: false,
+++            transition_guard_probe_only: true,
+++            transition_penalized_count: 0,
+++            transition_hard_blocked_count: 0,
+++            transition_unavailable_count: 0,
+++            selected_transition_risk: None,
+++            selected_transition_penalty: None,
+++            selected_transition_action: None,
+++            selected_transition_reasons: Vec::new(),
++         }
++     }
++ }
++@@ -149,11 +175,13 @@
++     semantic_bias: f32,
++     weighted: f32,
++     prob: f32,
+++    transition: TransitionDecision,
++ }
++ 
++ fn candidate_trace_from(
++     active: &[Candidate],
++     final_candidates: &[Candidate],
+++    selected: Option<&Candidate>,
++     pre_min_p_count: usize,
++     post_min_p_count: usize,
++     min_p_threshold: Option<f32>,
++@@ -171,6 +199,13 @@
++     let semantic_bias_min = bias_values.iter().copied().reduce(f32::min);
++     let semantic_bias_max = bias_values.iter().copied().reduce(f32::max);
++     let semantic_bias_mean = if bias_values.is_empty() { None } else { Some(bias_values.iter().sum::<f32>() / bias_values.len() as f32) };
+++    let transition_penalized_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::Penalize | TransitionAction::ProbeOnly)).count();
+++    let transition_hard_blocked_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::HardBlock)).count();
+++    let transition_unavailable_count = active.iter().chain(final_candidates.iter()).filter(|c| matches!(c.transition.action, TransitionAction::Unavailable)).count();
+++    let selected_transition_risk = selected.map(|c| c.transition.risk);
+++    let selected_transition_penalty = selected.map(|c| c.transition.penalty);
+++    let selected_transition_action = selected.map(|c| format!("{:?}", c.transition.action));
+++    let selected_transition_reasons = selected.map(|c| c.transition.reason_strings()).unwrap_or_default();
++     CpuOracleCandidateTrace {
++         active_ids: active.iter().map(|c| c.id).collect(),
++         final_ids: final_candidates.iter().map(|c| c.id).collect(),
++@@ -194,6 +229,15 @@
++         semantic_bias_min,
++         semantic_bias_max,
++         semantic_bias_mean,
+++        transition_guard_enabled: config.transition_guard.enabled,
+++        transition_guard_probe_only: config.transition_guard.probe_only,
+++        transition_penalized_count,
+++        transition_hard_blocked_count,
+++        transition_unavailable_count,
+++        selected_transition_risk,
+++        selected_transition_penalty,
+++        selected_transition_action,
+++        selected_transition_reasons,
++     }
++ }
++ 
++@@ -213,6 +257,41 @@
++     (Some(max_scaled), Some(sum))
++ }
++ 
+++
+++fn token_piece_hint(ctx: &CpuOracleContext, id: u32) -> Option<String> {
+++    ctx.token_piece_hints
+++        .iter()
+++        .find(|(token_id, _)| *token_id == id)
+++        .map(|(_, piece)| piece.clone())
+++        .or_else(|| piece_for_known_special(id, ctx.eos_token_id, ctx.pad_token_id))
+++}
+++
+++fn transition_context_from_cpu_context(ctx: &CpuOracleContext) -> TransitionContext {
+++    TransitionContext {
+++        step: ctx.step,
+++        prev_token_id: ctx.recent_token_ids.last().copied(),
+++        prev_piece: ctx.prev_piece.clone(),
+++        prev_text: ctx.prev_text.clone().or_else(|| ctx.prev_piece.clone()),
+++        recent_token_ids: ctx.recent_token_ids.clone(),
+++        recent_token_pieces: ctx.recent_token_pieces.clone(),
+++        eos_token_id: ctx.eos_token_id,
+++        pad_token_id: ctx.pad_token_id,
+++        min_new_tokens: ctx.min_new_tokens,
+++    }
+++}
+++
+++fn candidate_view_from_context(ctx: &CpuOracleContext, id: u32) -> CandidateTokenView {
+++    let piece = token_piece_hint(ctx, id);
+++    let text = piece.as_ref().map(|p| p.trim_start_matches('▁').to_string()).unwrap_or_default();
+++    let is_eos = ctx.eos_token_id == Some(id) || piece.as_deref() == Some("<eos>");
+++    let is_pad = ctx.pad_token_id == Some(id) || piece.as_deref() == Some("<pad>");
+++    let is_byte = piece.as_deref().map(|p| p.starts_with("<byte:") || p.starts_with("<0x")).unwrap_or(false);
+++    let is_unknown = piece.as_deref() == Some("<unk>");
+++    let is_control = is_eos || is_pad || is_unknown || piece.as_deref().map(|p| p.starts_with('<') && p.ends_with('>')).unwrap_or(false);
+++    let mojibake = piece.as_deref().map(mojibake_suspected).unwrap_or(false) || mojibake_suspected(&text);
+++    CandidateTokenView { token_id: id, piece, text: if text.is_empty() { None } else { Some(text) }, is_eos, is_pad, is_control, is_byte, is_unknown, mojibake_suspected: mojibake }
+++}
+++
++ pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
++     config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
++ }
++@@ -286,13 +365,24 @@
++             } else {
++                 0.0
++             };
+++            let transition_context = transition_context_from_cpu_context(ctx);
+++            let candidate_view = candidate_view_from_context(ctx, id);
+++            let transition = evaluate_token_transition(&config.transition_guard, &transition_context, &candidate_view);
+++            if matches!(transition.action, TransitionAction::HardBlock) {
+++                return None;
+++            }
+++            let mut weighted = scaled + semantic_bias;
+++            if matches!(transition.action, TransitionAction::Penalize) {
+++                weighted -= transition.penalty;
+++            }
++             Some(Candidate {
++                 id,
++                 logit,
++                 scaled,
++                 semantic_bias,
++-                weighted: scaled + semantic_bias,
+++                weighted,
++                 prob: 0.0,
+++                transition,
++             })
++         })
++         .collect::<Vec<_>>();
++@@ -374,6 +464,7 @@
++         trace: candidate_trace_from(
++             &active_candidates_for_trace,
++             &candidates,
+++            Some(&selected),
++             active_count_before_min_p,
++             active_count_after_min_p,
++             min_p_threshold,
++@@ -514,6 +605,10 @@
++             pad_token_id: None,
++             banned_token_ids: Vec::new(),
++             recent_token_ids: Vec::new(),
+++            recent_token_pieces: Vec::new(),
+++            prev_piece: None,
+++            prev_text: None,
+++            token_piece_hints: Vec::new(),
++             min_new_tokens: 0,
++         };
++         let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
++@@ -532,6 +627,10 @@
++             pad_token_id: None,
++             banned_token_ids: vec![0],
++             recent_token_ids: Vec::new(),
+++            recent_token_pieces: Vec::new(),
+++            prev_piece: None,
+++            prev_text: None,
+++            token_piece_hints: Vec::new(),
++             min_new_tokens: 0,
++         };
++         let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
++diff -ruN decode02_orig/crates/model_core/src/decode_state.rs decode02_work/crates/model_core/src/decode_state.rs
++--- decode02_orig/crates/model_core/src/decode_state.rs	2026-05-26 10:54:20.000000000 +0000
+++++ decode02_work/crates/model_core/src/decode_state.rs	2026-05-27 00:12:51.875781677 +0000
++@@ -1,4 +1,5 @@
++ use super::*;
+++use crate::decode_transition_guard::TransitionRuntimeContext;
++ use crate::generation_telemetry::with_tensorcube_runtime_splice_label;
++ use crate::model_layers::grouped_query_attention;
++ 
++@@ -825,7 +826,15 @@
++                 )?;
++                 let first = with_runtime_splice_telemetry_label(
++                     "model_core.prefill.sampled.select".to_string(),
++-                    || self.select_next_token_with_sampling(&logits, sampling),
+++                    || {
+++                        let mut sampling_with_transition = sampling.clone();
+++                        sampling_with_transition.transition_context = Some(TransitionRuntimeContext::from_recent_ids(
+++                            0,
+++                            seed_ids.clone(),
+++                            sampling.transition_guard.recent_window,
+++                        ));
+++                        self.select_next_token_with_sampling(&logits, &sampling_with_transition)
+++                    },
++                 )?;
++                 Ok((kv, logits, first))
++             },
++@@ -945,7 +954,15 @@
++                 )?;
++                 let next = with_runtime_splice_telemetry_label(
++                     "model_core.decode.sampled.select".to_string(),
++-                    || self.select_next_token_with_sampling(&logits, sampling),
+++                    || {
+++                        let mut sampling_with_transition = sampling.clone();
+++                        sampling_with_transition.transition_context = Some(TransitionRuntimeContext::from_recent_ids(
+++                            state.generated.len(),
+++                            generated_prefix.clone(),
+++                            sampling.transition_guard.recent_window,
+++                        ));
+++                        self.select_next_token_with_sampling(&logits, &sampling_with_transition)
+++                    },
++                 )?;
++                 Ok((generated_prefix, logits, next))
++             },
++diff -ruN decode02_orig/crates/model_core/src/decode_transition_guard.rs decode02_work/crates/model_core/src/decode_transition_guard.rs
++--- decode02_orig/crates/model_core/src/decode_transition_guard.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode02_work/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:14:07.638421734 +0000
++@@ -0,0 +1,404 @@
+++use serde::{Deserialize, Serialize};
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct TransitionGuardConfig {
+++    pub enabled: bool,
+++    pub probe_only: bool,
+++    pub recent_window: usize,
+++    pub soft_penalty_scale: f32,
+++    pub max_soft_penalty: f32,
+++    pub hard_block_control_tokens: bool,
+++    pub hard_block_pad_token: bool,
+++    pub hard_block_mojibake_tokens: bool,
+++    pub hard_block_invalid_byte_tokens: bool,
+++    pub penalize_generic_continuation_eos: bool,
+++    pub penalize_double_particle_like: bool,
+++    pub penalize_repeated_punctuation: bool,
+++    pub penalize_byte_text_boundary: bool,
+++    pub min_new_tokens_for_eos: usize,
+++}
+++
+++impl Default for TransitionGuardConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            probe_only: true,
+++            recent_window: 8,
+++            soft_penalty_scale: 1.0,
+++            max_soft_penalty: 2.0,
+++            hard_block_control_tokens: true,
+++            hard_block_pad_token: true,
+++            hard_block_mojibake_tokens: true,
+++            hard_block_invalid_byte_tokens: true,
+++            penalize_generic_continuation_eos: true,
+++            penalize_double_particle_like: true,
+++            penalize_repeated_punctuation: true,
+++            penalize_byte_text_boundary: true,
+++            min_new_tokens_for_eos: 8,
+++        }
+++    }
+++}
+++
+++impl TransitionGuardConfig {
+++    pub fn sanitized(mut self) -> Self {
+++        if self.recent_window == 0 { self.recent_window = 8; }
+++        if !self.soft_penalty_scale.is_finite() || self.soft_penalty_scale < 0.0 { self.soft_penalty_scale = 1.0; }
+++        if !self.max_soft_penalty.is_finite() || self.max_soft_penalty < 0.0 { self.max_soft_penalty = 2.0; }
+++        self.max_soft_penalty = self.max_soft_penalty.min(8.0);
+++        self
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum TransitionAction {
+++    Allow,
+++    Penalize,
+++    HardBlock,
+++    ProbeOnly,
+++    Unavailable,
+++}
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum TransitionReason {
+++    None,
+++    PieceContextUnavailable,
+++    PadToken,
+++    ControlToken,
+++    EosBeforeMinNewTokens,
+++    GenericContinuationImmediateEos,
+++    InvalidByteToken,
+++    ByteTextBoundaryRisk,
+++    MojibakeSuspected,
+++    DoubleParticleLike,
+++    DoubleSentenceEndingLike,
+++    RepeatedPunctuation,
+++    UnbalancedOpenCloseSymbol,
+++    WhitespaceOnlyToken,
+++    UnknownToken,
+++    RecentLoopRisk,
+++}
+++
+++impl TransitionReason {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::None => "none",
+++            Self::PieceContextUnavailable => "piece_context_unavailable",
+++            Self::PadToken => "pad_token",
+++            Self::ControlToken => "control_token",
+++            Self::EosBeforeMinNewTokens => "eos_before_min_new_tokens",
+++            Self::GenericContinuationImmediateEos => "generic_continuation_immediate_eos",
+++            Self::InvalidByteToken => "invalid_byte_token",
+++            Self::ByteTextBoundaryRisk => "byte_text_boundary_risk",
+++            Self::MojibakeSuspected => "mojibake_suspected",
+++            Self::DoubleParticleLike => "double_particle_like",
+++            Self::DoubleSentenceEndingLike => "double_sentence_ending_like",
+++            Self::RepeatedPunctuation => "repeated_punctuation",
+++            Self::UnbalancedOpenCloseSymbol => "unbalanced_open_close_symbol",
+++            Self::WhitespaceOnlyToken => "whitespace_only_token",
+++            Self::UnknownToken => "unknown_token",
+++            Self::RecentLoopRisk => "recent_loop_risk",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct TransitionDecision {
+++    pub risk: f32,
+++    pub penalty: f32,
+++    pub action: TransitionAction,
+++    pub reasons: Vec<TransitionReason>,
+++}
+++
+++impl Default for TransitionDecision {
+++    fn default() -> Self {
+++        Self { risk: 0.0, penalty: 0.0, action: TransitionAction::Allow, reasons: vec![TransitionReason::None] }
+++    }
+++}
+++
+++impl TransitionDecision {
+++    pub fn unavailable() -> Self {
+++        Self { risk: 0.0, penalty: 0.0, action: TransitionAction::Unavailable, reasons: vec![TransitionReason::PieceContextUnavailable] }
+++    }
+++
+++    pub fn reason_strings(&self) -> Vec<String> {
+++        self.reasons.iter().map(|r| r.as_str().to_string()).collect()
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct TransitionRuntimeContext {
+++    pub step: usize,
+++    pub prev_token_id: Option<u32>,
+++    pub prev_piece: Option<String>,
+++    pub prev_text: Option<String>,
+++    pub recent_token_ids: Vec<u32>,
+++    pub recent_token_pieces: Vec<String>,
+++}
+++
+++impl TransitionRuntimeContext {
+++    pub fn from_recent_ids(step: usize, recent_token_ids: Vec<u32>, recent_window: usize) -> Self {
+++        let prev_token_id = recent_token_ids.last().copied();
+++        let start = recent_token_ids.len().saturating_sub(recent_window.max(1));
+++        Self {
+++            step,
+++            prev_token_id,
+++            prev_piece: None,
+++            prev_text: None,
+++            recent_token_ids: recent_token_ids[start..].to_vec(),
+++            recent_token_pieces: Vec::new(),
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct TransitionContext {
+++    pub step: usize,
+++    pub prev_token_id: Option<u32>,
+++    pub prev_piece: Option<String>,
+++    pub prev_text: Option<String>,
+++    pub recent_token_ids: Vec<u32>,
+++    pub recent_token_pieces: Vec<String>,
+++    pub eos_token_id: Option<u32>,
+++    pub pad_token_id: Option<u32>,
+++    pub min_new_tokens: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct CandidateTokenView {
+++    pub token_id: u32,
+++    pub piece: Option<String>,
+++    pub text: Option<String>,
+++    pub is_eos: bool,
+++    pub is_pad: bool,
+++    pub is_control: bool,
+++    pub is_byte: bool,
+++    pub is_unknown: bool,
+++    pub mojibake_suspected: bool,
+++}
+++
+++pub fn piece_for_known_special(token_id: u32, eos_token_id: Option<u32>, pad_token_id: Option<u32>) -> Option<String> {
+++    if pad_token_id == Some(token_id) { return Some("<pad>".to_string()); }
+++    if eos_token_id == Some(token_id) { return Some("<eos>".to_string()); }
+++    None
+++}
+++
+++fn is_generic_continuation(text_or_piece: &str) -> bool {
+++    let s = text_or_piece.trim().trim_start_matches('▁');
+++    matches!(s, "이어가고" | "그리고" | "하지만" | "그러나" | "때문에" | "즉" | "그래서" | "따라서" | "그러므로" | "또한")
+++}
+++
+++fn is_particle_like(s: &str) -> bool {
+++    let s = s.trim().trim_start_matches('▁');
+++    matches!(s, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "의")
+++}
+++
+++fn is_sentence_ending_like(s: &str) -> bool {
+++    let s = s.trim().trim_start_matches('▁');
+++    matches!(s, "다" | "요" | "죠" | "까" | "네" | "습니다" | "합니다" | "했다" | "한다")
+++}
+++
+++fn is_punctuation_repeat_piece(s: &str) -> bool {
+++    let t = s.trim();
+++    matches!(t, "!" | "?" | "." | "," | "。" | "…")
+++}
+++
+++fn is_korean_emotional_repeat_piece(s: &str) -> bool {
+++    let t = s.trim();
+++    matches!(t, "ㅋ" | "ㅠ" | "ㅜ" | ";")
+++}
+++
+++fn looks_like_byte_piece(s: &str) -> bool {
+++    s.starts_with("<byte:") || s.starts_with("<0x")
+++}
+++
+++fn looks_like_control_piece(s: &str) -> bool {
+++    matches!(s, "<pad>" | "<bos>" | "<eos>" | "<unk>" | "<s>" | "</s>")
+++        || s.starts_with("<glossary:")
+++        || s.starts_with("<task:")
+++        || s.starts_with("<lang:")
+++        || s.starts_with("<qwave:")
+++        || s.starts_with("<delta_k:")
+++}
+++
+++pub fn mojibake_suspected(piece_or_text: &str) -> bool {
+++    let s = piece_or_text;
+++    s.contains('�') || s.contains("?댁") || s.contains('媛') || s.contains('怨') || s.contains('Ã') || s.contains('ì') || s.contains('ê')
+++}
+++
+++fn push_reason(reasons: &mut Vec<TransitionReason>, reason: TransitionReason) {
+++    if !reasons.contains(&reason) {
+++        reasons.push(reason);
+++    }
+++}
+++
+++pub fn evaluate_token_transition(
+++    config: &TransitionGuardConfig,
+++    ctx: &TransitionContext,
+++    candidate: &CandidateTokenView,
+++) -> TransitionDecision {
+++    let cfg = config.clone().sanitized();
+++    if !cfg.enabled {
+++        return TransitionDecision::default();
+++    }
+++
+++    let mut risk = 0.0f32;
+++    let mut action = TransitionAction::Allow;
+++    let mut reasons: Vec<TransitionReason> = Vec::new();
+++
+++    let candidate_piece = candidate.piece.as_deref().unwrap_or("");
+++    let candidate_text = candidate.text.as_deref().unwrap_or(candidate_piece);
+++    let prev_text = ctx.prev_text.as_deref().or(ctx.prev_piece.as_deref()).unwrap_or("");
+++    let piece_available = !candidate_piece.is_empty() || candidate.is_eos || candidate.is_pad;
+++
+++    if !piece_available {
+++        push_reason(&mut reasons, TransitionReason::PieceContextUnavailable);
+++    }
+++
+++    if candidate.is_pad && cfg.hard_block_pad_token {
+++        risk = risk.max(1.0);
+++        action = TransitionAction::HardBlock;
+++        push_reason(&mut reasons, TransitionReason::PadToken);
+++    }
+++
+++    if candidate.is_eos && ctx.step < cfg.min_new_tokens_for_eos.max(ctx.min_new_tokens) {
+++        risk = risk.max(1.0);
+++        action = TransitionAction::HardBlock;
+++        push_reason(&mut reasons, TransitionReason::EosBeforeMinNewTokens);
+++    }
+++
+++    if candidate.is_control && !candidate.is_eos && !candidate.is_pad && cfg.hard_block_control_tokens {
+++        risk = risk.max(1.0);
+++        action = TransitionAction::HardBlock;
+++        push_reason(&mut reasons, TransitionReason::ControlToken);
+++    }
+++
+++    if (candidate.mojibake_suspected || mojibake_suspected(candidate_piece) || mojibake_suspected(candidate_text)) && cfg.hard_block_mojibake_tokens {
+++        risk = risk.max(0.95);
+++        action = TransitionAction::HardBlock;
+++        push_reason(&mut reasons, TransitionReason::MojibakeSuspected);
+++    }
+++
+++    if candidate.is_byte && cfg.hard_block_invalid_byte_tokens {
+++        risk = risk.max(0.8);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::InvalidByteToken);
+++    }
+++
+++    if cfg.penalize_generic_continuation_eos && candidate.is_eos && !prev_text.is_empty() && is_generic_continuation(prev_text) {
+++        risk = risk.max(0.95);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::GenericContinuationImmediateEos);
+++    }
+++
+++    if cfg.penalize_double_particle_like && !prev_text.is_empty() && is_particle_like(prev_text) && is_particle_like(candidate_text) {
+++        risk = risk.max(0.65);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::DoubleParticleLike);
+++    }
+++
+++    if !prev_text.is_empty() && is_sentence_ending_like(prev_text) && is_sentence_ending_like(candidate_text) {
+++        risk = risk.max(0.55);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::DoubleSentenceEndingLike);
+++    }
+++
+++    if cfg.penalize_byte_text_boundary && !prev_text.is_empty() && (looks_like_byte_piece(prev_text) || candidate.is_byte) {
+++        risk = risk.max(0.6);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::ByteTextBoundaryRisk);
+++    }
+++
+++    if cfg.penalize_repeated_punctuation && is_punctuation_repeat_piece(candidate_text) {
+++        let repeated = ctx.recent_token_pieces.iter().rev().take(3).all(|p| p.trim() == candidate_text.trim());
+++        if repeated && !is_korean_emotional_repeat_piece(candidate_text) {
+++            risk = risk.max(0.7);
+++            if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++            push_reason(&mut reasons, TransitionReason::RepeatedPunctuation);
+++        }
+++    }
+++
+++    if candidate_text.trim().is_empty() && !candidate.is_eos {
+++        risk = risk.max(0.25);
+++        if action == TransitionAction::Allow { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::WhitespaceOnlyToken);
+++    }
+++
+++    if candidate.is_unknown || candidate_piece == "<unk>" {
+++        risk = risk.max(0.5);
+++        if action != TransitionAction::HardBlock { action = TransitionAction::Penalize; }
+++        push_reason(&mut reasons, TransitionReason::UnknownToken);
+++    }
+++
+++    if reasons.is_empty() {
+++        reasons.push(TransitionReason::None);
+++    }
+++
+++    if action == TransitionAction::Allow && reasons.len() == 1 && reasons[0] == TransitionReason::PieceContextUnavailable {
+++        return TransitionDecision { risk: 0.0, penalty: 0.0, action: TransitionAction::Unavailable, reasons };
+++    }
+++
+++    if cfg.probe_only && action != TransitionAction::Allow {
+++        let penalty = (risk * cfg.soft_penalty_scale).min(cfg.max_soft_penalty);
+++        return TransitionDecision { risk, penalty, action: TransitionAction::ProbeOnly, reasons };
+++    }
+++
+++    let penalty = match action {
+++        TransitionAction::HardBlock => cfg.max_soft_penalty,
+++        TransitionAction::Penalize => (risk * cfg.soft_penalty_scale).min(cfg.max_soft_penalty),
+++        _ => 0.0,
+++    };
+++
+++    TransitionDecision { risk, penalty, action, reasons }
+++}
+++
+++pub fn transition_guard_config_from_env() -> TransitionGuardConfig {
+++    let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
+++    let parse_usize = |key: &str, default: usize| -> usize { std::env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default) };
+++    let parse_f32 = |key: &str, default: f32| -> f32 { std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default) };
+++    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true");
+++    let probe_only = !matches!(mode.as_str(), "on" | "1" | "true");
+++    TransitionGuardConfig {
+++        enabled,
+++        probe_only,
+++        recent_window: parse_usize("ASH_DECODE_TRANSITION_RECENT_WINDOW", 8),
+++        soft_penalty_scale: parse_f32("ASH_DECODE_TRANSITION_SOFT_PENALTY_SCALE", 1.0),
+++        max_soft_penalty: parse_f32("ASH_DECODE_TRANSITION_MAX_PENALTY", 2.0),
+++        min_new_tokens_for_eos: parse_usize("ASH_DECODE_TRANSITION_MIN_NEW_TOKENS", 8),
+++        ..TransitionGuardConfig::default()
+++    }.sanitized()
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn cfg_on() -> TransitionGuardConfig {
+++        TransitionGuardConfig { enabled: true, probe_only: false, ..TransitionGuardConfig::default() }
+++    }
+++
+++    #[test]
+++    fn generic_continuation_eos_is_risky() {
+++        let ctx = TransitionContext { step: 9, prev_text: Some("이어가고".to_string()), ..Default::default() };
+++        let cand = CandidateTokenView { token_id: 2, piece: Some("<eos>".to_string()), text: Some(String::new()), is_eos: true, ..Default::default() };
+++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
+++        assert!(d.risk >= 0.9);
+++        assert!(d.reasons.contains(&TransitionReason::GenericContinuationImmediateEos));
+++    }
+++
+++    #[test]
+++    fn eos_before_min_new_tokens_is_hard_blocked() {
+++        let ctx = TransitionContext { step: 2, min_new_tokens: 8, ..Default::default() };
+++        let cand = CandidateTokenView { token_id: 2, piece: Some("<eos>".to_string()), text: Some(String::new()), is_eos: true, ..Default::default() };
+++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
+++        assert_eq!(d.action, TransitionAction::HardBlock);
+++        assert!(d.reasons.contains(&TransitionReason::EosBeforeMinNewTokens));
+++    }
+++
+++    #[test]
+++    fn korean_emotional_repeat_not_hard_blocked() {
+++        let ctx = TransitionContext { recent_token_pieces: vec!["ㅠ".to_string(), "ㅠ".to_string(), "ㅠ".to_string()], ..Default::default() };
+++        let cand = CandidateTokenView { token_id: 42, piece: Some("ㅠ".to_string()), text: Some("ㅠ".to_string()), ..Default::default() };
+++        let d = evaluate_token_transition(&cfg_on(), &ctx, &cand);
+++        assert_ne!(d.action, TransitionAction::HardBlock);
+++    }
+++}
++diff -ruN decode02_orig/crates/model_core/src/generation_sampling.rs decode02_work/crates/model_core/src/generation_sampling.rs
++--- decode02_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 23:43:04.000000000 +0000
+++++ decode02_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:12:51.876575109 +0000
++@@ -1,6 +1,7 @@
++ use super::*;
++ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
++ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
+++use crate::decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext};
++ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
++ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
++ use std::collections::BTreeMap;
++@@ -695,6 +696,8 @@
++     pub semantic_prior_enabled: Option<bool>,
++     pub semantic_prior_effective: Option<bool>,
++     pub semantic_bias_cap: Option<f32>,
+++    pub transition_guard_enabled: Option<bool>,
+++    pub transition_guard_probe_only: Option<bool>,
++     pub compare_score_eps: Option<f32>,
++     pub compare_logprob_eps: Option<f32>,
++     pub fallback_on_mismatch: Option<bool>,
++@@ -711,6 +714,8 @@
++     pub min_p: f32,
++     pub semantic_prior: SemanticPriorConfig,
++     pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
+++    pub transition_guard: TransitionGuardConfig,
+++    pub transition_context: Option<TransitionRuntimeContext>,
++     pub seed: Option<u64>,
++     pub stop_sequences: Vec<String>,
++     pub min_new_tokens: usize,
++@@ -744,6 +749,8 @@
++             min_p: 0.0,
++             semantic_prior: SemanticPriorConfig::default(),
++             semantic_score_snapshot: None,
+++            transition_guard: TransitionGuardConfig::default(),
+++            transition_context: None,
++             seed: None,
++             stop_sequences: Vec::new(),
++             min_new_tokens: 0,
++@@ -787,6 +794,8 @@
++             semantic_prior_enabled: Some(self.semantic_prior.enabled),
++             semantic_prior_effective: Some(self.semantic_prior.enabled && self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false)),
++             semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
+++            transition_guard_enabled: Some(self.transition_guard.enabled),
+++            transition_guard_probe_only: Some(self.transition_guard.probe_only),
++             compare_score_eps: self.compare_score_eps,
++             compare_logprob_eps: self.compare_logprob_eps,
++             fallback_on_mismatch: self.fallback_on_mismatch,
++@@ -2375,13 +2384,18 @@
++         step: usize,
++         fallback_reason: &'static str,
++     ) -> NextTokenChoice {
+++        let transition_context = sampling.transition_context.clone().unwrap_or_default();
++         let ctx = CpuOracleContext {
++             step,
++             seed: sampling.seed.unwrap_or(0),
++             eos_token_id: Some(self.spec.token_ids.eos_id),
++             pad_token_id: Some(self.spec.token_ids.pad_id),
++             banned_token_ids: Vec::new(),
++-            recent_token_ids: Vec::new(),
+++            recent_token_ids: if transition_context.recent_token_ids.is_empty() { Vec::new() } else { transition_context.recent_token_ids.clone() },
+++            recent_token_pieces: transition_context.recent_token_pieces.clone(),
+++            prev_piece: transition_context.prev_piece.clone(),
+++            prev_text: transition_context.prev_text.clone(),
+++            token_piece_hints: Vec::new(),
++             min_new_tokens: sampling.min_new_tokens,
++         };
++         let result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
++@@ -2433,13 +2447,18 @@
++         if !mode.enabled() || step >= sampler_parity::max_steps() {
++             return None;
++         }
+++        let transition_context = sampling.transition_context.clone().unwrap_or_default();
++         let ctx = CpuOracleContext {
++             step,
++             seed: sampling.seed.unwrap_or(0),
++             eos_token_id: Some(self.spec.token_ids.eos_id),
++             pad_token_id: Some(self.spec.token_ids.pad_id),
++             banned_token_ids: Vec::new(),
++-            recent_token_ids: Vec::new(),
+++            recent_token_ids: if transition_context.recent_token_ids.is_empty() { Vec::new() } else { transition_context.recent_token_ids.clone() },
+++            recent_token_pieces: transition_context.recent_token_pieces.clone(),
+++            prev_piece: transition_context.prev_piece.clone(),
+++            prev_text: transition_context.prev_text.clone(),
+++            token_piece_hints: Vec::new(),
++             min_new_tokens: sampling.min_new_tokens,
++         };
++         let cpu_result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
++diff -ruN decode02_orig/crates/model_core/src/lib.rs decode02_work/crates/model_core/src/lib.rs
++--- decode02_orig/crates/model_core/src/lib.rs	2026-05-26 23:50:27.000000000 +0000
+++++ decode02_work/crates/model_core/src/lib.rs	2026-05-27 00:12:51.873223397 +0000
++@@ -10,6 +10,7 @@
++ mod generation_sampling;
++ mod sampling_helpers;
++ mod cpu_oracle_sampler;
+++mod decode_transition_guard;
++ mod sampler_parity;
++ mod sampler_parity_validation;
++ mod minp_c1a_smoke;
++@@ -63,6 +64,7 @@
++ };
++ 
++ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
+++pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, transition_guard_config_from_env, evaluate_token_transition};
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++diff -ruN decode02_orig/crates/model_core/src/minp_c1a_smoke.rs decode02_work/crates/model_core/src/minp_c1a_smoke.rs
++--- decode02_orig/crates/model_core/src/minp_c1a_smoke.rs	2026-05-26 23:33:31.000000000 +0000
+++++ decode02_work/crates/model_core/src/minp_c1a_smoke.rs	2026-05-27 00:13:19.878376596 +0000
++@@ -28,6 +28,10 @@
++         pad_token_id: Some(0),
++         banned_token_ids: Vec::new(),
++         recent_token_ids: Vec::new(),
+++        recent_token_pieces: Vec::new(),
+++        prev_piece: None,
+++        prev_text: None,
+++        token_piece_hints: Vec::new(),
++         min_new_tokens: 0,
++     }
++ }
++diff -ruN decode02_orig/crates/model_core/src/reference_checkpoint.rs decode02_work/crates/model_core/src/reference_checkpoint.rs
++--- decode02_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-26 15:34:10.000000000 +0000
+++++ decode02_work/crates/model_core/src/reference_checkpoint.rs	2026-05-27 00:12:51.879611899 +0000
++@@ -768,6 +768,10 @@
++                     pad_token_id: Some(self.spec.token_ids.pad_id),
++                     banned_token_ids: banned_token_ids.to_vec(),
++                     recent_token_ids: ids.clone(),
+++                    recent_token_pieces: Vec::new(),
+++                    prev_piece: None,
+++                    prev_text: None,
+++                    token_piece_hints: Vec::new(),
++                     min_new_tokens: sampling.min_new_tokens,
++                 };
++                 sample_with_cpu_oracle(&logits, &sampling, &ctx).selected_id
++diff -ruN decode02_orig/crates/runtime/src/infer.rs decode02_work/crates/runtime/src/infer.rs
++--- decode02_orig/crates/runtime/src/infer.rs	2026-05-26 23:50:27.000000000 +0000
+++++ decode02_work/crates/runtime/src/infer.rs	2026-05-27 00:12:51.875232779 +0000
++@@ -18,7 +18,7 @@
++     GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision,
++     GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy,
++     GpuSamplingTelemetryCompact, GpuSamplingTelemetrySummary, ModelSpec, NativeWgpuModel,
++-    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig,
+++    ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, SemanticPriorConfig, TransitionGuardConfig, transition_guard_config_from_env,
++     TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary,
++     evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key,
++     next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy,
++@@ -1623,6 +1623,7 @@
++ ) {
++     let mut cfg = GenerationSamplingConfig::default();
++     cfg.semantic_prior = semantic_prior_config_from_env();
+++    cfg.transition_guard = transition_guard_config_from_env();
++     if cfg.semantic_prior.require_sampler04_strict_ready {
++         let sampler04_ready = std::env::var("ASH_SAMPLER04_PROMOTION_STATUS")
++             .map(|v| v == "STRICT_CANDIDATE_READY")
+diff -ruN decode02_orig/workspace/decode02_report.md decode02_work/workspace/decode02_report.md
+--- decode02_orig/workspace/decode02_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02_report.md	2026-05-27 00:12:51.880358431 +0000
+@@ -0,0 +1,17 @@
++# 16AI-QW-38G-R6A-DECODE-02 Report
++
++Token Transition Context Guard / Local Coherence Decode Seal baked.
++
++## Implemented
++- Added `model_core::decode_transition_guard` SSOT.
++- Added `TransitionGuardConfig`, `TransitionRuntimeContext`, `TransitionDecision`, `TransitionAction`, and `TransitionReason`.
++- Added transition fields to `CpuOracleCandidateTrace`.
++- CPU oracle now evaluates transition risk and can soft-penalize or hard-block candidates when guard is enabled.
++- `probe_only` mode records risk without changing logits.
++- Runtime env gate: `ASH_DECODE_TRANSITION_GUARD=off|probe|on`.
++- Generation sampled decode now attaches id-based recent context through `TransitionRuntimeContext`.
++
++## Limits
++- GPU shader transition parity is intentionally deferred to DECODE-02A.
++- Full piece/text candidate hints are not yet available for every runtime candidate; missing piece context is recorded as unavailable.
++- Cargo/rustfmt/WebGPU runtime validation was not run in this container.
+diff -ruN decode02_orig/workspace/decode02_static_checks.json decode02_work/workspace/decode02_static_checks.json
+--- decode02_orig/workspace/decode02_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02_static_checks.json	2026-05-27 00:14:19.173574747 +0000
+@@ -0,0 +1,10 @@
++{
++  "decode_transition_guard_module_exists": true,
++  "lib_declares_decode_transition_guard": true,
++  "lib_exports_transition_guard": true,
++  "cpu_oracle_uses_transition_guard": true,
++  "cpu_trace_has_transition_fields": true,
++  "runtime_env_gate": true,
++  "generation_config_has_transition_guard": true,
++  "decode_state_attaches_transition_context": true
++}
+\ No newline at end of file
+diff -ruN decode02_orig/workspace/decode02_transition_guard_summary.json decode02_work/workspace/decode02_transition_guard_summary.json
+--- decode02_orig/workspace/decode02_transition_guard_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02_transition_guard_summary.json	2026-05-27 00:12:51.879998949 +0000
+@@ -0,0 +1,32 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02",
++  "status": "TOKEN_TRANSITION_CONTEXT_GUARD_BAKED_STATIC",
++  "decode_ssot": "tokenizer_core::decode_ssot",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "default_mode": "off",
++  "recommended_validation_mode": "probe",
++  "hard_block_targets": [
++    "pad",
++    "invalid_control",
++    "invalid_byte",
++    "mojibake",
++    "eos_before_min_new_tokens"
++  ],
++  "soft_penalty_targets": [
++    "generic_continuation_immediate_eos",
++    "double_particle_like",
++    "repeated_punctuation",
++    "byte_text_boundary_risk"
++  ],
++  "gpu_transition_shader_parity": "non_scope_decode02_deferred_to_decode02a",
++  "notes": [
++    "piece-based transition requires TransitionRuntimeContext piece hints; id-only EOS/pad guard works without hints",
++    "probe_only leaves logits unchanged and records transition risk"
++  ],
++  "non_scope": [
++    "gpu_transition_shader_parity",
++    "dynamic_context_qwave",
++    "tokenizer_vocab_change",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN decode02_orig/workspace/decode02_transition_probe.jsonl decode02_work/workspace/decode02_transition_probe.jsonl
+--- decode02_orig/workspace/decode02_transition_probe.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02_transition_probe.jsonl	2026-05-27 00:12:51.880268311 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-02", "step": 2, "prev": {"id": 29899, "piece": "▁이어가고", "text": "이어가고"}, "candidate": {"id": 2, "piece": "<eos>", "text": "", "is_eos": true}, "transition": {"risk": 0.95, "penalty": 0.95, "action": "ProbeOnly", "reasons": ["GenericContinuationImmediateEos"], "probe_only": true}, "scores": {"weighted_logit_before_transition": 10.2, "weighted_logit_after_transition": 10.2}}
+diff -ruN decode02_orig/workspace/decode02_transition_probe_schema.json decode02_work/workspace/decode02_transition_probe_schema.json
+--- decode02_orig/workspace/decode02_transition_probe_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02_work/workspace/decode02_transition_probe_schema.json	2026-05-27 00:12:51.880128890 +0000
+@@ -0,0 +1,39 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02",
++  "jsonl": "workspace/decode02_transition_probe.jsonl",
++  "fields": [
++    "step",
++    "prev",
++    "candidate",
++    "transition.risk",
++    "transition.penalty",
++    "transition.action",
++    "transition.reasons",
++    "transition.probe_only",
++    "scores.weighted_logit_before_transition",
++    "scores.weighted_logit_after_transition"
++  ],
++  "transition_actions": [
++    "Allow",
++    "Penalize",
++    "HardBlock",
++    "ProbeOnly",
++    "Unavailable"
++  ],
++  "transition_reasons": [
++    "PieceContextUnavailable",
++    "PadToken",
++    "ControlToken",
++    "EosBeforeMinNewTokens",
++    "GenericContinuationImmediateEos",
++    "InvalidByteToken",
++    "ByteTextBoundaryRisk",
++    "MojibakeSuspected",
++    "DoubleParticleLike",
++    "DoubleSentenceEndingLike",
++    "RepeatedPunctuation",
++    "WhitespaceOnlyToken",
++    "UnknownToken",
++    "RecentLoopRisk"
++  ]
++}
+\ No newline at end of file

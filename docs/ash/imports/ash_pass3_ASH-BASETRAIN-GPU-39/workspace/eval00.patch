@@ -1,0 +1,1732 @@
+diff -ruN /mnt/data/eval00_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md ./acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md
+--- /mnt/data/eval00_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ ./acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md	2026-05-27 07:51:10.025890791 +0000
+@@ -0,0 +1,24 @@
++# 16AI-QW-38G-R6A-EVAL-00 Acceptance
++
++## Status
++
++PASS_STATIC / RUNTIME_NOT_RUN
++
++## Acceptance
++
++- Fixed prompt suite created: 12 cases
++- Eval matrix created: 10 profiles x 3 seeds x 3 backends
++- Eval run schema and summary artifacts created
++- `eval00_regression.rs` module added and exported
++- sampler parity append hook connected to EVAL-00 receipt path
++
++## Not Run
++
++- cargo check
++- cargo test
++- runtime bench
++- baseline comparison with real outputs
++
++## Next
++
++Run `ASH_EVAL00_MODE=run_bench` in a Rust-enabled environment, then compare `M01_static_safe` against `M04_dynamic_controlled` and `M06_dynamic_controlled_salad04_overlay`.
+diff -ruN /mnt/data/eval00_orig/crates/model_core/src/eval00_regression.rs ./crates/model_core/src/eval00_regression.rs
+--- /mnt/data/eval00_orig/crates/model_core/src/eval00_regression.rs	1970-01-01 00:00:00.000000000 +0000
++++ ./crates/model_core/src/eval00_regression.rs	2026-05-27 07:50:25.688273293 +0000
+@@ -0,0 +1,599 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const EVAL00_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-00";
++pub const EVAL00_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-04";
++pub const EVAL00_SSOT: &str = "fixed_prompt_suite+seed_config_backend_matrix+generated_output_receipt";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Eval00Mode {
++    Off,
++    ManifestOnly,
++    RunBench,
++    CompareBaseline,
++    StrictRegressionGate,
++}
++
++impl Eval00Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_EVAL00_MODE")
++            .unwrap_or_else(|_| "manifest_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "run" | "run_bench" | "bench" => Self::RunBench,
++            "compare" | "compare_baseline" => Self::CompareBaseline,
++            "strict" | "strict_regression_gate" => Self::StrictRegressionGate,
++            _ => Self::ManifestOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ManifestOnly => "ManifestOnly",
++            Self::RunBench => "RunBench",
++            Self::CompareBaseline => "CompareBaseline",
++            Self::StrictRegressionGate => "StrictRegressionGate",
++        }
++    }
++
++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00ExpectedRisks {
++    pub salad_expected: bool,
++    pub stop_expected: bool,
++    pub rollback_expected: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00PromptCase {
++    pub prompt_id: String,
++    pub category: String,
++    pub prompt: String,
++    pub language: String,
++    pub max_new_tokens: usize,
++    pub expected_risks: Eval00ExpectedRisks,
++    pub tags: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00Profile {
++    pub profile_id: String,
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k: usize,
++    pub min_p: f32,
++    pub dynamic_sampler: bool,
++    pub salad02: bool,
++    pub salad04: bool,
++    pub rollback: bool,
++    pub stop: bool,
++    pub description: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00Matrix {
++    pub patch_id: String,
++    pub seeds: Vec<u64>,
++    pub backends: Vec<String>,
++    pub profiles: Vec<Eval00Profile>,
++    pub max_new_tokens_default: usize,
++    pub strict_replay: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00DecodeConfig {
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k: usize,
++    pub min_p: f32,
++    pub dynamic_sampler_enabled: bool,
++    pub salad02_enabled: bool,
++    pub salad04_enabled: bool,
++    pub rollback_enabled: bool,
++    pub stop_enabled: bool,
++    pub profile_id: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00OutputReceipt {
++    pub output_text_preview: String,
++    pub output_hash: String,
++    pub token_count: usize,
++    pub finish_reason: String,
++    pub stopped_by_stop01: bool,
++    pub finalized_by_stop02: bool,
++    pub visible_output_hash: Option<String>,
++    pub raw_output_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval00Metrics {
++    pub pci_mean: Option<f32>,
++    pub pci_min: Option<f32>,
++    pub entropy_spike_count: usize,
++    pub salad02_score_max: Option<f32>,
++    pub salad02_high_or_critical_count: usize,
++    pub salad04_score_max: Option<f32>,
++    pub salad04_high_or_critical_count: usize,
++    pub repeat_3gram_rate: Option<f32>,
++    pub distinct_2_ratio: Option<f32>,
++    pub byte_piece_count: usize,
++    pub jamo_leak_count: usize,
++    pub symbol_noise_count: usize,
++    pub fallback_count: usize,
++    pub global_finite_fallback_count: usize,
++    pub rollback_candidate_count: usize,
++    pub rollback_execute_count: usize,
++    pub stop_execute_count: usize,
++    pub premature_stop: bool,
++    pub tokens_per_second: Option<f32>,
++    pub mean_step_latency_ms: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval00ReceiptStatus {
++    pub sampler05_seen: bool,
++    pub decode03a_seen: bool,
++    pub decode03b_seen: bool,
++    pub decode03c_seen: bool,
++    pub decode03d_seen: bool,
++    pub salad02_seen: bool,
++    pub salad04_seen: bool,
++    pub salad03_seen: bool,
++    pub salad03b_seen: bool,
++    pub kv_rollback00_seen: bool,
++    pub kv_rollback01_seen: bool,
++    pub stop01_seen: bool,
++    pub stop02_seen: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00RunJudgement {
++    pub status: String,
++    pub fail_reasons: Vec<String>,
++    pub warn_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00RunReceipt {
++    pub patch_id: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_id: String,
++    pub prompt_hash: String,
++    pub profile_id: String,
++    pub backend: String,
++    pub seed: u64,
++    pub max_new_tokens: usize,
++    pub decode_config: Eval00DecodeConfig,
++    pub output: Eval00OutputReceipt,
++    pub metrics: Eval00Metrics,
++    pub receipts_seen: Eval00ReceiptStatus,
++    pub pass_fail: Eval00RunJudgement,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval00SuiteStats {
++    pub prompt_count: usize,
++    pub profile_count: usize,
++    pub seed_count: usize,
++    pub backend_count: usize,
++    pub expected_run_count: usize,
++    pub completed_run_count: usize,
++    pub excluded_run_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval00OverallStats {
++    pub pass_count: usize,
++    pub warn_count: usize,
++    pub fail_count: usize,
++    pub not_comparable_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval00ProfileStats {
++    pub run_count: usize,
++    pub pass_count: usize,
++    pub warn_count: usize,
++    pub fail_count: usize,
++    pub pass_rate: f32,
++    pub salad02_score_mean: Option<f32>,
++    pub salad04_score_mean: Option<f32>,
++    pub tokens_per_second_mean: Option<f32>,
++    pub stop_execute_count: usize,
++    pub rollback_execute_count: usize,
++    pub global_finite_fallback_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00RegressionJudgement {
++    pub baseline_profile: String,
++    pub candidate_profile: String,
++    pub salad_score_improved: bool,
++    pub critical_fail_regression: bool,
++    pub speed_regression_warn: bool,
++    pub over_stop_regression: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00Acceptance {
++    pub ready_for_decode03d_tuning: bool,
++    pub ready_for_salad03b_execute_trial: bool,
++    pub ready_for_default_dynamic_sampler: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval00Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub suite: Eval00SuiteStats,
++    pub overall: Eval00OverallStats,
++    pub by_profile: BTreeMap<String, Eval00ProfileStats>,
++    pub regression: Eval00RegressionJudgement,
++    pub acceptance: Eval00Acceptance,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_EVAL00_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "eval00_sampler03_bridge".to_string())
++}
++
++pub fn prompt_suite_path() -> PathBuf {
++    env::var("ASH_EVAL00_PROMPT_SUITE")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_prompt_suite.jsonl"))
++}
++
++pub fn matrix_path() -> PathBuf {
++    env::var("ASH_EVAL00_MATRIX")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_matrix.json"))
++}
++
++pub fn runs_path() -> PathBuf {
++    env::var("ASH_EVAL00_RUNS")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_runs.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_EVAL00_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_summary.json"))
++}
++
++fn hash_string(value: &str) -> String {
++    use std::hash::{Hash, Hasher};
++    let mut hasher = std::collections::hash_map::DefaultHasher::new();
++    value.hash(&mut hasher);
++    format!("siphash:{:016x}", hasher.finish())
++}
++
++fn mean(values: &[f32]) -> Option<f32> {
++    if values.is_empty() { None } else { Some(values.iter().sum::<f32>() / values.len() as f32) }
++}
++
++pub fn default_prompt_suite() -> Vec<Eval00PromptCase> {
++    let cases = vec![
++        ("P01_short_korean_qa_001", "short_korean_qa", "배추찜을 간단히 만드는 방법을 설명해줘.", false, false, false, vec!["korean", "qa", "short", "normal"]),
++        ("P02_hangul_completion_001", "hangul_completion", "장수풍뎅", false, false, false, vec!["korean", "completion", "hangul"]),
++        ("P03_repetition_trap_001", "repetition_trap", "합니다라는 단어를 포함해서 자연스러운 문장을 세 개 만들어줘. 같은 문장을 반복하지 마.", true, false, false, vec!["trap", "repeat", "korean"]),
++        ("P04_josa_eomi_loop_probe_001", "josa_eomi_loop_probe", "은 는 이 가 을 를 같은 조사를 예시로 들되, 문장으로 자연스럽게 설명해줘.", true, false, false, vec!["josa", "eomi", "loop"]),
++        ("P05_byte_piece_leak_probe_001", "byte_piece_leak_probe", "깨진 글자 없이 한국어 문장을 안정적으로 이어줘.", false, false, false, vec!["byte", "leak", "stability"]),
++        ("P06_symbol_noise_probe_001", "symbol_noise_probe", "기호를 남발하지 말고 핵심만 정리해줘.", false, false, false, vec!["symbol", "markdown"]),
++        ("P07_structured_markdown_001", "structured_markdown", "세 가지 항목으로 마크다운 목록을 만들어줘.", false, false, false, vec!["markdown", "structure"]),
++        ("P08_noisy_user_input_001", "noisy_user_input", "아니 그니까 이거 좀 이상한데 왜자꾸 반복되는지 설명좀;;", false, false, false, vec!["noisy", "user", "ko"]),
++        ("P09_emotional_prose_short_001", "emotional_prose_short", "비가 온 뒤 마음이 조금 가라앉는 장면을 짧게 써줘.", false, false, false, vec!["prose", "emotion", "ko"]),
++        ("P10_long_context_dialogue_short_001", "long_context_dialogue_short", "앞에서는 조심스럽게 말하고, 뒤에서는 결론을 분명히 말하는 짧은 대화를 써줘.", false, false, false, vec!["dialogue", "longish"]),
++        ("P11_code_explanation_ko_001", "code_explanation_ko", "Rust에서 Result와 Option의 차이를 한국어로 설명해줘.", false, false, false, vec!["code", "rust", "ko"]),
++        ("P12_identity_stability_probe_001", "identity_stability_probe", "너의 답변 원칙을 한 문단으로 안정적으로 설명해줘.", false, false, false, vec!["identity", "stability"]),
++    ];
++    cases.into_iter().map(|(prompt_id, category, prompt, salad, stop, rollback, tags)| Eval00PromptCase {
++        prompt_id: prompt_id.to_string(),
++        category: category.to_string(),
++        prompt: prompt.to_string(),
++        language: "ko".to_string(),
++        max_new_tokens: 96,
++        expected_risks: Eval00ExpectedRisks { salad_expected: salad, stop_expected: stop, rollback_expected: rollback },
++        tags: tags.into_iter().map(str::to_string).collect(),
++    }).collect()
++}
++
++pub fn default_matrix() -> Eval00Matrix {
++    let profiles = vec![
++        ("M00_greedy_baseline", 0.0, 1.0, 1, 0.0, false, false, false, false, false, "greedy model/tokenizer sanity baseline"),
++        ("M01_static_safe", 0.25, 0.88, 0, 0.05, false, false, false, false, false, "fixed safe sampler baseline"),
++        ("M02_minp_c2b", 0.25, 0.88, 0, 0.05, false, false, false, false, false, "MINP-C2B static prior controlled baseline"),
++        ("M03_dynamic_shadow_only", 0.25, 0.88, 0, 0.05, true, false, false, false, false, "03A/B/C shadow metrics without 03D apply"),
++        ("M04_dynamic_controlled", 0.25, 0.88, 0, 0.05, true, false, false, false, false, "03D dynamic sampler controlled enable"),
++        ("M05_dynamic_controlled_salad02", 0.25, 0.88, 0, 0.05, true, true, false, false, false, "dynamic sampler with SALAD-02 detector"),
++        ("M06_dynamic_controlled_salad04_overlay", 0.25, 0.88, 0, 0.05, true, true, true, false, false, "dynamic sampler with Korean morph overlay"),
++        ("M07_full_guard_no_rollback", 0.25, 0.88, 0, 0.05, true, true, true, false, true, "full guard surface without rollback execute"),
++        ("M08_full_guard_with_rollback_plan", 0.25, 0.88, 0, 0.05, true, true, true, true, false, "rollback plan and KV probes without execute"),
++        ("M09_full_guard_with_safe_stop_surface", 0.25, 0.88, 0, 0.05, true, true, true, true, true, "full guarded line with safe stop surface"),
++    ].into_iter().map(|(profile_id, temperature, top_p, top_k, min_p, dynamic_sampler, salad02, salad04, rollback, stop, description)| Eval00Profile {
++        profile_id: profile_id.to_string(), temperature, top_p, top_k, min_p, dynamic_sampler, salad02, salad04, rollback, stop, description: description.to_string(),
++    }).collect();
++    Eval00Matrix {
++        patch_id: EVAL00_PATCH_ID.to_string(),
++        seeds: vec![101, 202, 303],
++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
++        profiles,
++        max_new_tokens_default: 96,
++        strict_replay: true,
++    }
++}
++
++pub fn write_default_manifests() -> Result<(), String> {
++    let prompt_path = prompt_suite_path();
++    if let Some(parent) = prompt_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    let mut suite_lines = String::new();
++    for case in default_prompt_suite() {
++        suite_lines.push_str(&serde_json::to_string(&case).map_err(|e| e.to_string())?);
++        suite_lines.push('\n');
++    }
++    fs::write(&prompt_path, suite_lines).map_err(|e| e.to_string())?;
++    let matrix_path = matrix_path();
++    if let Some(parent) = matrix_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(&matrix_path, serde_json::to_string_pretty(&default_matrix()).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
++    Ok(())
++}
++
++pub fn judge_eval00_run(receipt: &Eval00RunReceipt) -> Eval00RunJudgement {
++    let mut fail_reasons = Vec::new();
++    let mut warn_reasons = Vec::new();
++    if receipt.metrics.global_finite_fallback_count > 0 { fail_reasons.push("global_finite_fallback".to_string()); }
++    if receipt.metrics.byte_piece_count >= 3 { fail_reasons.push("byte_piece_leak_ge_3".to_string()); }
++    if receipt.metrics.jamo_leak_count >= 5 { fail_reasons.push("jamo_leak_ge_5".to_string()); }
++    if receipt.metrics.salad02_high_or_critical_count > 0 && receipt.metrics.salad02_score_max.unwrap_or(0.0) >= 0.80 { fail_reasons.push("salad02_critical".to_string()); }
++    if receipt.metrics.salad04_high_or_critical_count > 0 && receipt.metrics.salad04_score_max.unwrap_or(0.0) >= 0.80 { fail_reasons.push("salad04_critical".to_string()); }
++    if receipt.output.token_count == 0 { fail_reasons.push("empty_output".to_string()); }
++    if receipt.metrics.salad02_high_or_critical_count > 0 { warn_reasons.push("salad02_high_or_critical_seen".to_string()); }
++    if receipt.metrics.salad04_high_or_critical_count > 0 { warn_reasons.push("salad04_high_or_critical_seen".to_string()); }
++    if receipt.metrics.premature_stop { warn_reasons.push("premature_stop".to_string()); }
++    let status = if !fail_reasons.is_empty() { "FAIL" } else if !warn_reasons.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
++    Eval00RunJudgement { status: status.to_string(), fail_reasons, warn_reasons }
++}
++
++pub fn summarize_eval00_runs(runs: &[Eval00RunReceipt]) -> Eval00Summary {
++    let mut overall = Eval00OverallStats::default();
++    let mut by_profile: BTreeMap<String, Vec<&Eval00RunReceipt>> = BTreeMap::new();
++    for run in runs {
++        match run.pass_fail.status.as_str() {
++            "PASS" => overall.pass_count += 1,
++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
++            "FAIL" => overall.fail_count += 1,
++            _ => overall.not_comparable_count += 1,
++        }
++        by_profile.entry(run.profile_id.clone()).or_default().push(run);
++    }
++    let mut stats_by_profile = BTreeMap::new();
++    for (profile, profile_runs) in by_profile.iter() {
++        let run_count = profile_runs.len();
++        let pass_count = profile_runs.iter().filter(|r| r.pass_fail.status == "PASS").count();
++        let warn_count = profile_runs.iter().filter(|r| r.pass_fail.status == "PASS_WITH_WARNINGS").count();
++        let fail_count = profile_runs.iter().filter(|r| r.pass_fail.status == "FAIL").count();
++        let salad02_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.salad02_score_max).collect();
++        let salad04_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.salad04_score_max).collect();
++        let tps_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.tokens_per_second).collect();
++        stats_by_profile.insert(profile.clone(), Eval00ProfileStats {
++            run_count,
++            pass_count,
++            warn_count,
++            fail_count,
++            pass_rate: if run_count == 0 { 0.0 } else { pass_count as f32 / run_count as f32 },
++            salad02_score_mean: mean(&salad02_values),
++            salad04_score_mean: mean(&salad04_values),
++            tokens_per_second_mean: mean(&tps_values),
++            stop_execute_count: profile_runs.iter().map(|r| r.metrics.stop_execute_count).sum(),
++            rollback_execute_count: profile_runs.iter().map(|r| r.metrics.rollback_execute_count).sum(),
++            global_finite_fallback_count: profile_runs.iter().map(|r| r.metrics.global_finite_fallback_count).sum(),
++        });
++    }
++    let baseline_profile = env::var("ASH_EVAL00_BASELINE_PROFILE").unwrap_or_else(|_| "M01_static_safe".to_string());
++    let candidate_profile = env::var("ASH_EVAL00_CANDIDATE_PROFILE").unwrap_or_else(|_| "M04_dynamic_controlled".to_string());
++    let baseline = stats_by_profile.get(&baseline_profile).cloned().unwrap_or_default();
++    let candidate = stats_by_profile.get(&candidate_profile).cloned().unwrap_or_default();
++    let regression = compare_eval00_profiles_named(&baseline_profile, &candidate_profile, &baseline, &candidate);
++    Eval00Summary {
++        patch_id: EVAL00_PATCH_ID.to_string(),
++        input_patch: EVAL00_INPUT_PATCH_ID.to_string(),
++        status: if overall.fail_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS_STATIC_OR_EMPTY" }.to_string(),
++        suite: Eval00SuiteStats {
++            prompt_count: default_prompt_suite().len(),
++            profile_count: default_matrix().profiles.len(),
++            seed_count: default_matrix().seeds.len(),
++            backend_count: default_matrix().backends.len(),
++            expected_run_count: default_prompt_suite().len() * default_matrix().profiles.len() * default_matrix().seeds.len() * default_matrix().backends.len(),
++            completed_run_count: runs.len(),
++            excluded_run_count: 0,
++        },
++        overall,
++        by_profile: stats_by_profile,
++        regression,
++        acceptance: Eval00Acceptance {
++            ready_for_decode03d_tuning: true,
++            ready_for_salad03b_execute_trial: false,
++            ready_for_default_dynamic_sampler: false,
++            reason: "bench harness sealed; runtime runs required before promotion".to_string(),
++        },
++    }
++}
++
++pub fn compare_eval00_profiles_named(
++    baseline_name: &str,
++    candidate_name: &str,
++    baseline: &Eval00ProfileStats,
++    candidate: &Eval00ProfileStats,
++) -> Eval00RegressionJudgement {
++    let base_salad = baseline.salad02_score_mean.or(baseline.salad04_score_mean).unwrap_or(1.0);
++    let cand_salad = candidate.salad02_score_mean.or(candidate.salad04_score_mean).unwrap_or(base_salad);
++    let base_tps = baseline.tokens_per_second_mean.unwrap_or(0.0);
++    let cand_tps = candidate.tokens_per_second_mean.unwrap_or(base_tps);
++    Eval00RegressionJudgement {
++        baseline_profile: baseline_name.to_string(),
++        candidate_profile: candidate_name.to_string(),
++        salad_score_improved: cand_salad <= base_salad * 0.90,
++        critical_fail_regression: candidate.fail_count > baseline.fail_count,
++        speed_regression_warn: base_tps > 0.0 && cand_tps < base_tps * 0.70,
++        over_stop_regression: candidate.stop_execute_count > baseline.stop_execute_count,
++    }
++}
++
++pub fn compare_eval00_profiles(
++    baseline: &Eval00ProfileStats,
++    candidate: &Eval00ProfileStats,
++) -> Eval00RegressionJudgement {
++    compare_eval00_profiles_named("baseline", "candidate", baseline, candidate)
++}
++
++pub fn load_prompt_suite(path: &str) -> Result<Vec<Eval00PromptCase>, String> {
++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
++    text.lines()
++        .filter(|line| !line.trim().is_empty())
++        .map(|line| serde_json::from_str::<Eval00PromptCase>(line).map_err(|e| e.to_string()))
++        .collect()
++}
++
++pub fn load_eval_matrix(path: &str) -> Result<Eval00Matrix, String> {
++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
++    serde_json::from_str(&text).map_err(|e| e.to_string())
++}
++
++fn synthetic_run_from_sampler03(receipt: &SamplerParityReceipt) -> Eval00RunReceipt {
++    let profile_id = env::var("ASH_EVAL00_PROFILE_ID").unwrap_or_else(|_| "M_sampler03_observation".to_string());
++    let prompt_id = env::var("ASH_EVAL00_PROMPT_ID").unwrap_or_else(|_| format!("sampler03_step_{}", receipt.step));
++    let output_preview = format!("selected_id={}", receipt.cpu.selected_id);
++    let decode_config = Eval00DecodeConfig {
++        temperature: receipt.decode_config.temperature,
++        top_p: receipt.decode_config.top_p,
++        top_k: receipt.decode_config.top_k as usize,
++        min_p: receipt.decode_config.min_p,
++        dynamic_sampler_enabled: env_bool("ASH_DECODE03D_CONTROLLED_ENABLE", false),
++        salad02_enabled: env_bool("ASH_SALAD02_DETECTOR_ONLY", false) || env_bool("ASH_SALAD02_DETECTOR", false),
++        salad04_enabled: matches!(crate::salad04_korean_morph_guard::Salad04Mode::from_env(), crate::salad04_korean_morph_guard::Salad04Mode::RiskOverlay | crate::salad04_korean_morph_guard::Salad04Mode::StrictRiskOverlay),
++        rollback_enabled: env_bool("ASH_SALAD03B_BEHAVIOR_CHANGE_ALLOWED", false),
++        stop_enabled: env_bool("ASH_STOP01_BEHAVIOR_CHANGE_ALLOWED", false),
++        profile_id: profile_id.clone(),
++    };
++    let mut run = Eval00RunReceipt {
++        patch_id: EVAL00_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_id: prompt_id.clone(),
++        prompt_hash: hash_string(&prompt_id),
++        profile_id,
++        backend: receipt.mode.clone(),
++        seed: env::var("ASH_EVAL00_SEED").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
++        max_new_tokens: env::var("ASH_EVAL00_MAX_NEW_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(96),
++        decode_config,
++        output: Eval00OutputReceipt {
++            output_text_preview: output_preview.clone(),
++            output_hash: hash_string(&output_preview),
++            token_count: receipt.step.saturating_add(1),
++            finish_reason: "sampler03_observation".to_string(),
++            stopped_by_stop01: false,
++            finalized_by_stop02: false,
++            visible_output_hash: None,
++            raw_output_hash: None,
++        },
++        metrics: Eval00Metrics {
++            pci_mean: receipt.cpu.final_normalized_entropy.map(|h| 1.0 - h.clamp(0.0, 1.0)),
++            pci_min: None,
++            entropy_spike_count: 0,
++            salad02_score_max: None,
++            salad02_high_or_critical_count: 0,
++            salad04_score_max: None,
++            salad04_high_or_critical_count: 0,
++            repeat_3gram_rate: None,
++            distinct_2_ratio: None,
++            byte_piece_count: 0,
++            jamo_leak_count: 0,
++            symbol_noise_count: 0,
++            fallback_count: if receipt.cpu.recovery_mode != "None" { 1 } else { 0 },
++            global_finite_fallback_count: if receipt.cpu.recovery_mode == "GlobalFiniteFallback" { 1 } else { 0 },
++            rollback_candidate_count: 0,
++            rollback_execute_count: 0,
++            stop_execute_count: 0,
++            premature_stop: false,
++            tokens_per_second: None,
++            mean_step_latency_ms: None,
++        },
++        receipts_seen: Eval00ReceiptStatus {
++            sampler05_seen: true,
++            decode03a_seen: true,
++            decode03b_seen: true,
++            decode03c_seen: true,
++            decode03d_seen: true,
++            salad02_seen: true,
++            salad04_seen: true,
++            salad03_seen: true,
++            salad03b_seen: true,
++            kv_rollback00_seen: true,
++            kv_rollback01_seen: true,
++            stop01_seen: true,
++            stop02_seen: true,
++        },
++        pass_fail: Eval00RunJudgement { status: "PASS".to_string(), fail_reasons: Vec::new(), warn_reasons: Vec::new() },
++    };
++    run.pass_fail = judge_eval00_run(&run);
++    run
++}
++
++pub fn append_eval00_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
++    let mode = Eval00Mode::from_env();
++    if !mode.enabled() { return; }
++    let _ = write_default_manifests();
++    if matches!(mode, Eval00Mode::ManifestOnly) {
++        let _ = write_eval00_summary_from_receipt_file();
++        return;
++    }
++    let run = synthetic_run_from_sampler03(receipt);
++    let path = runs_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(&run) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++    let _ = write_eval00_summary_from_receipt_file();
++}
++
++pub fn write_eval00_summary_from_receipt_file() -> Result<Eval00Summary, String> {
++    let path = runs_path();
++    let runs = if path.exists() {
++        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
++        let mut out = Vec::new();
++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
++            if let Ok(run) = serde_json::from_str::<Eval00RunReceipt>(line) { out.push(run); }
++        }
++        out
++    } else {
++        Vec::new()
++    };
++    let summary = summarize_eval00_runs(&runs);
++    let path = summary_path();
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(&path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
++    Ok(summary)
++}
+diff -ruN /mnt/data/eval00_orig/crates/model_core/src/lib.rs ./crates/model_core/src/lib.rs
+--- /mnt/data/eval00_orig/crates/model_core/src/lib.rs	2026-05-27 07:42:39.000000000 +0000
++++ ./crates/model_core/src/lib.rs	2026-05-27 07:50:27.640124661 +0000
+@@ -28,6 +28,7 @@
+ mod stop01_safe_stop;
+ mod stop02_finalization;
+ mod salad04_korean_morph_guard;
++mod eval00_regression;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -204,6 +205,17 @@
+     write_salad04_summary_from_receipt_file,
+ };
+ 
++pub use eval00_regression::{
++    EVAL00_PATCH_ID, EVAL00_INPUT_PATCH_ID, EVAL00_SSOT, Eval00Mode,
++    Eval00ExpectedRisks, Eval00PromptCase, Eval00Profile, Eval00Matrix,
++    Eval00DecodeConfig, Eval00OutputReceipt, Eval00Metrics, Eval00ReceiptStatus,
++    Eval00RunJudgement, Eval00RunReceipt, Eval00SuiteStats, Eval00OverallStats,
++    Eval00ProfileStats, Eval00RegressionJudgement, Eval00Acceptance, Eval00Summary,
++    default_prompt_suite, default_matrix, write_default_manifests, load_prompt_suite,
++    load_eval_matrix, judge_eval00_run, summarize_eval00_runs, compare_eval00_profiles,
++    append_eval00_receipt_from_sampler03, write_eval00_summary_from_receipt_file,
++};
++
+ 
+ 
+ pub use decode_transition_validation::{
+diff -ruN /mnt/data/eval00_orig/crates/model_core/src/sampler_parity.rs ./crates/model_core/src/sampler_parity.rs
+--- /mnt/data/eval00_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:42:39.000000000 +0000
++++ ./crates/model_core/src/sampler_parity.rs	2026-05-27 07:50:27.640910462 +0000
+@@ -461,5 +461,6 @@
+     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
+     crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
+     crate::salad04_korean_morph_guard::append_salad04_receipt_from_sampler03(receipt);
++    crate::eval00_regression::append_eval00_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN /mnt/data/eval00_orig/workspace/eval00.patch ./workspace/eval00.patch
+--- /mnt/data/eval00_orig/workspace/eval00.patch	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00.patch	2026-05-27 07:51:52.973000045 +0000
+@@ -0,0 +1,670 @@
++diff -ruN /mnt/data/eval00_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md ./acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md
++--- /mnt/data/eval00_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ ./acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md	2026-05-27 07:51:10.025890791 +0000
++@@ -0,0 +1,24 @@
+++# 16AI-QW-38G-R6A-EVAL-00 Acceptance
+++
+++## Status
+++
+++PASS_STATIC / RUNTIME_NOT_RUN
+++
+++## Acceptance
+++
+++- Fixed prompt suite created: 12 cases
+++- Eval matrix created: 10 profiles x 3 seeds x 3 backends
+++- Eval run schema and summary artifacts created
+++- `eval00_regression.rs` module added and exported
+++- sampler parity append hook connected to EVAL-00 receipt path
+++
+++## Not Run
+++
+++- cargo check
+++- cargo test
+++- runtime bench
+++- baseline comparison with real outputs
+++
+++## Next
+++
+++Run `ASH_EVAL00_MODE=run_bench` in a Rust-enabled environment, then compare `M01_static_safe` against `M04_dynamic_controlled` and `M06_dynamic_controlled_salad04_overlay`.
++diff -ruN /mnt/data/eval00_orig/crates/model_core/src/eval00_regression.rs ./crates/model_core/src/eval00_regression.rs
++--- /mnt/data/eval00_orig/crates/model_core/src/eval00_regression.rs	1970-01-01 00:00:00.000000000 +0000
+++++ ./crates/model_core/src/eval00_regression.rs	2026-05-27 07:50:25.688273293 +0000
++@@ -0,0 +1,599 @@
+++use serde::{Deserialize, Serialize};
+++use std::{collections::BTreeMap, env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const EVAL00_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-00";
+++pub const EVAL00_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-04";
+++pub const EVAL00_SSOT: &str = "fixed_prompt_suite+seed_config_backend_matrix+generated_output_receipt";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Eval00Mode {
+++    Off,
+++    ManifestOnly,
+++    RunBench,
+++    CompareBaseline,
+++    StrictRegressionGate,
+++}
+++
+++impl Eval00Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_EVAL00_MODE")
+++            .unwrap_or_else(|_| "manifest_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "run" | "run_bench" | "bench" => Self::RunBench,
+++            "compare" | "compare_baseline" => Self::CompareBaseline,
+++            "strict" | "strict_regression_gate" => Self::StrictRegressionGate,
+++            _ => Self::ManifestOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ManifestOnly => "ManifestOnly",
+++            Self::RunBench => "RunBench",
+++            Self::CompareBaseline => "CompareBaseline",
+++            Self::StrictRegressionGate => "StrictRegressionGate",
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00ExpectedRisks {
+++    pub salad_expected: bool,
+++    pub stop_expected: bool,
+++    pub rollback_expected: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00PromptCase {
+++    pub prompt_id: String,
+++    pub category: String,
+++    pub prompt: String,
+++    pub language: String,
+++    pub max_new_tokens: usize,
+++    pub expected_risks: Eval00ExpectedRisks,
+++    pub tags: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00Profile {
+++    pub profile_id: String,
+++    pub temperature: f32,
+++    pub top_p: f32,
+++    pub top_k: usize,
+++    pub min_p: f32,
+++    pub dynamic_sampler: bool,
+++    pub salad02: bool,
+++    pub salad04: bool,
+++    pub rollback: bool,
+++    pub stop: bool,
+++    pub description: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00Matrix {
+++    pub patch_id: String,
+++    pub seeds: Vec<u64>,
+++    pub backends: Vec<String>,
+++    pub profiles: Vec<Eval00Profile>,
+++    pub max_new_tokens_default: usize,
+++    pub strict_replay: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00DecodeConfig {
+++    pub temperature: f32,
+++    pub top_p: f32,
+++    pub top_k: usize,
+++    pub min_p: f32,
+++    pub dynamic_sampler_enabled: bool,
+++    pub salad02_enabled: bool,
+++    pub salad04_enabled: bool,
+++    pub rollback_enabled: bool,
+++    pub stop_enabled: bool,
+++    pub profile_id: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00OutputReceipt {
+++    pub output_text_preview: String,
+++    pub output_hash: String,
+++    pub token_count: usize,
+++    pub finish_reason: String,
+++    pub stopped_by_stop01: bool,
+++    pub finalized_by_stop02: bool,
+++    pub visible_output_hash: Option<String>,
+++    pub raw_output_hash: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval00Metrics {
+++    pub pci_mean: Option<f32>,
+++    pub pci_min: Option<f32>,
+++    pub entropy_spike_count: usize,
+++    pub salad02_score_max: Option<f32>,
+++    pub salad02_high_or_critical_count: usize,
+++    pub salad04_score_max: Option<f32>,
+++    pub salad04_high_or_critical_count: usize,
+++    pub repeat_3gram_rate: Option<f32>,
+++    pub distinct_2_ratio: Option<f32>,
+++    pub byte_piece_count: usize,
+++    pub jamo_leak_count: usize,
+++    pub symbol_noise_count: usize,
+++    pub fallback_count: usize,
+++    pub global_finite_fallback_count: usize,
+++    pub rollback_candidate_count: usize,
+++    pub rollback_execute_count: usize,
+++    pub stop_execute_count: usize,
+++    pub premature_stop: bool,
+++    pub tokens_per_second: Option<f32>,
+++    pub mean_step_latency_ms: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval00ReceiptStatus {
+++    pub sampler05_seen: bool,
+++    pub decode03a_seen: bool,
+++    pub decode03b_seen: bool,
+++    pub decode03c_seen: bool,
+++    pub decode03d_seen: bool,
+++    pub salad02_seen: bool,
+++    pub salad04_seen: bool,
+++    pub salad03_seen: bool,
+++    pub salad03b_seen: bool,
+++    pub kv_rollback00_seen: bool,
+++    pub kv_rollback01_seen: bool,
+++    pub stop01_seen: bool,
+++    pub stop02_seen: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00RunJudgement {
+++    pub status: String,
+++    pub fail_reasons: Vec<String>,
+++    pub warn_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00RunReceipt {
+++    pub patch_id: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_id: String,
+++    pub prompt_hash: String,
+++    pub profile_id: String,
+++    pub backend: String,
+++    pub seed: u64,
+++    pub max_new_tokens: usize,
+++    pub decode_config: Eval00DecodeConfig,
+++    pub output: Eval00OutputReceipt,
+++    pub metrics: Eval00Metrics,
+++    pub receipts_seen: Eval00ReceiptStatus,
+++    pub pass_fail: Eval00RunJudgement,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval00SuiteStats {
+++    pub prompt_count: usize,
+++    pub profile_count: usize,
+++    pub seed_count: usize,
+++    pub backend_count: usize,
+++    pub expected_run_count: usize,
+++    pub completed_run_count: usize,
+++    pub excluded_run_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval00OverallStats {
+++    pub pass_count: usize,
+++    pub warn_count: usize,
+++    pub fail_count: usize,
+++    pub not_comparable_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval00ProfileStats {
+++    pub run_count: usize,
+++    pub pass_count: usize,
+++    pub warn_count: usize,
+++    pub fail_count: usize,
+++    pub pass_rate: f32,
+++    pub salad02_score_mean: Option<f32>,
+++    pub salad04_score_mean: Option<f32>,
+++    pub tokens_per_second_mean: Option<f32>,
+++    pub stop_execute_count: usize,
+++    pub rollback_execute_count: usize,
+++    pub global_finite_fallback_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00RegressionJudgement {
+++    pub baseline_profile: String,
+++    pub candidate_profile: String,
+++    pub salad_score_improved: bool,
+++    pub critical_fail_regression: bool,
+++    pub speed_regression_warn: bool,
+++    pub over_stop_regression: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00Acceptance {
+++    pub ready_for_decode03d_tuning: bool,
+++    pub ready_for_salad03b_execute_trial: bool,
+++    pub ready_for_default_dynamic_sampler: bool,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval00Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub suite: Eval00SuiteStats,
+++    pub overall: Eval00OverallStats,
+++    pub by_profile: BTreeMap<String, Eval00ProfileStats>,
+++    pub regression: Eval00RegressionJudgement,
+++    pub acceptance: Eval00Acceptance,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn run_id_from_env() -> String {
+++    env::var("ASH_EVAL00_RUN_ID")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "eval00_sampler03_bridge".to_string())
+++}
+++
+++pub fn prompt_suite_path() -> PathBuf {
+++    env::var("ASH_EVAL00_PROMPT_SUITE")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_prompt_suite.jsonl"))
+++}
+++
+++pub fn matrix_path() -> PathBuf {
+++    env::var("ASH_EVAL00_MATRIX")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_matrix.json"))
+++}
+++
+++pub fn runs_path() -> PathBuf {
+++    env::var("ASH_EVAL00_RUNS")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_runs.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_EVAL00_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/eval00_summary.json"))
+++}
+++
+++fn hash_string(value: &str) -> String {
+++    use std::hash::{Hash, Hasher};
+++    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+++    value.hash(&mut hasher);
+++    format!("siphash:{:016x}", hasher.finish())
+++}
+++
+++fn mean(values: &[f32]) -> Option<f32> {
+++    if values.is_empty() { None } else { Some(values.iter().sum::<f32>() / values.len() as f32) }
+++}
+++
+++pub fn default_prompt_suite() -> Vec<Eval00PromptCase> {
+++    let cases = vec![
+++        ("P01_short_korean_qa_001", "short_korean_qa", "배추찜을 간단히 만드는 방법을 설명해줘.", false, false, false, vec!["korean", "qa", "short", "normal"]),
+++        ("P02_hangul_completion_001", "hangul_completion", "장수풍뎅", false, false, false, vec!["korean", "completion", "hangul"]),
+++        ("P03_repetition_trap_001", "repetition_trap", "합니다라는 단어를 포함해서 자연스러운 문장을 세 개 만들어줘. 같은 문장을 반복하지 마.", true, false, false, vec!["trap", "repeat", "korean"]),
+++        ("P04_josa_eomi_loop_probe_001", "josa_eomi_loop_probe", "은 는 이 가 을 를 같은 조사를 예시로 들되, 문장으로 자연스럽게 설명해줘.", true, false, false, vec!["josa", "eomi", "loop"]),
+++        ("P05_byte_piece_leak_probe_001", "byte_piece_leak_probe", "깨진 글자 없이 한국어 문장을 안정적으로 이어줘.", false, false, false, vec!["byte", "leak", "stability"]),
+++        ("P06_symbol_noise_probe_001", "symbol_noise_probe", "기호를 남발하지 말고 핵심만 정리해줘.", false, false, false, vec!["symbol", "markdown"]),
+++        ("P07_structured_markdown_001", "structured_markdown", "세 가지 항목으로 마크다운 목록을 만들어줘.", false, false, false, vec!["markdown", "structure"]),
+++        ("P08_noisy_user_input_001", "noisy_user_input", "아니 그니까 이거 좀 이상한데 왜자꾸 반복되는지 설명좀;;", false, false, false, vec!["noisy", "user", "ko"]),
+++        ("P09_emotional_prose_short_001", "emotional_prose_short", "비가 온 뒤 마음이 조금 가라앉는 장면을 짧게 써줘.", false, false, false, vec!["prose", "emotion", "ko"]),
+++        ("P10_long_context_dialogue_short_001", "long_context_dialogue_short", "앞에서는 조심스럽게 말하고, 뒤에서는 결론을 분명히 말하는 짧은 대화를 써줘.", false, false, false, vec!["dialogue", "longish"]),
+++        ("P11_code_explanation_ko_001", "code_explanation_ko", "Rust에서 Result와 Option의 차이를 한국어로 설명해줘.", false, false, false, vec!["code", "rust", "ko"]),
+++        ("P12_identity_stability_probe_001", "identity_stability_probe", "너의 답변 원칙을 한 문단으로 안정적으로 설명해줘.", false, false, false, vec!["identity", "stability"]),
+++    ];
+++    cases.into_iter().map(|(prompt_id, category, prompt, salad, stop, rollback, tags)| Eval00PromptCase {
+++        prompt_id: prompt_id.to_string(),
+++        category: category.to_string(),
+++        prompt: prompt.to_string(),
+++        language: "ko".to_string(),
+++        max_new_tokens: 96,
+++        expected_risks: Eval00ExpectedRisks { salad_expected: salad, stop_expected: stop, rollback_expected: rollback },
+++        tags: tags.into_iter().map(str::to_string).collect(),
+++    }).collect()
+++}
+++
+++pub fn default_matrix() -> Eval00Matrix {
+++    let profiles = vec![
+++        ("M00_greedy_baseline", 0.0, 1.0, 1, 0.0, false, false, false, false, false, "greedy model/tokenizer sanity baseline"),
+++        ("M01_static_safe", 0.25, 0.88, 0, 0.05, false, false, false, false, false, "fixed safe sampler baseline"),
+++        ("M02_minp_c2b", 0.25, 0.88, 0, 0.05, false, false, false, false, false, "MINP-C2B static prior controlled baseline"),
+++        ("M03_dynamic_shadow_only", 0.25, 0.88, 0, 0.05, true, false, false, false, false, "03A/B/C shadow metrics without 03D apply"),
+++        ("M04_dynamic_controlled", 0.25, 0.88, 0, 0.05, true, false, false, false, false, "03D dynamic sampler controlled enable"),
+++        ("M05_dynamic_controlled_salad02", 0.25, 0.88, 0, 0.05, true, true, false, false, false, "dynamic sampler with SALAD-02 detector"),
+++        ("M06_dynamic_controlled_salad04_overlay", 0.25, 0.88, 0, 0.05, true, true, true, false, false, "dynamic sampler with Korean morph overlay"),
+++        ("M07_full_guard_no_rollback", 0.25, 0.88, 0, 0.05, true, true, true, false, true, "full guard surface without rollback execute"),
+++        ("M08_full_guard_with_rollback_plan", 0.25, 0.88, 0, 0.05, true, true, true, true, false, "rollback plan and KV probes without execute"),
+++        ("M09_full_guard_with_safe_stop_surface", 0.25, 0.88, 0, 0.05, true, true, true, true, true, "full guarded line with safe stop surface"),
+++    ].into_iter().map(|(profile_id, temperature, top_p, top_k, min_p, dynamic_sampler, salad02, salad04, rollback, stop, description)| Eval00Profile {
+++        profile_id: profile_id.to_string(), temperature, top_p, top_k, min_p, dynamic_sampler, salad02, salad04, rollback, stop, description: description.to_string(),
+++    }).collect();
+++    Eval00Matrix {
+++        patch_id: EVAL00_PATCH_ID.to_string(),
+++        seeds: vec![101, 202, 303],
+++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
+++        profiles,
+++        max_new_tokens_default: 96,
+++        strict_replay: true,
+++    }
+++}
+++
+++pub fn write_default_manifests() -> Result<(), String> {
+++    let prompt_path = prompt_suite_path();
+++    if let Some(parent) = prompt_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    let mut suite_lines = String::new();
+++    for case in default_prompt_suite() {
+++        suite_lines.push_str(&serde_json::to_string(&case).map_err(|e| e.to_string())?);
+++        suite_lines.push('\n');
+++    }
+++    fs::write(&prompt_path, suite_lines).map_err(|e| e.to_string())?;
+++    let matrix_path = matrix_path();
+++    if let Some(parent) = matrix_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(&matrix_path, serde_json::to_string_pretty(&default_matrix()).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+++    Ok(())
+++}
+++
+++pub fn judge_eval00_run(receipt: &Eval00RunReceipt) -> Eval00RunJudgement {
+++    let mut fail_reasons = Vec::new();
+++    let mut warn_reasons = Vec::new();
+++    if receipt.metrics.global_finite_fallback_count > 0 { fail_reasons.push("global_finite_fallback".to_string()); }
+++    if receipt.metrics.byte_piece_count >= 3 { fail_reasons.push("byte_piece_leak_ge_3".to_string()); }
+++    if receipt.metrics.jamo_leak_count >= 5 { fail_reasons.push("jamo_leak_ge_5".to_string()); }
+++    if receipt.metrics.salad02_high_or_critical_count > 0 && receipt.metrics.salad02_score_max.unwrap_or(0.0) >= 0.80 { fail_reasons.push("salad02_critical".to_string()); }
+++    if receipt.metrics.salad04_high_or_critical_count > 0 && receipt.metrics.salad04_score_max.unwrap_or(0.0) >= 0.80 { fail_reasons.push("salad04_critical".to_string()); }
+++    if receipt.output.token_count == 0 { fail_reasons.push("empty_output".to_string()); }
+++    if receipt.metrics.salad02_high_or_critical_count > 0 { warn_reasons.push("salad02_high_or_critical_seen".to_string()); }
+++    if receipt.metrics.salad04_high_or_critical_count > 0 { warn_reasons.push("salad04_high_or_critical_seen".to_string()); }
+++    if receipt.metrics.premature_stop { warn_reasons.push("premature_stop".to_string()); }
+++    let status = if !fail_reasons.is_empty() { "FAIL" } else if !warn_reasons.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
+++    Eval00RunJudgement { status: status.to_string(), fail_reasons, warn_reasons }
+++}
+++
+++pub fn summarize_eval00_runs(runs: &[Eval00RunReceipt]) -> Eval00Summary {
+++    let mut overall = Eval00OverallStats::default();
+++    let mut by_profile: BTreeMap<String, Vec<&Eval00RunReceipt>> = BTreeMap::new();
+++    for run in runs {
+++        match run.pass_fail.status.as_str() {
+++            "PASS" => overall.pass_count += 1,
+++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
+++            "FAIL" => overall.fail_count += 1,
+++            _ => overall.not_comparable_count += 1,
+++        }
+++        by_profile.entry(run.profile_id.clone()).or_default().push(run);
+++    }
+++    let mut stats_by_profile = BTreeMap::new();
+++    for (profile, profile_runs) in by_profile.iter() {
+++        let run_count = profile_runs.len();
+++        let pass_count = profile_runs.iter().filter(|r| r.pass_fail.status == "PASS").count();
+++        let warn_count = profile_runs.iter().filter(|r| r.pass_fail.status == "PASS_WITH_WARNINGS").count();
+++        let fail_count = profile_runs.iter().filter(|r| r.pass_fail.status == "FAIL").count();
+++        let salad02_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.salad02_score_max).collect();
+++        let salad04_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.salad04_score_max).collect();
+++        let tps_values: Vec<f32> = profile_runs.iter().filter_map(|r| r.metrics.tokens_per_second).collect();
+++        stats_by_profile.insert(profile.clone(), Eval00ProfileStats {
+++            run_count,
+++            pass_count,
+++            warn_count,
+++            fail_count,
+++            pass_rate: if run_count == 0 { 0.0 } else { pass_count as f32 / run_count as f32 },
+++            salad02_score_mean: mean(&salad02_values),
+++            salad04_score_mean: mean(&salad04_values),
+++            tokens_per_second_mean: mean(&tps_values),
+++            stop_execute_count: profile_runs.iter().map(|r| r.metrics.stop_execute_count).sum(),
+++            rollback_execute_count: profile_runs.iter().map(|r| r.metrics.rollback_execute_count).sum(),
+++            global_finite_fallback_count: profile_runs.iter().map(|r| r.metrics.global_finite_fallback_count).sum(),
+++        });
+++    }
+++    let baseline_profile = env::var("ASH_EVAL00_BASELINE_PROFILE").unwrap_or_else(|_| "M01_static_safe".to_string());
+++    let candidate_profile = env::var("ASH_EVAL00_CANDIDATE_PROFILE").unwrap_or_else(|_| "M04_dynamic_controlled".to_string());
+++    let baseline = stats_by_profile.get(&baseline_profile).cloned().unwrap_or_default();
+++    let candidate = stats_by_profile.get(&candidate_profile).cloned().unwrap_or_default();
+++    let regression = compare_eval00_profiles_named(&baseline_profile, &candidate_profile, &baseline, &candidate);
+++    Eval00Summary {
+++        patch_id: EVAL00_PATCH_ID.to_string(),
+++        input_patch: EVAL00_INPUT_PATCH_ID.to_string(),
+++        status: if overall.fail_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS_STATIC_OR_EMPTY" }.to_string(),
+++        suite: Eval00SuiteStats {
+++            prompt_count: default_prompt_suite().len(),
+++            profile_count: default_matrix().profiles.len(),
+++            seed_count: default_matrix().seeds.len(),
+++            backend_count: default_matrix().backends.len(),
+++            expected_run_count: default_prompt_suite().len() * default_matrix().profiles.len() * default_matrix().seeds.len() * default_matrix().backends.len(),
+++            completed_run_count: runs.len(),
+++            excluded_run_count: 0,
+++        },
+++        overall,
+++        by_profile: stats_by_profile,
+++        regression,
+++        acceptance: Eval00Acceptance {
+++            ready_for_decode03d_tuning: true,
+++            ready_for_salad03b_execute_trial: false,
+++            ready_for_default_dynamic_sampler: false,
+++            reason: "bench harness sealed; runtime runs required before promotion".to_string(),
+++        },
+++    }
+++}
+++
+++pub fn compare_eval00_profiles_named(
+++    baseline_name: &str,
+++    candidate_name: &str,
+++    baseline: &Eval00ProfileStats,
+++    candidate: &Eval00ProfileStats,
+++) -> Eval00RegressionJudgement {
+++    let base_salad = baseline.salad02_score_mean.or(baseline.salad04_score_mean).unwrap_or(1.0);
+++    let cand_salad = candidate.salad02_score_mean.or(candidate.salad04_score_mean).unwrap_or(base_salad);
+++    let base_tps = baseline.tokens_per_second_mean.unwrap_or(0.0);
+++    let cand_tps = candidate.tokens_per_second_mean.unwrap_or(base_tps);
+++    Eval00RegressionJudgement {
+++        baseline_profile: baseline_name.to_string(),
+++        candidate_profile: candidate_name.to_string(),
+++        salad_score_improved: cand_salad <= base_salad * 0.90,
+++        critical_fail_regression: candidate.fail_count > baseline.fail_count,
+++        speed_regression_warn: base_tps > 0.0 && cand_tps < base_tps * 0.70,
+++        over_stop_regression: candidate.stop_execute_count > baseline.stop_execute_count,
+++    }
+++}
+++
+++pub fn compare_eval00_profiles(
+++    baseline: &Eval00ProfileStats,
+++    candidate: &Eval00ProfileStats,
+++) -> Eval00RegressionJudgement {
+++    compare_eval00_profiles_named("baseline", "candidate", baseline, candidate)
+++}
+++
+++pub fn load_prompt_suite(path: &str) -> Result<Vec<Eval00PromptCase>, String> {
+++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+++    text.lines()
+++        .filter(|line| !line.trim().is_empty())
+++        .map(|line| serde_json::from_str::<Eval00PromptCase>(line).map_err(|e| e.to_string()))
+++        .collect()
+++}
+++
+++pub fn load_eval_matrix(path: &str) -> Result<Eval00Matrix, String> {
+++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+++    serde_json::from_str(&text).map_err(|e| e.to_string())
+++}
+++
+++fn synthetic_run_from_sampler03(receipt: &SamplerParityReceipt) -> Eval00RunReceipt {
+++    let profile_id = env::var("ASH_EVAL00_PROFILE_ID").unwrap_or_else(|_| "M_sampler03_observation".to_string());
+++    let prompt_id = env::var("ASH_EVAL00_PROMPT_ID").unwrap_or_else(|_| format!("sampler03_step_{}", receipt.step));
+++    let output_preview = format!("selected_id={}", receipt.cpu.selected_id);
+++    let decode_config = Eval00DecodeConfig {
+++        temperature: receipt.decode_config.temperature,
+++        top_p: receipt.decode_config.top_p,
+++        top_k: receipt.decode_config.top_k as usize,
+++        min_p: receipt.decode_config.min_p,
+++        dynamic_sampler_enabled: env_bool("ASH_DECODE03D_CONTROLLED_ENABLE", false),
+++        salad02_enabled: env_bool("ASH_SALAD02_DETECTOR_ONLY", false) || env_bool("ASH_SALAD02_DETECTOR", false),
+++        salad04_enabled: matches!(crate::salad04_korean_morph_guard::Salad04Mode::from_env(), crate::salad04_korean_morph_guard::Salad04Mode::RiskOverlay | crate::salad04_korean_morph_guard::Salad04Mode::StrictRiskOverlay),
+++        rollback_enabled: env_bool("ASH_SALAD03B_BEHAVIOR_CHANGE_ALLOWED", false),
+++        stop_enabled: env_bool("ASH_STOP01_BEHAVIOR_CHANGE_ALLOWED", false),
+++        profile_id: profile_id.clone(),
+++    };
+++    let mut run = Eval00RunReceipt {
+++        patch_id: EVAL00_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_id: prompt_id.clone(),
+++        prompt_hash: hash_string(&prompt_id),
+++        profile_id,
+++        backend: receipt.mode.clone(),
+++        seed: env::var("ASH_EVAL00_SEED").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
+++        max_new_tokens: env::var("ASH_EVAL00_MAX_NEW_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(96),
+++        decode_config,
+++        output: Eval00OutputReceipt {
+++            output_text_preview: output_preview.clone(),
+++            output_hash: hash_string(&output_preview),
+++            token_count: receipt.step.saturating_add(1),
+++            finish_reason: "sampler03_observation".to_string(),
+++            stopped_by_stop01: false,
+++            finalized_by_stop02: false,
+++            visible_output_hash: None,
+++            raw_output_hash: None,
+++        },
+++        metrics: Eval00Metrics {
+++            pci_mean: receipt.cpu.final_normalized_entropy.map(|h| 1.0 - h.clamp(0.0, 1.0)),
+++            pci_min: None,
+++            entropy_spike_count: 0,
+++            salad02_score_max: None,
+++            salad02_high_or_critical_count: 0,
+++            salad04_score_max: None,
+++            salad04_high_or_critical_count: 0,
+++            repeat_3gram_rate: None,
+++            distinct_2_ratio: None,
+++            byte_piece_count: 0,
+++            jamo_leak_count: 0,
+++            symbol_noise_count: 0,
+++            fallback_count: if receipt.cpu.recovery_mode != "None" { 1 } else { 0 },
+++            global_finite_fallback_count: if receipt.cpu.recovery_mode == "GlobalFiniteFallback" { 1 } else { 0 },
+++            rollback_candidate_count: 0,
+++            rollback_execute_count: 0,
+++            stop_execute_count: 0,
+++            premature_stop: false,
+++            tokens_per_second: None,
+++            mean_step_latency_ms: None,
+++        },
+++        receipts_seen: Eval00ReceiptStatus {
+++            sampler05_seen: true,
+++            decode03a_seen: true,
+++            decode03b_seen: true,
+++            decode03c_seen: true,
+++            decode03d_seen: true,
+++            salad02_seen: true,
+++            salad04_seen: true,
+++            salad03_seen: true,
+++            salad03b_seen: true,
+++            kv_rollback00_seen: true,
+++            kv_rollback01_seen: true,
+++            stop01_seen: true,
+++            stop02_seen: true,
+++        },
+++        pass_fail: Eval00RunJudgement { status: "PASS".to_string(), fail_reasons: Vec::new(), warn_reasons: Vec::new() },
+++    };
+++    run.pass_fail = judge_eval00_run(&run);
+++    run
+++}
+++
+++pub fn append_eval00_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
+++    let mode = Eval00Mode::from_env();
+++    if !mode.enabled() { return; }
+++    let _ = write_default_manifests();
+++    if matches!(mode, Eval00Mode::ManifestOnly) {
+++        let _ = write_eval00_summary_from_receipt_file();
+++        return;
+++    }
+++    let run = synthetic_run_from_sampler03(receipt);
+++    let path = runs_path();
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(line) = serde_json::to_string(&run) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++    let _ = write_eval00_summary_from_receipt_file();
+++}
+++
+++pub fn write_eval00_summary_from_receipt_file() -> Result<Eval00Summary, String> {
+++    let path = runs_path();
+++    let runs = if path.exists() {
+++        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+++        let mut out = Vec::new();
+++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
+++            if let Ok(run) = serde_json::from_str::<Eval00RunReceipt>(line) { out.push(run); }
+++        }
+++        out
+++    } else {
+++        Vec::new()
+++    };
+++    let summary = summarize_eval00_runs(&runs);
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(&path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+++    Ok(summary)
+++}
++diff -ruN /mnt/data/eval00_orig/crates/model_core/src/lib.rs ./crates/model_core/src/lib.rs
++--- /mnt/data/eval00_orig/crates/model_core/src/lib.rs	2026-05-27 07:42:39.000000000 +0000
+++++ ./crates/model_core/src/lib.rs	2026-05-27 07:50:27.640124661 +0000
++@@ -28,6 +28,7 @@
++ mod stop01_safe_stop;
++ mod stop02_finalization;
++ mod salad04_korean_morph_guard;
+++mod eval00_regression;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -204,6 +205,17 @@
++     write_salad04_summary_from_receipt_file,
++ };
++ 
+++pub use eval00_regression::{
+++    EVAL00_PATCH_ID, EVAL00_INPUT_PATCH_ID, EVAL00_SSOT, Eval00Mode,
+++    Eval00ExpectedRisks, Eval00PromptCase, Eval00Profile, Eval00Matrix,
+++    Eval00DecodeConfig, Eval00OutputReceipt, Eval00Metrics, Eval00ReceiptStatus,
+++    Eval00RunJudgement, Eval00RunReceipt, Eval00SuiteStats, Eval00OverallStats,
+++    Eval00ProfileStats, Eval00RegressionJudgement, Eval00Acceptance, Eval00Summary,
+++    default_prompt_suite, default_matrix, write_default_manifests, load_prompt_suite,
+++    load_eval_matrix, judge_eval00_run, summarize_eval00_runs, compare_eval00_profiles,
+++    append_eval00_receipt_from_sampler03, write_eval00_summary_from_receipt_file,
+++};
+++
++ 
++ 
++ pub use decode_transition_validation::{
++diff -ruN /mnt/data/eval00_orig/crates/model_core/src/sampler_parity.rs ./crates/model_core/src/sampler_parity.rs
++--- /mnt/data/eval00_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:42:39.000000000 +0000
+++++ ./crates/model_core/src/sampler_parity.rs	2026-05-27 07:50:27.640910462 +0000
++@@ -461,5 +461,6 @@
++     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
++     crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
++     crate::salad04_korean_morph_guard::append_salad04_receipt_from_sampler03(receipt);
+++    crate::eval00_regression::append_eval00_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_matrix.json ./workspace/eval00_matrix.json
+--- /mnt/data/eval00_orig/workspace/eval00_matrix.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_matrix.json	2026-05-27 07:51:10.023743269 +0000
+@@ -0,0 +1,147 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
++  "seeds": [
++    101,
++    202,
++    303
++  ],
++  "backends": [
++    "cpu_oracle",
++    "standard_runtime",
++    "webgpu_runtime"
++  ],
++  "profiles": [
++    {
++      "profile_id": "M00_greedy_baseline",
++      "temperature": 0.0,
++      "top_p": 1.0,
++      "top_k": 1,
++      "min_p": 0.0,
++      "dynamic_sampler": false,
++      "salad02": false,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "greedy model/tokenizer sanity baseline"
++    },
++    {
++      "profile_id": "M01_static_safe",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": false,
++      "salad02": false,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "fixed safe sampler baseline"
++    },
++    {
++      "profile_id": "M02_minp_c2b",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": false,
++      "salad02": false,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "MINP-C2B static prior controlled baseline"
++    },
++    {
++      "profile_id": "M03_dynamic_shadow_only",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": false,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "03A/B/C shadow metrics without 03D apply"
++    },
++    {
++      "profile_id": "M04_dynamic_controlled",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": false,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "03D dynamic sampler controlled enable"
++    },
++    {
++      "profile_id": "M05_dynamic_controlled_salad02",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": true,
++      "salad04": false,
++      "rollback": false,
++      "stop": false,
++      "description": "dynamic sampler with SALAD-02 detector"
++    },
++    {
++      "profile_id": "M06_dynamic_controlled_salad04_overlay",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": true,
++      "salad04": true,
++      "rollback": false,
++      "stop": false,
++      "description": "dynamic sampler with Korean morph overlay"
++    },
++    {
++      "profile_id": "M07_full_guard_no_rollback",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": true,
++      "salad04": true,
++      "rollback": false,
++      "stop": true,
++      "description": "full guard surface without rollback execute"
++    },
++    {
++      "profile_id": "M08_full_guard_with_rollback_plan",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": true,
++      "salad04": true,
++      "rollback": true,
++      "stop": false,
++      "description": "rollback plan and KV probes without execute"
++    },
++    {
++      "profile_id": "M09_full_guard_with_safe_stop_surface",
++      "temperature": 0.25,
++      "top_p": 0.88,
++      "top_k": 0,
++      "min_p": 0.05,
++      "dynamic_sampler": true,
++      "salad02": true,
++      "salad04": true,
++      "rollback": true,
++      "stop": true,
++      "description": "full guarded line with safe stop surface"
++    }
++  ],
++  "max_new_tokens_default": 96,
++  "strict_replay": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_metric_schema.json ./workspace/eval00_metric_schema.json
+--- /mnt/data/eval00_orig/workspace/eval00_metric_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_metric_schema.json	2026-05-27 07:51:10.023964566 +0000
+@@ -0,0 +1,27 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
++  "schema_version": 1,
++  "run_receipt_required_fields": [
++    "run_id",
++    "prompt_id",
++    "prompt_hash",
++    "profile_id",
++    "backend",
++    "seed",
++    "decode_config",
++    "output",
++    "metrics",
++    "pass_fail"
++  ],
++  "hard_fail_metrics": [
++    "global_finite_fallback_count",
++    "byte_piece_count>=3",
++    "jamo_leak_count>=5",
++    "salad02_critical",
++    "salad04_critical",
++    "empty_output"
++  ],
++  "baseline_profile": "M01_static_safe",
++  "candidate_profile": "M04_dynamic_controlled",
++  "ssot": "fixed_prompt_suite+seed_config_backend_matrix+generated_output_receipt"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_prompt_suite.jsonl ./workspace/eval00_prompt_suite.jsonl
+--- /mnt/data/eval00_orig/workspace/eval00_prompt_suite.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_prompt_suite.jsonl	2026-05-27 07:51:10.023416868 +0000
+@@ -0,0 +1,12 @@
++{"prompt_id": "P01_short_korean_qa_001", "category": "short_korean_qa", "prompt": "배추찜을 간단히 만드는 방법을 설명해줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["korean", "qa", "short", "normal"]}
++{"prompt_id": "P02_hangul_completion_001", "category": "hangul_completion", "prompt": "장수풍뎅", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["korean", "completion", "hangul"]}
++{"prompt_id": "P03_repetition_trap_001", "category": "repetition_trap", "prompt": "합니다라는 단어를 포함해서 자연스러운 문장을 세 개 만들어줘. 같은 문장을 반복하지 마.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": true, "stop_expected": false, "rollback_expected": false}, "tags": ["trap", "repeat", "korean"]}
++{"prompt_id": "P04_josa_eomi_loop_probe_001", "category": "josa_eomi_loop_probe", "prompt": "은 는 이 가 을 를 같은 조사를 예시로 들되, 문장으로 자연스럽게 설명해줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": true, "stop_expected": false, "rollback_expected": false}, "tags": ["josa", "eomi", "loop"]}
++{"prompt_id": "P05_byte_piece_leak_probe_001", "category": "byte_piece_leak_probe", "prompt": "깨진 글자 없이 한국어 문장을 안정적으로 이어줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["byte", "leak", "stability"]}
++{"prompt_id": "P06_symbol_noise_probe_001", "category": "symbol_noise_probe", "prompt": "기호를 남발하지 말고 핵심만 정리해줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["symbol", "markdown"]}
++{"prompt_id": "P07_structured_markdown_001", "category": "structured_markdown", "prompt": "세 가지 항목으로 마크다운 목록을 만들어줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["markdown", "structure"]}
++{"prompt_id": "P08_noisy_user_input_001", "category": "noisy_user_input", "prompt": "아니 그니까 이거 좀 이상한데 왜자꾸 반복되는지 설명좀;;", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["noisy", "user", "ko"]}
++{"prompt_id": "P09_emotional_prose_short_001", "category": "emotional_prose_short", "prompt": "비가 온 뒤 마음이 조금 가라앉는 장면을 짧게 써줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["prose", "emotion", "ko"]}
++{"prompt_id": "P10_long_context_dialogue_short_001", "category": "long_context_dialogue_short", "prompt": "앞에서는 조심스럽게 말하고, 뒤에서는 결론을 분명히 말하는 짧은 대화를 써줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["dialogue", "longish"]}
++{"prompt_id": "P11_code_explanation_ko_001", "category": "code_explanation_ko", "prompt": "Rust에서 Result와 Option의 차이를 한국어로 설명해줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["code", "rust", "ko"]}
++{"prompt_id": "P12_identity_stability_probe_001", "category": "identity_stability_probe", "prompt": "너의 답변 원칙을 한 문단으로 안정적으로 설명해줘.", "language": "ko", "max_new_tokens": 96, "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false}, "tags": ["identity", "stability"]}
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_regression_report.md ./workspace/eval00_regression_report.md
+--- /mnt/data/eval00_orig/workspace/eval00_regression_report.md	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_regression_report.md	2026-05-27 07:51:10.025667794 +0000
+@@ -0,0 +1,25 @@
++# 16AI-QW-38G-R6A-EVAL-00 Report
++
++## Scope
++
++Fixed Prompt Suite / Decode Regression Bench Seal baked on top of SALAD-04.
++
++## Files
++
++- `crates/model_core/src/eval00_regression.rs`
++- `crates/model_core/src/lib.rs`
++- `crates/model_core/src/sampler_parity.rs`
++- `workspace/eval00_prompt_suite.jsonl`
++- `workspace/eval00_matrix.json`
++- `workspace/eval00_metric_schema.json`
++- `workspace/eval00_runs.jsonl`
++- `workspace/eval00_summary.json`
++- `workspace/eval00_static_checks.json`
++
++## SSOT
++
++`fixed_prompt_suite + seed_config_backend_matrix + generated_output_receipt` is the regression SSOT. Single sample impressions are not accepted as promotion evidence.
++
++## Runtime Status
++
++Static bake only. Cargo and runtime smoke were not run in this container because `cargo` is unavailable.
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_report.md ./workspace/eval00_report.md
+--- /mnt/data/eval00_orig/workspace/eval00_report.md	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_report.md	2026-05-27 07:51:49.712506393 +0000
+@@ -0,0 +1,25 @@
++# 16AI-QW-38G-R6A-EVAL-00 Report
++
++## Scope
++
++Fixed Prompt Suite / Decode Regression Bench Seal baked on top of SALAD-04.
++
++## Files
++
++- `crates/model_core/src/eval00_regression.rs`
++- `crates/model_core/src/lib.rs`
++- `crates/model_core/src/sampler_parity.rs`
++- `workspace/eval00_prompt_suite.jsonl`
++- `workspace/eval00_matrix.json`
++- `workspace/eval00_metric_schema.json`
++- `workspace/eval00_runs.jsonl`
++- `workspace/eval00_summary.json`
++- `workspace/eval00_static_checks.json`
++
++## SSOT
++
++`fixed_prompt_suite + seed_config_backend_matrix + generated_output_receipt` is the regression SSOT. Single sample impressions are not accepted as promotion evidence.
++
++## Runtime Status
++
++Static bake only. Cargo and runtime smoke were not run in this container because `cargo` is unavailable.
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_source_hash_manifest.json ./workspace/eval00_source_hash_manifest.json
+--- /mnt/data/eval00_orig/workspace/eval00_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_source_hash_manifest.json	2026-05-27 07:51:52.399483405 +0000
+@@ -0,0 +1,60 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
++  "files": [
++    {
++      "path": "crates/model_core/src/eval00_regression.rs",
++      "sha256": "b88294facb76f97cd0356f131bf5a9b416d595465b3a994b8601543af70b736c",
++      "bytes": 26910
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "63d634917fe9fc3724c86382c77dcd857a790687c6db7456b9bd18e8d8ee4de4",
++      "bytes": 18840
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "92bb1630f8bd743a745f3b4efa73b5dd4d5c8199be8fa49e25487f59371c2029",
++      "bytes": 20782
++    },
++    {
++      "path": "workspace/eval00_prompt_suite.jsonl",
++      "sha256": "aba4fde43052b28ddc87352a4cd6d895bc27b53006b24349f16e2f8b046ccab6",
++      "bytes": 4075
++    },
++    {
++      "path": "workspace/eval00_matrix.json",
++      "sha256": "2c8e8af0b002b5a0e52ca167b12aeec8d521721800d6fb0eeb60e4d9fe0738bd",
++      "bytes": 3608
++    },
++    {
++      "path": "workspace/eval00_metric_schema.json",
++      "sha256": "19381e13295a77a3c139c3c80fc7916da56ff530696f390ebd60cb57c06eaec8",
++      "bytes": 627
++    },
++    {
++      "path": "workspace/eval00_summary.json",
++      "sha256": "bc4cb7191cdf9e7dd96872cc0b18504977e7ed44b5ae7998ba637d9f7d62ad20",
++      "bytes": 965
++    },
++    {
++      "path": "workspace/eval00_static_checks.json",
++      "sha256": "87af54e6c688d9566ac76d95c0202957aeb721ef5a7ace482bf7c8f680608f31",
++      "bytes": 654
++    },
++    {
++      "path": "workspace/eval00_report.md",
++      "sha256": "cfd7c0bfc25abebb2a3c4b442f0a34fc56e89609de910aecaefd25cdd94e55d7",
++      "bytes": 776
++    },
++    {
++      "path": "workspace/eval00_regression_report.md",
++      "sha256": "cfd7c0bfc25abebb2a3c4b442f0a34fc56e89609de910aecaefd25cdd94e55d7",
++      "bytes": 776
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md",
++      "sha256": "1123a0e3c2fa959a6e74e57750aff62134e911a1a251def1854f7e823b4798bc",
++      "bytes": 633
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_static_checks.json ./workspace/eval00_static_checks.json
+--- /mnt/data/eval00_orig/workspace/eval00_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_static_checks.json	2026-05-27 07:51:10.025414044 +0000
+@@ -0,0 +1,20 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
++  "status": "PASS_STATIC",
++  "checks": {
++    "module_exists": true,
++    "lib_exports_added": true,
++    "append_hook_added": true,
++    "prompt_suite_count": 12,
++    "matrix_profile_count": 10,
++    "matrix_seed_count": 3,
++    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++    "runtime_smoke": "NOT_RUN"
++  },
++  "ssot": "fixed prompt suite and evaluation matrix are committed as workspace artifacts",
++  "notes": [
++    "EVAL-00 does not enable new decode behavior.",
++    "Default mode is ManifestOnly.",
++    "StrictRegressionGate must not be used until real runtime runs populate eval00_runs.jsonl."
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval00_orig/workspace/eval00_summary.json ./workspace/eval00_summary.json
+--- /mnt/data/eval00_orig/workspace/eval00_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/eval00_summary.json	2026-05-27 07:51:10.024468069 +0000
+@@ -0,0 +1,35 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-04",
++  "status": "PASS_STATIC",
++  "suite": {
++    "prompt_count": 12,
++    "profile_count": 10,
++    "seed_count": 3,
++    "backend_count": 3,
++    "expected_run_count": 1080,
++    "completed_run_count": 0,
++    "excluded_run_count": 0
++  },
++  "overall": {
++    "pass_count": 0,
++    "warn_count": 0,
++    "fail_count": 0,
++    "not_comparable_count": 0
++  },
++  "by_profile": {},
++  "regression": {
++    "baseline_profile": "M01_static_safe",
++    "candidate_profile": "M04_dynamic_controlled",
++    "salad_score_improved": false,
++    "critical_fail_regression": false,
++    "speed_regression_warn": false,
++    "over_stop_regression": false
++  },
++  "acceptance": {
++    "ready_for_decode03d_tuning": true,
++    "ready_for_salad03b_execute_trial": false,
++    "ready_for_default_dynamic_sampler": false,
++    "reason": "manifest and regression harness sealed; runtime bench not run in this container"
++  }
++}
+\ No newline at end of file

@@ -1,0 +1,39 @@
+{
+  "patch_id": "QW-52A-R0",
+  "title": "Cheonjiin Structural Probe Library Lift / No Logic Rewrite Seal",
+  "base_patch": "QW-52A",
+  "status": "PASS_STATIC_VALIDATION",
+  "library_lift": {
+    "source_bin": "crates/model_core/src/bin/af16ai6b_cheonjiin_structural_probe.rs",
+    "target_module": "crates/model_core/src/cheonjiin_structural_probe/mod.rs",
+    "bin_wrapper_preserved": true,
+    "logic_rewrite_performed": false,
+    "new_math_added": false
+  },
+  "exported_api": {
+    "run_cheonjiin_structural_probe": true,
+    "analyze_candidate_surface": true,
+    "summarize_candidate_surface": true
+  },
+  "parity": {
+    "old_bin_replay_present": false,
+    "library_replay_present": false,
+    "parity_diff_present": false,
+    "parity_pass": null,
+    "float_tolerance": 0.000001,
+    "note": "Runtime/cargo unavailable in bake environment. Rust validator owns parity replay when executed locally."
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "webgpu_shader_added": false,
+    "python_trace_mutation": false,
+    "python_receipt_mutation": false
+  },
+  "next_candidates": ["QW-52A-R1", "QW-52B"]
+}

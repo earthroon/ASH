@@ -1,0 +1,350 @@
+Only in minp_p0_work/acceptance_reports: 16AI-QW-38G-R6A-MINP-P0_acceptance.md
+diff -ru minp_p0_clean/crates/orchestrator_local/src/infer_entry.rs minp_p0_work/crates/orchestrator_local/src/infer_entry.rs
+--- minp_p0_clean/crates/orchestrator_local/src/infer_entry.rs	2026-05-26 12:44:37.000000000 +0000
++++ minp_p0_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-26 14:42:00.512798461 +0000
+@@ -11,7 +11,7 @@
+ use std::fs;
+ use std::path::PathBuf;
+ use std::sync::{Arc, Mutex};
+-use runtime::{build_candidate_plan_for_task, run_standard_infer, run_standard_infer_candidate_pool, run_standard_infer_with_decode, NativeEmbeddingMode, NativeVocabProjectionMode, StandardInferDecodeOverride, StandardInferRequest};
++use runtime::{build_candidate_plan_for_task, normalize_min_p, run_standard_infer, run_standard_infer_candidate_pool, run_standard_infer_with_decode, NativeEmbeddingMode, NativeVocabProjectionMode, StandardInferDecodeOverride, StandardInferRequest};
+ use text_kernel::{observe_text_kernel, TextKernelRequest};
+ 
+ use crate::{
+@@ -1214,7 +1214,7 @@
+         .or_else(|| payload.get("samplingMinP"))
+         .or_else(|| payload.get("sampling_min_p"))
+         .and_then(|v| v.as_f64())
+-        .map(|v| (v as f32).clamp(0.0, 0.95));
++        .map(|v| normalize_min_p(v as f32));
+     let min_new_tokens = payload
+         .get("minNewTokens")
+         .or_else(|| payload.get("min_new_tokens"))
+@@ -1272,7 +1272,7 @@
+         .or_else(|| payload.get("samplingMinP"))
+         .or_else(|| payload.get("sampling_min_p"))
+         .and_then(|v| v.as_f64())
+-        .map(|v| (v as f32).clamp(0.0, 0.95))
++        .map(|v| normalize_min_p(v as f32))
+ }
+ 
+ fn sampler01_receipt_path(payload: &Value, workspace_root: &std::path::Path) -> PathBuf {
+diff -ru minp_p0_clean/crates/runtime/src/causal_lm.rs minp_p0_work/crates/runtime/src/causal_lm.rs
+--- minp_p0_clean/crates/runtime/src/causal_lm.rs	2026-05-26 11:11:11.000000000 +0000
++++ minp_p0_work/crates/runtime/src/causal_lm.rs	2026-05-26 14:42:00.495028451 +0000
+@@ -23,7 +23,7 @@
+     tokenizer::{TokenizerAdapter, WhitespaceTokenizer, load_runtime_tokenizer},
+     types::{
+         ExecutionConfig, LoadModelConfig, LoraAdapterSpec, LoraMergeMode, RuntimeLoadedModel,
+-        RuntimeSamplingConfig, SessionCleanupReport,
++        RuntimeSamplingConfig, SessionCleanupReport, normalize_min_p,
+     },
+ };
+ 
+@@ -364,7 +364,7 @@
+         temperature: Some(*exec_cfg.sampling.temperature.resolved()),
+         top_p: Some(*exec_cfg.sampling.top_p.resolved()),
+         top_k: Some(*exec_cfg.sampling.top_k.resolved()),
+-        min_p: None,
++        min_p: Some(normalize_min_p(*exec_cfg.sampling.min_p.resolved())),
+         stop_sequences: exec_cfg.stop.text_sequences.clone(),
+         min_new_tokens: None,
+         max_new_tokens: Some(exec_cfg.max_new_tokens),
+diff -ru minp_p0_clean/crates/runtime/src/engine/bootstrap.rs minp_p0_work/crates/runtime/src/engine/bootstrap.rs
+--- minp_p0_clean/crates/runtime/src/engine/bootstrap.rs	2026-05-24 04:08:30.000000000 +0000
++++ minp_p0_work/crates/runtime/src/engine/bootstrap.rs	2026-05-26 14:42:00.492766885 +0000
+@@ -12,7 +12,7 @@
+         AppliedField, ExecutionConfig, GenerateConfig, LoadModelConfig, MemorySlotState,
+         PromptShapingBackend, RuntimeControlConfig, RuntimeLoadedModel, RuntimeOutputControlConfig,
+         RuntimeSamplingConfig, RuntimeStopConfig, RuntimeTokenBiasConfig, TokenBiasStrategy,
+-        WeightedPolicyTerm,
++        WeightedPolicyTerm, normalize_min_p,
+     },
+ };
+ 
+@@ -1208,6 +1208,7 @@
+             temperature: mark_supported(legacy_gate.temperature, capabilities.supports_temperature),
+             top_p: mark_supported(legacy_gate.top_p, capabilities.supports_top_p),
+             top_k: mark_supported(legacy_gate.top_k, capabilities.supports_top_k),
++            min_p: AppliedField::Applied(normalize_min_p(cfg.min_p.unwrap_or(0.0))),
+             repeat_penalty: if capabilities.supports_repeat_penalty {
+                 AppliedField::Applied(legacy_gate.repeat_penalty)
+             } else {
+diff -ru minp_p0_clean/crates/runtime/src/engine/generation_runner.rs minp_p0_work/crates/runtime/src/engine/generation_runner.rs
+--- minp_p0_clean/crates/runtime/src/engine/generation_runner.rs	2026-05-26 02:47:36.000000000 +0000
++++ minp_p0_work/crates/runtime/src/engine/generation_runner.rs	2026-05-26 14:42:00.494085314 +0000
+@@ -140,6 +140,7 @@
+                 temperature: *execution_cfg.sampling.temperature.resolved(),
+                 top_p: *execution_cfg.sampling.top_p.resolved(),
+                 top_k: *execution_cfg.sampling.top_k.resolved(),
++                min_p: *execution_cfg.sampling.min_p.resolved(),
+                 repeat_penalty: *execution_cfg.sampling.repeat_penalty.resolved(),
+                 repeat_last_n: *execution_cfg.sampling.repeat_last_n.resolved(),
+                 stop_count: execution_cfg.stop.text_sequences.len(),
+@@ -158,6 +159,7 @@
+                 applied_temperature: execution_cfg.sampling.temperature.is_applied(),
+                 applied_top_p: execution_cfg.sampling.top_p.is_applied(),
+                 applied_top_k: execution_cfg.sampling.top_k.is_applied(),
++                applied_min_p: execution_cfg.sampling.min_p.is_applied(),
+                 applied_repeat_penalty: execution_cfg.sampling.repeat_penalty.is_applied(),
+                 applied_repeat_last_n: execution_cfg.sampling.repeat_last_n.is_applied(),
+                 token_bias_enabled: execution_cfg.sampling.token_bias.enabled,
+diff -ru minp_p0_clean/crates/runtime/src/infer.rs minp_p0_work/crates/runtime/src/infer.rs
+--- minp_p0_clean/crates/runtime/src/infer.rs	2026-05-26 11:12:37.000000000 +0000
++++ minp_p0_work/crates/runtime/src/infer.rs	2026-05-26 14:42:00.510949425 +0000
+@@ -47,7 +47,7 @@
+ use crate::{
+     RepetitionState, ResolvedRuntimeProfile, build_gpu_penalty_telemetry, derive_adapter_gate,
+     derive_penalty_coeffs, load_runtime_lora_attachments_from_json_paths,
+-    load_runtime_profile_toml,
++    load_runtime_profile_toml, normalize_min_p,
+     output_guard::{build_retry_banned_token_ids, evaluate_output_guard, should_regenerate},
+ };
+ 
+@@ -1610,7 +1610,7 @@
+             cfg.top_k = v as u32;
+         }
+         if let Some(v) = d.min_p {
+-            cfg.min_p = v.clamp(0.0, 0.95);
++            cfg.min_p = normalize_min_p(v);
+         }
+         cfg.seed = Some(d.seed_override.unwrap_or(req_seed));
+         cfg.stop_sequences = d.stop_sequences.clone();
+diff -ru minp_p0_clean/crates/runtime/src/lib.rs minp_p0_work/crates/runtime/src/lib.rs
+--- minp_p0_clean/crates/runtime/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
++++ minp_p0_work/crates/runtime/src/lib.rs	2026-05-26 14:41:11.016795967 +0000
+@@ -32,8 +32,9 @@
+ pub use types::{
+     AppliedField, ExecutionConfig, GenerateConfig, GenerateEvent, GenerateStatus, GenerateTask,
+     LoadModelConfig, LoraAdapterSpec, LoraMergeMode, MemorySlotState, PromptShapingBackend,
+-    RuntimeBackendKind, RuntimeLoadedModel, RuntimeOutputControlConfig, RuntimeTokenBiasConfig,
+-    TokenBiasStrategy, WeightedPolicyTerm,
++    RuntimeBackendKind, RuntimeLoadedModel, RuntimeOutputControlConfig, RuntimeSamplingConfig,
++    RuntimeTokenBiasConfig, TokenBiasStrategy, WeightedPolicyTerm, default_runtime_min_p,
++    normalize_min_p,
+ };
+ 
+ // LoRA registry/load/report surface.
+diff -ru minp_p0_clean/crates/runtime/src/types.rs minp_p0_work/crates/runtime/src/types.rs
+--- minp_p0_clean/crates/runtime/src/types.rs	2026-05-26 02:32:46.000000000 +0000
++++ minp_p0_work/crates/runtime/src/types.rs	2026-05-26 14:44:35.186957482 +0000
+@@ -65,6 +65,8 @@
+     pub temperature: f32,
+     pub top_p: f32,
+     pub top_k: usize,
++    #[serde(default, alias = "minP", alias = "samplingMinP", alias = "sampling_min_p")]
++    pub min_p: Option<f32>,
+     pub repeat_penalty: f32,
+     pub repeat_last_n: usize,
+     pub stop: Vec<String>,
+@@ -81,6 +83,17 @@
+     GenerateTask::Freeform
+ }
+ 
++pub fn normalize_min_p(value: f32) -> f32 {
++    if !value.is_finite() {
++        return 0.0;
++    }
++    value.clamp(0.0, 0.95)
++}
++
++pub fn default_runtime_min_p() -> AppliedField<f32> {
++    AppliedField::Applied(0.0)
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ExecutionConfig {
+     pub session_id: String,
+@@ -102,6 +115,8 @@
+     pub temperature: AppliedField<f32>,
+     pub top_p: AppliedField<f32>,
+     pub top_k: AppliedField<usize>,
++    #[serde(default = "default_runtime_min_p")]
++    pub min_p: AppliedField<f32>,
+     pub repeat_penalty: AppliedField<f32>,
+     pub repeat_last_n: AppliedField<usize>,
+     pub token_bias: RuntimeTokenBiasConfig,
+@@ -294,6 +309,7 @@
+         temperature: f32,
+         top_p: f32,
+         top_k: usize,
++        min_p: f32,
+         repeat_penalty: f32,
+         repeat_last_n: usize,
+         stop_count: usize,
+@@ -307,6 +323,7 @@
+         applied_temperature: bool,
+         applied_top_p: bool,
+         applied_top_k: bool,
++        applied_min_p: bool,
+         applied_repeat_penalty: bool,
+         applied_repeat_last_n: bool,
+         token_bias_enabled: bool,
+@@ -403,3 +420,74 @@
+     Accepted,
+     Rejected,
+ }
++
++#[cfg(test)]
++mod minp_p0_tests {
++    use super::{AppliedField, RuntimeSamplingConfig, normalize_min_p};
++
++    #[test]
++    fn minp_p0_normalize_min_p_clamps_and_rejects_non_finite() {
++        assert_eq!(normalize_min_p(-1.0), 0.0);
++        assert_eq!(normalize_min_p(0.0), 0.0);
++        assert_eq!(normalize_min_p(0.05), 0.05);
++        assert_eq!(normalize_min_p(0.95), 0.95);
++        assert_eq!(normalize_min_p(1.0), 0.95);
++        assert_eq!(normalize_min_p(f32::NAN), 0.0);
++        assert_eq!(normalize_min_p(f32::INFINITY), 0.0);
++    }
++
++    #[test]
++    fn minp_p0_runtime_sampling_config_defaults_to_disabled_min_p() {
++        let raw = r#"{
++            "temperature": { "Applied": 0.7 },
++            "top_p": { "Applied": 0.9 },
++            "top_k": { "Applied": 40 },
++            "repeat_penalty": { "Applied": 1.0 },
++            "repeat_last_n": { "Applied": 64 },
++            "token_bias": {
++                "enabled": false,
++                "strategy": "Disabled",
++                "role_profile": "default",
++                "cue_profile": "default",
++                "turn_memory_enabled": false,
++                "turn_memory_profile": "none",
++                "recent_role_profiles": [],
++                "recent_cue_profiles": [],
++                "deny_text_prefixes": [],
++                "deny_text_sequences": [],
++                "stop_text_sequences": [],
++                "prefer_text_prefixes": [],
++                "deny_text_terms": [],
++                "prefer_text_terms": [],
++                "memory_deny_terms": [],
++                "memory_prefer_terms": [],
++                "memory_reinforcement_terms": [],
++                "memory_contradiction_terms": [],
++                "memory_forget_terms": [],
++                "memory_overwrite_terms": [],
++                "memory_slot_profile": "none",
++                "memory_slots": [],
++                "memory_slot_prefer_terms": [],
++                "memory_slot_deny_terms": [],
++                "weighted_deny_terms": [],
++                "weighted_prefer_terms": [],
++                "memory_decay_factor": 1.0,
++                "memory_prefer_score_total": 0.0,
++                "memory_deny_score_total": 0.0,
++                "memory_reinforcement_score_total": 0.0,
++                "memory_contradiction_score_total": 0.0,
++                "memory_forget_score_total": 0.0,
++                "memory_overwrite_score_total": 0.0,
++                "memory_reinforcement_hits": 0,
++                "memory_contradiction_hits": 0,
++                "memory_forget_hits": 0,
++                "memory_overwrite_hits": 0,
++                "memory_slot_strength_total": 0.0,
++                "memory_slot_contradiction_total": 0.0,
++                "preferred_strength": 1.0
++            }
++        }"#;
++        let cfg: RuntimeSamplingConfig = serde_json::from_str(raw).expect("legacy config without min_p remains valid");
++        assert!(matches!(cfg.min_p, AppliedField::Applied(v) if v == 0.0));
++    }
++}
+diff -ru minp_p0_clean/crates/runtime_unz/src/engine.rs minp_p0_work/crates/runtime_unz/src/engine.rs
+--- minp_p0_clean/crates/runtime_unz/src/engine.rs	2026-05-24 04:08:30.000000000 +0000
++++ minp_p0_work/crates/runtime_unz/src/engine.rs	2026-05-26 14:45:22.161550021 +0000
+@@ -18,6 +18,7 @@
+         PromptShapingBackend, RuntimeControlConfig, RuntimeLoadedModel,
+         MemorySlotState, RuntimeOutputControlConfig, RuntimeSamplingConfig, RuntimeStopConfig,
+         RuntimeTokenBiasConfig, SessionCleanupReport, TokenBiasStrategy, WeightedPolicyTerm,
++        normalize_min_p,
+     },
+ };
+ 
+@@ -934,6 +935,7 @@
+             temperature: mark_supported(legacy_gate.temperature, capabilities.supports_temperature),
+             top_p: mark_supported(legacy_gate.top_p, capabilities.supports_top_p),
+             top_k: mark_supported(legacy_gate.top_k, capabilities.supports_top_k),
++            min_p: AppliedField::Applied(normalize_min_p(cfg.min_p.unwrap_or(0.0))),
+             repeat_penalty: if capabilities.supports_repeat_penalty {
+                 AppliedField::Applied(legacy_gate.repeat_penalty)
+             } else {
+@@ -1157,6 +1159,7 @@
+                 temperature: *execution_cfg.sampling.temperature.resolved(),
+                 top_p: *execution_cfg.sampling.top_p.resolved(),
+                 top_k: *execution_cfg.sampling.top_k.resolved(),
++                min_p: *execution_cfg.sampling.min_p.resolved(),
+                 repeat_penalty: *execution_cfg.sampling.repeat_penalty.resolved(),
+                 repeat_last_n: *execution_cfg.sampling.repeat_last_n.resolved(),
+                 stop_count: execution_cfg.stop.text_sequences.len(),
+@@ -1170,6 +1173,7 @@
+                 applied_temperature: execution_cfg.sampling.temperature.is_applied(),
+                 applied_top_p: execution_cfg.sampling.top_p.is_applied(),
+                 applied_top_k: execution_cfg.sampling.top_k.is_applied(),
++                applied_min_p: execution_cfg.sampling.min_p.is_applied(),
+                 applied_repeat_penalty: execution_cfg.sampling.repeat_penalty.is_applied(),
+                 applied_repeat_last_n: execution_cfg.sampling.repeat_last_n.is_applied(),
+                 token_bias_enabled: execution_cfg.sampling.token_bias.enabled,
+diff -ru minp_p0_clean/crates/runtime_unz/src/types.rs minp_p0_work/crates/runtime_unz/src/types.rs
+--- minp_p0_clean/crates/runtime_unz/src/types.rs	2026-05-24 04:08:30.000000000 +0000
++++ minp_p0_work/crates/runtime_unz/src/types.rs	2026-05-26 14:44:35.187492230 +0000
+@@ -66,6 +66,8 @@
+     pub temperature: f32,
+     pub top_p: f32,
+     pub top_k: usize,
++    #[serde(default, alias = "minP", alias = "samplingMinP", alias = "sampling_min_p")]
++    pub min_p: Option<f32>,
+     pub repeat_penalty: f32,
+     pub repeat_last_n: usize,
+     pub stop: Vec<String>,
+@@ -80,6 +82,17 @@
+     GenerateTask::Freeform
+ }
+ 
++pub fn normalize_min_p(value: f32) -> f32 {
++    if !value.is_finite() {
++        return 0.0;
++    }
++    value.clamp(0.0, 0.95)
++}
++
++pub fn default_runtime_min_p() -> AppliedField<f32> {
++    AppliedField::Applied(0.0)
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ExecutionConfig {
+     pub session_id: String,
+@@ -99,6 +112,8 @@
+     pub temperature: AppliedField<f32>,
+     pub top_p: AppliedField<f32>,
+     pub top_k: AppliedField<usize>,
++    #[serde(default = "default_runtime_min_p")]
++    pub min_p: AppliedField<f32>,
+     pub repeat_penalty: AppliedField<f32>,
+     pub repeat_last_n: AppliedField<usize>,
+     pub token_bias: RuntimeTokenBiasConfig,
+@@ -291,6 +306,7 @@
+         temperature: f32,
+         top_p: f32,
+         top_k: usize,
++        min_p: f32,
+         repeat_penalty: f32,
+         repeat_last_n: usize,
+         stop_count: usize,
+@@ -304,6 +320,7 @@
+         applied_temperature: bool,
+         applied_top_p: bool,
+         applied_top_k: bool,
++        applied_min_p: bool,
+         applied_repeat_penalty: bool,
+         applied_repeat_last_n: bool,
+         token_bias_enabled: bool,
+Only in minp_p0_work/workspace: minp_p0.patch
+Only in minp_p0_work/workspace: minp_p0_ssot_report.md
+Only in minp_p0_work/workspace: minp_p0_ssot_summary.json

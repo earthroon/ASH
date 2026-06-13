@@ -1,0 +1,127 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "check": "crates_model_core_src_decode03c_shadow_policy.rs_exists",
+      "status": "PASS",
+      "path": "crates/model_core/src/decode03c_shadow_policy.rs"
+    },
+    {
+      "check": "crates_model_core_src_lib.rs_exists",
+      "status": "PASS",
+      "path": "crates/model_core/src/lib.rs"
+    },
+    {
+      "check": "crates_model_core_src_sampler_parity.rs_exists",
+      "status": "PASS",
+      "path": "crates/model_core/src/sampler_parity.rs"
+    },
+    {
+      "check": "workspace_decode03c_shadow_policy_schema.json_exists",
+      "status": "PASS",
+      "path": "workspace/decode03c_shadow_policy_schema.json"
+    },
+    {
+      "check": "workspace_decode03c_shadow_steps.jsonl_exists",
+      "status": "PASS",
+      "path": "workspace/decode03c_shadow_steps.jsonl"
+    },
+    {
+      "check": "workspace_decode03c_summary.json_exists",
+      "status": "PASS",
+      "path": "workspace/decode03c_summary.json"
+    },
+    {
+      "check": "workspace_decode03c_report.md_exists",
+      "status": "PASS",
+      "path": "workspace/decode03c_report.md"
+    },
+    {
+      "check": "workspace_decode03c.patch_exists",
+      "status": "PASS",
+      "path": "workspace/decode03c.patch"
+    },
+    {
+      "check": "acceptance_reports_16AI-QW-38G-R6A-DECODE-03C_acceptance.md_exists",
+      "status": "PASS",
+      "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03C_acceptance.md"
+    },
+    {
+      "check": "module_contains_pub const DECODE03C_PATCH_ID",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_Decode03CShadowInput",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_Decode03CShadowPolicy",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_Decode03CStepReceipt",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_compute_shadow_policy",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_classify_shadow_effect",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_append_decode03c_receipt_from_sampler03",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_shadow_only: true",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_behavior_change: false",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_numeric_risk_safe_stop",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_fallback_risk_panic",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_entropy_conflict_relax_guard",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_overcompression_relax",
+      "status": "PASS"
+    },
+    {
+      "check": "module_contains_ready_for_default_enable: false",
+      "status": "PASS"
+    },
+    {
+      "check": "lib_declares_decode03c",
+      "status": "PASS"
+    },
+    {
+      "check": "lib_exports_decode03c",
+      "status": "PASS"
+    },
+    {
+      "check": "sampler_parity_hook",
+      "status": "PASS"
+    },
+    {
+      "check": "rough_brace_balance",
+      "status": "PASS",
+      "open": 117,
+      "close": 117
+    }
+  ]
+}

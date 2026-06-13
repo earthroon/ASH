@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-52C-R11",
+  "cases": [
+    {
+      "case_id": "runtime_shadow_observation_records_diff",
+      "status": "PASS",
+      "actual_vs_shadow_class": "BeneficialDiff"
+    },
+    {
+      "case_id": "no_token_selection_mutation",
+      "status": "PASS",
+      "token_selection_mutation_count": 0
+    },
+    {
+      "case_id": "runtime_shadow_observation_risky_diff_reintroduced",
+      "status": "PASS",
+      "actual_vs_shadow_class": "RiskyDiff",
+      "runtime_apply_allowed": false
+    },
+    {
+      "case_id": "shadow_result_applied_detected",
+      "status": "PASS",
+      "detected_failure_condition": true
+    },
+    {
+      "case_id": "missing_r10_explicit_enable_unavailable",
+      "status": "PASS",
+      "observation_status": "Unavailable"
+    }
+  ]
+}

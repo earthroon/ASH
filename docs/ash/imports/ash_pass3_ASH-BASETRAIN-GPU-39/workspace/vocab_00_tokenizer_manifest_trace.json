@@ -1,0 +1,57 @@
+{
+  "manifest_path": "artifacts/tokenizer_manifest_v5_final.json",
+  "manifest_exists": true,
+  "manifest_sha256": "sha256:a449033ff7672e8e771fc3f3e69279e608b4bd5ac220736a68e8f3c84613de49",
+  "trainer_vocab_size": 48259,
+  "manifest_vocab_count": 48259,
+  "max_token_id": 48258,
+  "ids_contiguous_zero_based": true,
+  "special_or_angle_token_count": 584,
+  "byte_fallback_token_count": 256,
+  "eos_token_id": 2,
+  "bos_token_id": 1,
+  "pad_token_id": 0,
+  "unk_token_id": 3,
+  "tokens_above_48255_count": 3,
+  "tokens_above_48255": [
+    {
+      "token": "<byte:FD>",
+      "id": 48256,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FE>",
+      "id": 48257,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FF>",
+      "id": 48258,
+      "score": null,
+      "is_reserved": false
+    }
+  ],
+  "if_cap_48256_exclusive_last_three_unreachable": [
+    {
+      "token": "<byte:FD>",
+      "id": 48256,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FE>",
+      "id": 48257,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FF>",
+      "id": 48258,
+      "score": null,
+      "is_reserved": false
+    }
+  ],
+  "tail_three_classification": "byte_fallback_tail_fd_fe_ff"
+}

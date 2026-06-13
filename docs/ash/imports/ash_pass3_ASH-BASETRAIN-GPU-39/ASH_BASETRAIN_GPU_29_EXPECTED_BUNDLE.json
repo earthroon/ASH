@@ -1,0 +1,88 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-29",
+  "title": "Gradient Buffer Zero Init And Boundary Readback Audit / Allocated Logits Gradient Candidate Buffer Zero State Verification No Gradient Value No Backward No Optimizer Seal",
+  "pass": true,
+  "verdict": "PASS_ASH_BASETRAIN_GPU_29_GRADIENT_BUFFER_ZERO_INIT_BOUNDARY_READBACK_AUDIT_ALLOCATED_LOGITS_GRADIENT_CANDIDATE_BUFFER_ZERO_STATE_VERIFICATION_NO_GRADIENT_VALUE_NO_BACKWARD_NO_OPTIMIZER",
+  "source_28_validation": {
+    "patch_id": "ASH-BASETRAIN-GPU-29",
+    "source_patch": "ASH-BASETRAIN-GPU-28",
+    "source_verdict": "PASS_ASH_BASETRAIN_GPU_28_GRADIENT_BUFFER_ALLOCATION_CANDIDATE_CONTRACTED_LOGITS_GRADIENT_BUFFER_ALLOCATION_NO_BACKWARD_NO_OPTIMIZER",
+    "source_28_pass": true,
+    "source_28_violation_mask": 0,
+    "source_28_verdict_lut_index": 0,
+    "source_28_gpu_runtime_available": true,
+    "source_28_new_wgpu_device_acquired": true,
+    "source_28_gradient_buffer_created": true,
+    "source_28_gradient_buffer_created_scope": "logits_gradient_candidate_only",
+    "source_28_gradient_buffer_written": false,
+    "source_28_gradient_value_computed": false,
+    "source_28_backward_executed": false,
+    "source_28_optimizer_step_executed": false,
+    "source_28_model_weight_gradient_contract_created": false,
+    "source_28_safetensors_mutation_present": false
+  },
+  "zero_init_audit": {
+    "zero_init_audit_created": true,
+    "audit_target": "logits_gradient_candidate_buffer",
+    "buffer_size_bytes": 8192,
+    "buffer_element_count": 2048,
+    "expected_zero_bytes": 8192,
+    "expected_zero_f32": 0.0,
+    "all_readback_bytes_zero": true,
+    "all_readback_f32_zero": true,
+    "non_zero_byte_count": 0,
+    "non_zero_f32_count": 0,
+    "max_abs_f32_value": 0.0,
+    "nan_count": 0,
+    "inf_count": 0,
+    "zero_state_verified": true,
+    "gradient_value_computed": false
+  },
+  "zero_digest_receipt": {
+    "zero_digest_created": true,
+    "zero_digest_algorithm": "sha256",
+    "zero_digest_scope": "raw_8192_zero_bytes",
+    "expected_zero_digest_hex": "9f1dcbc35c350d6027f98be0f5c8b43b42ca52b7604459c0c42be3aa88913d47",
+    "actual_zero_digest_hex": "RUNTIME_COMPUTED_FROM_READBACK_RAW_BYTES",
+    "zero_digest_match": "RUNTIME_ASSERT_TRUE"
+  },
+  "gpu_runtime_boundary_receipt": {
+    "gpu_runtime_available": true,
+    "queue_submit_executed_for_readback_copy": true,
+    "queue_submit_scope": "zero_state_readback_copy_only",
+    "queue_submit_used_for_compute": false,
+    "new_compute_dispatch_executed": false,
+    "gradient_compute_dispatch_executed": false,
+    "backward_compute_dispatch_executed": false
+  },
+  "no_gradient_value_guard": {
+    "no_gradient_value_guard_created": true,
+    "no_gradient_value_guard_valid": true,
+    "gradient_formula_evaluated": false,
+    "softmax_minus_target_computed": false,
+    "logits_gradient_values_materialized": false,
+    "gradient_value_computed": false,
+    "zero_state_readback_interpreted_as_gradient": false,
+    "zero_state_used_for_optimizer": false
+  },
+  "no_backward_no_optimizer_contract": {
+    "backward_executed": false,
+    "backward_kernel_dispatched": false,
+    "backward_shader_created": false,
+    "backward_pipeline_created": false,
+    "optimizer_step_executed": false,
+    "optimizer_state_mutated": false,
+    "safetensors_mutation_present": false,
+    "checkpoint_finalization_present": false
+  },
+  "control_flow_lut_receipt": {
+    "branching_policy": "lookup_table_first",
+    "control_flow_lut_used": true,
+    "if_keyword_used": false,
+    "match_statement_used": false,
+    "early_return_used": false,
+    "violation_mask": 0,
+    "verdict_lut_index": 0,
+    "route": "ASH-BASETRAIN-GPU-30_CPU_LOGITS_GRADIENT_FORMULA_RECEIPT_NO_GPU_WRITE_NO_BACKWARD_NO_OPTIMIZER"
+  }
+}

@@ -1,0 +1,3 @@
+# QW-TOK-FORGE-01-R2 Acceptance
+
+Expected: PASS_QW_TOK_FORGE01_R2_SHADOW_READONLY_RUNTIME_PROBE after local execution.

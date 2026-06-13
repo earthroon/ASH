@@ -1,0 +1,766 @@
+diff -ruN /mnt/data/16AB_work/crates/audio_kernel/src/qwave_pipeline.rs /mnt/data/16AC_work/crates/audio_kernel/src/qwave_pipeline.rs
+--- /mnt/data/16AB_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:35:30.877455655 +0000
++++ /mnt/data/16AC_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:54:03.283271428 +0000
+@@ -223,6 +223,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/orchestrator_local/src/infer_entry.rs /mnt/data/16AC_work/crates/orchestrator_local/src/infer_entry.rs
+--- /mnt/data/16AB_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:35:06.373368038 +0000
++++ /mnt/data/16AC_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:52:37.077944307 +0000
+@@ -313,6 +313,26 @@
+         "disableNativeQkvBridge",
+         "disable_native_qkv_bridge",
+     );
++    let disable_native_matmul_autotune = payload_bool(
++        &incoming.payload,
++        "disableNativeMatmulAutotune",
++        "disable_native_matmul_autotune",
++    );
++    let disable_native_burn_fusion = payload_bool(
++        &incoming.payload,
++        "disableNativeBurnFusion",
++        "disable_native_burn_fusion",
++    );
++    let force_native_safe_attention = payload_bool(
++        &incoming.payload,
++        "forceNativeSafeAttention",
++        "force_native_safe_attention",
++    );
++    let force_native_reference_prefill = payload_bool(
++        &incoming.payload,
++        "forceNativeReferencePrefill",
++        "force_native_reference_prefill",
++    );
+     eprintln!(
+         "[16Y-2][projection-mode] requested_vocab_projection={} requested_embedding_mode={} tile_size={} avoid_full_upload={} max_single_buffer={}",
+         native_vocab_projection.as_str(),
+@@ -327,6 +347,13 @@
+         disable_native_raw_bridge,
+         disable_native_qkv_bridge,
+     );
++    eprintln!(
++        "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++        disable_native_matmul_autotune,
++        disable_native_burn_fusion,
++        force_native_safe_attention,
++        force_native_reference_prefill,
++    );
+ 
+     let seed = incoming.payload.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
+ 
+@@ -360,6 +387,10 @@
+         disable_native_headwise_atlas,
+         disable_native_raw_bridge,
+         disable_native_qkv_bridge,
++        disable_native_matmul_autotune,
++        disable_native_burn_fusion,
++        force_native_safe_attention,
++        force_native_reference_prefill,
+         native_vocab_projection,
+         native_vocab_tile_size,
+         native_avoid_full_vocab_gpu_upload,
+diff -ruN /mnt/data/16AB_work/crates/orchestrator_local/src/lib.rs /mnt/data/16AC_work/crates/orchestrator_local/src/lib.rs
+--- /mnt/data/16AB_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:35:51.198273349 +0000
++++ /mnt/data/16AC_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:54:55.976174389 +0000
+@@ -589,6 +589,10 @@
+             disable_native_headwise_atlas: false,
+             disable_native_raw_bridge: false,
+             disable_native_qkv_bridge: false,
++            disable_native_matmul_autotune: false,
++            disable_native_burn_fusion: false,
++            force_native_safe_attention: false,
++            force_native_reference_prefill: false,
+             native_vocab_projection: Default::default(),
+             native_vocab_tile_size: 1024,
+             native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_final_layers6.rs /mnt/data/16AC_work/crates/runtime/examples/infer_final_layers6.rs
+--- /mnt/data/16AB_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:35:30.879319135 +0000
++++ /mnt/data/16AC_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:54:03.284946520 +0000
+@@ -85,6 +85,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_only.rs /mnt/data/16AC_work/crates/runtime/examples/infer_only.rs
+--- /mnt/data/16AB_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:35:30.880212651 +0000
++++ /mnt/data/16AC_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:54:03.285986333 +0000
+@@ -197,6 +197,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_only_v4_lora.rs /mnt/data/16AC_work/crates/runtime/examples/infer_only_v4_lora.rs
+--- /mnt/data/16AB_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:35:30.881274279 +0000
++++ /mnt/data/16AC_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:54:03.286825930 +0000
+@@ -335,6 +335,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_run01.rs /mnt/data/16AC_work/crates/runtime/examples/infer_run01.rs
+--- /mnt/data/16AB_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:35:30.882045272 +0000
++++ /mnt/data/16AC_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:54:03.287603288 +0000
+@@ -28,6 +28,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/src/causal_lm.rs /mnt/data/16AC_work/crates/runtime/src/causal_lm.rs
+--- /mnt/data/16AB_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:35:30.883456708 +0000
++++ /mnt/data/16AC_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:54:03.297037704 +0000
+@@ -296,6 +296,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/crates/runtime/src/infer/request_resolution.rs /mnt/data/16AC_work/crates/runtime/src/infer/request_resolution.rs
+--- /mnt/data/16AB_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:35:06.371912957 +0000
++++ /mnt/data/16AC_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:52:37.076690494 +0000
+@@ -54,6 +54,10 @@
+     pub disable_native_headwise_atlas: bool,
+     pub disable_native_raw_bridge: bool,
+     pub disable_native_qkv_bridge: bool,
++    pub disable_native_matmul_autotune: bool,
++    pub disable_native_burn_fusion: bool,
++    pub force_native_safe_attention: bool,
++    pub force_native_reference_prefill: bool,
+     pub native_vocab_projection: NativeVocabProjectionMode,
+     pub native_vocab_tile_size: usize,
+     pub native_avoid_full_vocab_gpu_upload: bool,
+@@ -122,6 +126,10 @@
+             disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+             disable_native_raw_bridge: req.disable_native_raw_bridge,
+             disable_native_qkv_bridge: req.disable_native_qkv_bridge,
++            disable_native_matmul_autotune: req.disable_native_matmul_autotune,
++            disable_native_burn_fusion: req.disable_native_burn_fusion,
++            force_native_safe_attention: req.force_native_safe_attention,
++            force_native_reference_prefill: req.force_native_reference_prefill,
+             native_vocab_projection: req.native_vocab_projection,
+             native_vocab_tile_size: req.native_vocab_tile_size,
+             native_avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
+diff -ruN /mnt/data/16AB_work/crates/runtime/src/infer.rs /mnt/data/16AC_work/crates/runtime/src/infer.rs
+--- /mnt/data/16AB_work/crates/runtime/src/infer.rs	2026-05-06 02:35:06.370820298 +0000
++++ /mnt/data/16AC_work/crates/runtime/src/infer.rs	2026-05-06 02:57:25.389060442 +0000
+@@ -612,6 +612,10 @@
+     pub disable_native_headwise_atlas: bool,
+     pub disable_native_raw_bridge: bool,
+     pub disable_native_qkv_bridge: bool,
++    pub disable_native_matmul_autotune: bool,
++    pub disable_native_burn_fusion: bool,
++    pub force_native_safe_attention: bool,
++    pub force_native_reference_prefill: bool,
+     pub native_vocab_projection: NativeVocabProjectionMode,
+     pub native_vocab_tile_size: usize,
+     pub native_avoid_full_vocab_gpu_upload: bool,
+@@ -1007,6 +1011,10 @@
+     pub disable_native_headwise_atlas: bool,
+     pub disable_native_raw_bridge: bool,
+     pub disable_native_qkv_bridge: bool,
++    pub disable_native_matmul_autotune: bool,
++    pub disable_native_burn_fusion: bool,
++    pub force_native_safe_attention: bool,
++    pub force_native_reference_prefill: bool,
+     pub structure_routing_config_attempted: bool,
+     pub text_density_config_attempted: bool,
+     pub gpu_penalty_config_attempted: bool,
+@@ -2147,6 +2155,10 @@
+         disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+         disable_native_raw_bridge: req.disable_native_raw_bridge,
+         disable_native_qkv_bridge: req.disable_native_qkv_bridge,
++        disable_native_matmul_autotune: req.disable_native_matmul_autotune,
++        disable_native_burn_fusion: req.disable_native_burn_fusion,
++        force_native_safe_attention: req.force_native_safe_attention,
++        force_native_reference_prefill: req.force_native_reference_prefill,
+         structure_routing_config_attempted,
+         text_density_config_attempted,
+         gpu_penalty_config_attempted,
+@@ -2340,6 +2352,13 @@
+                 req.disable_native_raw_bridge,
+                 req.disable_native_qkv_bridge,
+             );
++            eprintln!(
++                "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++                req.disable_native_matmul_autotune,
++                req.disable_native_burn_fusion,
++                req.force_native_safe_attention,
++                req.force_native_reference_prefill,
++            );
+             match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+                 &req.model_spec_path,
+                 &req.checkpoint_paths,
+@@ -2395,6 +2414,53 @@
+                         native_model.clear_structure_routing_prior();
+                         native_model.clear_gpu_penalty();
+                     }
++                    let force_16ac_reference_safe_generation = req.disable_native_matmul_autotune
++                        || req.disable_native_burn_fusion
++                        || req.force_native_safe_attention
++                        || req.force_native_reference_prefill;
++                    if force_16ac_reference_safe_generation {
++                        eprintln!(
++                            "[16AC][safe-generation] cached_path_skipped=true reason=matmul_autotune_guard disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++                            req.disable_native_matmul_autotune,
++                            req.disable_native_burn_fusion,
++                            req.force_native_safe_attention,
++                            req.force_native_reference_prefill,
++                        );
++                        check_cancel(cancel_flag)?;
++                        let reference_model = ReferenceModel::load_toml_with_loras(
++                            &req.model_spec_path,
++                            &req.checkpoint_paths,
++                            attached.iter().collect::<Vec<_>>(),
++                        )?;
++                        if requested_sampled_decode {
++                            fallback_decode_mode = Some("cpu_greedy_16AC_safe_generation".to_string());
++                        }
++                        let ids = if let Some(sink) = streaming_this_call {
++                            let mut piece_sink = ModelCorePieceSinkAdapter { sink };
++                            reference_model.greedy_generate_streaming(
++                                &prompt_ids,
++                                effective_max_new_tokens,
++                                spec.dimensions.vocab_size.max(1),
++                                effective_banned_token_ids,
++                                Some(&manifest),
++                                Some(&sampling_cfg),
++                                cancel_flag,
++                                &mut piece_sink,
++                            )?
++                        } else {
++                            reference_model.greedy_generate(
++                                &prompt_ids,
++                                effective_max_new_tokens,
++                                spec.dimensions.vocab_size.max(1),
++                                effective_banned_token_ids,
++                            )
++                        };
++                        let backend_label = format!("{}+16AC_reference_safe_generation", cpu_reference_backend_label(&req.checkpoint_paths));
++                        let mut telemetry = GenerationTelemetry::default();
++                        telemetry.sampled_decode_applied = requested_sampled_decode;
++                        telemetry.finish_reason = GenerationFinishReason::MaxNewTokens;
++                        return Ok((ids, backend_label, Some(telemetry)));
++                    }
+                     let backend_label = native_model
+                         .text_density_state()
+                         .binding_note
+diff -ruN /mnt/data/16AB_work/crates/runtime/src/lora_smoke.rs /mnt/data/16AC_work/crates/runtime/src/lora_smoke.rs
+--- /mnt/data/16AB_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:35:30.884199047 +0000
++++ /mnt/data/16AC_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:54:03.298071564 +0000
+@@ -131,6 +131,10 @@
+         disable_native_headwise_atlas: false,
+         disable_native_raw_bridge: false,
+         disable_native_qkv_bridge: false,
++        disable_native_matmul_autotune: false,
++        disable_native_burn_fusion: false,
++        force_native_safe_attention: false,
++        force_native_reference_prefill: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN /mnt/data/16AB_work/infer_debug/commit_16AC_bake_report.md /mnt/data/16AC_work/infer_debug/commit_16AC_bake_report.md
+--- /mnt/data/16AB_work/infer_debug/commit_16AC_bake_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/16AC_work/infer_debug/commit_16AC_bake_report.md	2026-05-06 02:58:21.488378782 +0000
+@@ -0,0 +1,60 @@
++# Commit 16AC Bake Report
++
++## Commit
++Commit 16AC — Matmul Autotune / Grouped Attention Safe Path Seal
++
++## SSOT
++16AB proved that the headwise/raw/qkv bridge disable gate works, but the run still fails in the standard Burn/CubeCL matmul autotune path:
++
++- `grouped_query_attention`
++- `Tensor::matmul`
++- `burn_cubecl_fusion::optim::matmul::tune::fused_matmul_autotune`
++- `cubecl_runtime::tune::local::LocalTuner::execute`
++- `No tile size is available for the problem` / `SHADER_INT64`
++
++## Implemented
++
++### Policy plumbing
++Added request/payload fields:
++
++- `disableNativeMatmulAutotune` / `disable_native_matmul_autotune`
++- `disableNativeBurnFusion` / `disable_native_burn_fusion`
++- `forceNativeSafeAttention` / `force_native_safe_attention`
++- `forceNativeReferencePrefill` / `force_native_reference_prefill`
++
++The fields are carried through:
++
++- `orchestrator_local::infer_entry`
++- `runtime::infer::StandardInferRequest`
++- `runtime::infer::request_resolution::ResolvedStandardInferRequest`
++- native aux probe metadata
++
++### Safe-generation gate
++After native WebGPU model load succeeds, if any 16AC guard is enabled, runtime skips cached native generation before it can enter `allocate_kv_cache`, `forward_prefill`, `grouped_query_attention`, or Burn/CubeCL matmul autotune.
++
++The fallback uses `ReferenceModel::greedy_generate` / `greedy_generate_streaming` and emits:
++
++```text
++[16AC][safe-generation] cached_path_skipped=true reason=matmul_autotune_guard ...
++```
++
++The backend label is suffixed with:
++
++```text
+++16AC_reference_safe_generation
++```
++
++## Expected pass condition
++The following stack should disappear when 16AC flags are true:
++
++- `fused_matmul_autotune`
++- `LocalTuner::execute`
++- `model_core::model_layers::grouped_query_attention`
++- `No tile size is available for the problem`
++- `SHADER_INT64`
++
++## Caveat
++This is a safety seal, not a performance optimization. It intentionally bypasses native cached generation when the matmul autotune guard is enabled. 16Y atlas construction can still happen during native load, but token generation is routed to the CPU/reference path to avoid CubeCL autotune panic.
++
++## Local validation status
++Not compiled in bake container because `cargo` is unavailable here. Final SSOT is the user's local `cargo build -p native_host --bin native_host --release` and `run_16AC_stderr.txt`.
+diff -ruN /mnt/data/16AB_work/infer_debug/commit_16AC_diff.patch /mnt/data/16AC_work/infer_debug/commit_16AC_diff.patch
+--- /mnt/data/16AB_work/infer_debug/commit_16AC_diff.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/16AC_work/infer_debug/commit_16AC_diff.patch	2026-05-06 02:58:23.079506948 +0000
+@@ -0,0 +1,360 @@
++diff -ruN /mnt/data/16AB_work/crates/audio_kernel/src/qwave_pipeline.rs /mnt/data/16AC_work/crates/audio_kernel/src/qwave_pipeline.rs
++--- /mnt/data/16AB_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:35:30.877455655 +0000
+++++ /mnt/data/16AC_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:54:03.283271428 +0000
++@@ -223,6 +223,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/orchestrator_local/src/infer_entry.rs /mnt/data/16AC_work/crates/orchestrator_local/src/infer_entry.rs
++--- /mnt/data/16AB_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:35:06.373368038 +0000
+++++ /mnt/data/16AC_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:52:37.077944307 +0000
++@@ -313,6 +313,26 @@
++         "disableNativeQkvBridge",
++         "disable_native_qkv_bridge",
++     );
+++    let disable_native_matmul_autotune = payload_bool(
+++        &incoming.payload,
+++        "disableNativeMatmulAutotune",
+++        "disable_native_matmul_autotune",
+++    );
+++    let disable_native_burn_fusion = payload_bool(
+++        &incoming.payload,
+++        "disableNativeBurnFusion",
+++        "disable_native_burn_fusion",
+++    );
+++    let force_native_safe_attention = payload_bool(
+++        &incoming.payload,
+++        "forceNativeSafeAttention",
+++        "force_native_safe_attention",
+++    );
+++    let force_native_reference_prefill = payload_bool(
+++        &incoming.payload,
+++        "forceNativeReferencePrefill",
+++        "force_native_reference_prefill",
+++    );
++     eprintln!(
++         "[16Y-2][projection-mode] requested_vocab_projection={} requested_embedding_mode={} tile_size={} avoid_full_upload={} max_single_buffer={}",
++         native_vocab_projection.as_str(),
++@@ -327,6 +347,13 @@
++         disable_native_raw_bridge,
++         disable_native_qkv_bridge,
++     );
+++    eprintln!(
+++        "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
+++        disable_native_matmul_autotune,
+++        disable_native_burn_fusion,
+++        force_native_safe_attention,
+++        force_native_reference_prefill,
+++    );
++ 
++     let seed = incoming.payload.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
++ 
++@@ -360,6 +387,10 @@
++         disable_native_headwise_atlas,
++         disable_native_raw_bridge,
++         disable_native_qkv_bridge,
+++        disable_native_matmul_autotune,
+++        disable_native_burn_fusion,
+++        force_native_safe_attention,
+++        force_native_reference_prefill,
++         native_vocab_projection,
++         native_vocab_tile_size,
++         native_avoid_full_vocab_gpu_upload,
++diff -ruN /mnt/data/16AB_work/crates/orchestrator_local/src/lib.rs /mnt/data/16AC_work/crates/orchestrator_local/src/lib.rs
++--- /mnt/data/16AB_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:35:51.198273349 +0000
+++++ /mnt/data/16AC_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:54:55.976174389 +0000
++@@ -589,6 +589,10 @@
++             disable_native_headwise_atlas: false,
++             disable_native_raw_bridge: false,
++             disable_native_qkv_bridge: false,
+++            disable_native_matmul_autotune: false,
+++            disable_native_burn_fusion: false,
+++            force_native_safe_attention: false,
+++            force_native_reference_prefill: false,
++             native_vocab_projection: Default::default(),
++             native_vocab_tile_size: 1024,
++             native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_final_layers6.rs /mnt/data/16AC_work/crates/runtime/examples/infer_final_layers6.rs
++--- /mnt/data/16AB_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:35:30.879319135 +0000
+++++ /mnt/data/16AC_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:54:03.284946520 +0000
++@@ -85,6 +85,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_only.rs /mnt/data/16AC_work/crates/runtime/examples/infer_only.rs
++--- /mnt/data/16AB_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:35:30.880212651 +0000
+++++ /mnt/data/16AC_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:54:03.285986333 +0000
++@@ -197,6 +197,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_only_v4_lora.rs /mnt/data/16AC_work/crates/runtime/examples/infer_only_v4_lora.rs
++--- /mnt/data/16AB_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:35:30.881274279 +0000
+++++ /mnt/data/16AC_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:54:03.286825930 +0000
++@@ -335,6 +335,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/examples/infer_run01.rs /mnt/data/16AC_work/crates/runtime/examples/infer_run01.rs
++--- /mnt/data/16AB_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:35:30.882045272 +0000
+++++ /mnt/data/16AC_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:54:03.287603288 +0000
++@@ -28,6 +28,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/src/causal_lm.rs /mnt/data/16AC_work/crates/runtime/src/causal_lm.rs
++--- /mnt/data/16AB_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:35:30.883456708 +0000
+++++ /mnt/data/16AC_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:54:03.297037704 +0000
++@@ -296,6 +296,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/crates/runtime/src/infer/request_resolution.rs /mnt/data/16AC_work/crates/runtime/src/infer/request_resolution.rs
++--- /mnt/data/16AB_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:35:06.371912957 +0000
+++++ /mnt/data/16AC_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:52:37.076690494 +0000
++@@ -54,6 +54,10 @@
++     pub disable_native_headwise_atlas: bool,
++     pub disable_native_raw_bridge: bool,
++     pub disable_native_qkv_bridge: bool,
+++    pub disable_native_matmul_autotune: bool,
+++    pub disable_native_burn_fusion: bool,
+++    pub force_native_safe_attention: bool,
+++    pub force_native_reference_prefill: bool,
++     pub native_vocab_projection: NativeVocabProjectionMode,
++     pub native_vocab_tile_size: usize,
++     pub native_avoid_full_vocab_gpu_upload: bool,
++@@ -122,6 +126,10 @@
++             disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++             disable_native_raw_bridge: req.disable_native_raw_bridge,
++             disable_native_qkv_bridge: req.disable_native_qkv_bridge,
+++            disable_native_matmul_autotune: req.disable_native_matmul_autotune,
+++            disable_native_burn_fusion: req.disable_native_burn_fusion,
+++            force_native_safe_attention: req.force_native_safe_attention,
+++            force_native_reference_prefill: req.force_native_reference_prefill,
++             native_vocab_projection: req.native_vocab_projection,
++             native_vocab_tile_size: req.native_vocab_tile_size,
++             native_avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
++diff -ruN /mnt/data/16AB_work/crates/runtime/src/infer.rs /mnt/data/16AC_work/crates/runtime/src/infer.rs
++--- /mnt/data/16AB_work/crates/runtime/src/infer.rs	2026-05-06 02:35:06.370820298 +0000
+++++ /mnt/data/16AC_work/crates/runtime/src/infer.rs	2026-05-06 02:57:25.389060442 +0000
++@@ -612,6 +612,10 @@
++     pub disable_native_headwise_atlas: bool,
++     pub disable_native_raw_bridge: bool,
++     pub disable_native_qkv_bridge: bool,
+++    pub disable_native_matmul_autotune: bool,
+++    pub disable_native_burn_fusion: bool,
+++    pub force_native_safe_attention: bool,
+++    pub force_native_reference_prefill: bool,
++     pub native_vocab_projection: NativeVocabProjectionMode,
++     pub native_vocab_tile_size: usize,
++     pub native_avoid_full_vocab_gpu_upload: bool,
++@@ -1007,6 +1011,10 @@
++     pub disable_native_headwise_atlas: bool,
++     pub disable_native_raw_bridge: bool,
++     pub disable_native_qkv_bridge: bool,
+++    pub disable_native_matmul_autotune: bool,
+++    pub disable_native_burn_fusion: bool,
+++    pub force_native_safe_attention: bool,
+++    pub force_native_reference_prefill: bool,
++     pub structure_routing_config_attempted: bool,
++     pub text_density_config_attempted: bool,
++     pub gpu_penalty_config_attempted: bool,
++@@ -2147,6 +2155,10 @@
++         disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++         disable_native_raw_bridge: req.disable_native_raw_bridge,
++         disable_native_qkv_bridge: req.disable_native_qkv_bridge,
+++        disable_native_matmul_autotune: req.disable_native_matmul_autotune,
+++        disable_native_burn_fusion: req.disable_native_burn_fusion,
+++        force_native_safe_attention: req.force_native_safe_attention,
+++        force_native_reference_prefill: req.force_native_reference_prefill,
++         structure_routing_config_attempted,
++         text_density_config_attempted,
++         gpu_penalty_config_attempted,
++@@ -2340,6 +2352,13 @@
++                 req.disable_native_raw_bridge,
++                 req.disable_native_qkv_bridge,
++             );
+++            eprintln!(
+++                "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
+++                req.disable_native_matmul_autotune,
+++                req.disable_native_burn_fusion,
+++                req.force_native_safe_attention,
+++                req.force_native_reference_prefill,
+++            );
++             match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
++                 &req.model_spec_path,
++                 &req.checkpoint_paths,
++@@ -2395,6 +2414,53 @@
++                         native_model.clear_structure_routing_prior();
++                         native_model.clear_gpu_penalty();
++                     }
+++                    let force_16ac_reference_safe_generation = req.disable_native_matmul_autotune
+++                        || req.disable_native_burn_fusion
+++                        || req.force_native_safe_attention
+++                        || req.force_native_reference_prefill;
+++                    if force_16ac_reference_safe_generation {
+++                        eprintln!(
+++                            "[16AC][safe-generation] cached_path_skipped=true reason=matmul_autotune_guard disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
+++                            req.disable_native_matmul_autotune,
+++                            req.disable_native_burn_fusion,
+++                            req.force_native_safe_attention,
+++                            req.force_native_reference_prefill,
+++                        );
+++                        check_cancel(cancel_flag)?;
+++                        let reference_model = ReferenceModel::load_toml_with_loras(
+++                            &req.model_spec_path,
+++                            &req.checkpoint_paths,
+++                            attached.iter().collect::<Vec<_>>(),
+++                        )?;
+++                        if requested_sampled_decode {
+++                            fallback_decode_mode = Some("cpu_greedy_16AC_safe_generation".to_string());
+++                        }
+++                        let ids = if let Some(sink) = streaming_this_call {
+++                            let mut piece_sink = ModelCorePieceSinkAdapter { sink };
+++                            reference_model.greedy_generate_streaming(
+++                                &prompt_ids,
+++                                effective_max_new_tokens,
+++                                spec.dimensions.vocab_size.max(1),
+++                                effective_banned_token_ids,
+++                                Some(&manifest),
+++                                Some(&sampling_cfg),
+++                                cancel_flag,
+++                                &mut piece_sink,
+++                            )?
+++                        } else {
+++                            reference_model.greedy_generate(
+++                                &prompt_ids,
+++                                effective_max_new_tokens,
+++                                spec.dimensions.vocab_size.max(1),
+++                                effective_banned_token_ids,
+++                            )
+++                        };
+++                        let backend_label = format!("{}+16AC_reference_safe_generation", cpu_reference_backend_label(&req.checkpoint_paths));
+++                        let mut telemetry = GenerationTelemetry::default();
+++                        telemetry.sampled_decode_applied = requested_sampled_decode;
+++                        telemetry.finish_reason = GenerationFinishReason::MaxNewTokens;
+++                        return Ok((ids, backend_label, Some(telemetry)));
+++                    }
++                     let backend_label = native_model
++                         .text_density_state()
++                         .binding_note
++diff -ruN /mnt/data/16AB_work/crates/runtime/src/lora_smoke.rs /mnt/data/16AC_work/crates/runtime/src/lora_smoke.rs
++--- /mnt/data/16AB_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:35:30.884199047 +0000
+++++ /mnt/data/16AC_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:54:03.298071564 +0000
++@@ -131,6 +131,10 @@
++         disable_native_headwise_atlas: false,
++         disable_native_raw_bridge: false,
++         disable_native_qkv_bridge: false,
+++        disable_native_matmul_autotune: false,
+++        disable_native_burn_fusion: false,
+++        force_native_safe_attention: false,
+++        force_native_reference_prefill: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN /mnt/data/16AB_work/infer_debug/commit_16AC_bake_report.md /mnt/data/16AC_work/infer_debug/commit_16AC_bake_report.md
++--- /mnt/data/16AB_work/infer_debug/commit_16AC_bake_report.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/16AC_work/infer_debug/commit_16AC_bake_report.md	2026-05-06 02:58:21.488378782 +0000
++@@ -0,0 +1,60 @@
+++# Commit 16AC Bake Report
+++
+++## Commit
+++Commit 16AC — Matmul Autotune / Grouped Attention Safe Path Seal
+++
+++## SSOT
+++16AB proved that the headwise/raw/qkv bridge disable gate works, but the run still fails in the standard Burn/CubeCL matmul autotune path:
+++
+++- `grouped_query_attention`
+++- `Tensor::matmul`
+++- `burn_cubecl_fusion::optim::matmul::tune::fused_matmul_autotune`
+++- `cubecl_runtime::tune::local::LocalTuner::execute`
+++- `No tile size is available for the problem` / `SHADER_INT64`
+++
+++## Implemented
+++
+++### Policy plumbing
+++Added request/payload fields:
+++
+++- `disableNativeMatmulAutotune` / `disable_native_matmul_autotune`
+++- `disableNativeBurnFusion` / `disable_native_burn_fusion`
+++- `forceNativeSafeAttention` / `force_native_safe_attention`
+++- `forceNativeReferencePrefill` / `force_native_reference_prefill`
+++
+++The fields are carried through:
+++
+++- `orchestrator_local::infer_entry`
+++- `runtime::infer::StandardInferRequest`
+++- `runtime::infer::request_resolution::ResolvedStandardInferRequest`
+++- native aux probe metadata
+++
+++### Safe-generation gate
+++After native WebGPU model load succeeds, if any 16AC guard is enabled, runtime skips cached native generation before it can enter `allocate_kv_cache`, `forward_prefill`, `grouped_query_attention`, or Burn/CubeCL matmul autotune.
+++
+++The fallback uses `ReferenceModel::greedy_generate` / `greedy_generate_streaming` and emits:
+++
+++```text
+++[16AC][safe-generation] cached_path_skipped=true reason=matmul_autotune_guard ...
+++```
+++
+++The backend label is suffixed with:
+++
+++```text
++++16AC_reference_safe_generation
+++```
+++
+++## Expected pass condition
+++The following stack should disappear when 16AC flags are true:
+++
+++- `fused_matmul_autotune`
+++- `LocalTuner::execute`
+++- `model_core::model_layers::grouped_query_attention`
+++- `No tile size is available for the problem`
+++- `SHADER_INT64`
+++
+++## Caveat
+++This is a safety seal, not a performance optimization. It intentionally bypasses native cached generation when the matmul autotune guard is enabled. 16Y atlas construction can still happen during native load, but token generation is routed to the CPU/reference path to avoid CubeCL autotune panic.
+++
+++## Local validation status
+++Not compiled in bake container because `cargo` is unavailable here. Final SSOT is the user's local `cargo build -p native_host --bin native_host --release` and `run_16AC_stderr.txt`.
+diff -ruN /mnt/data/16AB_work/infer_debug/commit_16AC_static_validation.txt /mnt/data/16AC_work/infer_debug/commit_16AC_static_validation.txt
+--- /mnt/data/16AB_work/infer_debug/commit_16AC_static_validation.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/16AC_work/infer_debug/commit_16AC_static_validation.txt	2026-05-06 02:58:21.688127961 +0000
+@@ -0,0 +1,33 @@
++Commit 16AC static validation
++
++crates/orchestrator_local/src/infer_entry.rs:351:        "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++crates/runtime/src/infer.rs:2356:                "[16AC][policy] disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++crates/runtime/src/infer.rs:2423:                            "[16AC][safe-generation] cached_path_skipped=true reason=matmul_autotune_guard disable_matmul_autotune={} disable_burn_fusion={} force_safe_attention={} force_reference_prefill={}",
++
++crates/runtime/src/infer.rs:615:    pub disable_native_matmul_autotune: bool,
++crates/runtime/src/infer.rs:618:    pub force_native_reference_prefill: bool,
++crates/runtime/src/infer.rs:1014:    pub disable_native_matmul_autotune: bool,
++crates/runtime/src/infer.rs:1017:    pub force_native_reference_prefill: bool,
++crates/runtime/src/infer.rs:2158:        disable_native_matmul_autotune: req.disable_native_matmul_autotune,
++crates/runtime/src/infer.rs:2161:        force_native_reference_prefill: req.force_native_reference_prefill,
++crates/runtime/src/infer.rs:2357:                req.disable_native_matmul_autotune,
++crates/runtime/src/infer.rs:2360:                req.force_native_reference_prefill,
++crates/runtime/src/infer.rs:2417:                    let force_16ac_reference_safe_generation = req.disable_native_matmul_autotune
++crates/runtime/src/infer.rs:2420:                        || req.force_native_reference_prefill;
++crates/runtime/src/infer.rs:2424:                            req.disable_native_matmul_autotune,
++crates/runtime/src/infer.rs:2427:                            req.force_native_reference_prefill,
++crates/runtime/src/infer/request_resolution.rs:57:    pub disable_native_matmul_autotune: bool,
++crates/runtime/src/infer/request_resolution.rs:60:    pub force_native_reference_prefill: bool,
++crates/runtime/src/infer/request_resolution.rs:129:            disable_native_matmul_autotune: req.disable_native_matmul_autotune,
++crates/runtime/src/infer/request_resolution.rs:132:            force_native_reference_prefill: req.force_native_reference_prefill,
++crates/orchestrator_local/src/infer_entry.rs:316:    let disable_native_matmul_autotune = payload_bool(
++crates/orchestrator_local/src/infer_entry.rs:319:        "disable_native_matmul_autotune",
++crates/orchestrator_local/src/infer_entry.rs:331:    let force_native_reference_prefill = payload_bool(
++crates/orchestrator_local/src/infer_entry.rs:334:        "force_native_reference_prefill",
++crates/orchestrator_local/src/infer_entry.rs:352:        disable_native_matmul_autotune,
++crates/orchestrator_local/src/infer_entry.rs:355:        force_native_reference_prefill,
++crates/orchestrator_local/src/infer_entry.rs:390:        disable_native_matmul_autotune,
++crates/orchestrator_local/src/infer_entry.rs:393:        force_native_reference_prefill,
++
++Probe:
++{"cmd":"run.start","id":"probe_16AC_safe_attention_A","payload":{"kind":"infer","input":"A","task":"freeform","modelSpecPath":"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml","checkpointPath":"D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors","tokenizerManifestPath":"D:/1111113232/DUST/1/ash_pass3/artifacts/tokenizer_manifest_v5_final.json","maxNewTokens":1,"decodeMaxNewTokens":1,"decodeTemperature":0.0,"seed":42,"nativeVocabProjection":"gpu_atlas","nativeVocabTileSize":1024,"nativeAvoidFullVocabGpuUpload":true,"nativeMaxSingleGpuBufferBytes":268435456,"nativeEmbeddingMode":"row_gather","disableNativeGpuProfiler":true,"disableNativeAutotuneTiming":true,"disableTimestampQuery":false,"disableNativeStructureRouting":true,"disableNativeTextDensity":true,"disableNativeGpuPenalty":true,"disableNativeHeadwiseAtlas":true,"disableNativeRawBridge":true,"disableNativeQkvBridge":true,"disableNativeMatmulAutotune":true,"disableNativeBurnFusion":true,"forceNativeSafeAttention":true,"forceNativeReferencePrefill":true}}
+diff -ruN /mnt/data/16AB_work/infer_debug/probe_16AC_safe_attention_A.jsonl /mnt/data/16AC_work/infer_debug/probe_16AC_safe_attention_A.jsonl
+--- /mnt/data/16AB_work/infer_debug/probe_16AC_safe_attention_A.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/16AC_work/infer_debug/probe_16AC_safe_attention_A.jsonl	2026-05-06 02:58:21.472471349 +0000
+@@ -0,0 +1 @@
++{"cmd":"run.start","id":"probe_16AC_safe_attention_A","payload":{"kind":"infer","input":"A","task":"freeform","modelSpecPath":"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml","checkpointPath":"D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors","tokenizerManifestPath":"D:/1111113232/DUST/1/ash_pass3/artifacts/tokenizer_manifest_v5_final.json","maxNewTokens":1,"decodeMaxNewTokens":1,"decodeTemperature":0.0,"seed":42,"nativeVocabProjection":"gpu_atlas","nativeVocabTileSize":1024,"nativeAvoidFullVocabGpuUpload":true,"nativeMaxSingleGpuBufferBytes":268435456,"nativeEmbeddingMode":"row_gather","disableNativeGpuProfiler":true,"disableNativeAutotuneTiming":true,"disableTimestampQuery":false,"disableNativeStructureRouting":true,"disableNativeTextDensity":true,"disableNativeGpuPenalty":true,"disableNativeHeadwiseAtlas":true,"disableNativeRawBridge":true,"disableNativeQkvBridge":true,"disableNativeMatmulAutotune":true,"disableNativeBurnFusion":true,"forceNativeSafeAttention":true,"forceNativeReferencePrefill":true}}

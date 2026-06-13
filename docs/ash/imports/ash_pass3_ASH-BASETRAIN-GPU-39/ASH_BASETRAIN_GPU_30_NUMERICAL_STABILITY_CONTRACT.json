@@ -1,0 +1,17 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-30",
+  "numerical_stability_contract_created": true,
+  "softmax_max_subtraction_used": true,
+  "exp_input_shifted_by_max_logit": true,
+  "sum_exp_finite_required": true,
+  "sum_exp_positive_required": true,
+  "nan_count_required": 0,
+  "inf_count_required": 0,
+  "probability_sum_epsilon": 0.0001,
+  "gradient_sum_epsilon": 0.0001,
+  "softmax_sum_close_to_one": "COMPUTED_AT_RUNTIME",
+  "gradient_sum_close_to_zero": "COMPUTED_AT_RUNTIME",
+  "all_probabilities_finite": "COMPUTED_AT_RUNTIME",
+  "all_gradient_values_finite": "COMPUTED_AT_RUNTIME",
+  "target_probability_bounds_required": true
+}

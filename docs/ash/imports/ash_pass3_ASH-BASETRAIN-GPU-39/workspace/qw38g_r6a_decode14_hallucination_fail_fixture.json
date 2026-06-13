@@ -1,0 +1,23 @@
+{
+  "candidate_id": "candidate-hallucination-fail",
+  "candidate_ko": "지금 당장 경찰서로 달려가서 모든 걸 설명해.",
+  "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+  "cue_id": "mock-cue-0003",
+  "decode_session_id": "mock-decode-session-hallucination-fail",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "expected_decision": "RejectCandidateRecommended",
+  "expected_reason": "HallucinationMeaningDrift",
+  "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+  "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+  "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+  "source_en": "Run.",
+  "span_error_receipt_hash": "mock-span-receipt-hash",
+  "span_errors": [
+    {
+      "candidate_span": "경찰서로 달려가서 모든 걸 설명해",
+      "error_type": "Hallucination",
+      "severity": "Major",
+      "source_span": null
+    }
+  ]
+}

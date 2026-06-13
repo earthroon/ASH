@@ -1,0 +1,21 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
+  "candidate_source": "workspace/decode03f_candidates.jsonl",
+  "baseline_profiles": ["S01_static_safe", "S05_decode03e_guard_overlay"],
+  "candidate_profiles": ["C03F_candidate_0001"],
+  "prompt_suites": {
+    "short_regression": "workspace/eval00_prompt_suite.jsonl",
+    "long_horizon": "workspace/eval02_long_prompt_suite.jsonl"
+  },
+  "backends": ["cpu_oracle", "standard_runtime", "webgpu_runtime"],
+  "seeds": [101, 202, 303],
+  "max_new_tokens_short": 96,
+  "max_new_tokens_long": 512,
+  "horizon_buckets": [128, 256, 512],
+  "compare_backend_parity": true,
+  "compare_long_horizon": true,
+  "strict_replay": true,
+  "ssot": "DECODE-03F candidate + EVAL-00/01/02 replay matrix",
+  "base_config_mutation_allowed": false,
+  "runtime_promotion_allowed": false
+}

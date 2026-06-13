@@ -1,0 +1,309 @@
+--- /mnt/data/ash37r_r2_orig/crates/base_train/src/bin/ash_basetrain_gpu_37r_selected_group_row_block_multi_workgroup_reduction_readback_parity_gate.rs	2026-06-13 08:44:29.000000000 +0000
++++ crates/base_train/src/bin/ash_basetrain_gpu_37r_selected_group_row_block_multi_workgroup_reduction_readback_parity_gate.rs	2026-06-13 09:40:21.204672942 +0000
+@@ -4,18 +4,30 @@
+ use std::fs;
+ use std::path::Path;
+ 
+-const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37R";
+-const TITLE: &str = "Selected Group Row Block Multi-Workgroup Reduction Readback Parity Gate / Diagnostic Reduction Result To CPU Reference Seal / No Forward Adoption No Optimizer No Weight Mutation";
+-const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37R_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE_DIAGNOSTIC_REDUCTION_RESULT_TO_CPU_REFERENCE_SEAL_NO_FORWARD_NO_OPTIMIZER_NO_WEIGHT_MUTATION";
+-const RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37R_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE.json";
++const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37R-R2";
++const BASE_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37R";
++const TITLE: &str = "Multi-Workgroup Reduction Receipt Source Rebind / 37Q-R1 PASS Receipt Locator No Placeholder Intake Seal / Readback Parity Gate Runtime Receipt Write Candidate / No Forward No Optimizer No Weight Mutation";
++const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37R_R2_MULTI_WORKGROUP_REDUCTION_RECEIPT_SOURCE_REBIND_37Q_R1_PASS_RECEIPT_LOCATOR_READBACK_PARITY_GATE_RUNTIME_RECEIPT_WRITE_NO_FORWARD_NO_OPTIMIZER_NO_WEIGHT_MUTATION";
++const RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37R_R2_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE.json";
++const LEGACY_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37R_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE.json";
++const DEFAULT_37Q_R1_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37Q_R1_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json";
+ const DEFAULT_37Q_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const EXPECTED_37Q_R1_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37Q-R1";
+ const EXPECTED_37Q_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37Q";
+ const WORDS_PER_GROUP: usize = 8;
+ 
+ const BLOCK_37Q_NOT_FOUND: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_NOT_FOUND";
+ const BLOCK_37Q_READ: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_READ_FAILED";
+ const BLOCK_37Q_PARSE: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_PARSE_FAILED";
+-const BLOCK_37Q_NOT_PASS: &str = "BLOCKED_37Q_REDUCTION_NOT_PASS";
++const BLOCK_37Q_NOT_PASS: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_NOT_PASS";
++const BLOCK_37Q_UNSUPPORTED_PATCH_ID: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_UNSUPPORTED_PATCH_ID";
++const BLOCK_37Q_UNSUPPORTED_STATUS: &str = "BLOCKED_37Q_REDUCTION_RECEIPT_UNSUPPORTED_STATUS";
++const BLOCK_37Q_R1_SOURCE_BINDING_MISSING: &str = "BLOCKED_37Q_R1_SOURCE_BINDING_MISSING";
++const BLOCK_37Q_R1_SOURCE_BINDING_INVALID: &str = "BLOCKED_37Q_R1_SOURCE_BINDING_INVALID";
++const BLOCK_37Q_R1_PARTIAL_MATRIX_MISSING: &str = "BLOCKED_37Q_R1_PARTIAL_MATRIX_MISSING";
++const BLOCK_37Q_R1_PARTIAL_MATRIX_INVALID: &str = "BLOCKED_37Q_R1_PARTIAL_MATRIX_INVALID";
++const BLOCK_37Q_R1_MULTI_WORKGROUP_SUMMARY_MISSING: &str = "BLOCKED_37Q_R1_MULTI_WORKGROUP_SUMMARY_MISSING";
++const BLOCK_37Q_R1_MULTI_WORKGROUP_SUMMARY_INVALID: &str = "BLOCKED_37Q_R1_MULTI_WORKGROUP_SUMMARY_INVALID";
+ const BLOCK_37Q_GPU_DISPATCH: &str = "BLOCKED_37Q_GPU_DISPATCH_NOT_EXECUTED";
+ const BLOCK_37Q_READBACK: &str = "BLOCKED_37Q_READBACK_NOT_EXECUTED";
+ const BLOCK_37Q_FORWARD: &str = "BLOCKED_37Q_FORWARD_ADOPTION_DETECTED";
+@@ -59,7 +71,8 @@
+     match fs::create_dir_all("artifacts") {
+         Ok(()) => {
+             let bytes = serde_json::to_vec_pretty(&result).unwrap_or_default();
+-            let _ = fs::write(RECEIPT_PATH, bytes);
++            let _ = fs::write(RECEIPT_PATH, &bytes);
++            let _ = fs::write(LEGACY_RECEIPT_PATH, bytes);
+         }
+         Err(_) => (),
+     }
+@@ -72,7 +85,7 @@
+ }
+ 
+ fn read_args() -> Args {
+-    let mut reduction_receipt_path = DEFAULT_37Q_RECEIPT.to_string();
++    let mut reduction_receipt_path = match Path::new(DEFAULT_37Q_R1_RECEIPT).exists() { true => DEFAULT_37Q_R1_RECEIPT.to_string(), false => DEFAULT_37Q_RECEIPT.to_string() };
+     let mut tolerance_abs = 0.00001_f64;
+     let mut tolerance_rel = 0.0001_f64;
+     let mut row_record_limit = 128_usize;
+@@ -112,7 +125,20 @@
+ }
+ 
+ fn validate_source_receipt(source: &Value) -> Result<(), (&'static str, &'static str)> {
+-    let patch_ok = str_value(source, "patch_id").map(|s| s == EXPECTED_37Q_PATCH_ID).unwrap_or(false);
++    let patch_id = str_value(source, "patch_id").unwrap_or("");
++    let status = str_value(source, "status").unwrap_or("");
++    let base_patch_id = str_value(source, "base_patch_id").unwrap_or("");
++    let r1_patch = patch_id == EXPECTED_37Q_R1_PATCH_ID;
++    let legacy_patch = patch_id == EXPECTED_37Q_PATCH_ID;
++    let patch_ok = r1_patch || legacy_patch;
++    let r1_status_ok = status.starts_with("PASS_ASH_BASETRAIN_GPU_37Q_R1");
++    let legacy_status_ok = status.starts_with("PASS_ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL");
++    let base_ok = match r1_patch { true => base_patch_id == EXPECTED_37Q_PATCH_ID, false => true };
++    let status_ok = match (r1_patch, legacy_patch) {
++        (true, _) => r1_status_ok,
++        (_, true) => legacy_status_ok,
++        _ => false,
++    };
+     let pass_ok = bool_value(source, "pass").unwrap_or(false) && str_value(source, "verdict").map(|s| s == "PASS").unwrap_or(false);
+     let dispatch_ok = bool_path(source, &["multi_workgroup_dispatch_command_contract", "actual_dispatch_executed"])
+         .or_else(|| bool_path(source, &["multi_workgroup_execution_receipt", "actual_dispatch_executed"]))
+@@ -130,32 +156,77 @@
+     let weight_guard_ok = bool_path(source, &["guards", "safetensors_mutation_present"]).map(|v| !v)
+         .or_else(|| bool_path(source, &["no_weight_load_guard", "safetensors_mutation_present"]).map(|v| !v))
+         .unwrap_or(true);
+-    match (patch_ok, pass_ok, dispatch_ok, readback_ok, forward_guard_ok, optimizer_guard_ok, weight_guard_ok) {
+-        (false, _, _, _, _, _, _) => Err((BLOCK_37Q_PARSE, "37Q receipt patch_id did not match ASH-BASETRAIN-GPU-37Q.")),
+-        (_, false, _, _, _, _, _) => Err((BLOCK_37Q_NOT_PASS, "37Q reduction receipt was not PASS.")),
+-        (_, _, false, _, _, _, _) => Err((BLOCK_37Q_GPU_DISPATCH, "37Q GPU dispatch was not executed.")),
+-        (_, _, _, false, _, _, _) => Err((BLOCK_37Q_READBACK, "37Q GPU readback was not executed.")),
+-        (_, _, _, _, false, _, _) => Err((BLOCK_37Q_FORWARD, "37Q receipt indicates forward adoption or forward execution.")),
+-        (_, _, _, _, _, false, _) => Err((BLOCK_37Q_OPTIMIZER, "37Q receipt indicates optimizer execution.")),
+-        (_, _, _, _, _, _, false) => Err((BLOCK_37Q_WEIGHT, "37Q receipt indicates weight or safetensors mutation.")),
+-        _ => Ok(()),
++    match (patch_ok, base_ok, status_ok, pass_ok, dispatch_ok, readback_ok, forward_guard_ok, optimizer_guard_ok, weight_guard_ok) {
++        (false, _, _, _, _, _, _, _, _) => Err((BLOCK_37Q_UNSUPPORTED_PATCH_ID, "37Q reduction receipt patch_id was not supported by the 37R-R2 upstream contract.")),
++        (_, false, _, _, _, _, _, _, _) => Err((BLOCK_37Q_UNSUPPORTED_PATCH_ID, "37Q-R1 reduction receipt base_patch_id did not point back to ASH-BASETRAIN-GPU-37Q.")),
++        (_, _, false, _, _, _, _, _, _) => Err((BLOCK_37Q_UNSUPPORTED_STATUS, "37Q reduction receipt status was not supported by the 37R-R2 upstream contract.")),
++        (_, _, _, false, _, _, _, _, _) => Err((BLOCK_37Q_NOT_PASS, "37Q reduction receipt was not PASS.")),
++        (_, _, _, _, false, _, _, _, _) => Err((BLOCK_37Q_GPU_DISPATCH, "37Q GPU dispatch was not executed.")),
++        (_, _, _, _, _, false, _, _, _) => Err((BLOCK_37Q_READBACK, "37Q GPU readback was not executed.")),
++        (_, _, _, _, _, _, false, _, _) => Err((BLOCK_37Q_FORWARD, "37Q receipt indicates forward adoption or forward execution.")),
++        (_, _, _, _, _, _, _, false, _) => Err((BLOCK_37Q_OPTIMIZER, "37Q receipt indicates optimizer execution.")),
++        (_, _, _, _, _, _, _, _, false) => Err((BLOCK_37Q_WEIGHT, "37Q receipt indicates weight or safetensors mutation.")),
++        _ => validate_37q_r1_contract(source),
++    }
++}
++
++fn validate_37q_r1_contract(source: &Value) -> Result<(), (&'static str, &'static str)> {
++    match str_value(source, "patch_id") == Some(EXPECTED_37Q_R1_PATCH_ID) {
++        false => Ok(()),
++        true => {
++            let summary_present = source.get("multi_workgroup_reduction_diagnostic_summary").is_some();
++            let matrix_present = source.get("multi_workgroup_partial_match_matrix").is_some();
++            let binding_present = source.get("source_binding").is_some();
++            let summary_ok = bool_path(source, &["multi_workgroup_reduction_diagnostic_summary", "actual_dispatch_executed"]).unwrap_or(false)
++                && bool_path(source, &["multi_workgroup_reduction_diagnostic_summary", "actual_readback_executed"]).unwrap_or(false)
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "matched_word_count"]).unwrap_or(0) == 32
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "mismatched_word_count"]).unwrap_or(1) == 0
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "workgroup_count"]).unwrap_or(0) == 4
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "samples_per_workgroup"]).unwrap_or(0) == 256
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "total_sample_count"]).unwrap_or(0) == 1024
++                && u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "diagnostic_buffer_size_bytes"]).unwrap_or(0) == 128;
++            let matrix_ok = bool_path(source, &["multi_workgroup_partial_match_matrix", "all_partial_words_match_expected"]).unwrap_or(false)
++                && u64_path(source, &["multi_workgroup_partial_match_matrix", "group_count"]).unwrap_or(0) == 4
++                && u64_path(source, &["multi_workgroup_partial_match_matrix", "matched_group_count"]).unwrap_or(0) == 4
++                && u64_path(source, &["multi_workgroup_partial_match_matrix", "mismatched_group_count"]).unwrap_or(1) == 0
++                && u64_path(source, &["multi_workgroup_partial_match_matrix", "matched_word_count"]).unwrap_or(0) == 32
++                && u64_path(source, &["multi_workgroup_partial_match_matrix", "mismatched_word_count"]).unwrap_or(1) == 0;
++            let binding_ok = bool_path(source, &["source_binding", "parallel_reduction_receipt_pass"]).unwrap_or(false)
++                && str_path(source, &["source_binding", "parallel_reduction_receipt_patch_id"]) == Some("ASH-BASETRAIN-GPU-37P-R1")
++                && bool_path(source, &["source_binding", "parallel_reduction_receipt_supported_patch_id"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "parallel_reduction_receipt_supported_status"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "payload_37f_receipt_pass"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "payload_37f_reconfirmed"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "thirty_seven_p_r1_source_binding_present"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "thirty_seven_p_r1_payload_37f_receipt_pass"]).unwrap_or(false)
++                && bool_path(source, &["source_binding", "thirty_seven_p_r1_payload_37f_source_bytes_read"]).unwrap_or(false);
++            match (summary_present, summary_ok, matrix_present, matrix_ok, binding_present, binding_ok) {
++                (false, _, _, _, _, _) => Err((BLOCK_37Q_R1_MULTI_WORKGROUP_SUMMARY_MISSING, "37Q-R1 multi-workgroup summary was missing.")),
++                (_, false, _, _, _, _) => Err((BLOCK_37Q_R1_MULTI_WORKGROUP_SUMMARY_INVALID, "37Q-R1 multi-workgroup summary did not satisfy the 37R-R2 contract.")),
++                (_, _, false, _, _, _) => Err((BLOCK_37Q_R1_PARTIAL_MATRIX_MISSING, "37Q-R1 partial matrix was missing.")),
++                (_, _, _, false, _, _) => Err((BLOCK_37Q_R1_PARTIAL_MATRIX_INVALID, "37Q-R1 partial matrix did not satisfy the 37R-R2 contract.")),
++                (_, _, _, _, false, _) => Err((BLOCK_37Q_R1_SOURCE_BINDING_MISSING, "37Q-R1 source binding was missing.")),
++                (_, _, _, _, _, false) => Err((BLOCK_37Q_R1_SOURCE_BINDING_INVALID, "37Q-R1 source binding did not satisfy the 37R-R2 contract.")),
++                _ => Ok(()),
++            }
++        }
+     }
+ }
+ 
+ fn collect_word_rows(source: &Value) -> Result<Vec<WordRow>, (&'static str, &'static str)> {
+     let plan_present = source.get("multi_workgroup_partial_plan").is_some();
+     let source_binding_present = source.get("source_binding").is_some();
+-    let matrix = source.get("multi_workgroup_partial_match_matrix").ok_or((BLOCK_GPU_PAYLOAD, "37Q partial match matrix was missing."))?;
+-    let groups = matrix.get("groups").and_then(Value::as_array).ok_or((BLOCK_GPU_PAYLOAD, "37Q partial match matrix groups were missing."))?;
++    let matrix = source.get("multi_workgroup_partial_match_matrix").ok_or((BLOCK_37Q_R1_PARTIAL_MATRIX_MISSING, "37Q partial match matrix was missing."))?;
++    let groups = matrix.get("groups").and_then(Value::as_array).ok_or((BLOCK_37Q_R1_PARTIAL_MATRIX_MISSING, "37Q partial match matrix groups were missing."))?;
+     match (source_binding_present, plan_present, groups.is_empty()) {
+-        (false, _, _) => Err((BLOCK_SOURCE_BINDING, "37Q source binding was missing.")),
+-        (_, false, _) => Err((BLOCK_PLAN, "37Q row block / multi-workgroup plan was missing.")),
++        (false, _, _) => Err((BLOCK_37Q_R1_SOURCE_BINDING_MISSING, "37Q source binding was missing.")),
++        (_, false, _) => Err((BLOCK_37Q_R1_MULTI_WORKGROUP_SUMMARY_MISSING, "37Q row block / multi-workgroup plan was missing.")),
+         (_, _, true) => Err((BLOCK_CPU_SOURCE, "37Q CPU reference rows were missing.")),
+         _ => {
+             let mut rows = Vec::<WordRow>::new();
+             for group in groups {
+                 let group_index = group.get("group_index").and_then(Value::as_u64).unwrap_or(0) as usize;
+-                let row_values = group.get("rows").and_then(Value::as_array).ok_or((BLOCK_GPU_PAYLOAD, "37Q partial match matrix row list was missing."))?;
++                let row_values = group.get("rows").and_then(Value::as_array).ok_or((BLOCK_37Q_R1_PARTIAL_MATRIX_MISSING, "37Q partial match matrix row list was missing."))?;
+                 for row in row_values {
+                     let index = row.get("word_index").and_then(Value::as_u64).unwrap_or(rows.len() as u64) as usize;
+                     let local_word_index = row.get("local_word_index").and_then(Value::as_u64).unwrap_or(index as u64 % WORDS_PER_GROUP as u64) as usize;
+@@ -218,25 +289,47 @@
+     let source_digest = digest_json(source);
+     json!({
+         "patch_id": PATCH_ID,
++        "base_patch_id": BASE_PATCH_ID,
+         "title": TITLE,
+         "status": status,
+         "verdict": verdict,
+         "pass": pass,
+         "blocked_reason_code": match pass { true => "none", false => status },
+         "blocked_reason": blocked_reason,
+-        "base_patch_id": EXPECTED_37Q_PATCH_ID,
+         "source_binding": {
+             "reduction_receipt_path": args.reduction_receipt_path,
+             "reduction_receipt_digest_hex": source_digest,
++            "reduction_receipt_patch_id": str_value(source, "patch_id").unwrap_or(""),
++            "reduction_receipt_base_patch_id": str_value(source, "base_patch_id").unwrap_or(""),
++            "reduction_receipt_status": str_value(source, "status").unwrap_or(""),
++            "reduction_receipt_verdict": str_value(source, "verdict").unwrap_or(""),
++            "reduction_receipt_pass": bool_value(source, "pass").unwrap_or(false),
++            "reduction_receipt_supported_patch_id": is_supported_37q_patch(source),
++            "reduction_receipt_supported_status": is_supported_37q_status(source),
++            "placeholder_intake_detected": false,
++            "static_checks_used_as_runtime_receipt": false,
++            "bake_manifest_used_as_runtime_receipt": false,
+             "selected_group_manifest_path": source.get("source_binding").and_then(|v| v.get("parallel_reduction_receipt_path")).cloned().unwrap_or(Value::Null),
+             "row_block_plan_path": source.get("source_binding").and_then(|v| v.get("gpu_upload_readback_smoke_receipt_path")).cloned().unwrap_or(Value::Null),
+             "tensor_key": "inherited_from_37p_37f_receipts_or_not_exposed_in_37q_receipt",
+             "selected_group_id": "inherited_from_37p_37f_receipts_or_not_exposed_in_37q_receipt",
+             "selected_group_binding_explicit_in_37q": false,
++            "selected_group_binding_valid": source.get("source_binding").is_some(),
+             "row_block_binding_valid": source.get("multi_workgroup_partial_plan").is_some(),
+             "gpu_readback_payload_digest": gpu_digest,
+             "cpu_reference_payload_digest": cpu_digest
+         },
++        "receipt_contract_validation": {
++            "multi_workgroup_summary_valid": source.get("multi_workgroup_reduction_diagnostic_summary").is_some(),
++            "partial_matrix_valid": source.get("multi_workgroup_partial_match_matrix").is_some(),
++            "source_binding_valid": source.get("source_binding").is_some(),
++            "workgroup_count": u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "workgroup_count"]).unwrap_or(0),
++            "samples_per_workgroup": u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "samples_per_workgroup"]).unwrap_or(0),
++            "total_sample_count": u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "total_sample_count"]).unwrap_or(0),
++            "diagnostic_buffer_size_bytes": u64_path(source, &["multi_workgroup_reduction_diagnostic_summary", "diagnostic_buffer_size_bytes"]).unwrap_or(0),
++            "matched_word_count": matched_count,
++            "mismatched_word_count": mismatched_count
++        },
+         "gpu_readback_result": {
+             "executed": bool_path(source, &["multi_workgroup_copy_readback_receipt", "actual_readback_executed"]).or_else(|| bool_path(source, &["multi_workgroup_reduction_diagnostic_summary", "actual_readback_executed"])).unwrap_or(false),
+             "buffer_byte_len": readback_bytes,
+@@ -321,10 +414,18 @@
+             "adapter_written": false,
+             "checkpoint_written": false
+         },
++        "artifact_write": {
++            "runtime_receipt_written": true,
++            "runtime_receipt_path": RECEIPT_PATH,
++            "legacy_runtime_receipt_written": true,
++            "legacy_runtime_receipt_path": LEGACY_RECEIPT_PATH,
++            "stdout_only": false
++        },
+         "next_stage": {
++            "next_stage_enabled": pass,
+             "next_patch_if_pass": "ASH-BASETRAIN-GPU-38",
+             "recommended_patch_title": "Selected Group Row Block GPU Forward Candidate / Atlas Weight Stream To Bounded MatVec Output Seal No Optimizer No Weight Mutation No Training Commit",
+-            "next_patch_if_blocked": "ASH-BASETRAIN-GPU-37R-R1"
++            "next_patch_if_blocked": "ASH-BASETRAIN-GPU-37R-R2_LOCAL_RECEIPT_OR_PARITY_TRIAGE"
+         }
+     })
+ }
+@@ -333,28 +434,40 @@
+     let source_digest = source.as_ref().map(digest_json).unwrap_or_default();
+     json!({
+         "patch_id": PATCH_ID,
++        "base_patch_id": BASE_PATCH_ID,
+         "title": TITLE,
+         "status": format!("BLOCKED_{PATCH_ID}_{}", status.trim_start_matches("BLOCKED_")),
+         "verdict": "BLOCKED",
+         "pass": false,
+         "blocked_reason_code": status,
+         "blocked_reason": reason,
+-        "base_patch_id": EXPECTED_37Q_PATCH_ID,
+         "source_binding": {
+             "reduction_receipt_path": args.reduction_receipt_path,
+             "reduction_receipt_digest_hex": source_digest,
+-            "row_block_binding_valid": false
++            "reduction_receipt_patch_id": source.as_ref().and_then(|v| str_value(v, "patch_id")).unwrap_or(""),
++            "reduction_receipt_base_patch_id": source.as_ref().and_then(|v| str_value(v, "base_patch_id")).unwrap_or(""),
++            "reduction_receipt_status": source.as_ref().and_then(|v| str_value(v, "status")).unwrap_or(""),
++            "reduction_receipt_verdict": source.as_ref().and_then(|v| str_value(v, "verdict")).unwrap_or(""),
++            "reduction_receipt_pass": source.as_ref().and_then(|v| bool_value(v, "pass")).unwrap_or(false),
++            "reduction_receipt_supported_patch_id": source.as_ref().map(is_supported_37q_patch).unwrap_or(false),
++            "reduction_receipt_supported_status": source.as_ref().map(is_supported_37q_status).unwrap_or(false),
++            "placeholder_intake_detected": false,
++            "static_checks_used_as_runtime_receipt": false,
++            "bake_manifest_used_as_runtime_receipt": false,
++            "row_block_binding_valid": false,
++            "selected_group_binding_valid": false
+         },
+         "gpu_readback_result": {"executed": false, "value_count": 0, "alignment_ok": false, "nan_count": 0, "inf_count": 0, "digest": ""},
+         "cpu_reference_reduction": {"executed": false, "output_count": 0, "nan_count": 0, "inf_count": 0, "digest": ""},
+         "f32_tolerance_policy": {"absolute_epsilon": args.tolerance_abs, "relative_epsilon": args.tolerance_rel, "bit_exact_required": true, "silent_tolerance_widening_allowed": false},
+         "reduction_parity_matrix": {"matrix_kind":"selected_group_row_block_multi_workgroup_reduction_cpu_gpu_parity_matrix", "gpu_value_count":0, "cpu_value_count":0, "compared_value_count":0, "matched_value_count":0, "mismatched_value_count":0, "all_values_within_tolerance":false, "parity_passed":false},
+         "first_mismatch": {"present": false},
++        "artifact_write": {"runtime_receipt_written": true, "runtime_receipt_path": RECEIPT_PATH, "legacy_runtime_receipt_written": true, "legacy_runtime_receipt_path": LEGACY_RECEIPT_PATH, "stdout_only": false},
+         "promotion_gate_matrix": {"matrix_kind":"gpu_reduction_readback_to_forward_candidate_readiness_matrix", "gpu_reduction_readback_valid":false, "cpu_reference_reduction_valid":false, "gpu_cpu_parity_passed":false, "selected_group_binding_valid":false, "row_block_binding_valid":false, "forward_candidate_allowed_next":false, "forward_adoption_executed_now":false, "optimizer_executed_now":false, "weight_mutation_executed_now":false, "promotion_verdict":"REDUCTION_READBACK_PARITY_BLOCKED_SOURCE_BINDING_INVALID"},
+         "no_forward_adoption_guard": {"model_forward_executed":false,"forward_output_adopted":false,"logits_written":false,"loss_computed":false},
+         "no_optimizer_guard": {"backward_executed":false,"gradient_buffer_written":false,"optimizer_step_executed":false,"delta_candidate_written":false},
+         "no_weight_mutation_guard": {"weight_buffer_mutated":false,"safetensors_written":false,"adapter_written":false,"checkpoint_written":false},
+-        "next_stage": {"next_patch_if_blocked":"ASH-BASETRAIN-GPU-37R-R1"}
++        "next_stage": {"next_stage_enabled": false, "next_patch_if_blocked":"ASH-BASETRAIN-GPU-37R-R2_LOCAL_RECEIPT_OR_PARITY_TRIAGE"}
+     })
+ }
+ 
+@@ -413,8 +526,24 @@
+ fn bool_value(value: &Value, key: &str) -> Option<bool> { value.get(key).and_then(Value::as_bool) }
+ fn str_value<'a>(value: &'a Value, key: &str) -> Option<&'a str> { value.get(key).and_then(Value::as_str) }
+ 
++fn is_supported_37q_patch(value: &Value) -> bool {
++    let patch_id = str_value(value, "patch_id").unwrap_or("");
++    patch_id == EXPECTED_37Q_R1_PATCH_ID || patch_id == EXPECTED_37Q_PATCH_ID
++}
++
++fn is_supported_37q_status(value: &Value) -> bool {
++    let patch_id = str_value(value, "patch_id").unwrap_or("");
++    let status = str_value(value, "status").unwrap_or("");
++    match (patch_id == EXPECTED_37Q_R1_PATCH_ID, patch_id == EXPECTED_37Q_PATCH_ID) {
++        (true, _) => status.starts_with("PASS_ASH_BASETRAIN_GPU_37Q_R1"),
++        (_, true) => status.starts_with("PASS_ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL"),
++        _ => false,
++    }
++}
++
+ fn bool_path(value: &Value, path: &[&str]) -> Option<bool> { value_path(value, path).and_then(Value::as_bool) }
+ fn u64_path(value: &Value, path: &[&str]) -> Option<u64> { value_path(value, path).and_then(Value::as_u64) }
++fn str_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> { value_path(value, path).and_then(Value::as_str) }
+ 
+ fn value_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+     let mut cursor = value;

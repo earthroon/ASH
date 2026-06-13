@@ -1,0 +1,9 @@
+ASH-BASETRAIN-GPU-16-R1 local validation note
+
+Static source patch applied:
+- LOGITS_DISPATCH_X_RECEIPT_U64 added
+- source_target_dispatch_x type changed from u32 to u64
+- source_ready comparison uses receipt-side u64 constant
+
+Cargo validation not run in this environment: cargo command not available.
+Operator local cargo build/run is the SSOT.

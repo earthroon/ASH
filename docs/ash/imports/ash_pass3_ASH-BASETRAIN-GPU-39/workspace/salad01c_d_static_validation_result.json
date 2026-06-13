@@ -1,0 +1,28 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01C-D",
+  "source_patch_id": "16AI-QW-38G-R6A-SALAD-01C-C",
+  "status": "PASS_STATIC_EXTERNAL_RECEIPT_SYNC_BAKED_PENDING_LOCAL_CARGO_BUILD",
+  "cargo_build_executed": false,
+  "reason": "cargo/rustc unavailable in bake container",
+  "changed_files": [
+    "crates/orchestrator_local/src/infer_entry.rs"
+  ],
+  "static_checks": {
+    "patch_id_updated": true,
+    "pre_infer_receipt_kept": true,
+    "post_infer_receipt_finalization_fields_present": true,
+    "primary_final_write_fields_present": true,
+    "canonical_final_write_fields_present": true,
+    "response_embedded_receipt_sync_fields_present": true,
+    "output_json_receipt_embedded": true,
+    "response_json_receipt_embedded": true
+  },
+  "model_mutation_flags": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  }
+}

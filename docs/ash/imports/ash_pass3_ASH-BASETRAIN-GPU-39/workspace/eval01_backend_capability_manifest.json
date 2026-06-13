@@ -1,0 +1,113 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-01",
+  "input_patch": "16AI-QW-38G-R6A-EVAL-00",
+  "ssot": "cpu_oracle_replay_trace_as_backend_semantics_ssot",
+  "backends": [
+    {
+      "backend_id": "B00_cpu_oracle",
+      "backend_kind": "cpu",
+      "supports_min_p": "true",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "true",
+      "supports_static_prior": "true",
+      "supports_entropy_trace": "true",
+      "supports_pci_trace": "true",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "false",
+      "supports_kv_snapshot": "optional",
+      "supports_stop_surface": "true",
+      "notes": [
+        "canonical_semantics_ssot"
+      ]
+    },
+    {
+      "backend_id": "B01_standard_runtime",
+      "backend_kind": "runtime",
+      "supports_min_p": "true",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "true",
+      "supports_static_prior": "true",
+      "supports_entropy_trace": "true",
+      "supports_pci_trace": "true",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "false",
+      "supports_kv_snapshot": "optional",
+      "supports_stop_surface": "true",
+      "notes": []
+    },
+    {
+      "backend_id": "B02_burn_webgpu_runtime",
+      "backend_kind": "webgpu",
+      "supports_min_p": "true",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "true",
+      "supports_static_prior": "true",
+      "supports_entropy_trace": "optional",
+      "supports_pci_trace": "true",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "true",
+      "supports_kv_snapshot": "optional",
+      "supports_stop_surface": "true",
+      "notes": [
+        "gpu_reduction_tolerance_required"
+      ]
+    },
+    {
+      "backend_id": "B03_webgpu_gpu_sampler_trace",
+      "backend_kind": "webgpu_trace",
+      "supports_min_p": "true",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "true",
+      "supports_static_prior": "true",
+      "supports_entropy_trace": "optional",
+      "supports_pci_trace": "true",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "true",
+      "supports_kv_snapshot": "optional",
+      "supports_stop_surface": "true",
+      "notes": [
+        "candidate_active_set_trace_required"
+      ]
+    },
+    {
+      "backend_id": "B04_fallback_runtime",
+      "backend_kind": "fallback",
+      "supports_min_p": "optional",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "optional",
+      "supports_static_prior": "optional",
+      "supports_entropy_trace": "optional",
+      "supports_pci_trace": "optional",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "false",
+      "supports_kv_snapshot": "false",
+      "supports_stop_surface": "true",
+      "notes": [
+        "fallback_reason_required"
+      ]
+    },
+    {
+      "backend_id": "B05_safe_static_cpu",
+      "backend_kind": "cpu",
+      "supports_min_p": "true",
+      "supports_top_p": "true",
+      "supports_top_k": "true",
+      "supports_transition_guard": "true",
+      "supports_static_prior": "true",
+      "supports_entropy_trace": "true",
+      "supports_pci_trace": "true",
+      "supports_salad_trace": "true",
+      "supports_gpu_trace": "false",
+      "supports_kv_snapshot": "optional",
+      "supports_stop_surface": "true",
+      "notes": [
+        "dynamic_off_static_safe_reference"
+      ]
+    }
+  ]
+}

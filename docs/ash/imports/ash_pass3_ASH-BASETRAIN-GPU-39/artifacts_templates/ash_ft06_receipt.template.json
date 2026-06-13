@@ -1,0 +1,19 @@
+{
+  "patch_id": "ASH-FT-06",
+  "title": "Single Atlas Group Gradient Receipt / No Optimizer Apply No Candidate Write Seal",
+  "status": "PASS",
+  "guards": {
+    "optimizer_step_executed": false,
+    "optimizer_state_write_executed": false,
+    "optimizer_apply_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "full_model_forward_executed": false,
+    "decode_executed": false,
+    "generation_executed": false,
+    "real_corpus_train_executed": false,
+    "multi_group_train_executed": false
+  },
+  "verdict": "PASS_ASH_FT06_SINGLE_GROUP_GRADIENT_RECEIPT_NO_OPTIMIZER_APPLY_NO_CANDIDATE_WRITE"
+}

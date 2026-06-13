@@ -1,0 +1,20 @@
+{
+  "patch_id": "QW-52C-R12",
+  "title": "Runtime Shadow Observation Audit / No Promotion Seal",
+  "base_patch": "QW-52C-R11",
+  "trace_type": "RuntimeShadowObservationAuditTraceR12",
+  "required_outputs": [
+    "artifacts/qw52c_r12_runtime_shadow_observation_audit.json",
+    "artifacts/qw52c_r12_runtime_shadow_observation_audit_report.json",
+    "artifacts/qw52c_r12_runtime_shadow_observation_audit_manifest.json",
+    "workspace/trace/qw52c_r12_runtime_shadow_observation_audit_receipt.json"
+  ],
+  "invariants": {
+    "promotion_eligible": false,
+    "runtime_apply_allowed": false,
+    "runtime_default_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "safe_profile_apply_allowed": false,
+    "crate_js_ts_allowed": false
+  }
+}

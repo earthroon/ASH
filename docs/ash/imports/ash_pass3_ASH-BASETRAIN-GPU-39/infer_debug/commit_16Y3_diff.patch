@@ -1,0 +1,443 @@
+--- /mnt/data/16y3_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-05 09:50:50.000000000 +0000
++++ crates/model_core/src/reference_checkpoint.rs	2026-05-05 10:30:59.448498727 +0000
+@@ -1097,7 +1097,12 @@
+         .map(|bias| Param::from_tensor(checkpoint_tensor_1d::<B>(bias, bias.len(), device)));
+ }
+ 
+-pub fn load_full_checkpoint_into_model<B: Backend>(spec: &ModelSpec, full: &FullCheckpointWeights, device: &B::Device) -> AshModel<B> {
++pub fn load_full_checkpoint_into_model_with_lm_head_upload<B: Backend>(
++    spec: &ModelSpec,
++    full: &FullCheckpointWeights,
++    device: &B::Device,
++    upload_full_lm_head: bool,
++) -> AshModel<B> {
+     let layers = full
+         .layers
+         .iter()
+@@ -1107,6 +1112,28 @@
+         })
+         .collect();
+ 
++    let lm_head = if upload_full_lm_head {
++        Param::from_tensor(checkpoint_tensor_2d_named::<B>(
++            "lm_head.weight",
++            &full.lm_head,
++            full.vocab_size,
++            full.hidden_size,
++            device,
++        ))
++    } else {
++        // Commit 16Y-3: gpu_atlas mode must not allocate the full [vocab, hidden] lm_head tensor.
++        // A 1-row placeholder keeps the AshModel shape contract alive while projection is routed
++        // through NativeWgpuModel::vocab_atlas.
++        let placeholder = vec![0.0f32; full.hidden_size.max(1)];
++        Param::from_tensor(checkpoint_tensor_2d_named::<B>(
++            "lm_head.weight.placeholder_gpu_atlas",
++            &placeholder,
++            1,
++            full.hidden_size.max(1),
++            device,
++        ))
++    };
++
+     AshModel {
+         token_embedding: Param::from_tensor(checkpoint_tensor_2d_named::<B>(
+             "model.embed_tokens.weight",
+@@ -1115,16 +1142,14 @@
+             full.hidden_size,
+             device,
+         )),
+-        lm_head: Param::from_tensor(checkpoint_tensor_2d_named::<B>(
+-            "lm_head.weight",
+-            &full.lm_head,
+-            full.vocab_size,
+-            full.hidden_size,
+-            device,
+-        )),
++        lm_head,
+         final_norm: checkpoint_norm_from_weights::<B>("model.norm.weight", &full.final_norm, spec.norm.eps, device),
+         layers,
+         spec: Ignored(spec.clone()),
+     }
+ }
+ 
++pub fn load_full_checkpoint_into_model<B: Backend>(spec: &ModelSpec, full: &FullCheckpointWeights, device: &B::Device) -> AshModel<B> {
++    load_full_checkpoint_into_model_with_lm_head_upload::<B>(spec, full, device, true)
++}
++
+--- /mnt/data/16y3_orig/crates/model_core/src/native_wgpu.rs	2026-05-05 09:19:05.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-05 10:31:57.754047049 +0000
+@@ -328,12 +328,114 @@
+     Ok(captures)
+ }
+ 
++
++// Commit 16Y-3: lm_head is represented as a vocab atlas instead of a single
++// giant [vocab, hidden] WebGPU tensor when nativeVocabProjection=gpu_atlas.
++pub struct NativeVocabTile {
++    pub tile_id: usize,
++    pub token_start: usize,
++    pub token_len: usize,
++    pub hidden_size: usize,
++    pub bytes: usize,
++    pub weight: Tensor<NativeInferenceBackend, 2>,
++}
++
++pub struct NativeVocabAtlas {
++    pub vocab_size: usize,
++    pub hidden_size: usize,
++    pub tile_vocab: usize,
++    pub full_vocab_bytes: usize,
++    pub tiles: Vec<NativeVocabTile>,
++}
++
++fn build_native_vocab_atlas(
++    lm_head_cpu: &[f32],
++    vocab_size: usize,
++    hidden_size: usize,
++    tile_vocab: usize,
++    max_single_buffer_bytes: usize,
++    device: &WgpuDevice,
++) -> Result<NativeVocabAtlas> {
++    ensure!(tile_vocab > 0, "native vocab tile size must be > 0");
++    ensure!(hidden_size > 0, "native vocab atlas hidden size must be > 0");
++    ensure!(
++        lm_head_cpu.len() == vocab_size.saturating_mul(hidden_size),
++        "lm_head size mismatch for vocab atlas: got={} expected={}",
++        lm_head_cpu.len(),
++        vocab_size.saturating_mul(hidden_size),
++    );
++
++    let full_vocab_bytes = lm_head_cpu.len().saturating_mul(std::mem::size_of::<f32>());
++    let mut tiles = Vec::new();
++    let mut token_start = 0usize;
++
++    while token_start < vocab_size {
++        let tile_id = tiles.len();
++        let token_len = tile_vocab.min(vocab_size - token_start);
++        let row_start = token_start * hidden_size;
++        let row_end = row_start + token_len * hidden_size;
++        let tile_slice = &lm_head_cpu[row_start..row_end];
++        let bytes = tile_slice.len().saturating_mul(std::mem::size_of::<f32>());
++
++        ensure!(
++            bytes <= max_single_buffer_bytes,
++            "vocab atlas tile too large: tile={} bytes={} max={}",
++            tile_id,
++            bytes,
++            max_single_buffer_bytes,
++        );
++
++        eprintln!(
++            "[native-vocab-atlas] tile={} token_start={} token_len={} hidden={} bytes={}",
++            tile_id,
++            token_start,
++            token_len,
++            hidden_size,
++            bytes,
++        );
++
++        let weight = Tensor::<NativeInferenceBackend, 2>::from_data(
++            TensorData::new(tile_slice.to_vec(), [token_len, hidden_size]),
++            device,
++        );
++
++        tiles.push(NativeVocabTile {
++            tile_id,
++            token_start,
++            token_len,
++            hidden_size,
++            bytes,
++            weight,
++        });
++
++        token_start += token_len;
++    }
++
++    eprintln!(
++        "[native-vocab-atlas] built tile_count={} vocab={} hidden={} tile_vocab={} full_vocab_bytes={}",
++        tiles.len(),
++        vocab_size,
++        hidden_size,
++        tile_vocab,
++        full_vocab_bytes,
++    );
++
++    Ok(NativeVocabAtlas {
++        vocab_size,
++        hidden_size,
++        tile_vocab,
++        full_vocab_bytes,
++        tiles,
++    })
++}
++
+ pub struct NativeWgpuModel {
+     pub spec: ModelSpec,
+     pub attached_loras: Vec<RuntimeLoraAttachment>,
+     model: AshModel<NativeInferenceBackend>,
+     device: WgpuDevice,
+     full_checkpoint_execution: Option<Arc<FullCheckpointWeights>>,
++    vocab_atlas: Option<NativeVocabAtlas>,
+     native_device_bootstrap: Option<ExistingDeviceBootstrap>,
+     runtime_handles: Option<NativeWgpuRuntimeHandles>,
+     gpu_sampling_runtime: Option<GpuSamplingRuntime>,
+@@ -1224,6 +1326,16 @@
+         spec: ModelSpec,
+         checkpoint_paths: &[impl AsRef<Path>],
+     ) -> Result<Self> {
++        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX)
++    }
++
++    pub fn from_full_checkpoints_with_vocab_atlas(
++        spec: ModelSpec,
++        checkpoint_paths: &[impl AsRef<Path>],
++        use_vocab_atlas: bool,
++        vocab_tile_size: usize,
++        max_single_buffer_bytes: usize,
++    ) -> Result<Self> {
+         if checkpoint_paths.is_empty() {
+             bail!("native WebGPU inference requires at least one checkpoint path")
+         }
+@@ -1253,7 +1365,25 @@
+             gpu_sampling_runtime.is_some(),
+             gpu_penalty_runtime.is_some(),
+         );
+-        let model = load_full_checkpoint_into_model::<NativeInferenceBackend>(&spec, &full, &device);
++
++        let vocab_atlas = if use_vocab_atlas {
++            Some(build_native_vocab_atlas(
++                &full.lm_head,
++                full.vocab_size,
++                full.hidden_size,
++                vocab_tile_size.max(1),
++                max_single_buffer_bytes.max(1),
++                &device,
++            )?)
++        } else {
++            None
++        };
++        let model = load_full_checkpoint_into_model_with_lm_head_upload::<NativeInferenceBackend>(
++            &spec,
++            &full,
++            &device,
++            !use_vocab_atlas,
++        );
+ 
+         Ok(Self {
+             spec,
+@@ -1261,6 +1391,7 @@
+             model,
+             device,
+             full_checkpoint_execution: Some(Arc::new(full)),
++            vocab_atlas,
+             native_device_bootstrap: Some(bootstrap),
+             runtime_handles,
+             gpu_sampling_runtime,
+@@ -1280,11 +1411,28 @@
+         checkpoint_paths: &[impl AsRef<Path>],
+         loras: Vec<&RuntimeLoraAttachment>,
+     ) -> Result<Self> {
++        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX)
++    }
++
++    pub fn load_toml_with_loras_and_vocab_atlas(
++        spec_path: impl AsRef<Path>,
++        checkpoint_paths: &[impl AsRef<Path>],
++        loras: Vec<&RuntimeLoraAttachment>,
++        use_vocab_atlas: bool,
++        vocab_tile_size: usize,
++        max_single_buffer_bytes: usize,
++    ) -> Result<Self> {
+         let spec = ModelSpec::load_toml(spec_path)?;
+         for lora in &loras {
+             validate_runtime_lora_attachment_for_module(&spec, lora)?;
+         }
+-        let mut model = Self::from_full_checkpoints(spec, checkpoint_paths)?;
++        let mut model = Self::from_full_checkpoints_with_vocab_atlas(
++            spec,
++            checkpoint_paths,
++            use_vocab_atlas,
++            vocab_tile_size,
++            max_single_buffer_bytes,
++        )?;
+         model.attached_loras = loras.into_iter().cloned().collect();
+         Ok(model)
+     }
+@@ -1418,20 +1566,81 @@
+         input: Tensor<NativeInferenceBackend, 2, Int>,
+     ) -> Tensor<NativeInferenceBackend, 3> {
+         let active_loras = self.active_attached_loras();
++        if let Some(atlas) = self.vocab_atlas.as_ref() {
++            // Commit 16Y-3: legacy callers only consume the last logits row.
++            // Avoid touching the placeholder lm_head by forwarding hidden states
++            // and projecting the last row through vocab atlas tiles.
++            let hidden = self.model.forward_hidden(input, &active_loras);
++            let last_hidden = self
++                .slice_last_hidden_row(hidden)
++                .expect("failed to slice last hidden row for vocab atlas projection");
++            return self
++                .project_last_hidden_to_logits_vocab_atlas(last_hidden, atlas)
++                .reshape([1, 1, atlas.vocab_size]);
++        }
+         self.model.forward_logits(input, &active_loras)
+     }
+ 
+     pub(crate) fn lm_head_vocab_size(&self) -> usize {
+-        self.model.lm_head.val().dims()[0]
++        self.vocab_atlas
++            .as_ref()
++            .map(|atlas| atlas.vocab_size)
++            .unwrap_or_else(|| self.model.lm_head.val().dims()[0])
+     }
+ 
+     pub(crate) fn project_last_hidden_to_logits(
+         &self,
+         last_hidden: Tensor<NativeInferenceBackend, 2>,
+     ) -> Tensor<NativeInferenceBackend, 2> {
++        if let Some(atlas) = self.vocab_atlas.as_ref() {
++            return self.project_last_hidden_to_logits_vocab_atlas(last_hidden, atlas);
++        }
+         last_hidden.matmul(self.model.lm_head.val().swap_dims(0, 1))
+     }
+ 
++    fn project_last_hidden_to_logits_vocab_atlas(
++        &self,
++        last_hidden: Tensor<NativeInferenceBackend, 2>,
++        atlas: &NativeVocabAtlas,
++    ) -> Tensor<NativeInferenceBackend, 2> {
++        let mut merged_logits = Vec::with_capacity(atlas.vocab_size);
++        let mut best_token_id = 0usize;
++        let mut best_logit = f32::NEG_INFINITY;
++
++        for tile in &atlas.tiles {
++            let tile_logits = last_hidden
++                .clone()
++                .matmul(tile.weight.clone().swap_dims(0, 1))
++                .reshape([tile.token_len]);
++            let tile_row = tile_logits
++                .into_data()
++                .to_vec::<f32>()
++                .expect("failed to materialize native vocab atlas tile logits");
++
++            for (local_id, logit) in tile_row.iter().copied().enumerate() {
++                if logit.is_finite() && logit > best_logit {
++                    best_logit = logit;
++                    best_token_id = tile.token_start + local_id;
++                }
++            }
++            merged_logits.extend_from_slice(&tile_row);
++        }
++
++        eprintln!(
++            "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={}",
++            best_token_id,
++            best_logit,
++            atlas.tiles.len(),
++            atlas.vocab_size,
++            atlas.full_vocab_bytes,
++        );
++
++        Tensor::<NativeInferenceBackend, 2>::from_data(
++            TensorData::new(merged_logits, [1, atlas.vocab_size]),
++            &self.device,
++        )
++    }
++
+     pub(crate) fn try_dispatch_adjusted_logits_raw_lease_for_sampling(
+         &self,
+         logits: &LastLogitsGpu,
+--- /mnt/data/16y3_orig/crates/runtime/src/infer.rs	2026-05-05 09:59:11.000000000 +0000
++++ crates/runtime/src/infer.rs	2026-05-05 10:30:59.451832456 +0000
+@@ -486,6 +486,8 @@
+     pub avoid_full_vocab_gpu_upload: bool,
+     pub max_single_gpu_buffer_bytes: usize,
+     pub gpu_full_vocab_upload_skipped: bool,
++    pub vocab_atlas_tile_count: usize,
++    pub generated_by_tile_argmax: bool,
+     pub allocation_source: Option<String>,
+ }
+ 
+@@ -503,6 +505,8 @@
+             avoid_full_vocab_gpu_upload: true,
+             max_single_gpu_buffer_bytes: 268_435_456,
+             gpu_full_vocab_upload_skipped: false,
++            vocab_atlas_tile_count: 0,
++            generated_by_tile_argmax: false,
+             allocation_source: None,
+         }
+     }
+@@ -549,6 +553,12 @@
+             avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
+             max_single_gpu_buffer_bytes: req.native_max_single_gpu_buffer_bytes,
+             gpu_full_vocab_upload_skipped: effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas,
++            vocab_atlas_tile_count: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas {
++                (vocab_size + req.native_vocab_tile_size.max(1) - 1) / req.native_vocab_tile_size.max(1)
++            } else {
++                0
++            },
++            generated_by_tile_argmax: effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas,
+             allocation_source: None,
+         }
+     }
+@@ -2253,10 +2263,39 @@
+         let streaming_this_call = streaming_sink.take();
+         check_cancel(cancel_flag)?;
+         if wants_native_wgpu(&spec, &req.checkpoint_paths) {
+-            match NativeWgpuModel::load_toml_with_loras(
++            let native_full_vocab_bytes = spec
++                .dimensions
++                .vocab_size
++                .saturating_mul(spec.dimensions.hidden_size)
++                .saturating_mul(std::mem::size_of::<f32>());
++            let native_effective_vocab_projection = match req.native_vocab_projection {
++                NativeVocabProjectionMode::Auto => {
++                    if req.native_avoid_full_vocab_gpu_upload
++                        && native_full_vocab_bytes > req.native_max_single_gpu_buffer_bytes
++                    {
++                        NativeVocabProjectionMode::GpuAtlas
++                    } else {
++                        NativeVocabProjectionMode::GpuFull
++                    }
++                }
++                explicit => explicit,
++            };
++            let native_use_vocab_atlas = native_effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas;
++            eprintln!(
++                "[16Y-3][native-loader] vocab_projection_effective={} use_vocab_atlas={} tile_size={} full_vocab_bytes={} max_single_buffer={}",
++                native_effective_vocab_projection.as_str(),
++                native_use_vocab_atlas,
++                req.native_vocab_tile_size,
++                native_full_vocab_bytes,
++                req.native_max_single_gpu_buffer_bytes,
++            );
++            match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+                 &req.model_spec_path,
+                 &req.checkpoint_paths,
+                 attached.iter().collect::<Vec<_>>(),
++                native_use_vocab_atlas,
++                req.native_vocab_tile_size,
++                req.native_max_single_gpu_buffer_bytes,
+             ) {
+                 Ok(mut native_model) => {
+                     eprintln!("[debug] native_wgpu_enabled = true");
+--- /mnt/data/16y3_orig/crates/orchestrator_local/src/infer_entry.rs	2026-05-05 09:50:05.000000000 +0000
++++ crates/orchestrator_local/src/infer_entry.rs	2026-05-05 10:30:59.452816177 +0000
+@@ -385,6 +385,8 @@
+     output_json.insert("native_vocab_tile_size".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
+     output_json.insert("native_full_vocab_bytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
+     output_json.insert("native_gpu_full_vocab_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
++    output_json.insert("native_vocab_atlas_tile_count".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_tile_count));
++    output_json.insert("native_generated_by_tile_argmax".to_string(), json!(result.native_vocab_allocation_probe.generated_by_tile_argmax));
+     output_json.insert("native_embedding_mode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+     output_json.insert("artifact_freshness_seal".to_string(), json!({
+         "request_id": &incoming.id,
+@@ -741,6 +743,8 @@
+     response_json.insert("nativeVocabAllocationProbe".to_string(), json!(&result.native_vocab_allocation_probe));
+     response_json.insert("nativeVocabProjection".to_string(), json!(&result.native_vocab_allocation_probe.effective_vocab_projection));
+     response_json.insert("nativeVocabTileSize".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
++    response_json.insert("nativeVocabAtlasTileCount".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_tile_count));
++    response_json.insert("nativeGeneratedByTileArgmax".to_string(), json!(result.native_vocab_allocation_probe.generated_by_tile_argmax));
+     response_json.insert("nativeFullVocabBytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
+     response_json.insert("nativeGpuFullVocabUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
+     response_json.insert("nativeEmbeddingMode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));

@@ -1,0 +1,272 @@
+--- /tmp/stage3ab_orig/crates/model_core/src/lib.rs	2026-04-19 13:01:19.000000000 +0000
++++ /tmp/stage3ab/crates/model_core/src/lib.rs	2026-04-19 13:10:49.014913061 +0000
+@@ -1216,6 +1216,26 @@
+ }
+ 
+ #[derive(Debug, Clone)]
++pub struct ModuleTraceTapRequest {
++    pub target_key: String,
++    pub batch_size: usize,
++    pub max_seq_len: usize,
++    pub seq_lens: Vec<usize>,
++}
++
++#[derive(Debug, Clone)]
++pub struct ModuleTraceTapResult {
++    pub target_key: String,
++    pub input_dim: usize,
++    pub output_dim: usize,
++    pub batch_size: usize,
++    pub max_seq_len: usize,
++    pub seq_lens: Vec<usize>,
++    pub module_input: Vec<f32>,
++    pub module_output: Vec<f32>,
++}
++
++#[derive(Debug, Clone)]
+ pub struct CapturedModuleIo {
+     pub target_key: String,
+     pub input_dim: usize,
+@@ -2235,6 +2255,90 @@
+ 
+ }
+ 
++fn capture_module_from_native_hidden(
++    target_key: &str,
++    expected_in: usize,
++    expected_out: usize,
++    lengths: &[usize],
++    input: Tensor<NativeInferenceBackend, 3>,
++    output: Tensor<NativeInferenceBackend, 3>,
++) -> Result<Vec<CapturedModuleIo>> {
++    let [batch, seq, input_dim] = input.dims();
++    let [out_batch, out_seq, output_dim] = output.dims();
++    ensure!(
++        batch == out_batch && seq == out_seq,
++        "native module-local trace batch/seq mismatch: target_key={} input=[{}, {}, {}] output=[{}, {}, {}]",
++        target_key,
++        batch,
++        seq,
++        input_dim,
++        out_batch,
++        out_seq,
++        output_dim,
++    );
++    ensure!(
++        lengths.len() == batch,
++        "native module-local trace lengths mismatch: target_key={} batch={} lengths={}",
++        target_key,
++        batch,
++        lengths.len(),
++    );
++    ensure!(
++        input_dim == expected_in,
++        "native module-local trace input dim mismatch: target_key={} expected_in={} actual_in={}",
++        target_key,
++        expected_in,
++        input_dim,
++    );
++    ensure!(
++        output_dim == expected_out,
++        "native module-local trace output dim mismatch: target_key={} expected_out={} actual_out={}",
++        target_key,
++        expected_out,
++        output_dim,
++    );
++
++    let flat_input = input
++        .into_data()
++        .to_vec::<f32>()
++        .map_err(|err| anyhow!("failed to materialize native module trace input: {err}"))?;
++    let flat_output = output
++        .into_data()
++        .to_vec::<f32>()
++        .map_err(|err| anyhow!("failed to materialize native module trace output: {err}"))?;
++
++    let mut captures = Vec::with_capacity(batch);
++    for (batch_idx, &seq_len) in lengths.iter().enumerate() {
++        ensure!(
++            seq_len <= seq,
++            "native module-local trace seq len exceeds padded seq: target_key={} batch_idx={} seq_len={} padded_seq={}",
++            target_key,
++            batch_idx,
++            seq_len,
++            seq,
++        );
++        let mut module_input = Vec::with_capacity(seq_len * input_dim);
++        let mut module_output = Vec::with_capacity(seq_len * output_dim);
++        for token_idx in 0..seq_len {
++            let in_start = ((batch_idx * seq) + token_idx) * input_dim;
++            let in_end = in_start + input_dim;
++            module_input.extend_from_slice(&flat_input[in_start..in_end]);
++            let out_start = ((batch_idx * seq) + token_idx) * output_dim;
++            let out_end = out_start + output_dim;
++            module_output.extend_from_slice(&flat_output[out_start..out_end]);
++        }
++        captures.push(CapturedModuleIo {
++            target_key: target_key.to_string(),
++            input_dim,
++            output_dim,
++            seq_len,
++            module_input,
++            module_output,
++        });
++    }
++    Ok(captures)
++}
++
+ pub struct NativeWgpuModel {
+     pub spec: ModelSpec,
+     pub attached_loras: Vec<RuntimeLoraAttachment>,
+@@ -2252,6 +2356,151 @@
+ }
+ 
+ impl NativeWgpuModel {
++    pub fn capture_module_io_native_padded_batch(
++        &self,
++        request: &ModuleTraceTapRequest,
++        token_ids: &[u32],
++    ) -> Result<Vec<CapturedModuleIo>> {
++        let target_key = request.target_key.as_str();
++        let (expected_in, expected_out) = resolve_runtime_lora_target_module_dims(&self.spec, target_key)?;
++        let parts: Vec<&str> = target_key.split('.').collect();
++        if parts.len() != 4 || parts[0] != "layers" {
++            bail!("unsupported native module-local target_key format: {}", target_key);
++        }
++        let layer_idx: usize = parts[1]
++            .parse()
++            .map_err(|_| anyhow!("invalid native module-local layer index in target_key: {}", target_key))?;
++        let suffix = format!("{}.{}", parts[2], parts[3]);
++        if !matches!(suffix.as_str(), "attn.q_proj" | "attn.o_proj" | "ffn.up_proj") {
++            bail!(
++                "native module-local trace currently supports attn.q_proj, attn.o_proj, and ffn.up_proj only: target_key={} expected_in={} expected_out={}",
++                target_key,
++                expected_in,
++                expected_out,
++            );
++        }
++
++        if request.batch_size == 0 || request.max_seq_len == 0 {
++            return Ok((0..request.batch_size)
++                .map(|_| CapturedModuleIo {
++                    target_key: target_key.to_string(),
++                    input_dim: expected_in,
++                    output_dim: expected_out,
++                    seq_len: 0,
++                    module_input: Vec::new(),
++                    module_output: Vec::new(),
++                })
++                .collect());
++        }
++
++        ensure!(
++            request.seq_lens.len() == request.batch_size,
++            "native module-local trace request lengths mismatch: batch_size={} seq_lens={}",
++            request.batch_size,
++            request.seq_lens.len(),
++        );
++        ensure!(
++            token_ids.len() == request.batch_size * request.max_seq_len,
++            "native module-local padded token buffer mismatch: batch_size={} max_seq_len={} token_ids_len={} expected={}",
++            request.batch_size,
++            request.max_seq_len,
++            token_ids.len(),
++            request.batch_size * request.max_seq_len,
++        );
++
++        let input = Tensor::<NativeInferenceBackend, 2, Int>::from_data(
++            TensorData::new(
++                token_ids.to_vec(),
++                [request.batch_size, request.max_seq_len],
++            ),
++            &self.device,
++        );
++
++        let mut x = self.model.embed(input);
++        let active_loras = self.active_attached_loras();
++
++        for (idx, layer) in self.model.layers.iter().enumerate() {
++            let residual = x.clone();
++            let normed = layer.input_norm.forward(x);
++            let q = layer.q_proj.forward(normed.clone(), &active_loras, &[]);
++            if idx == layer_idx && suffix == "attn.q_proj" {
++                return capture_module_from_native_hidden(
++                    target_key,
++                    expected_in,
++                    expected_out,
++                    &request.seq_lens,
++                    normed,
++                    q,
++                );
++            }
++
++            let k = layer.k_proj.forward(normed.clone(), &active_loras, &[]);
++            let v = layer.v_proj.forward(normed, &active_loras, &[]);
++            let [batch, seq, hidden] = q.dims();
++            let heads = layer.num_heads.max(1);
++            let head_dim = layer.head_dim.max(1);
++            let kv_hidden = k.dims()[2];
++            let kv_heads = if kv_hidden >= head_dim {
++                (kv_hidden / head_dim).max(1)
++            } else {
++                layer.num_kv_heads.max(1)
++            };
++            let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
++            let k_cache = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
++            let v_cache = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
++            let ctx = match self.try_grouped_query_attention_via_atlas(
++                q.clone(),
++                k_cache.clone(),
++                v_cache.clone(),
++                heads,
++                kv_heads,
++                head_dim,
++            )? {
++                Some(ctx) => ctx,
++                None => grouped_query_attention(q, k_cache, v_cache, heads, kv_heads, head_dim),
++            }
++            .swap_dims(1, 2)
++            .reshape([batch, seq, hidden]);
++
++            let attn_out = layer.o_proj.forward(ctx.clone(), &active_loras, &[]);
++            if idx == layer_idx && suffix == "attn.o_proj" {
++                return capture_module_from_native_hidden(
++                    target_key,
++                    expected_in,
++                    expected_out,
++                    &request.seq_lens,
++                    ctx,
++                    attn_out,
++                );
++            }
++
++            let after_attn = residual + attn_out;
++            let residual = after_attn.clone();
++            let normed_ffn = layer.post_attn_norm.forward(after_attn);
++            let up = layer.up_proj.forward(normed_ffn.clone(), &active_loras, &[]);
++            if idx == layer_idx && suffix == "ffn.up_proj" {
++                return capture_module_from_native_hidden(
++                    target_key,
++                    expected_in,
++                    expected_out,
++                    &request.seq_lens,
++                    normed_ffn,
++                    up,
++                );
++            }
++
++            let gate = sigmoid(layer.gate_proj.forward(normed_ffn.clone(), &active_loras, &[]));
++            let ff = layer.down_proj.forward(gate * up, &active_loras, &[]);
++            x = residual + ff;
++        }
++
++        bail!(
++            "failed to capture native module-local trace for target_key={} layer_idx={} (layer not reached)",
++            target_key,
++            layer_idx
++        )
++    }
++
+     pub fn same_device_runtime_handles(&self) -> Option<&NativeWgpuRuntimeHandles> {
+         self.runtime_handles.as_ref()
+     }

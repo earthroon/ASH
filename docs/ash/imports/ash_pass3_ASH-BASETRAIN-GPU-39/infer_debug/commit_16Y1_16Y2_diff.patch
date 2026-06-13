@@ -1,0 +1,608 @@
+--- /mnt/data/ash16y_orig/crates/runtime/src/infer.rs	2026-05-05 07:50:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/src/infer.rs	2026-05-05 09:59:11.836797031 +0000
+@@ -409,6 +409,151 @@
+     }
+ }
+ 
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum NativeVocabProjectionMode {
++    Auto,
++    GpuFull,
++    GpuAtlas,
++    CpuDebug,
++}
++
++impl Default for NativeVocabProjectionMode {
++    fn default() -> Self { Self::Auto }
++}
++
++impl NativeVocabProjectionMode {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Auto => "auto",
++            Self::GpuFull => "gpu_full",
++            Self::GpuAtlas => "gpu_atlas",
++            Self::CpuDebug => "cpu_debug",
++        }
++    }
++
++    pub fn parse(value: Option<&str>) -> Self {
++        match value.unwrap_or("auto") {
++            "gpu_full" | "gpuFull" | "full" => Self::GpuFull,
++            "gpu_atlas" | "gpuAtlas" | "atlas" => Self::GpuAtlas,
++            "cpu_debug" | "cpuDebug" | "cpu" => Self::CpuDebug,
++            _ => Self::Auto,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++#[serde(rename_all = "snake_case")]
++pub enum NativeEmbeddingMode {
++    Auto,
++    GpuFull,
++    RowGather,
++}
++
++impl Default for NativeEmbeddingMode {
++    fn default() -> Self { Self::Auto }
++}
++
++impl NativeEmbeddingMode {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Auto => "auto",
++            Self::GpuFull => "gpu_full",
++            Self::RowGather => "row_gather",
++        }
++    }
++
++    pub fn parse(value: Option<&str>) -> Self {
++        match value.unwrap_or("auto") {
++            "gpu_full" | "gpuFull" | "full" => Self::GpuFull,
++            "row_gather" | "rowGather" | "gather" => Self::RowGather,
++            _ => Self::Auto,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++#[serde(default)]
++pub struct NativeVocabAllocationProbe {
++    pub requested_vocab_projection: String,
++    pub effective_vocab_projection: String,
++    pub requested_embedding_mode: String,
++    pub effective_embedding_mode: String,
++    pub vocab_size: usize,
++    pub hidden_size: usize,
++    pub full_vocab_bytes: usize,
++    pub vocab_tile_size: usize,
++    pub avoid_full_vocab_gpu_upload: bool,
++    pub max_single_gpu_buffer_bytes: usize,
++    pub gpu_full_vocab_upload_skipped: bool,
++    pub allocation_source: Option<String>,
++}
++
++impl Default for NativeVocabAllocationProbe {
++    fn default() -> Self {
++        Self {
++            requested_vocab_projection: "auto".to_string(),
++            effective_vocab_projection: "auto".to_string(),
++            requested_embedding_mode: "auto".to_string(),
++            effective_embedding_mode: "auto".to_string(),
++            vocab_size: 0,
++            hidden_size: 0,
++            full_vocab_bytes: 0,
++            vocab_tile_size: 1024,
++            avoid_full_vocab_gpu_upload: true,
++            max_single_gpu_buffer_bytes: 268_435_456,
++            gpu_full_vocab_upload_skipped: false,
++            allocation_source: None,
++        }
++    }
++}
++
++impl NativeVocabAllocationProbe {
++    fn new(req: &ResolvedStandardInferRequest, vocab_size: usize, hidden_size: usize) -> Self {
++        let full_vocab_bytes = vocab_size
++            .saturating_mul(hidden_size)
++            .saturating_mul(std::mem::size_of::<f32>());
++        let effective_vocab_projection = match req.native_vocab_projection {
++            NativeVocabProjectionMode::Auto => {
++                if req.native_avoid_full_vocab_gpu_upload
++                    && full_vocab_bytes > req.native_max_single_gpu_buffer_bytes
++                {
++                    NativeVocabProjectionMode::GpuAtlas
++                } else {
++                    NativeVocabProjectionMode::GpuFull
++                }
++            }
++            explicit => explicit,
++        };
++        let effective_embedding_mode = match req.native_embedding_mode {
++            NativeEmbeddingMode::Auto => {
++                if req.native_avoid_full_vocab_gpu_upload
++                    && full_vocab_bytes > req.native_max_single_gpu_buffer_bytes
++                {
++                    NativeEmbeddingMode::RowGather
++                } else {
++                    NativeEmbeddingMode::GpuFull
++                }
++            }
++            explicit => explicit,
++        };
++        Self {
++            requested_vocab_projection: req.native_vocab_projection.as_str().to_string(),
++            effective_vocab_projection: effective_vocab_projection.as_str().to_string(),
++            requested_embedding_mode: req.native_embedding_mode.as_str().to_string(),
++            effective_embedding_mode: effective_embedding_mode.as_str().to_string(),
++            vocab_size,
++            hidden_size,
++            full_vocab_bytes,
++            vocab_tile_size: req.native_vocab_tile_size,
++            avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
++            max_single_gpu_buffer_bytes: req.native_max_single_gpu_buffer_bytes,
++            gpu_full_vocab_upload_skipped: effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas,
++            allocation_source: None,
++        }
++    }
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ #[serde(default)]
+ pub struct StandardInferRequest {
+@@ -433,6 +578,11 @@
+     pub disable_native_structure_routing: bool,
+     pub disable_native_text_density: bool,
+     pub disable_native_gpu_penalty: bool,
++    pub native_vocab_projection: NativeVocabProjectionMode,
++    pub native_vocab_tile_size: usize,
++    pub native_avoid_full_vocab_gpu_upload: bool,
++    pub native_max_single_gpu_buffer_bytes: usize,
++    pub native_embedding_mode: NativeEmbeddingMode,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+@@ -910,6 +1060,7 @@
+     pub tokenizer_checkpoint_probe: StandardInferTokenizerCheckpointProbe,
+     pub checkpoint_fingerprint_probe: CheckpointFingerprintProbe,
+     pub native_aux_probe: StandardInferNativeAuxProbe,
++    pub native_vocab_allocation_probe: NativeVocabAllocationProbe,
+     pub decision: AshDecision,
+     pub model_spec_id: String,
+     pub tokenizer_manifest_id: String,
+@@ -2455,6 +2606,36 @@
+         &final_generated_ids,
+         &banned_token_ids,
+     );
++    let native_vocab_allocation_probe = NativeVocabAllocationProbe::new(
++        &req,
++        tokenizer_checkpoint_probe
++            .checkpoint_lm_head_vocab_size
++            .or(tokenizer_checkpoint_probe.checkpoint_embedding_vocab_size)
++            .unwrap_or(spec.dimensions.vocab_size),
++        tokenizer_checkpoint_probe
++            .checkpoint_lm_head_shape
++            .as_ref()
++            .and_then(|shape| shape.get(1).copied())
++            .or_else(|| tokenizer_checkpoint_probe
++                .checkpoint_embedding_shape
++                .as_ref()
++                .and_then(|shape| shape.get(1).copied()))
++            .unwrap_or(spec.dimensions.hidden_size),
++    );
++    eprintln!(
++        "[native-vocab-projection] requested={} effective={} embedding_requested={} embedding_effective={} vocab={} hidden={} bytes={} tile_size={} avoid_full_upload={} max_single_buffer={}",
++        native_vocab_allocation_probe.requested_vocab_projection,
++        native_vocab_allocation_probe.effective_vocab_projection,
++        native_vocab_allocation_probe.requested_embedding_mode,
++        native_vocab_allocation_probe.effective_embedding_mode,
++        native_vocab_allocation_probe.vocab_size,
++        native_vocab_allocation_probe.hidden_size,
++        native_vocab_allocation_probe.full_vocab_bytes,
++        native_vocab_allocation_probe.vocab_tile_size,
++        native_vocab_allocation_probe.avoid_full_vocab_gpu_upload,
++        native_vocab_allocation_probe.max_single_gpu_buffer_bytes,
++    );
++
+     let checkpoint_fingerprint_probe = build_checkpoint_fingerprint_probe(
+         &req.checkpoint_paths,
+         &req.tokenizer_manifest_path,
+@@ -2624,6 +2805,7 @@
+         tokenizer_checkpoint_probe,
+         checkpoint_fingerprint_probe,
+         native_aux_probe,
++        native_vocab_allocation_probe,
+         decision,
+         model_spec_id: spec.model_spec_id,
+         tokenizer_manifest_id: manifest.manifest_id,
+--- /mnt/data/ash16y_orig/crates/runtime/src/infer/request_resolution.rs	2026-05-05 07:19:16.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/src/infer/request_resolution.rs	2026-05-05 09:57:32.042856111 +0000
+@@ -4,7 +4,7 @@
+ 
+ use crate::{load_runtime_profile_toml, ResolvedRuntimeProfile};
+ 
+-use super::{QWaveInferenceHints, StandardInferRequest, SubtitleCueContext};
++use super::{NativeEmbeddingMode, NativeVocabProjectionMode, QWaveInferenceHints, StandardInferRequest, SubtitleCueContext};
+ 
+ pub(crate) fn validate_subtitle_cue_context(cue: &SubtitleCueContext) -> Result<()> {
+     if let (Some(start), Some(end)) = (cue.start_ms, cue.end_ms) {
+@@ -51,6 +51,11 @@
+     pub disable_native_structure_routing: bool,
+     pub disable_native_text_density: bool,
+     pub disable_native_gpu_penalty: bool,
++    pub native_vocab_projection: NativeVocabProjectionMode,
++    pub native_vocab_tile_size: usize,
++    pub native_avoid_full_vocab_gpu_upload: bool,
++    pub native_max_single_gpu_buffer_bytes: usize,
++    pub native_embedding_mode: NativeEmbeddingMode,
+ }
+ 
+ impl ResolvedStandardInferRequest {
+@@ -111,6 +116,11 @@
+             disable_native_structure_routing: req.disable_native_structure_routing,
+             disable_native_text_density: req.disable_native_text_density,
+             disable_native_gpu_penalty: req.disable_native_gpu_penalty,
++            native_vocab_projection: req.native_vocab_projection,
++            native_vocab_tile_size: req.native_vocab_tile_size,
++            native_avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
++            native_max_single_gpu_buffer_bytes: req.native_max_single_gpu_buffer_bytes,
++            native_embedding_mode: req.native_embedding_mode,
+         })
+     }
+ }
+--- /mnt/data/ash16y_orig/crates/runtime/src/lib.rs	2026-05-05 07:49:41.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/src/lib.rs	2026-05-05 09:52:34.430592325 +0000
+@@ -77,6 +77,9 @@
+     run_standard_infer,
+     run_standard_infer_candidate_pool,
+     run_standard_infer_with_decode,
++    NativeEmbeddingMode,
++    NativeVocabAllocationProbe,
++    NativeVocabProjectionMode,
+     QWaveInferenceHints,
+     StandardInferCandidateOutput,
+     StandardInferCandidatePlan,
+--- /mnt/data/ash16y_orig/crates/orchestrator_local/src/infer_entry.rs	2026-05-05 07:50:34.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/orchestrator_local/src/infer_entry.rs	2026-05-05 09:50:05.744255850 +0000
+@@ -10,7 +10,7 @@
+ use serde_json::{json, Value};
+ use std::path::PathBuf;
+ use std::sync::{Arc, Mutex};
+-use runtime::{build_candidate_plan_for_task, run_standard_infer, run_standard_infer_candidate_pool, run_standard_infer_with_decode, StandardInferDecodeOverride, StandardInferRequest};
++use runtime::{build_candidate_plan_for_task, run_standard_infer, run_standard_infer_candidate_pool, run_standard_infer_with_decode, NativeEmbeddingMode, NativeVocabProjectionMode, StandardInferDecodeOverride, StandardInferRequest};
+ use text_kernel::{observe_text_kernel, TextKernelRequest};
+ 
+ use crate::{
+@@ -29,6 +29,22 @@
+         .unwrap_or(false)
+ }
+ 
++fn payload_usize(payload: &Value, camel: &str, snake: &str, default: usize) -> usize {
++    payload
++        .get(camel)
++        .or_else(|| payload.get(snake))
++        .and_then(|v| v.as_u64())
++        .map(|v| v as usize)
++        .unwrap_or(default)
++}
++
++fn payload_str<'a>(payload: &'a Value, camel: &str, snake: &str) -> Option<&'a str> {
++    payload
++        .get(camel)
++        .or_else(|| payload.get(snake))
++        .and_then(|v| v.as_str())
++}
++
+ fn safe_artifact_component(value: &str) -> String {
+     let cleaned = value
+         .chars()
+@@ -254,6 +270,43 @@
+         "disableNativeGpuPenalty",
+         "disable_native_gpu_penalty",
+     );
++    let native_vocab_projection = NativeVocabProjectionMode::parse(payload_str(
++        &incoming.payload,
++        "nativeVocabProjection",
++        "native_vocab_projection",
++    ));
++    let native_vocab_tile_size = payload_usize(
++        &incoming.payload,
++        "nativeVocabTileSize",
++        "native_vocab_tile_size",
++        1024,
++    );
++    let native_avoid_full_vocab_gpu_upload = incoming
++        .payload
++        .get("nativeAvoidFullVocabGpuUpload")
++        .or_else(|| incoming.payload.get("native_avoid_full_vocab_gpu_upload"))
++        .and_then(|v| v.as_bool())
++        .unwrap_or(true);
++    let native_max_single_gpu_buffer_bytes = payload_usize(
++        &incoming.payload,
++        "nativeMaxSingleGpuBufferBytes",
++        "native_max_single_gpu_buffer_bytes",
++        268_435_456,
++    );
++    let native_embedding_mode = NativeEmbeddingMode::parse(payload_str(
++        &incoming.payload,
++        "nativeEmbeddingMode",
++        "native_embedding_mode",
++    ));
++    eprintln!(
++        "[16Y-2][projection-mode] requested_vocab_projection={} requested_embedding_mode={} tile_size={} avoid_full_upload={} max_single_buffer={}",
++        native_vocab_projection.as_str(),
++        native_embedding_mode.as_str(),
++        native_vocab_tile_size,
++        native_avoid_full_vocab_gpu_upload,
++        native_max_single_gpu_buffer_bytes,
++    );
++
+     let seed = incoming.payload.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
+ 
+     let infer_req = StandardInferRequest {
+@@ -283,6 +336,11 @@
+         disable_native_structure_routing,
+         disable_native_text_density,
+         disable_native_gpu_penalty,
++        native_vocab_projection,
++        native_vocab_tile_size,
++        native_avoid_full_vocab_gpu_upload,
++        native_max_single_gpu_buffer_bytes,
++        native_embedding_mode,
+     };
+ 
+     let decode_override = optional_decode_override_from_payload(&incoming.payload, seed, max_new_tokens);
+@@ -322,6 +380,12 @@
+     output_json.insert("checkpoint_fingerprint".to_string(), json!(&result.checkpoint_fingerprint_probe));
+     output_json.insert("checkpoint_fingerprint_probe".to_string(), json!(&result.checkpoint_fingerprint_probe));
+     output_json.insert("native_aux_probe".to_string(), json!(&result.native_aux_probe));
++    output_json.insert("native_vocab_allocation_probe".to_string(), json!(&result.native_vocab_allocation_probe));
++    output_json.insert("native_vocab_projection".to_string(), json!(&result.native_vocab_allocation_probe.effective_vocab_projection));
++    output_json.insert("native_vocab_tile_size".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
++    output_json.insert("native_full_vocab_bytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
++    output_json.insert("native_gpu_full_vocab_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
++    output_json.insert("native_embedding_mode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+     output_json.insert("artifact_freshness_seal".to_string(), json!({
+         "request_id": &incoming.id,
+         "seed": seed,
+@@ -674,6 +738,12 @@
+     response_json.insert("checkpointFingerprint".to_string(), json!(&result.checkpoint_fingerprint_probe));
+     response_json.insert("checkpointFingerprintProbe".to_string(), json!(&result.checkpoint_fingerprint_probe));
+     response_json.insert("nativeAuxProbe".to_string(), json!(&result.native_aux_probe));
++    response_json.insert("nativeVocabAllocationProbe".to_string(), json!(&result.native_vocab_allocation_probe));
++    response_json.insert("nativeVocabProjection".to_string(), json!(&result.native_vocab_allocation_probe.effective_vocab_projection));
++    response_json.insert("nativeVocabTileSize".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
++    response_json.insert("nativeFullVocabBytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
++    response_json.insert("nativeGpuFullVocabUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
++    response_json.insert("nativeEmbeddingMode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+     response_json.insert("artifactFreshnessSeal".to_string(), json!({
+         "outputPath": output_path.to_string_lossy().to_string(),
+         "outputStamp": output_stamp,
+--- /mnt/data/ash16y_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-04 18:54:06.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/model_core/src/reference_checkpoint.rs	2026-05-05 09:50:50.036129108 +0000
+@@ -998,34 +998,70 @@
+ 
+ pub type NativeInferenceBackend = Wgpu<f32, i32>;
+ 
+-fn checkpoint_tensor_1d<B: Backend>(values: &[f32], len: usize, device: &B::Device) -> Tensor<B, 1> {
++fn checkpoint_tensor_1d_named<B: Backend>(
++    tensor_name: &str,
++    values: &[f32],
++    len: usize,
++    device: &B::Device,
++) -> Tensor<B, 1> {
++    let bytes = values.len().saturating_mul(std::mem::size_of::<f32>());
++    eprintln!(
++        "[native-alloc-probe] tensor={} shape=[{}] dtype=F32 bytes={}",
++        tensor_name,
++        len,
++        bytes,
++    );
+     Tensor::<B, 1>::from_data(TensorData::new(values.to_vec(), [len]), device)
+ }
+ 
+-fn checkpoint_tensor_2d<B: Backend>(values: &[f32], rows: usize, cols: usize, device: &B::Device) -> Tensor<B, 2> {
++fn checkpoint_tensor_2d_named<B: Backend>(
++    tensor_name: &str,
++    values: &[f32],
++    rows: usize,
++    cols: usize,
++    device: &B::Device,
++) -> Tensor<B, 2> {
++    let bytes = values.len().saturating_mul(std::mem::size_of::<f32>());
++    eprintln!(
++        "[native-alloc-probe] tensor={} shape=[{}, {}] dtype=F32 bytes={}",
++        tensor_name,
++        rows,
++        cols,
++        bytes,
++    );
+     Tensor::<B, 2>::from_data(TensorData::new(values.to_vec(), [rows, cols]), device)
+ }
+ 
++fn checkpoint_tensor_1d<B: Backend>(values: &[f32], len: usize, device: &B::Device) -> Tensor<B, 1> {
++    checkpoint_tensor_1d_named::<B>("unnamed.1d", values, len, device)
++}
++
++fn checkpoint_tensor_2d<B: Backend>(values: &[f32], rows: usize, cols: usize, device: &B::Device) -> Tensor<B, 2> {
++    checkpoint_tensor_2d_named::<B>("unnamed.2d", values, rows, cols, device)
++}
++
+ fn checkpoint_linear_from_weights<B: Backend>(
+     target_key: impl Into<String>,
+     src: &FullLinearWeights,
+     device: &B::Device,
+ ) -> AshLinear<B> {
+-    let weight = checkpoint_tensor_2d::<B>(&src.weight, src.out_dim, src.in_dim, device);
++    let target_key = target_key.into();
++    let weight = checkpoint_tensor_2d_named::<B>(&target_key, &src.weight, src.out_dim, src.in_dim, device);
+     let bias = src
+         .bias
+         .as_ref()
+-        .map(|bias| checkpoint_tensor_1d::<B>(bias, bias.len(), device));
++        .map(|bias| checkpoint_tensor_1d_named::<B>(&format!("{}.bias", target_key), bias, bias.len(), device));
+     AshLinear::from_checkpoint_tensor(target_key, weight, bias)
+ }
+ 
+ fn checkpoint_norm_from_weights<B: Backend>(
++    tensor_name: &str,
+     values: &[f32],
+     eps: f64,
+     device: &B::Device,
+ ) -> AshRmsNorm<B> {
+     AshRmsNorm::from_checkpoint_tensor(
+-        checkpoint_tensor_1d::<B>(values, values.len(), device),
++        checkpoint_tensor_1d_named::<B>(tensor_name, values, values.len(), device),
+         eps,
+     )
+ }
+@@ -1038,8 +1074,8 @@
+ ) -> AshDecoderBlock<B> {
+     let d = &spec.dimensions;
+     AshDecoderBlock {
+-        input_norm: checkpoint_norm_from_weights::<B>(&weights.input_norm, spec.norm.eps, device),
+-        post_attn_norm: checkpoint_norm_from_weights::<B>(&weights.post_attn_norm, spec.norm.eps, device),
++        input_norm: checkpoint_norm_from_weights::<B>(&format!("layers.{layer_idx}.input_layernorm.weight"), &weights.input_norm, spec.norm.eps, device),
++        post_attn_norm: checkpoint_norm_from_weights::<B>(&format!("layers.{layer_idx}.post_attention_layernorm.weight"), &weights.post_attn_norm, spec.norm.eps, device),
+         q_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.q_proj"), &weights.q_proj, device),
+         k_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.k_proj"), &weights.k_proj, device),
+         v_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.v_proj"), &weights.v_proj, device),
+@@ -1072,19 +1108,21 @@
+         .collect();
+ 
+     AshModel {
+-        token_embedding: Param::from_tensor(checkpoint_tensor_2d::<B>(
++        token_embedding: Param::from_tensor(checkpoint_tensor_2d_named::<B>(
++            "model.embed_tokens.weight",
+             &full.embedding,
+             full.vocab_size,
+             full.hidden_size,
+             device,
+         )),
+-        lm_head: Param::from_tensor(checkpoint_tensor_2d::<B>(
++        lm_head: Param::from_tensor(checkpoint_tensor_2d_named::<B>(
++            "lm_head.weight",
+             &full.lm_head,
+             full.vocab_size,
+             full.hidden_size,
+             device,
+         )),
+-        final_norm: checkpoint_norm_from_weights::<B>(&full.final_norm, spec.norm.eps, device),
++        final_norm: checkpoint_norm_from_weights::<B>("model.norm.weight", &full.final_norm, spec.norm.eps, device),
+         layers,
+         spec: Ignored(spec.clone()),
+     }
+--- /mnt/data/ash16y_orig/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-05 09:54:38.433356087 +0000
+@@ -220,6 +220,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     };
+ 
+     run_standard_infer(runtime_req).map(Some)
+--- /mnt/data/ash16y_orig/crates/runtime/src/lora_smoke.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/src/lora_smoke.rs	2026-05-05 09:54:38.434254918 +0000
+@@ -128,6 +128,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     }
+ }
+ 
+--- /mnt/data/ash16y_orig/crates/orchestrator_local/src/lib.rs	2026-05-05 07:22:46.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/orchestrator_local/src/lib.rs	2026-05-05 09:55:52.134182707 +0000
+@@ -586,6 +586,11 @@
+             disable_native_structure_routing: false,
+             disable_native_text_density: false,
+             disable_native_gpu_penalty: false,
++            native_vocab_projection: Default::default(),
++            native_vocab_tile_size: 1024,
++            native_avoid_full_vocab_gpu_upload: true,
++            native_max_single_gpu_buffer_bytes: 268_435_456,
++            native_embedding_mode: Default::default(),
+         }
+     }
+ }
+--- /mnt/data/ash16y_orig/crates/runtime/src/causal_lm.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/src/causal_lm.rs	2026-05-05 09:54:38.534741673 +0000
+@@ -293,6 +293,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     }
+ }
+ 
+--- /mnt/data/ash16y_orig/crates/runtime/examples/infer_only.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/examples/infer_only.rs	2026-05-05 09:54:38.535514602 +0000
+@@ -194,6 +194,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     };
+ 
+     let result = run_standard_infer(req)?;
+--- /mnt/data/ash16y_orig/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-05 09:54:38.536142343 +0000
+@@ -332,6 +332,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     };
+ 
+     let result = run_standard_infer(req)?;
+--- /mnt/data/ash16y_orig/crates/runtime/examples/infer_final_layers6.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/examples/infer_final_layers6.rs	2026-05-05 09:54:38.536692013 +0000
+@@ -82,6 +82,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     })?;
+ 
+     println!("\n=== {} ===", case_name);
+--- /mnt/data/ash16y_orig/crates/runtime/examples/infer_run01.rs	2026-05-05 07:22:13.000000000 +0000
++++ /mnt/data/ash16y_bake/crates/runtime/examples/infer_run01.rs	2026-05-05 09:54:38.537081882 +0000
+@@ -25,6 +25,11 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        native_vocab_projection: Default::default(),
++        native_vocab_tile_size: 1024,
++        native_avoid_full_vocab_gpu_upload: true,
++        native_max_single_gpu_buffer_bytes: 268_435_456,
++        native_embedding_mode: Default::default(),
+     })?;
+ 
+     println!("\n=== infer_run01 ===");

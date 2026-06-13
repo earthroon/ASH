@@ -1,0 +1,925 @@
+diff -ruN '--exclude=decode02e.patch' run02e_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02E_acceptance.md run02e_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02E_acceptance.md
+--- run02e_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02E_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02E_acceptance.md	2026-05-27 05:04:45.593189197 +0000
+@@ -0,0 +1,49 @@
++# Acceptance — 16AI-QW-38G-R6A-DECODE-02E
++
++## Status
++
++STATIC_PASS / EXECUTION_NOT_RUN
++
++## Checks
++
++```json
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
++  "input_patch": "16AI-QW-38G-R6A-RUN-01",
++  "status": "PASS",
++  "checks": {
++    "decode02e_module_exists": true,
++    "lib_declares_decode02e_module": true,
++    "lib_exports_decode02e_types": true,
++    "controlled_config_exists": true,
++    "safe_v1_profile_exists": true,
++    "controlled_action_exists": true,
++    "apply_function_exists": true,
++    "gate_function_exists": true,
++    "default_enabled_false": true,
++    "max_penalty_capped_075": true,
++    "generic_eos_not_hardblock": true,
++    "emotional_repeat_observe": true,
++    "korean_particle_hardblock_forced_false": true,
++    "cpu_oracle_calls_controlled_apply": true,
++    "controlled_env_mode": true,
++    "run01_gate_envs": true,
++    "decode02d_ready_env": true,
++    "artifacts_json_valid": true
++  }
++}
++```
++
++## Gate
++
++Controlled enable is not effective by default. Runtime evidence is NOT_RUN, so gate is BLOCKED.
++
++## Required artifacts
++
++- workspace/decode02e_controlled_enable_summary.json
++- workspace/decode02e_controlled_enable_receipt.jsonl
++- workspace/decode02e_penalty_profile.json
++- workspace/decode02e_validation_fixtures.json
++- workspace/decode02e_static_checks.json
++- workspace/decode02e_report.md
++- workspace/decode02e.patch
+diff -ruN '--exclude=decode02e.patch' run02e_orig/crates/model_core/src/cpu_oracle_sampler.rs run02e_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- run02e_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 00:12:50.000000000 +0000
++++ run02e_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:02:37.274922879 +0000
+@@ -343,6 +343,8 @@
+         1.0
+     };
+ 
++    let controlled_transition_config = transition_controlled_enable_config_from_env();
++
+     let banned = |id: u32| -> bool { ctx.banned_token_ids.binary_search(&id).is_ok() || ctx.banned_token_ids.contains(&id) };
+     let eos_blocked = |id: u32| -> bool {
+         ctx.eos_token_id == Some(id) && ctx.min_new_tokens > 0 && ctx.step < ctx.min_new_tokens
+@@ -368,12 +370,25 @@
+             let transition_context = transition_context_from_cpu_context(ctx);
+             let candidate_view = candidate_view_from_context(ctx, id);
+             let transition = evaluate_token_transition(&config.transition_guard, &transition_context, &candidate_view);
+-            if matches!(transition.action, TransitionAction::HardBlock) {
+-                return None;
+-            }
+             let mut weighted = scaled + semantic_bias;
+-            if matches!(transition.action, TransitionAction::Penalize) {
+-                weighted -= transition.penalty;
++            let controlled_apply = apply_transition_controlled_decision(&controlled_transition_config, &transition, weighted);
++            if controlled_apply.effective {
++                match controlled_apply.action {
++                    TransitionControlledAction::HardBlock => return None,
++                    TransitionControlledAction::SoftPenalty => {
++                        if let Some(after) = controlled_apply.weighted_logit_after {
++                            weighted = after;
++                        }
++                    }
++                    _ => {}
++                }
++            } else {
++                if matches!(transition.action, TransitionAction::HardBlock) {
++                    return None;
++                }
++                if matches!(transition.action, TransitionAction::Penalize) {
++                    weighted -= transition.penalty;
++                }
+             }
+             Some(Candidate {
+                 id,
+diff -ruN '--exclude=decode02e.patch' run02e_orig/crates/model_core/src/decode02e_controlled_enable.rs run02e_work/crates/model_core/src/decode02e_controlled_enable.rs
+--- run02e_orig/crates/model_core/src/decode02e_controlled_enable.rs	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/crates/model_core/src/decode02e_controlled_enable.rs	2026-05-27 05:03:02.260366328 +0000
+@@ -0,0 +1,210 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode_transition_guard::{
++    apply_transition_controlled_decision, transition_controlled_enable_config_from_env,
++    transition_controlled_gate_status_from_env, TransitionControlledAction,
++    TransitionControlledApplyResult, TransitionControlledEnableConfig, TransitionControlledProfile,
++    TransitionDecision,
++};
++
++pub const DECODE02E_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-02E";
++pub const DECODE02E_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-02D";
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02ePenaltyProfile {
++    pub patch_id: String,
++    pub profile: String,
++    pub default_enabled: bool,
++    pub controlled_enable_requires_opt_in: bool,
++    pub requires_decode02d_ready: bool,
++    pub soft_penalty_scale: f32,
++    pub max_soft_penalty: f32,
++    pub hard_block_allowed: Vec<String>,
++    pub hard_block_forbidden: Vec<String>,
++    pub observe_only: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02eControlledEnableSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub transition_guard_ssot: String,
++    pub controlled_profile: String,
++    pub default_mode_changed: bool,
++    pub default_mode: String,
++    pub controlled_enable_default: bool,
++    pub requires_decode02d_ready: bool,
++    pub effective_by_default: bool,
++    pub hard_block_scope: Vec<String>,
++    pub soft_penalty_scope: Vec<String>,
++    pub observe_only_scope: Vec<String>,
++    pub penalty: Decode02ePenaltyConfig,
++    pub gate_status: String,
++    pub gate_reason: Option<String>,
++    pub non_scope: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02ePenaltyConfig {
++    pub soft_penalty_scale: f32,
++    pub max_soft_penalty: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02eControlledReceipt {
++    pub patch_id: String,
++    pub mode: String,
++    pub profile: String,
++    pub step: Option<usize>,
++    pub gate: Decode02eGateReceipt,
++    pub transition_guard_effective: bool,
++    pub controlled_apply: TransitionControlledApplyResult,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02eGateReceipt {
++    pub ready_required: bool,
++    pub status: String,
++    pub reason: Option<String>,
++}
++
++pub fn decode02e_summary_path() -> PathBuf {
++    env::var("ASH_DECODE_TRANSITION_CONTROLLED_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02e_controlled_enable_summary.json"))
++}
++
++pub fn decode02e_receipt_path() -> PathBuf {
++    env::var("ASH_DECODE_TRANSITION_CONTROLLED_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02e_controlled_enable_receipt.jsonl"))
++}
++
++pub fn decode02e_penalty_profile(config: &TransitionControlledEnableConfig) -> Decode02ePenaltyProfile {
++    let cfg = config.clone().sanitized();
++    Decode02ePenaltyProfile {
++        patch_id: DECODE02E_PATCH_ID.to_string(),
++        profile: cfg.profile.as_str().to_string(),
++        default_enabled: false,
++        controlled_enable_requires_opt_in: true,
++        requires_decode02d_ready: cfg.require_decode02d_ready,
++        soft_penalty_scale: cfg.soft_penalty_scale,
++        max_soft_penalty: cfg.max_soft_penalty,
++        hard_block_allowed: vec![
++            "PadToken".to_string(),
++            "ControlToken".to_string(),
++            "MojibakeSuspected".to_string(),
++            "InvalidByteToken".to_string(),
++            "EosBeforeMinNewTokens".to_string(),
++        ],
++        hard_block_forbidden: vec![
++            "NormalKoreanTransition".to_string(),
++            "EmotionalRepeat".to_string(),
++            "ParticleLikeAmbiguousTransition".to_string(),
++            "RepeatedPunctuation".to_string(),
++            "GenericContinuationImmediateEos".to_string(),
++        ],
++        observe_only: vec![
++            "EmotionalRepeat".to_string(),
++            "KoreanAmbiguousTransition".to_string(),
++        ],
++    }
++}
++
++pub fn decode02e_summary_from_env() -> Decode02eControlledEnableSummary {
++    let cfg = transition_controlled_enable_config_from_env();
++    let gate = transition_controlled_gate_status_from_env(&cfg);
++    Decode02eControlledEnableSummary {
++        patch_id: DECODE02E_PATCH_ID.to_string(),
++        status: "TRANSITION_GUARD_CONTROLLED_ENABLE_DEFINED".to_string(),
++        input_patch: DECODE02E_INPUT_PATCH_ID.to_string(),
++        transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
++        controlled_profile: cfg.profile.as_str().to_string(),
++        default_mode_changed: false,
++        default_mode: "off".to_string(),
++        controlled_enable_default: false,
++        requires_decode02d_ready: cfg.require_decode02d_ready,
++        effective_by_default: false,
++        hard_block_scope: vec![
++            "pad".to_string(),
++            "invalid_control".to_string(),
++            "mojibake".to_string(),
++            "invalid_byte".to_string(),
++            "eos_before_min_new_tokens".to_string(),
++        ],
++        soft_penalty_scope: vec![
++            "generic_continuation_immediate_eos".to_string(),
++            "byte_text_boundary_risk".to_string(),
++            "double_particle_like".to_string(),
++            "double_ending_like".to_string(),
++            "repeated_punctuation".to_string(),
++        ],
++        observe_only_scope: vec![
++            "emotional_repeat".to_string(),
++            "korean_ambiguous_transition".to_string(),
++        ],
++        penalty: Decode02ePenaltyConfig {
++            soft_penalty_scale: cfg.soft_penalty_scale,
++            max_soft_penalty: cfg.max_soft_penalty,
++        },
++        gate_status: gate.status,
++        gate_reason: gate.reason,
++        non_scope: vec![
++            "transition_rule_redesign".to_string(),
++            "transition_default_on".to_string(),
++            "dynamic_context_qwave".to_string(),
++            "semantic_prior_default_enable".to_string(),
++            "minp_formula_change".to_string(),
++            "lora_training".to_string(),
++        ],
++    }
++}
++
++pub fn decode02e_apply_for_receipt(
++    decision: &TransitionDecision,
++    weighted_logit: f32,
++    step: Option<usize>,
++) -> Decode02eControlledReceipt {
++    let cfg = transition_controlled_enable_config_from_env();
++    let gate = transition_controlled_gate_status_from_env(&cfg);
++    let apply = apply_transition_controlled_decision(&cfg, decision, weighted_logit);
++    Decode02eControlledReceipt {
++        patch_id: DECODE02E_PATCH_ID.to_string(),
++        mode: env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()),
++        profile: match cfg.profile { TransitionControlledProfile::SafeV1 => "safe_v1" }.to_string(),
++        step,
++        gate: Decode02eGateReceipt {
++            ready_required: gate.ready_required,
++            status: gate.status,
++            reason: gate.reason,
++        },
++        transition_guard_effective: apply.effective,
++        controlled_apply: apply,
++    }
++}
++
++pub fn append_decode02e_controlled_receipt(receipt: &Decode02eControlledReceipt) {
++    let path = decode02e_receipt_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++pub fn write_decode02e_summary() {
++    let path = decode02e_summary_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(raw) = serde_json::to_string_pretty(&decode02e_summary_from_env()) {
++        let _ = fs::write(path, raw);
++    }
++}
++
++pub fn decode02e_static_profile_receipts() -> (Decode02eControlledEnableSummary, Decode02ePenaltyProfile) {
++    let cfg = transition_controlled_enable_config_from_env();
++    (decode02e_summary_from_env(), decode02e_penalty_profile(&cfg))
++}
+diff -ruN '--exclude=decode02e.patch' run02e_orig/crates/model_core/src/decode_transition_guard.rs run02e_work/crates/model_core/src/decode_transition_guard.rs
+--- run02e_orig/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:40:20.000000000 +0000
++++ run02e_work/crates/model_core/src/decode_transition_guard.rs	2026-05-27 05:04:01.869591419 +0000
+@@ -416,19 +416,312 @@
+     let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
+     let parse_usize = |key: &str, default: usize| -> usize { std::env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default) };
+     let parse_f32 = |key: &str, default: f32| -> f32 { std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default) };
+-    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true");
+-    let probe_only = !matches!(mode.as_str(), "on" | "1" | "true");
++    let controlled_requested = mode == "controlled";
++    let controlled_cfg = transition_controlled_enable_config_from_env();
++    let controlled_gate = transition_controlled_gate_status_from_env(&controlled_cfg);
++    let controlled_ready = controlled_requested && controlled_cfg.enabled && controlled_gate.ready;
++    let enabled = matches!(mode.as_str(), "on" | "probe" | "1" | "true") || controlled_ready;
++    let probe_only = if controlled_requested { !controlled_ready } else { !matches!(mode.as_str(), "on" | "1" | "true") };
++    let (soft_penalty_scale, max_soft_penalty) = if controlled_ready {
++        (controlled_cfg.soft_penalty_scale, controlled_cfg.max_soft_penalty)
++    } else {
++        (parse_f32("ASH_DECODE_TRANSITION_SOFT_PENALTY_SCALE", 1.0), parse_f32("ASH_DECODE_TRANSITION_MAX_PENALTY", 2.0))
++    };
+     TransitionGuardConfig {
+         enabled,
+         probe_only,
+         recent_window: parse_usize("ASH_DECODE_TRANSITION_RECENT_WINDOW", 8),
+-        soft_penalty_scale: parse_f32("ASH_DECODE_TRANSITION_SOFT_PENALTY_SCALE", 1.0),
+-        max_soft_penalty: parse_f32("ASH_DECODE_TRANSITION_MAX_PENALTY", 2.0),
++        soft_penalty_scale,
++        max_soft_penalty,
+         min_new_tokens_for_eos: parse_usize("ASH_DECODE_TRANSITION_MIN_NEW_TOKENS", 8),
+         ..TransitionGuardConfig::default()
+     }.sanitized()
+ }
+ 
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionControlledProfile {
++    SafeV1,
++}
++
++impl TransitionControlledProfile {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::SafeV1 => "safe_v1",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionControlledEnableConfig {
++    pub enabled: bool,
++    pub profile: TransitionControlledProfile,
++    pub require_decode02d_ready: bool,
++    pub soft_penalty_scale: f32,
++    pub max_soft_penalty: f32,
++    pub hard_block_pad: bool,
++    pub hard_block_invalid_control: bool,
++    pub hard_block_mojibake: bool,
++    pub hard_block_invalid_byte: bool,
++    pub hard_block_eos_before_min_new_tokens: bool,
++    pub hard_block_korean_text: bool,
++    pub hard_block_emotional_repeat: bool,
++    pub hard_block_particle_like: bool,
++    pub observe_emotional_repeat: bool,
++    pub observe_korean_ambiguous_transition: bool,
++}
++
++impl Default for TransitionControlledEnableConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            profile: TransitionControlledProfile::SafeV1,
++            require_decode02d_ready: true,
++            soft_penalty_scale: 0.5,
++            max_soft_penalty: 0.75,
++            hard_block_pad: true,
++            hard_block_invalid_control: true,
++            hard_block_mojibake: true,
++            hard_block_invalid_byte: true,
++            hard_block_eos_before_min_new_tokens: true,
++            hard_block_korean_text: false,
++            hard_block_emotional_repeat: false,
++            hard_block_particle_like: false,
++            observe_emotional_repeat: true,
++            observe_korean_ambiguous_transition: true,
++        }
++    }
++}
++
++impl TransitionControlledEnableConfig {
++    pub fn sanitized(mut self) -> Self {
++        if !self.soft_penalty_scale.is_finite() || self.soft_penalty_scale < 0.0 {
++            self.soft_penalty_scale = 0.5;
++        }
++        if !self.max_soft_penalty.is_finite() || self.max_soft_penalty < 0.0 {
++            self.max_soft_penalty = 0.75;
++        }
++        self.soft_penalty_scale = self.soft_penalty_scale.min(2.0);
++        self.max_soft_penalty = self.max_soft_penalty.min(0.75);
++        // SafeV1 contract: these are never hard-blocked by the controlled profile.
++        self.hard_block_korean_text = false;
++        self.hard_block_emotional_repeat = false;
++        self.hard_block_particle_like = false;
++        self
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionControlledAction {
++    None,
++    Observe,
++    SoftPenalty,
++    HardBlock,
++    GateBlocked,
++}
++
++impl TransitionControlledAction {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::None => "None",
++            Self::Observe => "Observe",
++            Self::SoftPenalty => "SoftPenalty",
++            Self::HardBlock => "HardBlock",
++            Self::GateBlocked => "GateBlocked",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionControlledGateStatus {
++    pub ready_required: bool,
++    pub ready: bool,
++    pub status: String,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionControlledApplyResult {
++    pub effective: bool,
++    pub action: TransitionControlledAction,
++    pub candidate_removed: bool,
++    pub penalty_applied: f32,
++    pub weighted_logit_before: f32,
++    pub weighted_logit_after: Option<f32>,
++    pub reason: Option<TransitionReason>,
++    pub blocked_by_gate: bool,
++    pub gate_reason: Option<String>,
++}
++
++fn env_truthy(key: &str) -> bool {
++    std::env::var(key)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "controlled" | "ready" | "pass"))
++        .unwrap_or(false)
++}
++
++fn env_f32(key: &str, default: f32) -> f32 {
++    std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok()).unwrap_or(default)
++}
++
++pub fn transition_controlled_enable_config_from_env() -> TransitionControlledEnableConfig {
++    let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
++    let controlled_enable = env_truthy("ASH_DECODE_TRANSITION_CONTROLLED_ENABLE");
++    let profile = match std::env::var("ASH_DECODE_TRANSITION_CONTROLLED_PROFILE").unwrap_or_else(|_| "safe_v1".to_string()).to_ascii_lowercase().as_str() {
++        _ => TransitionControlledProfile::SafeV1,
++    };
++    TransitionControlledEnableConfig {
++        enabled: mode == "controlled" && controlled_enable,
++        profile,
++        require_decode02d_ready: true,
++        soft_penalty_scale: env_f32("ASH_DECODE_TRANSITION_CONTROLLED_SOFT_PENALTY_SCALE", 0.5),
++        max_soft_penalty: env_f32("ASH_DECODE_TRANSITION_CONTROLLED_MAX_PENALTY", 0.75),
++        ..TransitionControlledEnableConfig::default()
++    }.sanitized()
++}
++
++pub fn transition_controlled_gate_status_from_env(config: &TransitionControlledEnableConfig) -> TransitionControlledGateStatus {
++    if !config.enabled {
++        return TransitionControlledGateStatus {
++            ready_required: config.require_decode02d_ready,
++            ready: false,
++            status: "BLOCKED".to_string(),
++            reason: Some("CONTROLLED_ENABLE_NOT_REQUESTED".to_string()),
++        };
++    }
++    if !config.require_decode02d_ready {
++        return TransitionControlledGateStatus {
++            ready_required: false,
++            ready: true,
++            status: "PASS".to_string(),
++            reason: None,
++        };
++    }
++
++    let decode02d_status = std::env::var("ASH_DECODE_TRANSITION_READY_STATUS")
++        .or_else(|_| std::env::var("ASH_DECODE02D_PROMOTION_STATUS"))
++        .unwrap_or_else(|_| "UNKNOWN".to_string());
++    let run01_transition_ready = env_truthy("ASH_RUN01_TRANSITION_READY")
++        || std::env::var("ASH_RUN01_TRANSITION_ON_CANDIDATE_READY").ok().map(|v| v == "true" || v == "1").unwrap_or(false);
++    let cargo_pass = std::env::var("ASH_RUN01_CARGO_STATUS").map(|v| v == "PASS").unwrap_or(false);
++    let wgsl_pass = std::env::var("ASH_RUN01_WGSL_STATUS").map(|v| v == "PASS").unwrap_or(false);
++
++    if decode02d_status == "TRANSITION_ON_CANDIDATE_READY" && run01_transition_ready && cargo_pass && wgsl_pass {
++        TransitionControlledGateStatus { ready_required: true, ready: true, status: "PASS".to_string(), reason: None }
++    } else if decode02d_status != "TRANSITION_ON_CANDIDATE_READY" {
++        TransitionControlledGateStatus { ready_required: true, ready: false, status: "BLOCKED".to_string(), reason: Some("DECODE02D_NOT_READY".to_string()) }
++    } else if !cargo_pass {
++        TransitionControlledGateStatus { ready_required: true, ready: false, status: "BLOCKED".to_string(), reason: Some("RUN01_CARGO_NOT_PASS".to_string()) }
++    } else if !wgsl_pass {
++        TransitionControlledGateStatus { ready_required: true, ready: false, status: "BLOCKED".to_string(), reason: Some("RUN01_WGSL_NOT_PASS".to_string()) }
++    } else {
++        TransitionControlledGateStatus { ready_required: true, ready: false, status: "BLOCKED".to_string(), reason: Some("RUN01_TRANSITION_READY_FALSE".to_string()) }
++    }
++}
++
++fn decision_has(decision: &TransitionDecision, reason: TransitionReason) -> bool {
++    decision.reasons.iter().any(|r| *r == reason)
++}
++
++fn controlled_hardblock_allowed(config: &TransitionControlledEnableConfig, decision: &TransitionDecision) -> bool {
++    (config.hard_block_pad && decision_has(decision, TransitionReason::PadToken))
++        || (config.hard_block_invalid_control && decision_has(decision, TransitionReason::ControlToken))
++        || (config.hard_block_mojibake && decision_has(decision, TransitionReason::MojibakeSuspected))
++        || (config.hard_block_invalid_byte && decision_has(decision, TransitionReason::InvalidByteToken))
++        || (config.hard_block_eos_before_min_new_tokens && decision_has(decision, TransitionReason::EosBeforeMinNewTokens))
++}
++
++fn controlled_observe_only(config: &TransitionControlledEnableConfig, decision: &TransitionDecision) -> bool {
++    (config.observe_emotional_repeat && decision_has(decision, TransitionReason::RecentLoopRisk))
++        || (config.observe_korean_ambiguous_transition
++            && (decision_has(decision, TransitionReason::DoubleParticleLike)
++                || decision_has(decision, TransitionReason::DoubleSentenceEndingLike)))
++}
++
++pub fn apply_transition_controlled_decision(
++    config: &TransitionControlledEnableConfig,
++    decision: &TransitionDecision,
++    weighted_logit: f32,
++) -> TransitionControlledApplyResult {
++    let cfg = config.clone().sanitized();
++    let gate = transition_controlled_gate_status_from_env(&cfg);
++    if !cfg.enabled || !gate.ready {
++        return TransitionControlledApplyResult {
++            effective: false,
++            action: TransitionControlledAction::GateBlocked,
++            candidate_removed: false,
++            penalty_applied: 0.0,
++            weighted_logit_before: weighted_logit,
++            weighted_logit_after: Some(weighted_logit),
++            reason: decision.reasons.iter().find(|r| **r != TransitionReason::None).copied(),
++            blocked_by_gate: true,
++            gate_reason: gate.reason,
++        };
++    }
++
++    if controlled_hardblock_allowed(&cfg, decision) {
++        return TransitionControlledApplyResult {
++            effective: true,
++            action: TransitionControlledAction::HardBlock,
++            candidate_removed: true,
++            penalty_applied: 0.0,
++            weighted_logit_before: weighted_logit,
++            weighted_logit_after: None,
++            reason: decision.reasons.iter().find(|r| **r != TransitionReason::None).copied(),
++            blocked_by_gate: false,
++            gate_reason: None,
++        };
++    }
++
++    // SafeV1 forbids hard-blocking generic EOS, Korean ambiguity, punctuation, and emotional repeats.
++    if controlled_observe_only(&cfg, decision) {
++        return TransitionControlledApplyResult {
++            effective: true,
++            action: TransitionControlledAction::Observe,
++            candidate_removed: false,
++            penalty_applied: 0.0,
++            weighted_logit_before: weighted_logit,
++            weighted_logit_after: Some(weighted_logit),
++            reason: decision.reasons.iter().find(|r| **r != TransitionReason::None).copied(),
++            blocked_by_gate: false,
++            gate_reason: None,
++        };
++    }
++
++    let soft_penalty_reason = decision_has(decision, TransitionReason::GenericContinuationImmediateEos)
++        || decision_has(decision, TransitionReason::ByteTextBoundaryRisk)
++        || decision_has(decision, TransitionReason::RepeatedPunctuation)
++        || decision_has(decision, TransitionReason::DoubleParticleLike)
++        || decision_has(decision, TransitionReason::DoubleSentenceEndingLike);
++
++    if soft_penalty_reason && decision.risk > 0.0 {
++        let penalty = (decision.risk * cfg.soft_penalty_scale).min(cfg.max_soft_penalty);
++        return TransitionControlledApplyResult {
++            effective: true,
++            action: TransitionControlledAction::SoftPenalty,
++            candidate_removed: false,
++            penalty_applied: penalty,
++            weighted_logit_before: weighted_logit,
++            weighted_logit_after: Some(weighted_logit - penalty),
++            reason: decision.reasons.iter().find(|r| **r != TransitionReason::None).copied(),
++            blocked_by_gate: false,
++            gate_reason: None,
++        };
++    }
++
++    TransitionControlledApplyResult {
++        effective: true,
++        action: TransitionControlledAction::None,
++        candidate_removed: false,
++        penalty_applied: 0.0,
++        weighted_logit_before: weighted_logit,
++        weighted_logit_after: Some(weighted_logit),
++        reason: decision.reasons.iter().find(|r| **r != TransitionReason::None).copied(),
++        blocked_by_gate: false,
++        gate_reason: None,
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+diff -ruN '--exclude=decode02e.patch' run02e_orig/crates/model_core/src/lib.rs run02e_work/crates/model_core/src/lib.rs
+--- run02e_orig/crates/model_core/src/lib.rs	2026-05-27 02:32:14.000000000 +0000
++++ run02e_work/crates/model_core/src/lib.rs	2026-05-27 05:03:23.324733186 +0000
+@@ -21,6 +21,7 @@
+ mod minp_c2a_snapshot_alignment;
+ mod run00_consolidated_smoke;
+ mod run01_runtime_execution;
++mod decode02e_controlled_enable;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -68,7 +69,7 @@
+ };
+ 
+ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
+-pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, transition_guard_config_from_env, evaluate_token_transition};
++pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, TransitionControlledProfile, TransitionControlledEnableConfig, TransitionControlledAction, TransitionControlledGateStatus, TransitionControlledApplyResult, transition_guard_config_from_env, transition_controlled_enable_config_from_env, transition_controlled_gate_status_from_env, apply_transition_controlled_decision, evaluate_token_transition};
+ pub use decode_candidate_piece_hints::{
+     CandidatePieceClass, CandidatePieceHintRaw, CandidatePieceHintTable, CandidatePieceHintSummary,
+     build_candidate_piece_hint_table, classify_piece_hint,
+@@ -93,6 +94,14 @@
+     Run01RuntimeExecutionSummary, run01_evaluate_promotion_gates,
+     run01_not_run_cargo_receipt, run01_not_run_wgsl_receipt,
+ };
++pub use decode02e_controlled_enable::{
++    DECODE02E_PATCH_ID, DECODE02E_INPUT_PATCH_ID, Decode02ePenaltyProfile,
++    Decode02eControlledEnableSummary, Decode02ePenaltyConfig,
++    Decode02eControlledReceipt, Decode02eGateReceipt,
++    decode02e_penalty_profile, decode02e_summary_from_env,
++    decode02e_apply_for_receipt, append_decode02e_controlled_receipt,
++    write_decode02e_summary, decode02e_static_profile_receipts,
++};
+ pub use run00_consolidated_smoke::{
+     RUN00_PATCH_ID, Run00CheckStatus, Run00CommandReceipt, Run00CargoCheckReceipt,
+     Run00CargoTestReceipt, Run00WgslShaderReceipt, Run00WgslCompileReceipt,
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_controlled_enable_receipt.jsonl run02e_work/workspace/decode02e_controlled_enable_receipt.jsonl
+--- run02e_orig/workspace/decode02e_controlled_enable_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_controlled_enable_receipt.jsonl	2026-05-27 05:04:31.869944204 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-02E", "mode": "controlled", "profile": "safe_v1", "step": null, "gate": {"ready_required": true, "decode02d_status": "NOT_RUN", "run01_transition_ready": false, "status": "BLOCKED", "reason": "DECODE02D_NOT_READY"}, "transition_guard_effective": false, "controlled_apply": {"effective": false, "action": "GateBlocked", "candidate_removed": false, "penalty_applied": 0.0, "weighted_logit_before": 0.0, "weighted_logit_after": 0.0, "reason": null, "blocked_by_gate": true, "gate_reason": "DECODE02D_NOT_READY"}, "note": "No runtime evidence was executed in this bake environment; controlled enable remains blocked by design."}
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_controlled_enable_summary.json run02e_work/workspace/decode02e_controlled_enable_summary.json
+--- run02e_orig/workspace/decode02e_controlled_enable_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_controlled_enable_summary.json	2026-05-27 05:04:31.869793833 +0000
+@@ -0,0 +1,58 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
++  "status": "TRANSITION_GUARD_CONTROLLED_ENABLE_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02D",
++  "baked_from": "16AI-QW-38G-R6A-RUN-01_runtime_receipt_execution_baked",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "controlled_profile": "safe_v1",
++  "default_mode_changed": false,
++  "default_mode": "off",
++  "controlled_enable_default": false,
++  "requires_decode02d_ready": true,
++  "effective_by_default": false,
++  "gate_status": "BLOCKED",
++  "gate_reason": "RUNTIME_EVIDENCE_NOT_RUN",
++  "hard_block_scope": [
++    "pad",
++    "invalid_control",
++    "mojibake",
++    "invalid_byte",
++    "eos_before_min_new_tokens"
++  ],
++  "hard_block_forbidden": [
++    "normal_korean_transition",
++    "emotional_repeat",
++    "particle_like_ambiguous_transition",
++    "repeated_punctuation",
++    "generic_continuation_immediate_eos"
++  ],
++  "soft_penalty_scope": [
++    "generic_continuation_immediate_eos",
++    "byte_text_boundary_risk",
++    "double_particle_like",
++    "double_ending_like",
++    "repeated_punctuation"
++  ],
++  "observe_only_scope": [
++    "emotional_repeat",
++    "korean_ambiguous_transition"
++  ],
++  "penalty": {
++    "soft_penalty_scale": 0.5,
++    "max_soft_penalty": 0.75
++  },
++  "execution": {
++    "cargo_check": "NOT_RUN",
++    "cargo_test": "NOT_RUN",
++    "wgsl_compile": "NOT_RUN",
++    "runtime_controlled_enable": "NOT_RUN"
++  },
++  "non_scope": [
++    "transition_rule_redesign",
++    "transition_default_on",
++    "dynamic_context_qwave",
++    "semantic_prior_default_enable",
++    "minp_formula_change",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_penalty_profile.json run02e_work/workspace/decode02e_penalty_profile.json
+--- run02e_orig/workspace/decode02e_penalty_profile.json	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_penalty_profile.json	2026-05-27 05:04:31.869564217 +0000
+@@ -0,0 +1,27 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
++  "profile": "safe_v1",
++  "default_enabled": false,
++  "controlled_enable_requires_opt_in": true,
++  "requires_decode02d_ready": true,
++  "soft_penalty_scale": 0.5,
++  "max_soft_penalty": 0.75,
++  "hard_block_allowed": [
++    "PadToken",
++    "ControlToken",
++    "MojibakeSuspected",
++    "InvalidByteToken",
++    "EosBeforeMinNewTokens"
++  ],
++  "hard_block_forbidden": [
++    "NormalKoreanTransition",
++    "EmotionalRepeat",
++    "ParticleLikeAmbiguousTransition",
++    "RepeatedPunctuation",
++    "GenericContinuationImmediateEos"
++  ],
++  "observe_only": [
++    "EmotionalRepeat",
++    "KoreanAmbiguousTransition"
++  ]
++}
+\ No newline at end of file
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_report.md run02e_work/workspace/decode02e_report.md
+--- run02e_orig/workspace/decode02e_report.md	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_report.md	2026-05-27 05:04:45.592825397 +0000
+@@ -0,0 +1,27 @@
++# 16AI-QW-38G-R6A-DECODE-02E — Transition Guard Controlled Enable / Safe Penalty Application Seal
++
++## Result
++
++- Static structure: PASS
++- Execution: NOT_RUN
++- Default transition mode changed: false
++- Controlled enable default: false
++- Effective by default: false
++
++## Implemented
++
++- Added `TransitionControlledEnableConfig`, `TransitionControlledProfile::SafeV1`, `TransitionControlledAction`, `TransitionControlledApplyResult`.
++- Added `apply_transition_controlled_decision()`.
++- Added gate check using RUN-01 / DECODE-02D readiness environment values.
++- Added `model_core::decode02e_controlled_enable` receipt/summary helpers.
++- Routed CPU oracle transition application through controlled safe_v1 when explicitly requested and gate-ready.
++
++## Safe v1 policy
++
++Hard block is limited to pad, invalid control, mojibake, invalid byte, and EOS before min_new_tokens.
++Generic continuation immediate EOS is soft penalty, not hard block.
++Emotional repeats and ambiguous Korean transitions are observe-only.
++
++## Execution note
++
++This bake environment has no cargo/rustc/WebGPU runtime, so execution remains NOT_RUN. Controlled mode remains blocked until RUN-01 and DECODE-02D provide PASS/READY evidence.
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_static_checks.json run02e_work/workspace/decode02e_static_checks.json
+--- run02e_orig/workspace/decode02e_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_static_checks.json	2026-05-27 05:04:31.869099603 +0000
+@@ -0,0 +1,25 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
++  "input_patch": "16AI-QW-38G-R6A-RUN-01",
++  "status": "PASS",
++  "checks": {
++    "decode02e_module_exists": true,
++    "lib_declares_decode02e_module": true,
++    "lib_exports_decode02e_types": true,
++    "controlled_config_exists": true,
++    "safe_v1_profile_exists": true,
++    "controlled_action_exists": true,
++    "apply_function_exists": true,
++    "gate_function_exists": true,
++    "default_enabled_false": true,
++    "max_penalty_capped_075": true,
++    "generic_eos_not_hardblock": true,
++    "emotional_repeat_observe": true,
++    "korean_particle_hardblock_forced_false": true,
++    "cpu_oracle_calls_controlled_apply": true,
++    "controlled_env_mode": true,
++    "run01_gate_envs": true,
++    "decode02d_ready_env": true,
++    "artifacts_json_valid": true
++  }
++}
+\ No newline at end of file
+diff -ruN '--exclude=decode02e.patch' run02e_orig/workspace/decode02e_validation_fixtures.json run02e_work/workspace/decode02e_validation_fixtures.json
+--- run02e_orig/workspace/decode02e_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ run02e_work/workspace/decode02e_validation_fixtures.json	2026-05-27 05:04:31.870312712 +0000
+@@ -0,0 +1,94 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
++  "fixtures": [
++    {
++      "name": "gate_blocked_without_decode02d_ready",
++      "input": {
++        "decode02d_status": "NOT_RUN",
++        "mode": "controlled"
++      },
++      "expected": {
++        "effective": false,
++        "action": "GateBlocked",
++        "reason": "DECODE02D_NOT_READY"
++      }
++    },
++    {
++      "name": "eos_before_min_new_tokens_hardblock",
++      "input": {
++        "candidate": "<eos>",
++        "step": 2,
++        "min_new_tokens": 8,
++        "profile": "safe_v1"
++      },
++      "expected": {
++        "action": "HardBlock",
++        "candidate_removed": true
++      }
++    },
++    {
++      "name": "pad_token_hardblock",
++      "input": {
++        "candidate": "<pad>"
++      },
++      "expected": {
++        "action": "HardBlock",
++        "candidate_removed": true
++      }
++    },
++    {
++      "name": "generic_continuation_eos_soft_penalty",
++      "input": {
++        "prev": "▁이어가고",
++        "candidate": "<eos>",
++        "risk": 0.95
++      },
++      "expected": {
++        "action": "SoftPenalty",
++        "candidate_removed": false,
++        "penalty": 0.475
++      }
++    },
++    {
++      "name": "emotional_repeat_observe_only",
++      "input": {
++        "recent": [
++          "ㅠ",
++          "ㅠ"
++        ],
++        "candidate": "ㅠ"
++      },
++      "expected": {
++        "action": "Observe",
++        "candidate_removed": false,
++        "penalty_applied": 0.0
++      }
++    },
++    {
++      "name": "normal_korean_transition_allow",
++      "input": {
++        "prev": "사람",
++        "candidate": "은"
++      },
++      "expected": {
++        "hard_block": false,
++        "candidate_removed": false
++      }
++    },
++    {
++      "name": "repeated_punctuation_soft_penalty",
++      "input": {
++        "recent": [
++          "!",
++          "!",
++          "!"
++        ],
++        "candidate": "!"
++      },
++      "expected": {
++        "action": "SoftPenalty",
++        "candidate_removed": false
++      }
++    }
++  ]
++}
+\ No newline at end of file

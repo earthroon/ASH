@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03A",
+  "schema_version": 1,
+  "description": "Entropy / Confidence Metric Receipt Seal. Observe-only decode step receipt produced from sampler parity CPU oracle evidence.",
+  "required_contract": {
+    "behavior_change": false,
+    "sampler_ssot": "model_core::cpu_oracle_sampler",
+    "input_patch": "16AI-QW-38G-R6A-SAMPLER-05",
+    "runtime_enable_env": "ASH_DECODE03A_ENTROPY=receipt"
+  },
+  "receipt_path_default": "workspace/decode03a_entropy_steps.jsonl",
+  "summary_path_default": "workspace/decode03a_summary.json",
+  "stages": [
+    "Raw",
+    "Scaled",
+    "AfterStaticPrior",
+    "AfterTransitionGuard",
+    "AfterMinP",
+    "AfterTopP",
+    "FinalActive"
+  ],
+  "note": "Raw/scaled/prior stage entropy is marked partial when only sampler03 bridge evidence is available. CPU oracle active/final entropy is populated from CpuOracleCandidateTrace."
+}

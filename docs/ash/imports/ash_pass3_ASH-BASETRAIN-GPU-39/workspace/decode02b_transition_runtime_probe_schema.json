@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
+  "receipt": "workspace/decode02b_transition_runtime_probe_receipt.jsonl",
+  "fields": [
+    "step",
+    "mode",
+    "candidate_trace_version",
+    "cpu_transition",
+    "gpu_transition",
+    "probe_integrity",
+    "parity"
+  ],
+  "parity_statuses": [
+    "PASS",
+    "WARN_RISK_ONLY",
+    "FAIL_ACTION_MISMATCH",
+    "FAIL_REASON_MISMATCH",
+    "FAIL_HARDBLOCK_MISMATCH",
+    "FAIL_HINT_TABLE_MISSING",
+    "FAIL_CANDIDATE_TRACE_VERSION_NOT_V3",
+    "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE"
+  ],
+  "promotion_ready_requires_no_partial": true
+}

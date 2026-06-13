@@ -1,0 +1,41 @@
+{
+  "patch_id": "QW-50-R0X-A",
+  "sample": {
+    "target_repeated_token_id": 417,
+    "target_repeated_piece": "▁보니까",
+    "first_repeat_step": 12,
+    "top1_lock_steps": [
+      12,
+      13,
+      14,
+      15,
+      16
+    ],
+    "top1_lock_ratio_after_onset": 1.0,
+    "mutation_policy": {
+      "token_mutation": false,
+      "token_ban_added": false,
+      "hard_ban_added": false,
+      "blacklist_mutation": false,
+      "logit_mutation": false,
+      "logit_penalty_added": false,
+      "sampler_mutation": false,
+      "temperature_mutation": false,
+      "top_k_mutation": false,
+      "top_p_mutation": false,
+      "min_p_mutation": false,
+      "rerank_execution": false,
+      "retry_execution": false,
+      "decode_policy_mutation": false,
+      "guard_policy_mutation": false,
+      "model_weight_mutation": false,
+      "lora_scale_mutation": false,
+      "crates_js_ts_added": false
+    }
+  },
+  "expected": {
+    "observation_only": true,
+    "selected_token_mutation": false,
+    "recommended_next_patch": "QW-50-R0X-B or QW-50-R0X-C according to margin dominance"
+  }
+}

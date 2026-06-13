@@ -1,0 +1,215 @@
+crates/model_core/src/decode_state.rs:233:        let gate = silu_tensor(layer.gate_proj.forward(normed.clone(), &active_loras, &[]));
+crates/model_core/src/decode_state.rs:234:        let up = layer.up_proj.forward(normed, &active_loras, &[]);
+crates/model_core/src/decode_state.rs:235:        let ff = layer.down_proj.forward(gate * up, &active_loras, &[]);
+crates/model_core/src/decode_state.rs:288:        let gate = silu_tensor(layer.gate_proj.forward(normed.clone(), &active_loras, &[]));
+crates/model_core/src/decode_state.rs:289:        let up = layer.up_proj.forward(normed, &active_loras, &[]);
+crates/model_core/src/decode_state.rs:290:        let ff = layer.down_proj.forward(gate * up, &active_loras, &[]);
+crates/model_core/src/lib.rs:14:mod native_atlas_ffn_probe;
+crates/model_core/src/lib.rs:23:        activation::{sigmoid, softmax},
+crates/model_core/src/lib.rs:34:// Commit 16W SSOT: LLaMA/TinyLlama FFN uses SwiGLU, not a plain sigmoid gate.
+crates/model_core/src/lib.rs:35:// SiLU(x) = x * sigmoid(x), so the FFN path is:
+crates/model_core/src/lib.rs:36:// down_proj(SiLU(gate_proj(normed)) * up_proj(normed)).
+crates/model_core/src/lib.rs:37:fn silu_tensor<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
+crates/model_core/src/lib.rs:38:    x.clone() * sigmoid(x)
+crates/model_core/src/lib.rs:108:pub use native_atlas_ffn_probe::*;
+crates/model_core/src/model_layers.rs:317:    pub gate_proj: AshLinear<B>,
+crates/model_core/src/model_layers.rs:318:    pub up_proj: AshLinear<B>,
+crates/model_core/src/model_layers.rs:319:    pub down_proj: AshLinear<B>,
+crates/model_core/src/model_layers.rs:342:            gate_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.gate_proj"), hidden, inter, false, device),
+crates/model_core/src/model_layers.rs:343:            up_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.up_proj"), hidden, inter, false, device),
+crates/model_core/src/model_layers.rs:344:            down_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.down_proj"), inter, hidden, false, device),
+crates/model_core/src/model_layers.rs:382:        let gate = silu_tensor(self.gate_proj.forward(normed.clone(), runtime_loras, trainable_loras));
+crates/model_core/src/model_layers.rs:383:        let up = self.up_proj.forward(normed, runtime_loras, trainable_loras);
+crates/model_core/src/model_layers.rs:384:        let ff = self.down_proj.forward(gate * up, runtime_loras, trainable_loras);
+crates/model_core/src/model_layers.rs:400:        let gate_runtime_loras = self.gate_proj.bind_runtime_loras(runtime_loras);
+crates/model_core/src/model_layers.rs:401:        let up_runtime_loras = self.up_proj.bind_runtime_loras(runtime_loras);
+crates/model_core/src/model_layers.rs:402:        let down_runtime_loras = self.down_proj.bind_runtime_loras(runtime_loras);
+crates/model_core/src/model_layers.rs:426:        let gate = silu_tensor(self.gate_proj.forward_prepared_bound(normed.clone(), gate_runtime_loras, trainable_loras));
+crates/model_core/src/model_layers.rs:427:        let up = self.up_proj.forward_prepared_bound(normed, up_runtime_loras, trainable_loras);
+crates/model_core/src/model_layers.rs:428:        let ff = self.down_proj.forward_prepared_bound(gate * up, down_runtime_loras, trainable_loras);
+crates/model_core/src/native_wgpu.rs:17:    silu,
+crates/model_core/src/native_wgpu.rs:18:    silu_mul_batched,
+crates/model_core/src/native_wgpu.rs:536:                | "ffn.gate_proj" | "ffn.up_proj" | "ffn.down_proj"
+crates/model_core/src/native_wgpu.rs:634:            let normed_ffn = layer.post_attn_norm.forward(after_attn);
+crates/model_core/src/native_wgpu.rs:635:            let up = layer.up_proj.forward(normed_ffn.clone(), &active_loras, &[]);
+crates/model_core/src/native_wgpu.rs:636:            if idx == layer_idx && suffix == "ffn.up_proj" {
+crates/model_core/src/native_wgpu.rs:637:                return Ok((normed_ffn.clone(), up.clone(), expected_in, expected_out));
+crates/model_core/src/native_wgpu.rs:640:            let gate_pre = layer.gate_proj.forward(normed_ffn.clone(), &active_loras, &[]);
+crates/model_core/src/native_wgpu.rs:641:            if idx == layer_idx && suffix == "ffn.gate_proj" {
+crates/model_core/src/native_wgpu.rs:642:                return Ok((normed_ffn.clone(), gate_pre.clone(), expected_in, expected_out));
+crates/model_core/src/native_wgpu.rs:645:            let gate = silu_tensor(gate_pre);
+crates/model_core/src/native_wgpu.rs:647:            let ff = layer.down_proj.forward(fused.clone(), &active_loras, &[]);
+crates/model_core/src/native_wgpu.rs:648:            if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2623:                | "ffn.gate_proj" | "ffn.up_proj" | "ffn.down_proj"
+crates/model_core/src/native_wgpu.rs:2679:            let normed_ffn = rms_norm_batched(&after_attn, &layer.post_attn_norm, self.spec.norm.eps)?;
+crates/model_core/src/native_wgpu.rs:2680:            let gate = linear_apply_batched(&normed_ffn, &layer.gate_proj)?;
+crates/model_core/src/native_wgpu.rs:2681:            if idx == layer_idx && suffix == "ffn.gate_proj" {
+crates/model_core/src/native_wgpu.rs:2682:                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed_ffn, &gate);
+crates/model_core/src/native_wgpu.rs:2684:            let up = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
+crates/model_core/src/native_wgpu.rs:2685:            if idx == layer_idx && suffix == "ffn.up_proj" {
+crates/model_core/src/native_wgpu.rs:2686:                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed_ffn, &up);
+crates/model_core/src/native_wgpu.rs:2688:            let fused = silu_mul_batched(&gate, &up)?;
+crates/model_core/src/native_wgpu.rs:2689:            let mut down = linear_apply_batched(&fused, &layer.down_proj)?;
+crates/model_core/src/native_wgpu.rs:2690:            apply_loras_to_batched_hidden(&self.attached_loras, idx, "ffn.down_proj", &mut down);
+crates/model_core/src/native_wgpu.rs:2691:            if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2770:                | "ffn.gate_proj" | "ffn.up_proj" | "ffn.down_proj"
+crates/model_core/src/native_wgpu.rs:2873:            let normed_ffn: Vec<Vec<f32>> = after_attn
+crates/model_core/src/native_wgpu.rs:2877:            let gate_all: Vec<Vec<f32>> = normed_ffn.iter().map(|s| linear_apply(s, &layer.gate_proj)).collect();
+crates/model_core/src/native_wgpu.rs:2878:            if idx == layer_idx && suffix == "ffn.gate_proj" {
+crates/model_core/src/native_wgpu.rs:2879:                return Self::capture_module_from_token_hidden(target_key, expected_in, expected_out, &normed_ffn, &gate_all);
+crates/model_core/src/native_wgpu.rs:2881:            let up_all: Vec<Vec<f32>> = normed_ffn.iter().map(|s| linear_apply(s, &layer.up_proj)).collect();
+crates/model_core/src/native_wgpu.rs:2882:            if idx == layer_idx && suffix == "ffn.up_proj" {
+crates/model_core/src/native_wgpu.rs:2883:                return Self::capture_module_from_token_hidden(target_key, expected_in, expected_out, &normed_ffn, &up_all);
+crates/model_core/src/native_wgpu.rs:2886:            let mut fused_rows = if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2891:            let mut down_rows = if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2900:                for i in 0..fused.len() { fused[i] = silu(gate[i]) * up[i]; }
+crates/model_core/src/native_wgpu.rs:2901:                let mut down = linear_apply(&fused, &layer.down_proj);
+crates/model_core/src/native_wgpu.rs:2902:                apply_loras_to_hidden_vec(&self.attached_loras, idx, "ffn.down_proj", &mut down);
+crates/model_core/src/native_wgpu.rs:2903:                if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2911:            if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/native_wgpu.rs:2985:            "ffn.gate_proj" => layer.gate_proj.clone(),
+crates/model_core/src/native_wgpu.rs:2986:            "ffn.up_proj" => layer.up_proj.clone(),
+crates/model_core/src/native_wgpu.rs:2987:            "ffn.down_proj" => layer.down_proj.clone(),
+crates/model_core/src/reference_checkpoint.rs:21:    silu,
+crates/model_core/src/reference_checkpoint.rs:22:    silu_mul_batched,
+crates/model_core/src/reference_checkpoint.rs:206:            let normed_ffn: Vec<Vec<f32>> = after_attn
+crates/model_core/src/reference_checkpoint.rs:212:                let gate = linear_apply(&normed_ffn[idx], &layer.gate_proj);
+crates/model_core/src/reference_checkpoint.rs:213:                let up = linear_apply(&normed_ffn[idx], &layer.up_proj);
+crates/model_core/src/reference_checkpoint.rs:216:                    fused[i] = silu(gate[i]) * up[i];
+crates/model_core/src/reference_checkpoint.rs:218:                let mut down = linear_apply(&fused, &layer.down_proj);
+crates/model_core/src/reference_checkpoint.rs:219:                apply_loras_to_hidden_vec(&self.attached_loras, layer_idx, "ffn.down_proj", &mut down);
+crates/model_core/src/reference_checkpoint.rs:265:                self.apply_reference_loras(layer_idx, "ffn.down_proj", &mut next[i]);
+crates/model_core/src/reference_checkpoint.rs:350:                | "ffn.gate_proj" | "ffn.up_proj" | "ffn.down_proj"
+crates/model_core/src/reference_checkpoint.rs:406:            let normed_ffn = rms_norm_batched(&after_attn, &layer.post_attn_norm, self.spec.norm.eps)?;
+crates/model_core/src/reference_checkpoint.rs:407:            let gate = linear_apply_batched(&normed_ffn, &layer.gate_proj)?;
+crates/model_core/src/reference_checkpoint.rs:408:            if idx == layer_idx && suffix == "ffn.gate_proj" {
+crates/model_core/src/reference_checkpoint.rs:409:                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed_ffn, &gate);
+crates/model_core/src/reference_checkpoint.rs:411:            let up = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
+crates/model_core/src/reference_checkpoint.rs:412:            if idx == layer_idx && suffix == "ffn.up_proj" {
+crates/model_core/src/reference_checkpoint.rs:413:                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed_ffn, &up);
+crates/model_core/src/reference_checkpoint.rs:415:            let fused = silu_mul_batched(&gate, &up)?;
+crates/model_core/src/reference_checkpoint.rs:416:            let mut down = linear_apply_batched(&fused, &layer.down_proj)?;
+crates/model_core/src/reference_checkpoint.rs:417:            apply_loras_to_batched_hidden(&self.attached_loras, idx, "ffn.down_proj", &mut down);
+crates/model_core/src/reference_checkpoint.rs:418:            if idx == layer_idx && suffix == "ffn.down_proj" {
+crates/model_core/src/reference_checkpoint.rs:505:            "ffn.gate_proj" => layer.gate_proj.clone(),
+crates/model_core/src/reference_checkpoint.rs:506:            "ffn.up_proj" => layer.up_proj.clone(),
+crates/model_core/src/reference_checkpoint.rs:507:            "ffn.down_proj" => layer.down_proj.clone(),
+crates/model_core/src/reference_checkpoint.rs:659:    pub gate_proj: FullLinearWeights,
+crates/model_core/src/reference_checkpoint.rs:660:    pub up_proj: FullLinearWeights,
+crates/model_core/src/reference_checkpoint.rs:661:    pub down_proj: FullLinearWeights,
+crates/model_core/src/reference_checkpoint.rs:974:        let gate_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.gate_proj.weight"), vec![])
+crates/model_core/src/reference_checkpoint.rs:975:            .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.gate_proj.weight"), vec![]))?;
+crates/model_core/src/reference_checkpoint.rs:976:        let up_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.up_proj.weight"), vec![])
+crates/model_core/src/reference_checkpoint.rs:977:            .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.up_proj.weight"), vec![]))?;
+crates/model_core/src/reference_checkpoint.rs:978:        let down_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.down_proj.weight"), vec![])
+crates/model_core/src/reference_checkpoint.rs:979:            .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.down_proj.weight"), vec![]))?;
+crates/model_core/src/reference_checkpoint.rs:983:            q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj,
+crates/model_core/src/reference_checkpoint.rs:1083:        gate_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.gate_proj"), &weights.gate_proj, device),
+crates/model_core/src/reference_checkpoint.rs:1084:        up_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.up_proj"), &weights.up_proj, device),
+crates/model_core/src/reference_checkpoint.rs:1085:        down_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.down_proj"), &weights.down_proj, device),
+crates/model_core/src/reference_math.rs:25:pub(crate) fn silu(x: f32) -> f32 { x / (1.0 + (-x).exp()) }
+crates/model_core/src/reference_math.rs:387:pub(crate) fn silu_mul_batched(gate: &BatchedHidden, up: &BatchedHidden) -> Result<BatchedHidden> {
+crates/model_core/src/reference_math.rs:388:    ensure!(gate.batch_size == up.batch_size, "batched silu_mul batch size mismatch");
+crates/model_core/src/reference_math.rs:389:    ensure!(gate.seq_len == up.seq_len, "batched silu_mul seq len mismatch");
+crates/model_core/src/reference_math.rs:390:    ensure!(gate.hidden_dim == up.hidden_dim, "batched silu_mul hidden dim mismatch");
+crates/model_core/src/reference_math.rs:391:    ensure!(gate.lengths == up.lengths, "batched silu_mul lengths mismatch");
+crates/model_core/src/reference_math.rs:395:        out[i] = silu(gate.data[i]) * up.data[i];
+crates/model_core/src/runtime_lora.rs:21186:        && (target_key.contains(".attn.") || target_key.contains(".ffn."))
+crates/model_core/src/runtime_lora.rs:21235:        "ffn.gate_proj" | "ffn.up_proj" => Ok((hidden, inter)),
+crates/model_core/src/runtime_lora.rs:21236:        "ffn.down_proj" => Ok((inter, hidden)),
+crates/model_core/src/native_atlas_ffn_probe.rs:9:use crate::reference_math::{linear_apply, silu};
+crates/model_core/src/native_atlas_ffn_probe.rs:44:    pub burn_cubecl_ffn_matmul_disabled: bool,
+crates/model_core/src/native_atlas_ffn_probe.rs:51:pub fn native_atlas_ffn_16af_weight_layout(
+crates/model_core/src/native_atlas_ffn_probe.rs:58:    ensure!(layer.gate_proj.in_dim == layer.up_proj.in_dim, "16AF gate/up in_dim mismatch: gate={} up={}", layer.gate_proj.in_dim, layer.up_proj.in_dim);
+crates/model_core/src/native_atlas_ffn_probe.rs:59:    ensure!(layer.gate_proj.out_dim == layer.up_proj.out_dim, "16AF gate/up out_dim mismatch: gate={} up={}", layer.gate_proj.out_dim, layer.up_proj.out_dim);
+crates/model_core/src/native_atlas_ffn_probe.rs:60:    ensure!(layer.down_proj.in_dim == layer.gate_proj.out_dim, "16AF down in_dim mismatch: down_in={} intermediate={}", layer.down_proj.in_dim, layer.gate_proj.out_dim);
+crates/model_core/src/native_atlas_ffn_probe.rs:61:    ensure!(layer.down_proj.out_dim == layer.gate_proj.in_dim, "16AF down out_dim mismatch: down_out={} hidden={}", layer.down_proj.out_dim, layer.gate_proj.in_dim);
+crates/model_core/src/native_atlas_ffn_probe.rs:65:        hidden: layer.gate_proj.in_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:66:        intermediate: layer.gate_proj.out_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:67:        gate_shape: [layer.gate_proj.out_dim, layer.gate_proj.in_dim],
+crates/model_core/src/native_atlas_ffn_probe.rs:68:        up_shape: [layer.up_proj.out_dim, layer.up_proj.in_dim],
+crates/model_core/src/native_atlas_ffn_probe.rs:69:        down_shape: [layer.down_proj.out_dim, layer.down_proj.in_dim],
+crates/model_core/src/native_atlas_ffn_probe.rs:70:        gate_bias_present: layer.gate_proj.bias.is_some(),
+crates/model_core/src/native_atlas_ffn_probe.rs:71:        up_bias_present: layer.up_proj.bias.is_some(),
+crates/model_core/src/native_atlas_ffn_probe.rs:72:        down_bias_present: layer.down_proj.bias.is_some(),
+crates/model_core/src/native_atlas_ffn_probe.rs:86:pub fn run_native_atlas_ffn_16af_parity_probe(
+crates/model_core/src/native_atlas_ffn_probe.rs:92:    let layout = native_atlas_ffn_16af_weight_layout(full, layer_idx)?;
+crates/model_core/src/native_atlas_ffn_probe.rs:97:    ensure!(layer.gate_proj.bias.is_none(), "16AF native atlas FFN parity supports biasless gate_proj only");
+crates/model_core/src/native_atlas_ffn_probe.rs:98:    ensure!(layer.up_proj.bias.is_none(), "16AF native atlas FFN parity supports biasless up_proj only");
+crates/model_core/src/native_atlas_ffn_probe.rs:99:    ensure!(layer.down_proj.bias.is_none(), "16AF native atlas FFN parity supports biasless down_proj only");
+crates/model_core/src/native_atlas_ffn_probe.rs:101:    let gate_cpu = linear_apply(input_hidden, &layer.gate_proj);
+crates/model_core/src/native_atlas_ffn_probe.rs:102:    let up_cpu = linear_apply(input_hidden, &layer.up_proj);
+crates/model_core/src/native_atlas_ffn_probe.rs:103:    let mut swiglu_cpu = vec![0.0f32; layout.intermediate];
+crates/model_core/src/native_atlas_ffn_probe.rs:105:        swiglu_cpu[i] = silu(gate_cpu[i]) * up_cpu[i];
+crates/model_core/src/native_atlas_ffn_probe.rs:107:    let cpu_out = linear_apply(&swiglu_cpu, &layer.down_proj);
+crates/model_core/src/native_atlas_ffn_probe.rs:113:            gate_weight: &layer.gate_proj.weight,
+crates/model_core/src/native_atlas_ffn_probe.rs:114:            gate_out_dim: layer.gate_proj.out_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:115:            gate_in_dim: layer.gate_proj.in_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:116:            up_weight: &layer.up_proj.weight,
+crates/model_core/src/native_atlas_ffn_probe.rs:117:            up_out_dim: layer.up_proj.out_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:118:            up_in_dim: layer.up_proj.in_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:119:            down_weight: &layer.down_proj.weight,
+crates/model_core/src/native_atlas_ffn_probe.rs:120:            down_out_dim: layer.down_proj.out_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:121:            down_in_dim: layer.down_proj.in_dim,
+crates/model_core/src/native_atlas_ffn_probe.rs:128:        && gpu.swiglu.len() == swiglu_cpu.len();
+crates/model_core/src/native_atlas_ffn_probe.rs:178:        burn_cubecl_ffn_matmul_disabled: true,
+crates/burn_webgpu_backend/src/lib.rs:7:pub mod native_atlas_ffn;
+crates/burn_webgpu_backend/src/lib.rs:89:    pub activation_checkpointing: bool,
+crates/burn_webgpu_backend/src/lib.rs:125:pub use native_atlas_ffn::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfFlags, NativeAtlasFfn16AfOutput, NativeAtlasFfn16AfWeights, SHADER_NATIVE_ATLAS_FFN_16AF};
+crates/burn_webgpu_backend/src/shaders/qwave_full.wgsl:83:fn sigmoid(v: f32) -> f32 {
+crates/burn_webgpu_backend/src/shaders/qwave_full.wgsl:172:  let yout = log(1.0 + params.lambda_ * sigmoid(q));
+crates/burn_webgpu_backend/src/shaders/qwave_full_f16.wgsl:91:fn sigmoid(v: f32) -> f32 {
+crates/burn_webgpu_backend/src/shaders/qwave_full_f16.wgsl:201:  let yout = log(1.0 + params.lambda_ * sigmoid(q));
+crates/burn_webgpu_backend/src/shaders/qwave_output.wgsl:34:fn sigmoid(x: f32) -> f32 { return 1.0 / (1.0 + exp(-params.sigma_gain * (x - params.sigma_tau))); }
+crates/burn_webgpu_backend/src/shaders/qwave_output.wgsl:52:  output_y[i] = log(1.0 + params.lambda_ * sigmoid(q));
+crates/burn_webgpu_backend/src/shaders/qwave_summary.wgsl:76:fn sigmoid(v: f32) -> f32 {
+crates/burn_webgpu_backend/src/shaders/qwave_summary.wgsl:155:  let _yout = log(1.0 + params.lambda_ * sigmoid(q));
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:37:@group(0) @binding(8) var<storage, read_write> ffn_out: array<f32>;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:39:fn silu_16af(x: f32) -> f32 {
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:44:fn gate_up_swiglu(@builtin(global_invocation_id) gid: vec3<u32>) {
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:66:    mid_out[row] = silu_16af(gate_acc) * up_acc;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:70:fn down_project(@builtin(global_invocation_id) gid: vec3<u32>) {
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:87:    ffn_out[row] = acc;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:102:    pub enable_native_atlas_ffn: bool,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:103:    pub enable_native_silu_swiglu: bool,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:104:    pub disable_burn_cubecl_ffn_matmul: bool,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:110:            enable_native_atlas_ffn: true,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:111:            enable_native_silu_swiglu: true,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:112:            disable_burn_cubecl_ffn_matmul: true,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:136:    pub swiglu: Vec<f32>,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:164:        ensure!(flags.enable_native_atlas_ffn, "16AF native atlas FFN flag disabled");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:165:        ensure!(flags.enable_native_silu_swiglu, "16AF native SiLU/SwiGLU flag disabled");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:166:        ensure!(flags.disable_burn_cubecl_ffn_matmul, "16AF Burn/CubeCL FFN matmul must remain disabled");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:205:            label: Some("16AF.native_atlas_ffn.params"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:210:            label: Some("16AF.native_atlas_ffn.input_hidden"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:215:            label: Some("16AF.native_atlas_ffn.gate_weight"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:220:            label: Some("16AF.native_atlas_ffn.up_weight"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:225:            label: Some("16AF.native_atlas_ffn.down_weight"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:230:        let gate_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_gate", intermediate_len);
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:231:        let up_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_up", intermediate_len);
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:232:        let mid_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_swiglu", intermediate_len);
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:233:        let out_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_out", hidden_len);
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:236:            label: Some("16AF.native_atlas_ffn.shader"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:241:            label: Some("16AF.native_atlas_ffn.bgl"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:256:            label: Some("16AF.native_atlas_ffn.pipeline_layout"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:262:            label: Some("16AF.native_atlas_ffn.gate_up_swiglu.pipeline"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:265:            entry_point: Some("gate_up_swiglu"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:270:            label: Some("16AF.native_atlas_ffn.down_project.pipeline"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:273:            entry_point: Some("down_project"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:279:            label: Some("16AF.native_atlas_ffn.bind_group"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:295:            label: Some("16AF.native_atlas_ffn.encoder"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:300:                label: Some("16AF.native_atlas_ffn.pass"),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:310:        let gate_readback = queue_readback_copy(&gpu.device, &mut encoder, &gate_buffer, intermediate_len, "16AF.native_atlas_ffn.gate.readback");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:311:        let up_readback = queue_readback_copy(&gpu.device, &mut encoder, &up_buffer, intermediate_len, "16AF.native_atlas_ffn.up.readback");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:312:        let mid_readback = queue_readback_copy(&gpu.device, &mut encoder, &mid_buffer, intermediate_len, "16AF.native_atlas_ffn.swiglu.readback");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:313:        let out_readback = queue_readback_copy(&gpu.device, &mut encoder, &out_buffer, hidden_len, "16AF.native_atlas_ffn.out.readback");
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:317:        let gate = map_readback_f32(&gpu.device, &gate_readback, intermediate_len, "16AF.native_atlas_ffn.gate")?;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:318:        let up = map_readback_f32(&gpu.device, &up_readback, intermediate_len, "16AF.native_atlas_ffn.up")?;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:319:        let swiglu = map_readback_f32(&gpu.device, &mid_readback, intermediate_len, "16AF.native_atlas_ffn.swiglu")?;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:320:        let out = map_readback_f32(&gpu.device, &out_readback, hidden_len, "16AF.native_atlas_ffn.out")?;
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:327:            swiglu,
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:329:            resolved_backend: "native_atlas_ffn_16AF+manual_tile_loop+owned_wgpu_buffers".to_string(),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:331:                "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true".to_string(),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:332:                "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true".to_string(),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:333:                "[16AF][ffn] native-owned WGPU buffers used; RawWgpuBufferLease not used".to_string(),
+crates/burn_webgpu_backend/src/native_atlas_ffn.rs:350:        label: Some("16AF.native_atlas_ffn.device"),

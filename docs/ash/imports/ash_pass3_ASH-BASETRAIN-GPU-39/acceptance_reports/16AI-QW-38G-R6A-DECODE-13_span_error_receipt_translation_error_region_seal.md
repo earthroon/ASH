@@ -1,0 +1,75 @@
+# 16AI-QW-38G-R6A-DECODE-13
+## Span Error Receipt / Translation Error Region Seal
+
+status: PASS_STATIC_SPAN_ERROR_RECEIPT_CONTRACT
+domain_ssot: en_to_ko_translation_subtitle_machine
+depends_on:
+  - 16AI-QW-38G-R6A-DECODE-04
+  - 16AI-QW-38G-R6A-DECODE-05
+  - 16AI-QW-38G-R6A-DECODE-06
+  - 16AI-QW-38G-R6A-DECODE-07
+  - 16AI-QW-38G-R6A-DECODE-08
+  - 16AI-QW-38G-R6A-DECODE-09
+  - 16AI-QW-38G-R6A-DECODE-10
+  - 16AI-QW-38G-R6A-DECODE-11
+  - 16AI-QW-38G-R6A-DECODE-12
+
+span_error_policy_created_count: 1
+omission_span_fixture_created_count: 1
+hallucination_span_fixture_created_count: 1
+polarity_span_fixture_created_count: 1
+number_mismatch_span_fixture_created_count: 1
+entity_mismatch_span_fixture_created_count: 1
+missing_qe_receipt_fixture_created_count: 1
+
+span_error_receipt_created_count: 6
+span_error_packet_created_count: 6
+deterministic_key_created_count: 6
+
+omission_span_count: 1
+hallucination_span_count: 1
+polarity_span_count: 1
+number_mismatch_span_count: 1
+entity_mismatch_span_count: 1
+missing_qe_receipt_count: 1
+
+review_required_count: 6
+hard_fail_recommended_count: 1
+rewrite_recommended_count: 1
+source_adequacy_gate_required_count: 1
+glossary_gate_required_count: 1
+qe_receipt_required_count: 1
+
+localized_by_stub_count: 6
+localized_by_external_model_count: 0
+
+rewrite_executed_count: 0
+rollback_executed_count: 0
+candidate_reject_executed_count: 0
+
+runtime_decode_executed_count: 0
+model_forward_executed_count: 0
+sampling_executed_count: 0
+qe_model_executed_count: 0
+external_span_model_executed_count: 0
+
+external_span_model_allowed: false
+external_span_model_executed: false
+production_default_apply: false
+
+decode12_qe_receipt_required: true
+decode11_final_gate_required: true
+decode04_quality_score_span_slot_extended: true
+
+duplicate_receipt_key_count: 0
+domain_ssot_mismatch_count: 0
+
+canonical_receipt_keys:
+  omission: q4sha256:8f4c37e89c6835a16808ec8376f2af5b7078bcc9d4e9a150e1edbf16d618b5cf
+  hallucination: q4sha256:ca1b2c98402811d231a503e14115f414c7338ec2569468485979bca693b1153a
+  polarity: q4sha256:099d0457725fa48b1deecad287a1cf9f10774f9c43c101c7480cbfd6e64cdc1d
+  number_mismatch: q4sha256:ea13d0b76c1fd251cb0918461e28d4a83f99f91e71ff252e4c9e4ea0542b641b
+  entity_mismatch: q4sha256:d571140356aea8e21fc447de5055f8a30063ba19c88e3ce20ea7aa07732dd51b
+  missing_qe: q4sha256:73bf659614409aec70dac5d5c8f14d8b544f8123fa551a749eba257a44e244a4
+
+No rewrite, rollback, candidate rejection, COMET/xCOMET, LLM judge, model forward, or sampling is executed by this patch.

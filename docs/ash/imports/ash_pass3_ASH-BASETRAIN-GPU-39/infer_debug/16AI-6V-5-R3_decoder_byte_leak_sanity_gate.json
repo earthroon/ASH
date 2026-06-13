@@ -1,0 +1,178 @@
+{
+  "inputs": {
+    "branch_replay_json": "infer_debug/16AI-6V-5_tokenizer_v6_branch_local_replay.json",
+    "facade_json": "infer_debug/16AI-6V-3_tokenizer_v6_facade_probe.json",
+    "policy_import_json": "infer_debug/16AI-6V-4_tokenizer_v6_policy_import.json",
+    "policy_registry": "artifacts/tokenizer_v6_policy_registry.json",
+    "triage_json": "infer_debug/16AI-6V-5-R1_branch_local_byte_leak_triage.json",
+    "v5_manifest": "artifacts/tokenizer_manifest_v5_final.json",
+    "v6_manifest": "artifacts/tokenizer_manifest_v6_compat.json"
+  },
+  "reports": [
+    {
+      "baseline_raw_new_text": "<0x63>",
+      "baseline_sanity": {
+        "blocked_reasons": [
+          "ByteLikeTokenText",
+          "RawByteFallbackMarker"
+        ],
+        "byte_leak_detected": true,
+        "case_id": "ko_descriptive_sentence",
+        "diagnostics": [
+          "byte_like_output_detected=true",
+          "raw_output_preserved=true",
+          "output_mutated=false"
+        ],
+        "empty_output_detected": false,
+        "high_repetition_detected": false,
+        "new_token_ids": [
+          171
+        ],
+        "output_mutated": false,
+        "raw_new_text": "<0x63>",
+        "raw_output_preserved": true,
+        "recommended_runtime_action": "block_output_and_retry_or_fallback",
+        "runtime_mode": "v5-baseline",
+        "safe_display_text": "[OUTPUT_BLOCKED: BYTE_LEAK]",
+        "sanity_status": "BlockedByteLeak",
+        "special_marker_leak_detected": false,
+        "wrapper": "dialogue-ko",
+        "wrapper_echo_detected": false
+      },
+      "branch_local_not_causal": true,
+      "case_id": "ko_descriptive_sentence",
+      "causality_decision": "BranchLocalNotCausal",
+      "v6_branch_local_sanity": {
+        "blocked_reasons": [
+          "ByteLikeTokenText",
+          "RawByteFallbackMarker"
+        ],
+        "byte_leak_detected": true,
+        "case_id": "ko_descriptive_sentence",
+        "diagnostics": [
+          "byte_like_output_detected=true",
+          "raw_output_preserved=true",
+          "output_mutated=false"
+        ],
+        "empty_output_detected": false,
+        "high_repetition_detected": false,
+        "new_token_ids": [
+          171
+        ],
+        "output_mutated": false,
+        "raw_new_text": "<0x63>",
+        "raw_output_preserved": true,
+        "recommended_runtime_action": "block_output_and_retry_or_fallback",
+        "runtime_mode": "v6-branch-local",
+        "safe_display_text": "[OUTPUT_BLOCKED: BYTE_LEAK]",
+        "sanity_status": "BlockedByteLeak",
+        "special_marker_leak_detected": false,
+        "wrapper": "dialogue-ko",
+        "wrapper_echo_detected": false
+      },
+      "v6_leak_regression": false,
+      "v6_raw_new_text": "<0x63>",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "baseline_raw_new_text": "<0x63>",
+      "baseline_sanity": {
+        "blocked_reasons": [
+          "ByteLikeTokenText",
+          "RawByteFallbackMarker"
+        ],
+        "byte_leak_detected": true,
+        "case_id": "ko_particle_short",
+        "diagnostics": [
+          "byte_like_output_detected=true",
+          "raw_output_preserved=true",
+          "output_mutated=false"
+        ],
+        "empty_output_detected": false,
+        "high_repetition_detected": false,
+        "new_token_ids": [
+          171
+        ],
+        "output_mutated": false,
+        "raw_new_text": "<0x63>",
+        "raw_output_preserved": true,
+        "recommended_runtime_action": "block_output_and_retry_or_fallback",
+        "runtime_mode": "v5-baseline",
+        "safe_display_text": "[OUTPUT_BLOCKED: BYTE_LEAK]",
+        "sanity_status": "BlockedByteLeak",
+        "special_marker_leak_detected": false,
+        "wrapper": "dialogue-ko",
+        "wrapper_echo_detected": false
+      },
+      "branch_local_not_causal": true,
+      "case_id": "ko_particle_short",
+      "causality_decision": "BranchLocalNotCausal",
+      "v6_branch_local_sanity": {
+        "blocked_reasons": [
+          "ByteLikeTokenText",
+          "RawByteFallbackMarker"
+        ],
+        "byte_leak_detected": true,
+        "case_id": "ko_particle_short",
+        "diagnostics": [
+          "byte_like_output_detected=true",
+          "raw_output_preserved=true",
+          "output_mutated=false"
+        ],
+        "empty_output_detected": false,
+        "high_repetition_detected": false,
+        "new_token_ids": [
+          171
+        ],
+        "output_mutated": false,
+        "raw_new_text": "<0x63>",
+        "raw_output_preserved": true,
+        "recommended_runtime_action": "block_output_and_retry_or_fallback",
+        "runtime_mode": "v6-branch-local",
+        "safe_display_text": "[OUTPUT_BLOCKED: BYTE_LEAK]",
+        "sanity_status": "BlockedByteLeak",
+        "special_marker_leak_detected": false,
+        "wrapper": "dialogue-ko",
+        "wrapper_echo_detected": false
+      },
+      "v6_leak_regression": false,
+      "v6_raw_new_text": "<0x63>",
+      "wrapper": "dialogue-ko"
+    }
+  ],
+  "run": {
+    "acceptance_status": "PASS_DECODER_OUTPUT_SANITY_GATE",
+    "checkpoint_required": false,
+    "embedding_resize_required": false,
+    "generation": false,
+    "global_default_commit": false,
+    "gpu_default": false,
+    "gpu_execution": false,
+    "id": "16AI-6V-5-R3",
+    "kind": "decoder_byte_leak_sanity_gate",
+    "new_token_ids_created": false,
+    "output_mutated": false,
+    "raw_output_preserved": true,
+    "source_decision": "BranchLocalNotCausal",
+    "source_triage": "16AI-6V-5-R1",
+    "token_ids_mutated": false,
+    "vocab_augmented": false
+  },
+  "summary": {
+    "acceptance_status": "PASS_DECODER_OUTPUT_SANITY_GATE",
+    "blocked_output_count": 2,
+    "branch_local_not_causal_count": 2,
+    "byte_leak_detected_count": 2,
+    "case_count": 2,
+    "embedding_resize_required": false,
+    "global_default_commit": false,
+    "gpu_default": false,
+    "new_token_ids_created": false,
+    "output_mutated_count": 0,
+    "pass_clean_count": 0,
+    "raw_output_preserved_count": 2,
+    "token_ids_mutated": false,
+    "v6_leak_regression_count": 0,
+    "vocab_augmented": false
+  }
+}

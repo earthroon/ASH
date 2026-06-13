@@ -1,0 +1,89 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-24",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "validation_status": "PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE",
+  "rust_toolchain_available": false,
+  "checks": [
+    {
+      "name": "registry_summary_query_ok",
+      "pass": true
+    },
+    {
+      "name": "empty_ledger_entry_found",
+      "pass": true
+    },
+    {
+      "name": "entry_by_packet_hash_found",
+      "pass": true
+    },
+    {
+      "name": "no_duplicate_evidence",
+      "pass": true
+    },
+    {
+      "name": "no_collision_evidence",
+      "pass": true
+    },
+    {
+      "name": "immutable_registry_pass",
+      "pass": true
+    },
+    {
+      "name": "archive_registry_mutated_false",
+      "pass": true
+    },
+    {
+      "name": "archive_entry_created_false",
+      "pass": true
+    },
+    {
+      "name": "audit_packet_mutated_false",
+      "pass": true
+    },
+    {
+      "name": "target_text_mutated_false",
+      "pass": true
+    },
+    {
+      "name": "runtime_default_apply_false",
+      "pass": true
+    }
+  ],
+  "summary": {
+    "patch_id": "16AI-QW-38G-R6A-WCTX-24",
+    "domain_ssot": "en_to_ko_translation_subtitle_machine",
+    "total_cases": 7,
+    "pass_cases": 7,
+    "fail_cases": 0,
+    "deterministic_failures": 0,
+    "risk_failures": 0,
+    "query_ok_count": 1,
+    "registry_empty_count": 0,
+    "entry_found_count": 2,
+    "entry_not_found_count": 0,
+    "empty_ledger_entry_found_count": 1,
+    "empty_ledger_entry_not_found_count": 0,
+    "duplicate_evidence_found_count": 0,
+    "no_duplicate_evidence_count": 1,
+    "collision_evidence_found_count": 0,
+    "no_collision_evidence_count": 1,
+    "immutable_registry_pass_count": 1,
+    "archive_registry_mutation_count": 0,
+    "archive_entry_created_count": 0,
+    "archive_entry_deleted_count": 0,
+    "archive_entry_superseded_count": 0,
+    "audit_packet_mutation_count": 0,
+    "ledger_mutation_count": 0,
+    "revision_event_created_count": 0,
+    "target_text_mutation_count": 0,
+    "commit_executed_in_archive_query_count": 0,
+    "rollback_executed_in_archive_query_count": 0,
+    "runtime_default_apply_count": 0,
+    "runtime_apply_gate_open_count": 0,
+    "rerank_applied_count": 0,
+    "decode_executed_in_archive_query_count": 0,
+    "generation_executed_in_archive_query_count": 0,
+    "model_forward_executed_in_archive_query_count": 0,
+    "sampling_executed_in_archive_query_count": 0
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "patch_id": "QW-50-R0W-C",
+  "status": "PASS_STATIC",
+  "cargo_verified": false,
+  "cargo_verification_note": "cargo/rustc unavailable in bake environment",
+  "checks": {
+    "qwc_consts_present": true,
+    "prefix_push_fields_present": true,
+    "generated_repeat_fields_present": true,
+    "prefix_push_rule_requires_pushed_and_delta": true,
+    "generated_repeat_rule_requires_no_push_and_zero_delta": true,
+    "recommendation_moves_to_r0x_a": true,
+    "wrapper_tokenizer_manifest_support": true,
+    "powershell_wrapper_has_tokenizer_manifest": true,
+    "cmd_wrapper_has_tokenizer_manifest": true,
+    "runtime_profile_checkpoint_patched": true,
+    "runtime_profile_tokenizer_patched": true,
+    "sampler_mutation_absent": true,
+    "token_ban_not_added_by_patch": true
+  }
+}

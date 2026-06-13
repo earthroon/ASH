@@ -1,0 +1,72 @@
+[
+  {
+    "term_id": "term-daniel",
+    "violation_type": "RequiredTermMissing",
+    "term_kind": "CharacterName",
+    "constraint_strength": "Required",
+    "source_match_hash": "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7",
+    "target_expectation_hash": "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617",
+    "candidate_match_hash": "sha256:8c481b6cc32e0035aff102ffd512eff6623e749f0dd9e225c811f86ac563f2fd",
+    "severity_score": 0.30000000000000004,
+    "review_required": false,
+    "reject_recommended": false,
+    "rewrite_recommended": true,
+    "action_hint": "RewriteCandidate"
+  },
+  {
+    "term_id": "term-void-engine",
+    "violation_type": "WrongTargetTermUsed",
+    "term_kind": "SeriesTerm",
+    "constraint_strength": "Required",
+    "source_match_hash": "sha256:b812dcf6a7225872359ad0fbb00c98473ab2c3636f887988833cb6ba4f965708",
+    "target_expectation_hash": "sha256:a80aece79b6f97e1e4622a0018930e5cce22f09c0cb08a89417aa8696b8a2ad9",
+    "candidate_match_hash": "sha256:9761f88ae92d5b45ec78307f725c939b0deada8ff7e5b0a0b8db2aeac1be040d",
+    "severity_score": 0.30000000000000004,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "ReviewRequired"
+  },
+  {
+    "term_id": "term-daniel",
+    "violation_type": "ForbiddenAliasUsed",
+    "term_kind": "CharacterName",
+    "constraint_strength": "Required",
+    "source_match_hash": "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7",
+    "target_expectation_hash": "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617",
+    "candidate_match_hash": "sha256:3ff2b52f2e96ec618fd1c9257f62c8ba96becaf55a8c22396990144beb9a0092",
+    "severity_score": 0.35,
+    "review_required": false,
+    "reject_recommended": true,
+    "rewrite_recommended": false,
+    "action_hint": "RejectCandidate"
+  },
+  {
+    "term_id": "term-nova-order",
+    "violation_type": "VariantTermUsed",
+    "term_kind": "OrganizationName",
+    "constraint_strength": "Preferred",
+    "source_match_hash": "sha256:b1364b8cf2f3d6f283bfda8cc1ff3f74f78ea8257099312b22773b814876ac5b",
+    "target_expectation_hash": "sha256:796b446b97ac15727cabd701fbd1f1b03de64e9bef818349e15a43dae49cf842",
+    "candidate_match_hash": "sha256:34b667b2985796c7d887fc054edf2674ea76c6819362665f638623f983be83c2",
+    "severity_score": 0.07999999999999996,
+    "review_required": true,
+    "reject_recommended": false,
+    "rewrite_recommended": false,
+    "action_hint": "ReviewRequired"
+  },
+  {
+    "term_id": "term-daniel",
+    "violation_type": "NamedEntityMismatch",
+    "term_kind": "CharacterName",
+    "constraint_strength": "Required",
+    "source_match_hash": "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7",
+    "target_expectation_hash": "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617",
+    "candidate_match_hash": "sha256:69c1b21b52eac3a5e024f15874585007710014a4b1b4fe2a8a699598e38ae6d4",
+    "severity_score": 0.35,
+    "review_required": false,
+    "reject_recommended": true,
+    "rewrite_recommended": false,
+    "action_hint": "RejectCandidate"
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "patch_id": "ASH-FT-21",
+  "title": "Atlas Group Sequential Fine-Tune Stack Rebase / No Full Model Upload No Full Weight Update Seal",
+  "mode": "training_mainline_rebase",
+  "diagnostic_branch_freeze": true,
+  "training_mainline_declared": true,
+  "training_mainline": "atlas_group_sequential_finetune_stack",
+  "allow_full_model_upload": false,
+  "allow_full_weight_update": false,
+  "allow_full_optimizer_state_allocation": false,
+  "allow_base_checkpoint_mutation": false,
+  "allow_runtime_default_apply": false,
+  "allow_checkpoint_alias_rebind": false,
+  "allow_promotion": false,
+  "delta_stack_mode": "ordered_append_only",
+  "next_patch": "ASH-FT-22"
+}

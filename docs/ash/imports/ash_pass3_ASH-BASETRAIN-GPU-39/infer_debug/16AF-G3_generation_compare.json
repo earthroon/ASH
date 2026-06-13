@@ -1,0 +1,97 @@
+{
+  "attention_native": false,
+  "cache": {
+    "cached_layers": 14,
+    "enable_ms": 1104.3461,
+    "preupload": true,
+    "preupload_ms": 443.9547,
+    "total_bytes": 1937768448
+  },
+  "candidate_runtime_enabled": true,
+  "candidate_wire_present": true,
+  "commit": "16AF-G3",
+  "comparison": {
+    "first_mismatch_index": null,
+    "new_text_match": true,
+    "new_token_ids_match": true,
+    "text_match": true,
+    "token_ids_match": true
+  },
+  "cpu_reference": {
+    "elapsed_ms": 283206.7344,
+    "ids": [
+      1,
+      2,
+      3,
+      16422,
+      898,
+      16908,
+      7409,
+      2766,
+      1079,
+      4161,
+      27064
+    ],
+    "new_ids": [
+      16422,
+      898,
+      16908,
+      7409,
+      2766,
+      1079,
+      4161,
+      27064
+    ],
+    "new_text": "▁브라질 ▁했고 ▁장수풍뎅이 ▁나더라고요 ▁장점은 ▁쉽게 ▁마이너스 ▁키워드를",
+    "text": ""
+  },
+  "fallback_cpu_reference": true,
+  "generation_connected_default": false,
+  "kv_cache_native": false,
+  "max_new_tokens": 8,
+  "native_candidate": {
+    "elapsed_ms": 80628.12289999999,
+    "ids": [
+      1,
+      2,
+      3,
+      16422,
+      898,
+      16908,
+      7409,
+      2766,
+      1079,
+      4161,
+      27064
+    ],
+    "new_ids": [
+      16422,
+      898,
+      16908,
+      7409,
+      2766,
+      1079,
+      4161,
+      27064
+    ],
+    "new_text": "▁브라질 ▁했고 ▁장수풍뎅이 ▁나더라고요 ▁장점은 ▁쉽게 ▁마이너스 ▁키워드를",
+    "text": ""
+  },
+  "parity_pass_required": true,
+  "parity_passed": true,
+  "prompt_ids": [
+    1,
+    2,
+    3
+  ],
+  "runtime_gate": "native_ffn_candidate_vs_cpu_reference_generation_compare",
+  "summary": {
+    "cpu_reference_fallback_preserved": true,
+    "default_false_preserved": true,
+    "generation_default_connected": false,
+    "pass": true
+  },
+  "tokenizer_loaded": true,
+  "tokenizer_manifest": ".\\artifacts\\tokenizer_manifest_v5_final.json",
+  "vocab_limit": 56253
+}

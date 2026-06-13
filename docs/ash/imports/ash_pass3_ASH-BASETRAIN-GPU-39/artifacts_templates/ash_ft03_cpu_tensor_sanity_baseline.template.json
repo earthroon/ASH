@@ -1,0 +1,37 @@
+{
+  "patch_id": "ASH-FT-03",
+  "title": "CPU Tensor Sanity Baseline / Sampled Norm Drift Registry / No Train Seal",
+  "kind": "cpu_tensor_sanity_baseline",
+  "base": {
+    "ft00_manifest_path": "artifacts/ash_ft/ash_ft00_full_coverage_manifest.json",
+    "ft00_manifest_sha256": "",
+    "ft01_budget_path": "artifacts/ash_ft/ash_ft01_atlas_group_memory_budget.json",
+    "ft01_budget_sha256": "",
+    "ft02_probe_path": "artifacts/ash_ft/ash_ft02_full_coverage_slice_probe.json",
+    "ft02_probe_sha256": "",
+    "ft02_family_summary_path": "artifacts/ash_ft/ash_ft02_tensor_family_slice_summary.json",
+    "ft02_family_summary_sha256": ""
+  },
+  "baseline_config": {
+    "baseline_policy": "conservative",
+    "drift_threshold_policy": "relative",
+    "norm_zero_epsilon": 1e-12,
+    "max_abs_soft_limit": 100.0,
+    "outlier_z_threshold": 6.0
+  },
+  "summary": {
+    "total_tensor_count": 0,
+    "baseline_tensor_count": 0,
+    "family_count": 0,
+    "group_count": 0,
+    "warn_tensor_count": 0,
+    "fail_tensor_count": 0,
+    "nan_count": 0,
+    "inf_count": 0,
+    "zero_norm_sample_count": 0,
+    "baseline_status": "PENDING_RUNTIME"
+  },
+  "tensor_baselines": [],
+  "family_baselines": [],
+  "group_baselines": []
+}

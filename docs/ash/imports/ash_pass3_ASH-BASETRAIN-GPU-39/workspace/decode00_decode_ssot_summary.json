@@ -1,0 +1,75 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-00",
+  "status": "DECODE_SSOT_AND_WORD_SALAD_PROBE_BAKED_STATIC",
+  "decode_ssot_owner": "tokenizer_core::decode_ssot",
+  "canonical_decode_functions": [
+    "decode_token_sequence_to_text",
+    "decode_manifest_token_sequence",
+    "decode_piece_sequence_to_text",
+    "decode_piece_to_text",
+    "decode_single_token_fragment"
+  ],
+  "unified_decode_paths": [
+    "runtime final output -> tokenizer_core::decode_ssot",
+    "model_core streaming output -> tokenizer_core::decode_ssot",
+    "tokenizer direct decode -> tokenizer_core::decode_ssot"
+  ],
+  "probe_outputs": [
+    "workspace/decode00_distribution_probe.jsonl"
+  ],
+  "probe_top_n_default": 20,
+  "required_probe_fields": [
+    "selected_id",
+    "selected_piece",
+    "selected_text",
+    "top_n",
+    "eos_rank",
+    "eos_logit",
+    "decode_mode",
+    "sampler_requested",
+    "sampler_applied",
+    "fallback_applied",
+    "fallback_reason",
+    "finite_logits",
+    "nan_count",
+    "inf_count"
+  ],
+  "implemented_files": [
+    "crates/tokenizer_core/src/decode_ssot.rs",
+    "crates/tokenizer_core/src/lib.rs",
+    "crates/runtime/src/infer/output_text.rs",
+    "crates/model_core/src/sampling_helpers.rs"
+  ],
+  "artifact_files": [
+    "workspace/decode00_decode_ssot_summary.json",
+    "workspace/decode00_distribution_probe_schema.json",
+    "workspace/decode00_distribution_probe.jsonl",
+    "workspace/decode00_report.md",
+    "workspace/decode00.patch",
+    "acceptance_reports/16AI-QW-38G-R6A-DECODE-00_acceptance.md"
+  ],
+  "acceptance_static_checks": {
+    "decode_ssot_module_exists": true,
+    "tokenizer_core_exports_decode_ssot": true,
+    "native_decode_uses_decode_ssot": true,
+    "runtime_output_uses_decode_ssot": true,
+    "model_core_streaming_uses_decode_ssot": true,
+    "decode_step_probe_struct_exists": true,
+    "top_token_probe_struct_exists": true,
+    "sampler_requested_field_exists": true,
+    "sampler_applied_field_exists": true,
+    "fallback_reason_field_exists": true
+  },
+  "non_scope": [
+    "full_cpu_oracle_sampler",
+    "webgpu_active_set_renormalization",
+    "deltak_qwave_weighted_minp",
+    "context_router_training"
+  ],
+  "tooling_limits": [
+    "cargo_not_available",
+    "rustc_not_available",
+    "rustfmt_not_available"
+  ],
+  "static_check_status": "PASS"
+}

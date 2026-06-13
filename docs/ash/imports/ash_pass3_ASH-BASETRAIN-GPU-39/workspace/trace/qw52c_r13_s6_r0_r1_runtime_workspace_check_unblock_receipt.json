@@ -1,0 +1,22 @@
+{
+  "patch_id": "QW-52C-R13-S6-R0-R1",
+  "base_patch": "QW-52C-R13-S6-R0",
+  "status": "PATCH_APPLIED_CARGO_UNVERIFIED_IN_BAKE_ENV",
+  "target_status": "PASS_RUNTIME_WORKSPACE_CHECK_UNBLOCK_EXAMPLE_DEPENDENCY_BOUNDARY",
+  "cargo_check_unverified_reason": "rustc/cargo unavailable in bake container",
+  "source_repair_applied": true,
+  "runtime_apply_allowed": false,
+  "promotion_eligible": false,
+  "modified_files": [
+    {
+      "path": "crates/runtime/src/infer.rs",
+      "content_sha256": "sha256:03f05be8aa652962914df6fb12e3d17f17d623575dd806dd4339f1139b887ff6",
+      "size_bytes": 179976
+    },
+    {
+      "path": "crates/runtime_unz/Cargo.toml",
+      "content_sha256": "sha256:d317176fd8177e2e0058a9a55800b6490b92c6a9c70eee6a28180dc02c94a15d",
+      "size_bytes": 752
+    }
+  ]
+}

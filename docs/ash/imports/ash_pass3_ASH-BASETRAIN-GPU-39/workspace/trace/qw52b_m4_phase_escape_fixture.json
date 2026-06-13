@@ -1,0 +1,95 @@
+[
+  {
+    "case_id": "low_risk_no_escape_needed",
+    "current_phase": 1.0,
+    "candidate_phase": 1.2,
+    "input_anchor_phase": 1.1,
+    "recent_phase_window": [
+      0.8,
+      0.9,
+      1.0
+    ],
+    "residual_loop_score": 0.12,
+    "self_echo_score": 0.1,
+    "mirror_resonance_score": 0.7,
+    "expected": {
+      "shadow_recommended": false,
+      "risk_level_max": "Low"
+    }
+  },
+  {
+    "case_id": "phase_locked_loop_detected",
+    "current_phase": 1.0,
+    "candidate_phase": 1.03,
+    "input_anchor_phase": 2.4,
+    "recent_phase_window": [
+      0.98,
+      1.01,
+      1.02
+    ],
+    "residual_loop_score": 0.74,
+    "self_echo_score": 0.79,
+    "mirror_resonance_score": -0.2,
+    "expected": {
+      "risk_level_min": "High",
+      "phase_lock_score_min": 0.9,
+      "shadow_recommended": false
+    }
+  },
+  {
+    "case_id": "phase_escape_candidate_shadow_recommended",
+    "current_phase": 1.0,
+    "candidate_phase": 4.05,
+    "input_anchor_phase": 3.7,
+    "recent_phase_window": [
+      0.98,
+      1.01,
+      1.02
+    ],
+    "residual_loop_score": 0.76,
+    "self_echo_score": 0.8,
+    "mirror_resonance_score": 0.1,
+    "expected": {
+      "phase_opposition_score_min": 0.85,
+      "input_anchor_fit_min": 0.7,
+      "phase_escape_score_min": 0.6,
+      "shadow_recommended": true,
+      "action_allowed": false
+    }
+  },
+  {
+    "case_id": "phase_opposite_but_input_drift_rejected",
+    "current_phase": 1.0,
+    "candidate_phase": 4.14,
+    "input_anchor_phase": 1.1,
+    "recent_phase_window": [
+      0.98,
+      1.01,
+      1.02
+    ],
+    "residual_loop_score": 0.78,
+    "self_echo_score": 0.82,
+    "mirror_resonance_score": -0.1,
+    "expected": {
+      "phase_opposition_score_min": 0.85,
+      "input_anchor_fit_max": 0.3,
+      "shadow_recommended": false
+    }
+  },
+  {
+    "case_id": "missing_phase_trace",
+    "current_phase": null,
+    "candidate_phase": null,
+    "input_anchor_phase": null,
+    "recent_phase_window": [],
+    "residual_loop_score": 0.7,
+    "self_echo_score": 0.7,
+    "mirror_resonance_score": null,
+    "expected": {
+      "risk_level": "Unavailable",
+      "shadow_recommended": false,
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  }
+]

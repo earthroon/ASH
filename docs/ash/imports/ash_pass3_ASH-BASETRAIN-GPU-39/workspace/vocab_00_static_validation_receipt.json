@@ -1,0 +1,61 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-VOCAB-00",
+  "title": "Runtime Vocab Cap 48256 Trace / Logit Head Range Seal",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "preceded_by": "16AI-QW-38G-R6A-PERF-REVIEW-00",
+  "model_spec_vocab_size": 56000,
+  "v5_model_spec_vocab_size": 48259,
+  "tokenizer_manifest_vocab_count": 48259,
+  "checkpoint_fingerprint_vocab_size": 48259,
+  "embedding_vocab_dim": 48259,
+  "lm_head_vocab_dim": 48259,
+  "operator_prior_expected_runtime_vocab_cap": 48256,
+  "operator_revised_likely_vocab_cap": 48259,
+  "runtime_vocab_cap_48256_source_found": false,
+  "runtime_vocab_cap_48256_confirmed": false,
+  "runtime_vocab_cap_48259_static_lineage_confirmed": true,
+  "runtime_vocab_cap_confirmed_by_execution": false,
+  "tokens_above_48255_count": 3,
+  "tokens_above_48255_classified": true,
+  "tokens_above_48255": [
+    {
+      "token": "<byte:FD>",
+      "id": 48256,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FE>",
+      "id": 48257,
+      "score": null,
+      "is_reserved": false
+    },
+    {
+      "token": "<byte:FF>",
+      "id": 48258,
+      "score": null,
+      "is_reserved": false
+    }
+  ],
+  "tail_ids_banned": {
+    "48256": true,
+    "48257": true,
+    "48258": true
+  },
+  "lm_head_matches_tokenizer_vocab": true,
+  "lm_head_matches_prior_48256_cap": false,
+  "runtime_probe_executed": false,
+  "cargo_available": false,
+  "false_runtime_cap_48256_claim": false,
+  "false_lm_head_range_claim": false,
+  "silent_vocab_mutation": false,
+  "vocab_range_status": "CONSISTENT_48259_CURRENT_RUNTIME_CANDIDATE_WITH_56000_HIGHER_SPEC_DRIFT_AND_48256_PRIOR_UNCONFIRMED",
+  "vocab_trace_status": "PASS_STATIC_VOCAB_TRACE_BASELINE_48259_RECLASSIFIED",
+  "vocab_risks": [
+    "VOCAB_RISK_STATIC_SPEC_DRIFT",
+    "VOCAB_RISK_48256_PRIOR_UNCONFIRMED",
+    "VOCAB_RISK_48259_HEAD_TOKENIZER_LINEAGE_STRONG",
+    "VOCAB_RISK_48256_EXCLUSIVE_CAP_WOULD_TRUNCATE_BYTE_FALLBACK_TAIL_FD_FE_FF"
+  ],
+  "next_recommended_patch": "16AI-QW-38G-R6A-DECODE-SAMPLER-00 or 16AI-QW-38G-R6A-EVAL-TRANS-00"
+}

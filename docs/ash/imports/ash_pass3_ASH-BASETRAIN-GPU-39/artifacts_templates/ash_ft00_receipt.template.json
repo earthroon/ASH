@@ -1,0 +1,65 @@
+{
+  "patch_id": "ASH-FT-00",
+  "title": "Full Safetensors Trainable Coverage Manifest / Atlas Group Plan / No Weight Mutation Seal",
+  "status": "PENDING_ASH_FT00_FULL_COVERAGE_MANIFEST_NO_WEIGHT_MUTATION",
+  "source": {
+    "path": "tokenizer_v5/artifacts/ash_v5_native_genesis.forge01_smoke.safetensors",
+    "sha256_expected": "cecd088c8830d2c2c4ace4f684b9a06d119c0e00eda54f5d33f4016524c13537",
+    "sha256_actual": null,
+    "sha256_matches": false,
+    "slot": "forge01_smoke_shadow",
+    "file_size_bytes": null,
+    "header_length_bytes": null,
+    "runtime_default_apply_allowed": false
+  },
+  "dependency": {
+    "forge01_r3_required": true,
+    "forge01_r3_receipt_path": "artifacts/qw_tok_forge01_r3_tensor_map_dryrun_receipt.json",
+    "forge01_r3_receipt_exists": false,
+    "forge01_r3_pass_observed": false,
+    "forge01_r3_status": null,
+    "runtime_default_promotable": false,
+    "operator_review_required": true
+  },
+  "manifest": {
+    "created": false,
+    "path": "artifacts/ash_ft/ash_ft00_full_coverage_manifest.json",
+    "total_tensor_count": 0,
+    "covered_tensor_count": 0,
+    "all_tensors_registered": false,
+    "coverage_ratio": 0.0,
+    "unknown_tensor_count": 0
+  },
+  "atlas_group_plan": {
+    "created": false,
+    "path": "artifacts/ash_ft/ash_ft00_atlas_group_plan.json",
+    "total_group_count": 0,
+    "parallel_group_count": 0,
+    "sequential_commit_required": true,
+    "largest_group_budget_bytes": 0,
+    "full_load_required": false
+  },
+  "guards": {
+    "safetensors_header_read_executed": true,
+    "tensor_value_materialized": false,
+    "full_tensor_load_executed": false,
+    "mmap_materialization_executed": false,
+    "gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "backward_executed": false,
+    "loss_calculation_executed": false,
+    "optimizer_created": false,
+    "optimizer_step_executed": false,
+    "gradient_write_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "runtime_config_mutation_executed": false
+  },
+  "hard_failures": [],
+  "warnings": [],
+  "verdict": "PENDING_FULL_COVERAGE_MANIFEST_NO_WEIGHT_MUTATION"
+}

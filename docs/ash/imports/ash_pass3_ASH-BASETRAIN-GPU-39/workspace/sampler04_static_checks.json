@@ -1,0 +1,25 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-04",
+  "status": "STATIC_PASS",
+  "checks": {
+    "sampler_parity_validation_module_exists": true,
+    "lib_declares_sampler_parity_validation": true,
+    "lib_exports_sampler04_types": true,
+    "validation_mode_exists": true,
+    "env_validate_gate": true,
+    "env_promote_gate": true,
+    "sampler03_append_hooks_sampler04": true,
+    "receipt_path_exists": true,
+    "summary_path_exists": true,
+    "trace_readback_blocking": true,
+    "strict_default_not_changed": true,
+    "artifacts_exist": true,
+    "json_artifacts_valid": true
+  },
+  "execution": {
+    "cargo_check": "NOT_RUN",
+    "cargo_test": "NOT_RUN",
+    "rustfmt": "NOT_RUN",
+    "webgpu_runtime": "NOT_RUN"
+  }
+}

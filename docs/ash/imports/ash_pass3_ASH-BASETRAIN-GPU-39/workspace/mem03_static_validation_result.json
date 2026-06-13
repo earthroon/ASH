@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MEM-03",
+  "status": "PASS_STATIC_BAKE_PENDING_LOCAL_CARGO_CHECK",
+  "cargo_check": "NOT_RUN_IN_CONTAINER_CARGO_NOT_AVAILABLE",
+  "implemented": {
+    "standard_infer_request_mem03_fields": true,
+    "resolved_request_mem03_fields": true,
+    "native_wgpu_mem03_owner_audit_method": true,
+    "native_wgpu_hard_purge_optional_owners": true,
+    "runtime_native_generation_mem03_hook": true,
+    "orchestrator_payload_wiring": true,
+    "artifact_response_receipt_embedding": true,
+    "examples_written": true
+  },
+  "mutation_contract": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "base_safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "notes": [
+    "WGPU/OS memory release may be deferred even after Rust owner fields are cleared.",
+    "Use PrivateMemorySize64 vs WorkingSet64 to separate private heap growth from OS/GPU working-set effects."
+  ]
+}

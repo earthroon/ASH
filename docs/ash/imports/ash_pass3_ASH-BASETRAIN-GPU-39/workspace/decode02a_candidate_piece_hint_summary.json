@@ -1,0 +1,31 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02A",
+  "candidate_piece_hint_table": "model_core::decode_candidate_piece_hints::CandidatePieceHintTable",
+  "layout": "token_id_indexed",
+  "required_alignment": "hints[token_id].token_id == token_id",
+  "class_bits": [
+    "text",
+    "sentencepiece_text",
+    "korean_text",
+    "particle_like",
+    "ending_like",
+    "generic_continuation",
+    "punctuation",
+    "emotional_repeat",
+    "byte_token",
+    "control_token",
+    "pad_token",
+    "eos_token",
+    "unknown_token",
+    "mojibake_suspect",
+    "whitespace_only"
+  ],
+  "risk_bits": [
+    "hard_block_candidate",
+    "byte_boundary_risk",
+    "punctuation_repeat_candidate",
+    "generic_eos_risk_candidate",
+    "double_particle_candidate",
+    "double_ending_candidate"
+  ]
+}

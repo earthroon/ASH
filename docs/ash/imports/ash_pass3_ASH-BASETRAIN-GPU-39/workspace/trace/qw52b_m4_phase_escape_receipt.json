@@ -1,0 +1,342 @@
+{
+  "patch_id": "QW-52B-M4",
+  "title": "QWave Phase Escape Candidate Trace / No Rerank Mutation Seal",
+  "base_patch": "QW-52B-M3",
+  "status": "PASS_STATIC_QWAVE_PHASE_ESCAPE_CANDIDATE_TRACE",
+  "detector_added": {
+    "detector_id": "qwave_phase_escape_candidate_trace",
+    "detector_family": "qwave_phase_escape_shadow_candidate",
+    "registry_detector_count_before": 12,
+    "registry_detector_count_after": 13
+  },
+  "config": {
+    "phase_wrap": 6.283185307179586,
+    "phase_lock_weight": 0.25,
+    "phase_opposition_weight": 0.2,
+    "input_anchor_weight": 0.15,
+    "bridge_candidate_weight": 0.1,
+    "lens_pull_weight": 0.1,
+    "residual_loop_weight": 0.15,
+    "self_echo_weight": 0.05,
+    "shadow_recommend_threshold": 0.6,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85,
+    "min_available_signals": 2
+  },
+  "fixture_results": [
+    {
+      "case_id": "low_risk_no_escape_needed",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M4",
+        "detector_id": "qwave_phase_escape_candidate_trace",
+        "decode_step": 0,
+        "candidate_rank": null,
+        "token_id": null,
+        "piece": null,
+        "current_phase_available": true,
+        "candidate_phase_available": true,
+        "recent_phase_window_available": true,
+        "current_phase": 1.0,
+        "candidate_phase": 1.2,
+        "input_anchor_phase": 1.1,
+        "phase_distance_from_current": 0.06366197723675812,
+        "phase_distance_from_input_anchor": 0.031830988618379026,
+        "phase_opposition_score": 0.06366197723675812,
+        "phase_escape_score": 0.47087875141241736,
+        "bridge_candidate_score": 0.24826508728355537,
+        "lens_pull_score": 0.3100998983865659,
+        "residual_loop_score": 0.12,
+        "self_echo_score": 0.1,
+        "mirror_resonance_score": 0.7,
+        "shadow_recommended": false,
+        "shadow_reason": "loop risk is below medium threshold; escape candidate not recommended",
+        "risk_score": 0.2772676045526484,
+        "risk_level": "Low",
+        "evidence": {
+          "recent_phase_window": [
+            0.8,
+            0.9,
+            1.0
+          ],
+          "candidate_phase_window": [
+            1.2
+          ],
+          "repeated_phase_count": 1,
+          "phase_lock_score": 0.9363380227632419,
+          "nearest_recent_phase": 1.0,
+          "nearest_recent_step": 2,
+          "nearest_recent_distance": 0.06366197723675812,
+          "input_anchor_digest": "phase:1.100000",
+          "candidate_qwave_digest": "candidate_phase:1.200000",
+          "recent_window_digest": "recent_phase_count:3",
+          "available_signal_count": 7,
+          "missing_signals": [],
+          "note": [
+            "phase escape candidate is shadow-only; no rerank mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "phase_locked_loop_detected",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M4",
+        "detector_id": "qwave_phase_escape_candidate_trace",
+        "decode_step": 0,
+        "candidate_rank": null,
+        "token_id": null,
+        "piece": null,
+        "current_phase_available": true,
+        "candidate_phase_available": true,
+        "recent_phase_window_available": true,
+        "current_phase": 1.0,
+        "candidate_phase": 1.03,
+        "input_anchor_phase": 2.4,
+        "phase_distance_from_current": 0.009549296585513728,
+        "phase_distance_from_input_anchor": 0.4360845440717932,
+        "phase_opposition_score": 0.009549296585513728,
+        "phase_escape_score": 0.5066400722936637,
+        "bridge_candidate_score": 0.07338253155767824,
+        "lens_pull_score": 0.1310041614702164,
+        "residual_loop_score": 0.74,
+        "self_echo_score": 0.79,
+        "mirror_resonance_score": -0.2,
+        "shadow_recommended": false,
+        "shadow_reason": "phase escape score below shadow recommendation threshold",
+        "risk_score": 0.8063633802276324,
+        "risk_level": "High",
+        "evidence": {
+          "recent_phase_window": [
+            0.98,
+            1.01,
+            1.02
+          ],
+          "candidate_phase_window": [
+            1.03
+          ],
+          "repeated_phase_count": 1,
+          "phase_lock_score": 0.9968169011381621,
+          "nearest_recent_phase": 1.02,
+          "nearest_recent_step": 2,
+          "nearest_recent_distance": 0.0031830988618379097,
+          "input_anchor_digest": "phase:2.400000",
+          "candidate_qwave_digest": "candidate_phase:1.030000",
+          "recent_window_digest": "recent_phase_count:3",
+          "available_signal_count": 7,
+          "missing_signals": [],
+          "note": [
+            "phase escape candidate is shadow-only; no rerank mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "phase_escape_candidate_shadow_recommended",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M4",
+        "detector_id": "qwave_phase_escape_candidate_trace",
+        "decode_step": 0,
+        "candidate_rank": null,
+        "token_id": null,
+        "piece": null,
+        "current_phase_available": true,
+        "candidate_phase_available": true,
+        "recent_phase_window_available": true,
+        "current_phase": 1.0,
+        "candidate_phase": 4.05,
+        "input_anchor_phase": 3.7,
+        "phase_distance_from_current": 0.9708451528605615,
+        "phase_distance_from_input_anchor": 0.11140846016432662,
+        "phase_opposition_score": 0.9708451528605615,
+        "phase_escape_score": 0.6765473467541334,
+        "bridge_candidate_score": 0.9288082629490148,
+        "lens_pull_score": 0.9332849769599001,
+        "residual_loop_score": 0.76,
+        "self_echo_score": 0.8,
+        "mirror_resonance_score": 0.1,
+        "shadow_recommended": true,
+        "shadow_reason": "phase escape candidate is far from current loop phase and remains near input anchor; trace only",
+        "risk_score": 0.6271042089726229,
+        "risk_level": "Medium",
+        "evidence": {
+          "recent_phase_window": [
+            0.98,
+            1.01,
+            1.02
+          ],
+          "candidate_phase_window": [
+            4.05
+          ],
+          "repeated_phase_count": 0,
+          "phase_lock_score": 0.03552104486311425,
+          "nearest_recent_phase": 1.02,
+          "nearest_recent_step": 2,
+          "nearest_recent_distance": 0.9644789551368858,
+          "input_anchor_digest": "phase:3.700000",
+          "candidate_qwave_digest": "candidate_phase:4.050000",
+          "recent_window_digest": "recent_phase_count:3",
+          "available_signal_count": 7,
+          "missing_signals": [],
+          "note": [
+            "phase escape candidate is shadow-only; no rerank mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "phase_opposite_but_input_drift_rejected",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M4",
+        "detector_id": "qwave_phase_escape_candidate_trace",
+        "decode_step": 0,
+        "candidate_rank": null,
+        "token_id": null,
+        "piece": null,
+        "current_phase_available": true,
+        "candidate_phase_available": true,
+        "recent_phase_window_available": true,
+        "current_phase": 1.0,
+        "candidate_phase": 4.14,
+        "input_anchor_phase": 1.1,
+        "phase_distance_from_current": 0.9994930426171027,
+        "phase_distance_from_input_anchor": 0.9676620539987235,
+        "phase_opposition_score": 0.9994930426171027,
+        "phase_escape_score": 0.4187050975659362,
+        "bridge_candidate_score": 0.17978195693896373,
+        "lens_pull_score": 0.3625931267178454,
+        "residual_loop_score": 0.78,
+        "self_echo_score": 0.82,
+        "mirror_resonance_score": -0.1,
+        "shadow_recommended": false,
+        "shadow_reason": "phase-opposite candidate rejected because input anchor fit is too low",
+        "risk_score": 0.6373746310213146,
+        "risk_level": "Medium",
+        "evidence": {
+          "recent_phase_window": [
+            0.98,
+            1.01,
+            1.02
+          ],
+          "candidate_phase_window": [
+            4.14
+          ],
+          "repeated_phase_count": 0,
+          "phase_lock_score": 0.006873155106573159,
+          "nearest_recent_phase": 1.02,
+          "nearest_recent_step": 2,
+          "nearest_recent_distance": 0.9931268448934268,
+          "input_anchor_digest": "phase:1.100000",
+          "candidate_qwave_digest": "candidate_phase:4.140000",
+          "recent_window_digest": "recent_phase_count:3",
+          "available_signal_count": 7,
+          "missing_signals": [],
+          "note": [
+            "phase escape candidate is shadow-only; no rerank mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "missing_phase_trace",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M4",
+        "detector_id": "qwave_phase_escape_candidate_trace",
+        "decode_step": 0,
+        "candidate_rank": null,
+        "token_id": null,
+        "piece": null,
+        "current_phase_available": false,
+        "candidate_phase_available": false,
+        "recent_phase_window_available": false,
+        "current_phase": null,
+        "candidate_phase": null,
+        "input_anchor_phase": null,
+        "phase_distance_from_current": null,
+        "phase_distance_from_input_anchor": null,
+        "phase_opposition_score": null,
+        "phase_escape_score": 0.6999999999999998,
+        "bridge_candidate_score": null,
+        "lens_pull_score": null,
+        "residual_loop_score": 0.7,
+        "self_echo_score": 0.7,
+        "mirror_resonance_score": null,
+        "shadow_recommended": false,
+        "shadow_reason": "phase escape unavailable because required phase signals are missing",
+        "risk_score": null,
+        "risk_level": "Unavailable",
+        "evidence": {
+          "recent_phase_window": [],
+          "candidate_phase_window": [],
+          "repeated_phase_count": 0,
+          "phase_lock_score": null,
+          "nearest_recent_phase": null,
+          "nearest_recent_step": null,
+          "nearest_recent_distance": null,
+          "input_anchor_digest": null,
+          "candidate_qwave_digest": null,
+          "recent_window_digest": "recent_phase_count:0",
+          "available_signal_count": 2,
+          "missing_signals": [
+            "current_phase",
+            "candidate_phase",
+            "input_anchor_phase",
+            "recent_phase_window"
+          ],
+          "note": [
+            "phase escape candidate is shadow-only; no rerank mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false,
+    "patch_added_crate_js_ts_files": []
+  },
+  "next_candidates": [
+    "QW-52B-M5",
+    "QW-52B-C1",
+    "QW-53A"
+  ],
+  "notes": [
+    "Phase escape candidate is shadow-only.",
+    "No candidate rank or token selection is changed.",
+    "Phase-opposite candidate is not automatically selected.",
+    "Input anchor fit is required to avoid drift escape.",
+    "Crate/core detector and validator implementation is Rust-only; no JS/TS files are added under crates."
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03C",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "name": "module_exists",
+      "pass": true
+    },
+    {
+      "name": "module_contains_DynamicSamplerMode",
+      "pass": true
+    },
+    {
+      "name": "module_contains_Decode03DGateInput",
+      "pass": true
+    },
+    {
+      "name": "module_contains_Decode03DAppliedConfig",
+      "pass": true
+    },
+    {
+      "name": "module_contains_decide_decode03d_gate",
+      "pass": true
+    },
+    {
+      "name": "module_contains_apply_decode03d_controlled_config",
+      "pass": true
+    },
+    {
+      "name": "module_contains_append_decode03d_receipt_from_sampler03",
+      "pass": true
+    },
+    {
+      "name": "module_contains_write_decode03d_summary_from_receipt_file",
+      "pass": true
+    },
+    {
+      "name": "rollback_candidate_applied_false_contract",
+      "pass": true
+    },
+    {
+      "name": "safe_stop_candidate_applied_false_contract",
+      "pass": true
+    },
+    {
+      "name": "eos_bias_candidate_applied_false_contract",
+      "pass": true
+    },
+    {
+      "name": "lib_exists",
+      "pass": true
+    },
+    {
+      "name": "lib_declares_decode03d_module",
+      "pass": true
+    },
+    {
+      "name": "lib_exports_decode03d",
+      "pass": true
+    },
+    {
+      "name": "sampler_parity_exists",
+      "pass": true
+    },
+    {
+      "name": "sampler_parity_invokes_decode03d",
+      "pass": true
+    }
+  ]
+}

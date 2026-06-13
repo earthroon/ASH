@@ -1,0 +1,24 @@
+{
+  "patch_id": "QW-52A-R3",
+  "status": "PASS",
+  "rust_owned": true,
+  "python_injector_only": true,
+  "checks": {
+    "alignment_probe_module_present": true,
+    "alignment_validator_bin_present": true,
+    "hidden_snapshot_read_only_contract_present": true,
+    "candidate_attach_api_present": true,
+    "diagnostic_math_only": true,
+    "hidden_state_fusion_false": true,
+    "logit_mutation_false": true,
+    "sampler_mutation_false": true,
+    "adapter_projection_applied_false": true,
+    "webgpu_shader_added": false,
+    "python_analyzer_added": false,
+    "python_validator_added": false
+  },
+  "not_run": {
+    "cargo_check": "cargo unavailable in bake environment",
+    "runtime_probe": "cargo unavailable in bake environment"
+  }
+}

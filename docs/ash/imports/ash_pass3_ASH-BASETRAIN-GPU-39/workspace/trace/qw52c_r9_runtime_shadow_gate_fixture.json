@@ -1,0 +1,59 @@
+[
+  {
+    "case_id": "runtime_shadow_gate_created_but_closed",
+    "commit_candidate": {
+      "profile_id": "reduced_dream_weight_v1",
+      "commit_candidate_sealed": true,
+      "runtime_default_apply": false,
+      "requires_explicit_enable": true
+    },
+    "explicit_enable_receipt_present": false,
+    "expected": {
+      "runtime_shadow_gate_created": true,
+      "runtime_shadow_gate_open": false,
+      "candidate_bound": true,
+      "recommended_next_patch": "QW-52C-R10"
+    }
+  },
+  {
+    "case_id": "explicit_enable_missing_blocks_shadow_apply",
+    "explicit_enable_receipt_present": false,
+    "expected": {
+      "shadow_apply_execution_allowed": false,
+      "shadow_apply_execution_performed": false,
+      "blocked_reasons_contains": [
+        "ExplicitEnableReceiptMissing"
+      ]
+    }
+  },
+  {
+    "case_id": "runtime_default_apply_forbidden",
+    "commit_candidate_sealed": true,
+    "expected": {
+      "runtime_default_apply": false,
+      "runtime_default_apply_allowed": false,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "missing_commit_candidate_unavailable",
+    "commit_candidate_available": false,
+    "expected": {
+      "runtime_shadow_gate_status": "Unavailable",
+      "runtime_shadow_gate_created": false,
+      "runtime_shadow_gate_open": false
+    }
+  },
+  {
+    "case_id": "applied_commit_candidate_invalid",
+    "commit_candidate": {
+      "commit_candidate_sealed": true,
+      "commit_candidate_applied": true
+    },
+    "expected": {
+      "binding_status": "CandidateInvalid",
+      "runtime_shadow_gate_created": false,
+      "runtime_apply_allowed": false
+    }
+  }
+]

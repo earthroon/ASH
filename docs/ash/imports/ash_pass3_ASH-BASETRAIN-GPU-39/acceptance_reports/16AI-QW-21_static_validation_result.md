@@ -1,0 +1,64 @@
+# 16AI-QW-21 Static Validation Result
+
+STATIC_VALIDATION: PASS
+NATIVE_RUST_TEST: NOT_RUN_TOOLCHAIN_UNAVAILABLE
+
+## Checks
+- PASS: module exists
+- PASS: tests exist
+- PASS: acceptance exists
+- PASS: bake report exists
+- PASS: module contains QWaveLoraConditioningCandidateReceipt
+- PASS: lib exports QWaveLoraConditioningCandidateReceipt
+- PASS: module contains QWaveLoraConditioningCandidateEntry
+- PASS: lib exports QWaveLoraConditioningCandidateEntry
+- PASS: module contains QWaveLoraConditioningFeatureSchemaSummary
+- PASS: lib exports QWaveLoraConditioningFeatureSchemaSummary
+- PASS: module contains QWaveLoraConditioningAdapterBoundary
+- PASS: lib exports QWaveLoraConditioningAdapterBoundary
+- PASS: module contains QWaveLoraConditioningShapeContract
+- PASS: lib exports QWaveLoraConditioningShapeContract
+- PASS: module contains QWaveLoraConditioningTargetKind
+- PASS: lib exports QWaveLoraConditioningTargetKind
+- PASS: module contains QWaveLoraConditioningScopeKind
+- PASS: lib exports QWaveLoraConditioningScopeKind
+- PASS: module contains QWaveLoraConditioningCandidateReason
+- PASS: lib exports QWaveLoraConditioningCandidateReason
+- PASS: module contains QWaveRuntimeRoutingHintRef
+- PASS: lib exports QWaveRuntimeRoutingHintRef
+- PASS: module contains AcceptedLoraConditioningCandidate
+- PASS: module enum contains AcceptedLoraConditioningCandidate
+- PASS: module contains AcceptedRequiresProjectionDryRun
+- PASS: module enum contains AcceptedRequiresProjectionDryRun
+- PASS: module contains RejectedMissingQw20RuntimeHintReceipt
+- PASS: module enum contains RejectedMissingQw20RuntimeHintReceipt
+- PASS: module contains RejectedNonCandidateOnlyRuntimeHint
+- PASS: module enum contains RejectedNonCandidateOnlyRuntimeHint
+- PASS: module contains RejectedFeatureDimMismatch
+- PASS: module enum contains RejectedFeatureDimMismatch
+- PASS: module contains RejectedMissingMasks
+- PASS: module enum contains RejectedMissingMasks
+- PASS: module contains RejectedNonFiniteFeatures
+- PASS: module enum contains RejectedNonFiniteFeatures
+- PASS: module contains RejectedAdapterDoesNotAcceptConditioning
+- PASS: module enum contains RejectedAdapterDoesNotAcceptConditioning
+- PASS: module contains RejectedProjectionExecution
+- PASS: module enum contains RejectedProjectionExecution
+- PASS: module contains RejectedAdapterWeightMutation
+- PASS: module enum contains RejectedAdapterWeightMutation
+- PASS: module contains RejectedLoraAMutation
+- PASS: module enum contains RejectedLoraAMutation
+- PASS: module contains RejectedLoraBMutation
+- PASS: module enum contains RejectedLoraBMutation
+- PASS: module contains RejectedAdapterPointerMutation
+- PASS: module enum contains RejectedAdapterPointerMutation
+- PASS: module contains RejectedBaseModelMutation
+- PASS: module enum contains RejectedBaseModelMutation
+- PASS: module contains RejectedGradientConnection
+- PASS: module enum contains RejectedGradientConnection
+- PASS: lib.rs module declaration
+- PASS: lib.rs builder export
+- PASS: test function count >= 35
+- PASS: module brace balance
+- PASS: test brace balance
+- PASS: no direct apply enum labels

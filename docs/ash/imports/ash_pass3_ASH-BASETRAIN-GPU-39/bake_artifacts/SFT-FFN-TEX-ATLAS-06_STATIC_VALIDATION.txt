@@ -1,0 +1,22 @@
+SFT-FFN-TEX-ATLAS-06 static validation
+
+Checked:
+- ash_core hybrid module exists
+- ash_core hybrid tests exist
+- burn_webgpu_backend hybrid shell exists
+- WGSL hybrid contract shell exists
+- lib.rs exports added for ash_core and burn_webgpu_backend
+- acceptance report exists
+
+Static gates:
+- LoRA buffer read opened
+- LoRA buffer write closed
+- LoRA optimizer step closed
+- LoRA texture update closed
+- training path closed
+- production/default path closed
+- runtime attach closed
+- promotion/current pointer closed
+
+Runtime status:
+- PENDING_GPU_HYBRID_LORA_RUNTIME

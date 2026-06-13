@@ -1,0 +1,26 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R9",
+  "static_validation_pass": true,
+  "native_r9_env_gate": true,
+  "runner_exists": true,
+  "runner_loads_r8a": true,
+  "runner_candidate_profile": true,
+  "runner_repeat_matrix": true,
+  "runner_negative_control_status": true,
+  "runner_prompt_variant_status": true,
+  "runner_runtime_default_apply_false": true,
+  "compile_executed_in_container": false,
+  "mutation_performed": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "changed_files": [
+    "crates/model_core/src/native_wgpu.rs",
+    "scripts/run_16AI_QW_38G_R6A_R12A_R9_projection_attenuation_validation.ps1",
+    "patch_reports/16AI-QW-38G-R6A-R12A-R9_projection_attenuation_validation.md",
+    "acceptance_reports/16AI-QW-38G-R6A-R12A-R9_projection_attenuation_validation.md"
+  ]
+}

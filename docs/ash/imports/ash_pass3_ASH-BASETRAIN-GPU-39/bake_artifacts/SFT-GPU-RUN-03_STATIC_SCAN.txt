@@ -1,0 +1,27 @@
+SFT-GPU-RUN-03 STATIC SCAN
+
+Required symbols:
+- AshSftGpuTrainRegressionMatrixDecision
+- AshSftGpuTrainRegressionMatrixPolicy
+- AshSftGpuTrainRegressionSourceEvidence
+- AshSftGpuRegressionFixtureMatrixEvidence
+- AshSftGpuRegressionRunEvidence
+- AshSftGpuLossDirectionEvidence
+- AshSftGpuAdapterDeltaStabilityEvidence
+- AshSftGpuRegressionArtifactParityEvidence
+- AshSftGpuRegressionMatrixSummaryEvidence
+- AshSftGpuRegressionNoRuntimeMutationGuard
+- build_sft_gpu_train_regression_matrix
+- GpuTrainRegressionMatrixReceipt
+- BackendGpuTrainRegressionReceiptBoundary
+
+Closed-path flags:
+- cpu_fallback_detected_any = false
+- cpu_materialization_detected_any = false
+- silent_backend_demotion_detected_any = false
+- runtime_current_pointer_update_performed = false
+- promotion_apply_performed = false
+- lifecycle_mutation_performed = false
+- slot_action_apply_performed = false
+- rollback_execution_performed = false
+- ash_binding_performed = false

@@ -1,0 +1,16 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12B",
+  "status": "STATIC_BAKE_DONE_COMPILE_NOT_EXECUTED",
+  "reason": "cargo_not_available_in_current_container",
+  "source_tree_modified": true,
+  "runtime_env_gate_added": true,
+  "runner_added": true,
+  "acceptance_report_added": true,
+  "mutation_performed": false,
+  "safetensors_modified": false,
+  "tokenizer_modified": false,
+  "notes": [
+    "R12B is default-off and only runs when ASH_R12B_LM_HEAD_ROW_CONTRIBUTION_AUDIT or compatible env gate is set.",
+    "Full runtime PASS requires local checkpoint and previous R12/R10-R2/R38A workspace artifacts."
+  ]
+}

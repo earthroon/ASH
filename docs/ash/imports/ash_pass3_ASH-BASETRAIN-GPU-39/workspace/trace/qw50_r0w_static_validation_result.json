@@ -1,0 +1,47 @@
+{
+  "patch_id": "QW-50-R0W",
+  "status": "PASS",
+  "checks": [
+    {
+      "path": "crates/runtime/src/infer.rs",
+      "needle": "mod qw50_r0w_trace;",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/src/infer.rs",
+      "needle": "native_decode_r0w_trace",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/src/infer.rs",
+      "needle": "build_native_decode_r0w_trace",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/src/infer/qw50_r0w_trace.rs",
+      "needle": "topKCandidatesByStep",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/src/infer/qw50_r0w_trace.rs",
+      "needle": "rawModelOutputBeforeGuard",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/src/infer/qw50_r0w_trace.rs",
+      "needle": "decode_policy_mutation",
+      "ok": true
+    },
+    {
+      "path": "crates/runtime/examples/infer_only.rs",
+      "needle": "nativeDecodeR0wTrace",
+      "ok": true
+    },
+    {
+      "path": "tools/run_qw50_r0w_trace_probe.py",
+      "needle": "nativeDecodeR0wTrace",
+      "ok": true
+    }
+  ],
+  "cargo_check": "NOT_RUN_CARGO_NOT_AVAILABLE_IN_SANDBOX"
+}

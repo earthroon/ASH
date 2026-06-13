@@ -1,0 +1,4 @@
+cargo_build_not_run_in_bake_environment=true
+operator_local_build_required=true
+recommended_build=cargo build -p base_train --bin ash_basetrain_gpu_20_fixed_target_loss_candidate_gate --jobs 1
+recommended_run=cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_20_fixed_target_loss_candidate_gate

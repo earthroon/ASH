@@ -1,0 +1,14 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-35-R1",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_35_r1_selected_group_manifest_binding --jobs 1",
+  "recommended_manifest_binding_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r1_selected_group_manifest_binding",
+  "manifest_env": "ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH",
+  "manifest_binding_status": "BLOCKED_MISSING_MANIFEST_INPUT",
+  "runtime_gpu_required": false,
+  "actual_gpu_buffer_allocation_in_35_r1": false,
+  "selected_group_weight_load_required": false,
+  "next_patch_if_manifest_bound": "ASH-BASETRAIN-GPU-36",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-35-R1A",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-35-R1F",
+  "pass": true
+}

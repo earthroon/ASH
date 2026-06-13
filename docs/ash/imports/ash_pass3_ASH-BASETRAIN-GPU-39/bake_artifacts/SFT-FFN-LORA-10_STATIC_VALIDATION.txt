@@ -1,0 +1,30 @@
+SFT-FFN-LORA-10 STATIC VALIDATION
+
+[files]
+OK ash_core module exists
+OK ash_core test exists
+OK backend shell exists
+OK ash_core lib.rs export wired
+OK backend lib.rs export wired
+
+[closed gates]
+OK promotion apply commit default false
+OK current pointer update default false
+OK slot ready mark default false
+OK ASH binding default false
+OK backend promotion commit closed
+OK backend current pointer closed
+
+[tests declared]
+fn sft_ffn_lora_10_accepts_promotion_apply_candidate
+fn sft_ffn_lora_10_rejects_artifact_digest_mismatch
+fn sft_ffn_lora_10_rejects_current_pointer_update_or_apply_commit
+fn sft_ffn_lora_10_rejects_missing_apply_preflight
+fn sft_ffn_lora_10_rejects_missing_failure_demotion_path
+fn sft_ffn_lora_10_rejects_missing_rollback_ledger
+fn sft_ffn_lora_10_rejects_missing_runtime_attach_dry_run_seal
+fn sft_ffn_lora_10_rejects_unaccepted_runtime_attach_dry_run
+
+[toolchain]
+cargo unavailable in this environment
+rustc unavailable in this environment

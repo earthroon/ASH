@@ -1,0 +1,697 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-MOCK-08",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "status": "ledger_replayed",
+  "block_reasons": [],
+  "policy": {
+    "mock_only": true,
+    "fixture_path": true,
+    "production_safe": false,
+    "allow_wctx19_ledger_receipt": true,
+    "allow_revision_event_creation_in_ledger": true,
+    "allow_target_mutation": false,
+    "allow_production_subtitle_store_mutation": false,
+    "allow_runtime_apply": false,
+    "allow_rerank": false,
+    "allow_runtime_decode": false,
+    "allow_model_forward": false,
+    "allow_sampling": false,
+    "requires_committed_receipts": true,
+    "requires_reverted_receipts": true,
+    "requires_parent_commit_link": true,
+    "requires_no_orphan_rollback": true,
+    "requires_no_duplicate_revision": true,
+    "requires_non_production_label": true
+  },
+  "input": {
+    "replay_id": "mock_commit_rollback_ledger_replay:all_cues:12:12",
+    "source_mock_commit_replay_receipt_keys": [
+      "sha256:mock06_replay_01",
+      "sha256:mock06_replay_02",
+      "sha256:mock06_replay_03",
+      "sha256:mock06_replay_04",
+      "sha256:mock06_replay_05",
+      "sha256:mock06_replay_06",
+      "sha256:mock06_replay_07",
+      "sha256:mock06_replay_08",
+      "sha256:mock06_replay_09",
+      "sha256:mock06_replay_10",
+      "sha256:mock06_replay_11",
+      "sha256:mock06_replay_12"
+    ],
+    "source_mock_rollback_replay_receipt_keys": [
+      "sha256:mock07_replay_01",
+      "sha256:mock07_replay_02",
+      "sha256:mock07_replay_03",
+      "sha256:mock07_replay_04",
+      "sha256:mock07_replay_05",
+      "sha256:mock07_replay_06",
+      "sha256:mock07_replay_07",
+      "sha256:mock07_replay_08",
+      "sha256:mock07_replay_09",
+      "sha256:mock07_replay_10",
+      "sha256:mock07_replay_11",
+      "sha256:mock07_replay_12"
+    ],
+    "source_commit_receipt_keys": [
+      "sha256:mock06_commit_01",
+      "sha256:mock06_commit_02",
+      "sha256:mock06_commit_03",
+      "sha256:mock06_commit_04",
+      "sha256:mock06_commit_05",
+      "sha256:mock06_commit_06",
+      "sha256:mock06_commit_07",
+      "sha256:mock06_commit_08",
+      "sha256:mock06_commit_09",
+      "sha256:mock06_commit_10",
+      "sha256:mock06_commit_11",
+      "sha256:mock06_commit_12"
+    ],
+    "source_rollback_receipt_keys": [
+      "sha256:mock07_rollback_01",
+      "sha256:mock07_rollback_02",
+      "sha256:mock07_rollback_03",
+      "sha256:mock07_rollback_04",
+      "sha256:mock07_rollback_05",
+      "sha256:mock07_rollback_06",
+      "sha256:mock07_rollback_07",
+      "sha256:mock07_rollback_08",
+      "sha256:mock07_rollback_09",
+      "sha256:mock07_rollback_10",
+      "sha256:mock07_rollback_11",
+      "sha256:mock07_rollback_12"
+    ],
+    "commit_replay_count": 12,
+    "rollback_replay_count": 12,
+    "expected_commit_event_count": 12,
+    "expected_revert_event_count": 12,
+    "expected_cue_revision_chain_count": 12,
+    "mock_only": true,
+    "fixture_path": true,
+    "production_safe": false
+  },
+  "replay_result": {
+    "replay_result_id": "mock_commit_rollback_ledger_replay:ledger_built",
+    "ledger_replayed": true,
+    "ledger_status": "ledger_built",
+    "ledger_receipt_created": true,
+    "cue_revision_chain_count": 12,
+    "total_revision_events": 24,
+    "total_commit_events": 12,
+    "total_revert_events": 12,
+    "commit_parent_link_verified_count": 12,
+    "orphan_rollback_detected": false,
+    "duplicate_revision_detected": false,
+    "cue_boundary_violation_detected": false,
+    "target_text_mutated_in_ledger": false,
+    "production_subtitle_store_mutated": false,
+    "production_target_text_mutated": false,
+    "commit_executed_in_ledger": false,
+    "rollback_executed_in_ledger": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "runtime_apply_executed": false,
+    "rerank_applied": false,
+    "fixture_path": true,
+    "production_safe": false,
+    "result_reason": "mock committed and reverted single-cue receipts were replayed through WCTX-19 ledger path"
+  },
+  "commit_ledger_receipt": {
+    "patch_id": "16AI-QW-38G-R6A-WCTX-19",
+    "domain_ssot": "en_to_ko_translation_subtitle_machine",
+    "ledger_status": "ledger_built",
+    "source_commit_receipt_keys": [
+      "sha256:mock06_commit_01",
+      "sha256:mock06_commit_02",
+      "sha256:mock06_commit_03",
+      "sha256:mock06_commit_04",
+      "sha256:mock06_commit_05",
+      "sha256:mock06_commit_06",
+      "sha256:mock06_commit_07",
+      "sha256:mock06_commit_08",
+      "sha256:mock06_commit_09",
+      "sha256:mock06_commit_10",
+      "sha256:mock06_commit_11",
+      "sha256:mock06_commit_12"
+    ],
+    "source_rollback_receipt_keys": [
+      "sha256:mock07_rollback_01",
+      "sha256:mock07_rollback_02",
+      "sha256:mock07_rollback_03",
+      "sha256:mock07_rollback_04",
+      "sha256:mock07_rollback_05",
+      "sha256:mock07_rollback_06",
+      "sha256:mock07_rollback_07",
+      "sha256:mock07_rollback_08",
+      "sha256:mock07_rollback_09",
+      "sha256:mock07_rollback_10",
+      "sha256:mock07_rollback_11",
+      "sha256:mock07_rollback_12"
+    ],
+    "cue_revision_chains": [
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C001:sha256:mock",
+        "cue_id": "WCTX03-C001",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C001:commit",
+            "cue_id": "WCTX03-C001",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_01",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C001"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C001:revert",
+            "cue_id": "WCTX03-C001",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_01",
+            "parent_receipt_key": "sha256:mock06_commit_01",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C001"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C002:sha256:mock",
+        "cue_id": "WCTX03-C002",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C002:commit",
+            "cue_id": "WCTX03-C002",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_02",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C002"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C002:revert",
+            "cue_id": "WCTX03-C002",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_02",
+            "parent_receipt_key": "sha256:mock06_commit_02",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C002"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C003:sha256:mock",
+        "cue_id": "WCTX03-C003",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C003:commit",
+            "cue_id": "WCTX03-C003",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_03",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C003"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C003:revert",
+            "cue_id": "WCTX03-C003",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_03",
+            "parent_receipt_key": "sha256:mock06_commit_03",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C003"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C004:sha256:mock",
+        "cue_id": "WCTX03-C004",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C004:commit",
+            "cue_id": "WCTX03-C004",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_04",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C004"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C004:revert",
+            "cue_id": "WCTX03-C004",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_04",
+            "parent_receipt_key": "sha256:mock06_commit_04",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C004"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C005:sha256:mock",
+        "cue_id": "WCTX03-C005",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C005:commit",
+            "cue_id": "WCTX03-C005",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_05",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C005"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C005:revert",
+            "cue_id": "WCTX03-C005",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_05",
+            "parent_receipt_key": "sha256:mock06_commit_05",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C005"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C006:sha256:mock",
+        "cue_id": "WCTX03-C006",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C006:commit",
+            "cue_id": "WCTX03-C006",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_06",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C006"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C006:revert",
+            "cue_id": "WCTX03-C006",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_06",
+            "parent_receipt_key": "sha256:mock06_commit_06",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C006"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C007:sha256:mock",
+        "cue_id": "WCTX03-C007",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C007:commit",
+            "cue_id": "WCTX03-C007",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_07",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C007"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C007:revert",
+            "cue_id": "WCTX03-C007",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_07",
+            "parent_receipt_key": "sha256:mock06_commit_07",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C007"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C008:sha256:mock",
+        "cue_id": "WCTX03-C008",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C008:commit",
+            "cue_id": "WCTX03-C008",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_08",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C008"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C008:revert",
+            "cue_id": "WCTX03-C008",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_08",
+            "parent_receipt_key": "sha256:mock06_commit_08",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C008"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C009:sha256:mock",
+        "cue_id": "WCTX03-C009",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C009:commit",
+            "cue_id": "WCTX03-C009",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_09",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C009"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C009:revert",
+            "cue_id": "WCTX03-C009",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_09",
+            "parent_receipt_key": "sha256:mock06_commit_09",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C009"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C010:sha256:mock",
+        "cue_id": "WCTX03-C010",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C010:commit",
+            "cue_id": "WCTX03-C010",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_10",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C010"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C010:revert",
+            "cue_id": "WCTX03-C010",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_10",
+            "parent_receipt_key": "sha256:mock06_commit_10",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C010"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C011:sha256:mock",
+        "cue_id": "WCTX03-C011",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C011:commit",
+            "cue_id": "WCTX03-C011",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_11",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C011"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C011:revert",
+            "cue_id": "WCTX03-C011",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_11",
+            "parent_receipt_key": "sha256:mock06_commit_11",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C011"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      },
+      {
+        "chain_id": "cue_revision_chain:WCTX03-C012:sha256:mock",
+        "cue_id": "WCTX03-C012",
+        "domain_ssot": "en_to_ko_translation_subtitle_machine",
+        "events": [
+          {
+            "event_id": "cue_revision_event:WCTX03-C012:commit",
+            "cue_id": "WCTX03-C012",
+            "revision_index": 0,
+            "event_kind": "commit",
+            "event_source": "wctx17_commit_receipt",
+            "source_receipt_key": "sha256:mock06_commit_12",
+            "parent_receipt_key": null,
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C012"
+            ],
+            "event_summary": "mock WCTX-17 commit recorded"
+          },
+          {
+            "event_id": "cue_revision_event:WCTX03-C012:revert",
+            "cue_id": "WCTX03-C012",
+            "revision_index": 1,
+            "event_kind": "revert",
+            "event_source": "wctx18_rollback_receipt",
+            "source_receipt_key": "sha256:mock07_rollback_12",
+            "parent_receipt_key": "sha256:mock06_commit_12",
+            "single_cue_only": true,
+            "affected_cue_ids": [
+              "WCTX03-C012"
+            ],
+            "event_summary": "mock WCTX-18 revert recorded"
+          }
+        ],
+        "event_count": 2,
+        "commit_count": 1,
+        "revert_count": 1,
+        "chain_integrity_passed": true,
+        "chain_reason": "cue revision chain is contiguous and single-cue scoped"
+      }
+    ],
+    "integrity_checks": [
+      {
+        "check_id": "ledger_check:no_orphan_rollback",
+        "kind": "no_orphan_rollback",
+        "pass": true,
+        "severity": "critical",
+        "detail": "rollback events reference matching commit events"
+      }
+    ],
+    "total_revision_events": 24,
+    "total_commit_events": 12,
+    "total_revert_events": 12,
+    "risk": {
+      "target_text_mutated": false,
+      "commit_executed_in_ledger": false,
+      "rollback_executed_in_ledger": false,
+      "runtime_default_apply": false,
+      "runtime_apply_gate_open": false,
+      "orphan_rollback_detected": false,
+      "duplicate_revision_detected": false,
+      "cue_boundary_violation_detected": false,
+      "ledger_created": true,
+      "empty_ledger": false,
+      "roundtrip_exact": true
+    },
+    "deterministic_receipt_key": "sha256:08aed455a4f7695028846e18be5df6d2bc27fd6ab9c6cb3bddd437d807c3788b",
+    "created_by": "ash_core::word_context_commit_ledger",
+    "schema_version": 1
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "ledger_replayed": true,
+    "ledger_receipt_created": true,
+    "revision_event_created_in_ledger": true,
+    "commit_event_created_in_ledger": true,
+    "revert_event_created_in_ledger": true,
+    "runtime_decode_executed": false,
+    "generation_executed": false,
+    "model_forward_executed": false,
+    "sampling_executed": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "production_target_text_mutated": false,
+    "production_subtitle_store_mutated": false,
+    "commit_executed_in_ledger": false,
+    "rollback_executed_in_ledger": false,
+    "orphan_rollback_detected": false,
+    "duplicate_revision_detected": false,
+    "cue_boundary_violation_detected": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "runtime_apply_executed": false,
+    "rerank_applied": false,
+    "mock_marked_non_production": true,
+    "mock_mislabeled_as_runtime": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:0f16bc80139ae1eb072c09ce25f28c00c4810cf1a94f8e3bcc13f21c6530da89",
+  "created_by": "ash_core::word_context_mock_commit_rollback_ledger_replay",
+  "schema_version": 1
+}

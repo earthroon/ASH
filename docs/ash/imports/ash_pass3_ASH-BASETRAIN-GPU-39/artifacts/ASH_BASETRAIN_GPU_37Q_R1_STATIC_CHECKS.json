@@ -1,0 +1,24 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37Q-R1",
+  "status": "STATIC_CHECKS_PASS",
+  "pass": true,
+  "checks": {
+    "patch_id_r1": true,
+    "base_patch_id_present": true,
+    "r1_pass_status_present": true,
+    "default_37p_r1_path_present": true,
+    "default_37f_path_present": true,
+    "legacy_37p_supported": true,
+    "r1_37p_supported": true,
+    "unsupported_patch_id_split": true,
+    "unsupported_status_split": true,
+    "r1_source_binding_checks": true,
+    "37f_payload_codes_split": true,
+    "runtime_receipt_writer_present": true,
+    "artifact_write_in_receipt": true,
+    "no_forward_guard_false": true
+  },
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "source_file": "crates/base_train/src/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs"
+}

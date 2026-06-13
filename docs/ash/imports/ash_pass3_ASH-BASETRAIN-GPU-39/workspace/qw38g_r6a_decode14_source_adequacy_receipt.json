@@ -1,0 +1,289 @@
+[
+  {
+    "fixture": "adequacy_pass",
+    "receipt": {
+      "action_hints": [
+        "NoAction"
+      ],
+      "adequacy_risk_score": 0.0,
+      "adequacy_score": 1.0,
+      "candidate_id": "candidate-adequacy-pass",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0001",
+      "decision": "PassAdequacyGuard",
+      "decode_session_id": "mock-decode-session-pass",
+      "deterministic_receipt_key": "q4sha256:7c05d34d94994f564f31148e2e50125295ac2aca15b5c24a7a77d09aa51ad744",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": true,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "DeterministicStubOnly"
+      ],
+      "reject_recommended": false,
+      "review_required": false,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:4d713457d1cff50c5e2fe49ade12d468dd2d2db2d5881251138e886fd45deda0",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "omission_fail",
+    "receipt": {
+      "action_hints": [
+        "RewriteCandidate"
+      ],
+      "adequacy_risk_score": 0.24,
+      "adequacy_score": 0.76,
+      "candidate_id": "candidate-omission-fail",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0002",
+      "decision": "RewriteRecommended",
+      "decode_session_id": "mock-decode-session-omission-fail",
+      "deterministic_receipt_key": "q4sha256:e98f6d7e13af5255c45eb1ab0ba04ff9d721ff2850bfae0a2f579e787daec552",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "OmissionMeaningLoss"
+      ],
+      "reject_recommended": false,
+      "review_required": false,
+      "rewrite_executed": false,
+      "rewrite_recommended": true,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:2de83b153df0b19ca3fdb41c4838700ce38f1055fa46c483d545df71c53d2569",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "hallucination_fail",
+    "receipt": {
+      "action_hints": [
+        "RejectCandidate"
+      ],
+      "adequacy_risk_score": 0.24,
+      "adequacy_score": 0.76,
+      "candidate_id": "candidate-hallucination-fail",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0003",
+      "decision": "RejectCandidateRecommended",
+      "decode_session_id": "mock-decode-session-hallucination-fail",
+      "deterministic_receipt_key": "q4sha256:ffabcf46d82fef96720cbef3b0be9c7e6d5030db09c7d6e96549acc4306c7965",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "HallucinationMeaningDrift"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:5b8ecd4e3446eab39ab0f34773c1d115763bc97fe96fc080c0b3d5ddd09169e4",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "polarity_fail",
+    "receipt": {
+      "action_hints": [
+        "RejectCandidate"
+      ],
+      "adequacy_risk_score": 0.22,
+      "adequacy_score": 0.78,
+      "candidate_id": "candidate-polarity-fail",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0004",
+      "decision": "RejectCandidateRecommended",
+      "decode_session_id": "mock-decode-session-polarity-fail",
+      "deterministic_receipt_key": "q4sha256:74673bc8c7ebe340c43ac355fd3f7e58a08b75ce623f753012060cf75a16a1ec",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "PolarityInversion"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:8cdf762d229e8c173189e2d1887ec4a5de1a003cc81c76846ba54c852e22bc27",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "number_review",
+    "receipt": {
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "adequacy_risk_score": 0.12,
+      "adequacy_score": 0.88,
+      "candidate_id": "candidate-number-review",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0005",
+      "decision": "ReviewRequired",
+      "decode_session_id": "mock-decode-session-number-review",
+      "deterministic_receipt_key": "q4sha256:fbe1eab4cc7adac807487ee7bdb37f1aac6b866809e67b67a427a4cffd60d711",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "NumberTimeMismatch"
+      ],
+      "reject_recommended": false,
+      "review_required": true,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:996c5a897d20fb94f781472fe2a69b5dc308d28871321494104f8e8f55c6f7e6",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "entity_fail",
+    "receipt": {
+      "action_hints": [
+        "RequireGlossaryGate"
+      ],
+      "adequacy_risk_score": 0.14,
+      "adequacy_score": 0.86,
+      "candidate_id": "candidate-entity-fail",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0006",
+      "decision": "RejectCandidateRecommended",
+      "decode_session_id": "mock-decode-session-entity-fail",
+      "deterministic_receipt_key": "q4sha256:0e04524d9fb789054b92462b30c2dde7bfef316aa08c178dc5c616562de3668c",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "NamedEntityMismatch"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:185c2cf5d4736766a559697b4abccee6e759f93b9c5e8f02b4bd5b704ac0e2af",
+      "span_error_receipt_hash": "mock-span-receipt-hash"
+    }
+  },
+  {
+    "fixture": "missing_span_receipt",
+    "receipt": {
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "adequacy_risk_score": 1.0,
+      "adequacy_score": 0.0,
+      "candidate_id": "candidate-missing-span",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "candidate_reject_executed": false,
+      "cue_id": "mock-cue-0007",
+      "decision": "SkippedMissingSpanReceipt",
+      "decode_session_id": "mock-decode-session-missing-span",
+      "deterministic_receipt_key": "q4sha256:f0c975755cbe22e5b90eacc0f8f634f5014771bd4372f1504112324b2318d0be",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "external_adequacy_model_executed": false,
+      "fallback_apply_executed": false,
+      "fallback_recommended": false,
+      "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+      "glossary_constraint_executed": false,
+      "meaning_preserved": false,
+      "model_forward_executed": false,
+      "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+      "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+      "qe_model_executed": false,
+      "reasons": [
+        "SpanErrorReceiptMissing"
+      ],
+      "reject_recommended": false,
+      "review_required": true,
+      "rewrite_executed": false,
+      "rewrite_recommended": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "sampling_executed": false,
+      "source_adequacy_policy_hash": "sha256:69f16f0b883cb2d79842bb2d6eab8939b6ae43027c2e7082b81dc3aa0ce16eee",
+      "source_adequacy_risk_snapshot_hash": "sha256:84f10d971c7d3f6b324f48355478be4452b01e7ec2cc041385ab731b743e120f",
+      "span_error_receipt_hash": ""
+    }
+  }
+]

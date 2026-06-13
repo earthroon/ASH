@@ -1,0 +1,70 @@
+--- train01_r0_base/crates/model_core/src/tokenizer_v5_embedding_lmhead_atlas_adaptation.rs	2026-06-04 04:31:12.000000000 +0000
++++ train01_r0r1_work/crates/model_core/src/tokenizer_v5_embedding_lmhead_atlas_adaptation.rs	2026-06-04 04:42:39.794902361 +0000
+@@ -548,16 +548,26 @@
+     out
+ }
+ 
++
++fn json_ascii_safe(input: &str) -> String {
++    // QW-TOK-TRAIN-01-R0-R1: keep report-facing token surfaces ASCII-safe.
++    // The runtime may still compare raw UTF-8 pieces internally, but report JSON
++    // must survive Windows PowerShell ConvertFrom-Json even when the console/file
++    // view is mojibake. escape_debug() avoids raw non-ASCII and embedded control
++    // characters in the serialized fields.
++    input.escape_debug().to_string()
++}
++
+ fn resolve_focus_pieces(vocab: Option<&Value>) -> Vec<QwTokTrain01FocusTokenResolution> {
+     default_focus_tokens()
+         .into_iter()
+         .map(|(token_id, expected_piece, reason)| {
+-            let resolved_piece = vocab.and_then(|v| piece_for_token_id(v, token_id));
+-            let piece_match = resolved_piece.as_ref().map(|p| p == expected_piece);
++            let resolved_piece_raw = vocab.and_then(|v| piece_for_token_id(v, token_id));
++            let piece_match = resolved_piece_raw.as_ref().map(|p| p == expected_piece);
+             QwTokTrain01FocusTokenResolution {
+                 token_id,
+-                expected_piece: expected_piece.to_string(),
+-                resolved_piece,
++                expected_piece: json_ascii_safe(expected_piece),
++                resolved_piece: resolved_piece_raw.as_deref().map(json_ascii_safe),
+                 piece_match,
+                 reason: reason.to_string(),
+             }
+@@ -731,7 +741,7 @@
+             .into_iter()
+             .map(|(token_id, piece, reason)| QwTokTrain01FocusRowProbe {
+                 token_id,
+-                piece: piece.to_string(),
++                piece: json_ascii_safe(piece),
+                 reason: reason.to_string(),
+                 lm_head_row_probe_status: "ROW_OFFSET_IDENTIFIED_ONLY_NO_PAYLOAD_DECODE".to_string(),
+                 embedding_row_probe_status: "ROW_OFFSET_IDENTIFIED_ONLY_NO_PAYLOAD_DECODE".to_string(),
+@@ -741,7 +751,7 @@
+             })
+             .collect(),
+         payload_decode_policy: "no tensor payload decode in TRAIN-01 dry-run/probe bake".to_string(),
+-        topk_repeat_context: "focus set derived from direct v5 greedy attractor: 익숙해졌/입력하면/품질에/장면에".to_string(),
++        topk_repeat_context: json_ascii_safe("focus set derived from direct v5 greedy attractor: 익숙해졌/입력하면/품질에/장면에"),
+     }
+ }
+ 
+@@ -847,7 +857,7 @@
+ 
+ pub fn qw_tok_train01_failure_summary_json(report: &QwTokTrain01Report) -> Result<String> {
+     let summary = json!({
+-        "patch_id": "QW-TOK-TRAIN-01-R0",
++        "patch_id": "QW-TOK-TRAIN-01-R0-R1",
+         "base_patch_id": QW_TOK_TRAIN01_PATCH_ID,
+         "status": report.status.clone(),
+         "failed_stage": if report.failures.is_empty() { Value::Null } else { Value::String("precondition".to_string()) },
+@@ -886,7 +896,8 @@
+     if let Some(parent) = path.parent() {
+         fs::create_dir_all(parent)?;
+     }
+-    let text = serde_json::to_string_pretty(value)?;
++    let mut text = serde_json::to_string_pretty(value)?;
++    text.push('\n');
+     fs::write(path, text)?;
+     Ok(())
+ }

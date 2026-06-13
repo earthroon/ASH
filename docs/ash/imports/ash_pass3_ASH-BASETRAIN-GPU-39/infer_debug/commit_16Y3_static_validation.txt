@@ -1,0 +1,17 @@
+# Commit 16Y-3 static validation
+
+## Symbols
+crates/model_core/src/native_wgpu.rs:389:            "[native-vocab-atlas] tile={} token_start={} token_len={} hidden={} bytes={}",
+crates/model_core/src/native_wgpu.rs:415:        "[native-vocab-atlas] built tile_count={} vocab={} hidden={} tile_vocab={} full_vocab_bytes={}",
+crates/model_core/src/native_wgpu.rs:1414:        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX)
+crates/model_core/src/native_wgpu.rs:1417:    pub fn load_toml_with_loras_and_vocab_atlas(
+crates/model_core/src/native_wgpu.rs:1630:            "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={}",
+crates/model_core/src/reference_checkpoint.rs:1129:            "lm_head.weight.placeholder_gpu_atlas",
+crates/runtime/src/infer.rs:2292:            match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+crates/orchestrator_local/src/infer_entry.rs:747:    response_json.insert("nativeGeneratedByTileArgmax".to_string(), json!(result.native_vocab_allocation_probe.generated_by_tile_argmax));
+
+## Brace / paren balance
+crates/model_core/src/native_wgpu.rs: braces_delta=0 parens_delta=0
+crates/model_core/src/reference_checkpoint.rs: braces_delta=0 parens_delta=0
+crates/runtime/src/infer.rs: braces_delta=0 parens_delta=0
+crates/orchestrator_local/src/infer_entry.rs: braces_delta=0 parens_delta=0

@@ -1,0 +1,35 @@
+{
+  "patch_id": "QW-52A-R1",
+  "title": "Existing Cheonjiin Jaso Stroke Tensor Facade / No Math Rewrite Seal",
+  "base_patch": "QW-52A-R0",
+  "facade_schema": {
+    "module": "model_core::cheonjiin_jaso_stroke_facade",
+    "top_level": "CheonjiinJasoStrokeFacade",
+    "source": "CheonjiinFacadeSource",
+    "surface": "CheonjiinFacadeSurface",
+    "hangul_rows": "Vec<CheonjiinFacadeHangulRow>",
+    "qwave_pulses": "Vec<CheonjiinFacadeQWavePulse>",
+    "qwave_transitions": "Vec<CheonjiinFacadeQWaveTransition>",
+    "structural_probe": "Option<CheonjiinFacadeStructuralProbe>",
+    "aggregate": "CheonjiinFacadeAggregate",
+    "no_math_rewrite": "NoMathRewriteEvidence"
+  },
+  "existing_sources": {
+    "hangul_feature_row": "tokenizer_core::hangul_tensor::HangulFeatureRow",
+    "qwave_cell": "tokenizer_core::hangul_qwave_cell",
+    "qwave_pulse": "tokenizer_core::hangul_qwave_pulse",
+    "qwave_transition": "tokenizer_core::hangul_qwave_transition",
+    "structural_probe": "model_core::cheonjiin_structural_probe"
+  },
+  "forbidden": {
+    "new_hangul_decomposition": true,
+    "new_cheonjiin_lut": true,
+    "new_qwave_phase_math": true,
+    "new_stroke_rule": true,
+    "new_webgpu_shader": true,
+    "logit_mutation": true,
+    "sampler_mutation": true,
+    "adapter_projection": true,
+    "hidden_state_fusion": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-BUILD-05",
+  "status": "STATIC_PASS_INFER_BINARY_TARGET_RESOLUTION_BAKED",
+  "old_contract": "target/debug/infer_only.exe",
+  "resolved_contract": "target/release/examples/infer_only.exe",
+  "build_command": "cargo build --release --manifest-path .\\crates\\runtime\\Cargo.toml --example infer_only",
+  "runner_updated": true,
+  "build05_validation_runner_added": true,
+  "build_pass_and_run_pass_separated": true,
+  "r12a_r1_hidden_capture_code_unchanged": true,
+  "mutation_performed": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "compile_executed_in_container": false,
+  "receipt_json_written": true,
+  "summary_json_written": true,
+  "report_md_written": true,
+  "binary_inventory_runtime_written_by_runner": true,
+  "recommended_next_step": "run R12A-R1 runner and inspect trace capture receipt"
+}

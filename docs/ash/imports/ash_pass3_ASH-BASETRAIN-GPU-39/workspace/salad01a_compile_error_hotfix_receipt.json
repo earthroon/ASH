@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01A",
+  "parent_patch_id": "16AI-QW-38G-R6A-SALAD-01",
+  "title": "Decode Stability Numeric Type Annotation Hotfix Seal",
+  "compile_error_source": "crates/ash_core/src/decision.rs:250 error[E0689]",
+  "root_cause": "temperature binding inferred as ambiguous {float} before calling f32::min against stable_profile.temperature",
+  "applied_fix": {
+    "file": "crates/ash_core/src/decision.rs",
+    "before": "let temperature = match resolved_task.as_str() { ... 0.15, 0.18, 0.12, 0.20 }",
+    "after": "let temperature: f32 = match resolved_task.as_str() { ... 0.15_f32, 0.18_f32, 0.12_f32, 0.20_f32 }"
+  },
+  "scope": "compile-only hotfix; no decode policy semantic change",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "cargo_available_in_bake_container": false,
+  "local_runtime_replay_required": true,
+  "adjudication": "PASS_STATIC_TYPE_HOTFIX_PENDING_LOCAL_CARGO_BUILD"
+}

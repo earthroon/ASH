@@ -1,0 +1,95 @@
+{
+    "run_name":  "tinyllama_1p1b_v5_guarded_train_from_feature_store_128step",
+    "model_id":  "model_tinyllama_1p1b_v4",
+    "model_path":  "D:\\1111113232\\DUST\\1\\ash_pass3\\specs\\model_spec_tinyllama_1p1b_v4.toml",
+    "dataset":  {
+                    "train_jsonl":  "",
+                    "train_jsonl_paths":  [
+                                              "D:\\1111113232\\DUST\\1\\ash_pass3\\v5_split\\v5_guarded_lora_train.jsonl"
+                                          ],
+                    "eval_jsonl":  "D:\\1111113232\\DUST\\1\\ash_pass3\\v5_split\\v5_guarded_lora_val.jsonl",
+                    "system_field":  null,
+                    "prompt_field":  "prompt",
+                    "response_field":  "completion",
+                    "max_samples":  null,
+                    "max_seq_len":  192,
+                    "pack_turns":  false,
+                    "feature_jsonl":  null,
+                    "feature_store_manifest":  "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\\feature_store_work\\feature_store_manifest.json",
+                    "max_feature_batches":  128
+                },
+    "optimizer":  {
+                      "optimizer":  "adamw",
+                      "learning_rate":  0.00015,
+                      "weight_decay":  0.01,
+                      "warmup_steps":  100,
+                      "gradient_accumulation":  8,
+                      "max_steps":  128
+                  },
+    "hyper":  {
+                  "rank":  8,
+                  "alpha":  16.0,
+                  "dropout":  0.05,
+                  "preset":  "full_phase3",
+                  "target_modules":  [
+
+                                     ],
+                  "bias_mode":  "none",
+                  "hidden_size":  2048,
+                  "vocab_size":  57600,
+                  "init_std":  0.02
+              },
+    "checkpoints":  {
+                        "output_dir":  "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_train_from_feature_store_128step",
+                        "save_every_steps":  200,
+                        "keep_last":  3,
+                        "manifest_name":  "lora_manifest.json",
+                        "adapter_name":  "adapter.safetensors"
+                    },
+    "logging":  {
+                    "log_every_steps":  10,
+                    "report_loss":  true,
+                    "report_tokens_per_sec":  true
+                },
+    "training":  {
+                     "planned_layers":  6,
+                     "pad_token_id":  0,
+                     "label_smoothing":  0.0,
+                     "save_adapter_checkpoint":  true,
+                     "bridge_dump_only":  false,
+                     "plan_kind":  "module_local"
+                 },
+    "bridge":  {
+                   "enabled":  true,
+                   "model_kind":  "ash_native",
+                   "tokenizer_path":  "D:\\1111113232\\DUST\\1\\ash_pass3\\tokenizer_v5\\artifacts\\tokenizer_manifest_v5_final.json",
+                   "teacher_full_model_path":  "D:\\1111113232\\DUST\\1\\ash_pass3\\tokenizer_v5\\artifacts\\full_model_vocab_v5_resized.safetensors",
+                   "max_bridge_samples":  null,
+                   "bos":  true,
+                   "eos":  true,
+                   "include_system_prompt":  false,
+                   "output_feature_jsonl":  null,
+                   "feature_store_work_dir":  "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\\feature_store_work",
+                   "feature_store_archive_dir":  "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\\feature_store_archive",
+                   "feature_store_rows_per_shard":  128,
+                   "teacher":  {
+                                   "mode":  "token_aligned",
+                                   "span":  "full_sequence",
+                                   "center_per_sequence":  false,
+                                   "l2_normalize":  false,
+                                   "subtract_prompt_mean":  false,
+                                   "prompt_mean_scale":  1.0,
+                                   "keep_last_k_tokens":  null,
+                                   "min_span_tokens":  1,
+                                   "layer_blend":  {
+                                                       "enabled":  false,
+                                                       "previous_weight":  0.2,
+                                                       "current_weight":  0.6,
+                                                       "next_weight":  0.2,
+                                                       "renormalize":  true
+                                                   }
+                               },
+                   "extract_only":  false,
+                   "max_seq_len":  192
+               }
+}

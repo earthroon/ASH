@@ -1,0 +1,128 @@
+[
+  {
+    "case_id": "plain_low_cairo_stress",
+    "candidate_rank": 0,
+    "token_id": 1201,
+    "piece": "가",
+    "frames": [
+      {
+        "x_ji": 0.72,
+        "y_in": 0.45,
+        "z_cheon": 0.25,
+        "pressure": 0.25,
+        "closure": 0.3,
+        "curvature": 0.2,
+        "phase_delta": 0.05,
+        "transition_energy": 0.22,
+        "closure_release": 0.1
+      }
+    ],
+    "expected": {
+      "plain_cairo_score_min": 0.55,
+      "fortis_cairo_score_max": 0.45,
+      "aspirated_cairo_score_max": 0.45,
+      "risk_level_max": "Medium"
+    }
+  },
+  {
+    "case_id": "fortis_internal_concentration",
+    "candidate_rank": 1,
+    "token_id": 1202,
+    "piece": "까",
+    "frames": [
+      {
+        "x_ji": 0.74,
+        "y_in": 0.46,
+        "z_cheon": 0.66,
+        "pressure": 0.84,
+        "closure": 0.88,
+        "curvature": 0.32,
+        "phase_delta": 0.08,
+        "transition_energy": 0.55,
+        "closure_release": 0.12
+      }
+    ],
+    "expected": {
+      "tube_concentration_min": 0.7,
+      "fortis_cairo_score_min": 0.65,
+      "aspirated_cairo_score_max": 0.55,
+      "risk_level_min": "Medium"
+    }
+  },
+  {
+    "case_id": "aspirated_release_curvature",
+    "candidate_rank": 2,
+    "token_id": 1203,
+    "piece": "카",
+    "frames": [
+      {
+        "x_ji": 0.73,
+        "y_in": 0.45,
+        "z_cheon": 0.5,
+        "pressure": 0.7,
+        "closure": 0.85,
+        "curvature": 0.28,
+        "phase_delta": 0.06,
+        "transition_energy": 0.48,
+        "closure_release": 0.1
+      },
+      {
+        "x_ji": 0.76,
+        "y_in": 0.47,
+        "z_cheon": 0.86,
+        "pressure": 0.78,
+        "closure": 0.35,
+        "curvature": 0.86,
+        "phase_delta": 0.42,
+        "transition_energy": 0.88,
+        "closure_release": 0.82
+      }
+    ],
+    "expected": {
+      "release_impulse_min": 0.5,
+      "curvature_spike_min": 0.8,
+      "aspirated_cairo_score_min": 0.65,
+      "risk_level_min": "Medium"
+    }
+  },
+  {
+    "case_id": "partial_missing_pressure",
+    "candidate_rank": 3,
+    "token_id": 1204,
+    "piece": "까",
+    "frames": [
+      {
+        "x_ji": 0.74,
+        "y_in": 0.46,
+        "z_cheon": 0.66,
+        "pressure": null,
+        "closure": 0.88,
+        "curvature": 0.32,
+        "phase_delta": 0.08,
+        "transition_energy": 0.55,
+        "closure_release": 0.12
+      }
+    ],
+    "expected": {
+      "stress_status": "Partial",
+      "missing_channels_contains": [
+        "pressure"
+      ],
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  },
+  {
+    "case_id": "missing_cji_xyz_trace",
+    "candidate_rank": 4,
+    "token_id": 9999,
+    "piece": "unknown",
+    "frames": null,
+    "expected": {
+      "stress_status": "Unavailable",
+      "risk_level": "Unavailable",
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  }
+]

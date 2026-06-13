@@ -1,0 +1,52 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
+  "status": "GPU_ACTIVE_SET_RENORM_AND_FINAL_MASK_SAFE_FALLBACK_BAKED_STATIC",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "gpu_shader_targets": [
+    "gpu_sampling_topp_scan.wgsl",
+    "gpu_sampling_select.wgsl",
+    "gpu_sampling_select_legacy.wgsl"
+  ],
+  "sampling_order": [
+    "finite_check",
+    "guard_mask/top_k",
+    "min_p",
+    "active_set_softmax_renormalization",
+    "top_p",
+    "final_sample"
+  ],
+  "active_probability_denominator": "active_set_sum_exp",
+  "forbidden_denominator": "full_vocab_sum_exp_for_top_p_after_active_filters",
+  "final_mask_empty_policy": [
+    "active_top1",
+    "valid_global_top1",
+    "no_valid_token_sentinel"
+  ],
+  "pad_token_zero_fallback_allowed": false,
+  "abi_change": "none; recovery mode encoded in SelectionOut._pad0",
+  "probe_fields_extended": [
+    "gpu_active_set_renormalized",
+    "gpu_active_count",
+    "gpu_final_count",
+    "gpu_final_mask_empty",
+    "gpu_final_mask_recovered",
+    "gpu_recovery_mode",
+    "gpu_selected_from_recovery",
+    "cpu_gpu_candidate_parity_checked",
+    "cpu_gpu_candidate_parity_status"
+  ],
+  "artifacts": [
+    "workspace/sampler01_gpu_active_set_fixture.json",
+    "workspace/sampler01_cpu_gpu_parity_report.json",
+    "workspace/sampler01_report.md",
+    "workspace/sampler01.patch",
+    "workspace/sampler01_static_checks.json"
+  ],
+  "execution_validation": "NOT_RUN_cargo_rustfmt_unavailable",
+  "non_scope": [
+    "deltak_qwave_weighted_minp",
+    "context_router",
+    "tokenizer_decode_ssot",
+    "cpu_oracle_sampler_creation"
+  ]
+}

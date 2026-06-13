@@ -1,0 +1,26 @@
+SFT-FFN-LORA-05 STATIC VALIDATION
+
+Result: PASS_STATIC / PENDING_ARTIFACT_CANDIDATE_RUNTIME
+
+Validated:
+- ash_core module file exists
+- ash_core test file exists
+- burn_webgpu_backend shell file exists
+- ash_core lib.rs module/export linkage exists
+- burn_webgpu_backend lib.rs module/export linkage exists
+- Rust source brace balance checked
+- acceptance report exists
+- bake report exists
+
+Could not validate in this environment:
+- cargo test
+- rustc compile
+- rustfmt formatting
+
+Local validation commands:
+- cargo test -p ash_core sft_ffn_lora_05 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_04 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_03 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_02 -- --nocapture
+- cargo test -p ash_core sft_ffn_lora_01 -- --nocapture
+- cargo test -p burn_webgpu_backend ffn_lora_artifact_candidate -- --nocapture

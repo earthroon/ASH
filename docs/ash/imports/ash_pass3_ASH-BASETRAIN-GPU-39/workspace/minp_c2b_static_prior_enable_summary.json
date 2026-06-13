@@ -1,0 +1,35 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
+  "status": "STATIC_SEMANTIC_PRIOR_CONTROLLED_ENABLE_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-02E",
+  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
+  "controlled_profile": "static_safe_v1",
+  "default_enabled": false,
+  "controlled_enable_default": false,
+  "requires_sampler04_strict_ready": true,
+  "requires_minp_c2a_alignment_pass": true,
+  "weights": {
+    "qwave_weight": 0.05,
+    "deltak_weight": 0.05,
+    "cross_weight": 0.0,
+    "bias_cap": 0.2
+  },
+  "guards": [
+    "no_source_regression",
+    "hard_safety_precedence",
+    "semantic_bias_clamp",
+    "prior_domination_guard",
+    "nan_inf_to_zero"
+  ],
+  "gate_status": "RUN01_NOT_PASS",
+  "gate_reason": "RUN-01 execution is NOT_RUN in this environment; semantic prior effective=false by default",
+  "semantic_prior_effective_by_default": false,
+  "non_scope": [
+    "dynamic_context_qwave",
+    "dynamic_context_deltak",
+    "semantic_prior_default_on",
+    "minp_formula_change",
+    "transition_rule_change",
+    "lora_training"
+  ]
+}

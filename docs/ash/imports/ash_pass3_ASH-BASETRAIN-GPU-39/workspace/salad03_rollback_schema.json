@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SALAD-03 Rollback Candidate / Safe Resample Step Receipt",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "input_patch",
+    "schema_version",
+    "step",
+    "mode",
+    "input",
+    "plan",
+    "execution"
+  ],
+  "properties": {
+    "patch_id": {
+      "const": "16AI-QW-38G-R6A-SALAD-03"
+    },
+    "input_patch": {
+      "const": "16AI-QW-38G-R6A-SALAD-02"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "mode": {
+      "enum": [
+        "Off",
+        "PlanOnly",
+        "ControlledExecute",
+        "StrictControlledExecute"
+      ]
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "risk_stable",
+        "rollback_candidate",
+        "token_ledger_len",
+        "kv_snapshot_available",
+        "kv_restore_supported"
+      ]
+    },
+    "plan": {
+      "type": "object",
+      "required": [
+        "decision",
+        "behavior_change",
+        "plan_only",
+        "rollback_depth",
+        "safe_resample_config",
+        "denied_reasons",
+        "warning_reasons",
+        "plan_reasons"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "executed",
+        "rollback_executed",
+        "kv_restore_executed",
+        "resample_executed",
+        "safe_stop_executed"
+      ]
+    }
+  }
+}

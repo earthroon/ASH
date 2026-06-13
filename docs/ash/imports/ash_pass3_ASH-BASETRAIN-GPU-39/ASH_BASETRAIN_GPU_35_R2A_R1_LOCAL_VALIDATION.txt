@@ -1,0 +1,21 @@
+ASH-BASETRAIN-GPU-35-R2A-R1 LOCAL VALIDATION
+
+Container cargo/rustc unavailable in this environment.
+
+Recommended local commands:
+
+cd "D:\1111113232\DUST\1\ash_pass3"
+
+$env:CARGO_BUILD_JOBS="1"
+$env:CARGO_INCREMENTAL="0"
+$env:RUSTFLAGS="-C debuginfo=0"
+
+$env:ASH_BASETRAIN_GPU_OPERATOR_SELECTED_GROUP_MANIFEST_PATH="D:\1111113232\DUST\1\ash_pass3\target\selected_atlas_group_slot_0_manifest.operator.json"
+$env:ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH="D:\1111113232\DUST\1\ash_pass3\target\selected_atlas_group_slot_0_manifest.json"
+
+cargo build -p base_train --bin ash_basetrain_gpu_35_r2a_operator_manifest_materialization_failure_detail --jobs 1
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2a_operator_manifest_materialization_failure_detail
+
+Expected buildfix result:
+- no E0277 Value: From<i128> error
+- PASS_ASH_BASETRAIN_GPU_35_R2A_OPERATOR_MANIFEST_MATERIALIZATION_FAILURE_DETAIL_MISSING_INVALID_PLACEHOLDER_OR_SHAPE_BYTE_RANGE_MISMATCH_NO_BACKWARD_NO_OPTIMIZER

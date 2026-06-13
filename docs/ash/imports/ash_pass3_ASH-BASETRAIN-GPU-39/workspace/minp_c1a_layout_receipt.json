@@ -1,0 +1,243 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
+  "uniform_layout_checked": true,
+  "uniform_layout_check_kind": "static_field_scan_no_rustc_layout_eval",
+  "rust_uniform_size_bytes_static": 80,
+  "rust_uniform_fields": [
+    {
+      "name": "vocab_size",
+      "ty": "u32"
+    },
+    {
+      "name": "top_k",
+      "ty": "u32"
+    },
+    {
+      "name": "temperature",
+      "ty": "f32"
+    },
+    {
+      "name": "top_p",
+      "ty": "f32"
+    },
+    {
+      "name": "seed_lo",
+      "ty": "u32"
+    },
+    {
+      "name": "seed_hi",
+      "ty": "u32"
+    },
+    {
+      "name": "stage",
+      "ty": "u32"
+    },
+    {
+      "name": "block_count",
+      "ty": "u32"
+    },
+    {
+      "name": "min_p",
+      "ty": "f32"
+    },
+    {
+      "name": "_pad0",
+      "ty": "[u32; 3]"
+    },
+    {
+      "name": "semantic_prior_enabled",
+      "ty": "u32"
+    },
+    {
+      "name": "semantic_prior_source_mask",
+      "ty": "u32"
+    },
+    {
+      "name": "_semantic_pad0",
+      "ty": "[u32; 2]"
+    },
+    {
+      "name": "qwave_weight",
+      "ty": "f32"
+    },
+    {
+      "name": "deltak_weight",
+      "ty": "f32"
+    },
+    {
+      "name": "cross_weight",
+      "ty": "f32"
+    },
+    {
+      "name": "bias_cap",
+      "ty": "f32"
+    }
+  ],
+  "wgsl_uniform_fields_required": [
+    "semantic_prior_enabled",
+    "semantic_prior_source_mask",
+    "qwave_weight",
+    "deltak_weight",
+    "cross_weight",
+    "bias_cap"
+  ],
+  "binding_layout_checked": true,
+  "score_buffers": {
+    "topk": {
+      "qwave_binding": 5,
+      "deltak_binding": 6,
+      "binding_match": true
+    },
+    "topp": {
+      "qwave_binding": 9,
+      "deltak_binding": 10,
+      "binding_match": true
+    },
+    "select": {
+      "qwave_binding": 7,
+      "deltak_binding": 8,
+      "binding_match": true
+    },
+    "legacy": {
+      "score_buffers": "not_bound",
+      "reason": "legacy zero-source fallback path keeps semantic_bias=0.0"
+    }
+  },
+  "candidate_trace_version": 2,
+  "candidate_trace_v2_fields": [
+    "scaled_logit/logit",
+    "semantic_bias",
+    "weighted_logit",
+    "prob"
+  ],
+  "shader_bindings": {
+    "gpu_sampling_topk.wgsl": [
+      [
+        "0",
+        "SamplingUniform"
+      ],
+      [
+        "1",
+        "array<f32>"
+      ],
+      [
+        "2",
+        "array<u32>"
+      ],
+      [
+        "3",
+        "array<u32>"
+      ],
+      [
+        "4",
+        "array<f32>"
+      ],
+      [
+        "5",
+        "array<f32>"
+      ],
+      [
+        "6",
+        "array<f32>"
+      ]
+    ],
+    "gpu_sampling_topp_scan.wgsl": [
+      [
+        "0",
+        "SamplingUniform"
+      ],
+      [
+        "1",
+        "array<f32>"
+      ],
+      [
+        "2",
+        "array<u32>"
+      ],
+      [
+        "3",
+        "array<SamplingStats>"
+      ],
+      [
+        "4",
+        "array<f32>"
+      ],
+      [
+        "5",
+        "array<u32>"
+      ],
+      [
+        "6",
+        "array<u32>"
+      ],
+      [
+        "7",
+        "CandidateTraceHeader"
+      ],
+      [
+        "8",
+        "array<CandidateTraceEntry>"
+      ],
+      [
+        "9",
+        "array<f32>"
+      ],
+      [
+        "10",
+        "array<f32>"
+      ]
+    ],
+    "gpu_sampling_select.wgsl": [
+      [
+        "0",
+        "SamplingUniform"
+      ],
+      [
+        "1",
+        "array<f32>"
+      ],
+      [
+        "2",
+        "array<f32>"
+      ],
+      [
+        "3",
+        "array<f32>"
+      ],
+      [
+        "4",
+        "array<u32>"
+      ],
+      [
+        "5",
+        "SelectionOut"
+      ],
+      [
+        "6",
+        "array<SelectionOut>"
+      ],
+      [
+        "7",
+        "array<f32>"
+      ],
+      [
+        "8",
+        "array<f32>"
+      ]
+    ],
+    "gpu_sampling_select_legacy.wgsl": [
+      [
+        "0",
+        "SamplingUniform"
+      ],
+      [
+        "1",
+        "array<f32>"
+      ],
+      [
+        "2",
+        "SelectionOut"
+      ]
+    ]
+  }
+}

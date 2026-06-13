@@ -1,0 +1,43 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03A",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "behavior_change": false,
+  "requires_decode03a": true,
+  "decode03a_status_seen": null,
+  "sampler05_status_seen": null,
+  "steps_observed": 0,
+  "pci": {
+    "mean": null,
+    "min": null,
+    "max": null,
+    "p10": null,
+    "p50": null,
+    "p90": null
+  },
+  "buckets": {
+    "confident_count": 0,
+    "stable_count": 0,
+    "uncertain_count": 0,
+    "unstable_count": 0,
+    "collapsing_count": 0
+  },
+  "transitions": {
+    "downshift_count": 0,
+    "upshift_count": 0,
+    "hysteresis_hold_count": 0
+  },
+  "risk": {
+    "low_confidence_count": 0,
+    "collapsing_count": 0,
+    "entropy_conflict_count": 0,
+    "margin_collapse_count": 0,
+    "selected_rank_risk_count": 0,
+    "fallback_risk_count": 0,
+    "overcompression_risk_count": 0,
+    "numeric_risk_count": 0
+  },
+  "ready_for_decode03c_shadow_policy": false,
+  "ready_for_decode03d_controlled_enable": false,
+  "reason": "static bake only; run ASH_DECODE03B_PCI=receipt with DECODE-03A/SAMPLER-05 to produce PCI evidence"
+}

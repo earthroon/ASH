@@ -1,0 +1,61 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36C",
+  "title": "Bounded Weight Slice Row Alignment Probe / F32 Window Stats To Tensor Row Boundary Sanity No Full Tensor No GPU Upload Seal",
+  "baked_from": "ash_pass3_ASH-BASETRAIN-GPU-36B-R1_local_hex_encoder_buildfix_baked.zip",
+  "created_files": [
+    "crates/base_train/src/ash_basetrain_gpu_36c_bounded_weight_slice_row_alignment_probe.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_36c_bounded_weight_slice_row_alignment_probe.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-36C.md",
+    "patch_reports/ASH-BASETRAIN-GPU-36C_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_36C_BOUNDED_WEIGHT_SLICE_ROW_ALIGNMENT_PROBE.json",
+    "artifacts/ASH_BASETRAIN_GPU_36C_STATIC_CHECKS.txt"
+  ],
+  "cargo_build_executed": false,
+  "cargo_build_blocked_reason": "cargo/rustc not available in bake container",
+  "live_input_receipt_paths_included": [],
+  "guards": {
+    "file_open_used": false,
+    "bounded_window_re_read_executed": false,
+    "selected_group_full_slice_read": false,
+    "selected_group_weight_bytes_read": false,
+    "full_tensor_load_executed": false,
+    "full_tensor_stats_generated": false,
+    "safetensors_header_read_executed": false,
+    "mmap_materialization_executed": false,
+    "runtime_gpu_buffer_created": false,
+    "wgpu_device_requested": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "selected_group_gradient_buffer_allocated": false,
+    "selected_group_backward_executed": false,
+    "optimizer_created": false,
+    "optimizer_step_executed": false,
+    "delta_candidate_materialized": false,
+    "checkpoint_write_executed": false,
+    "safetensors_mutation_present": false,
+    "runtime_1p1b_training_claimed": false,
+    "rust_if_usage_policy": "minimize_if_use_match_and_lookup_tables"
+  },
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-36C",
+    "static_baked_status": "BLOCKED_36B_RECEIPT_NOT_FOUND",
+    "file_open_used": false,
+    "bounded_window_re_read_executed": false,
+    "full_tensor_load_executed": false,
+    "gpu_upload_executed": false,
+    "safetensors_header_read_executed": false,
+    "hex_crate_reference_present": false,
+    "rust_if_occurrence_count": 0,
+    "rust_match_occurrence_count": 1,
+    "rust_control_flow_policy": "minimize_if_use_match_and_lookup_tables",
+    "source_receipt_live_path_included": false
+  },
+  "file_sha256": {
+    "crates/base_train/src/ash_basetrain_gpu_36c_bounded_weight_slice_row_alignment_probe.rs": "5bf3c4e5440c31b7c87521d2c3772e71613ebb0ce6fca7429ebb6f0a06c79186",
+    "crates/base_train/src/bin/ash_basetrain_gpu_36c_bounded_weight_slice_row_alignment_probe.rs": "e552fa670b4dceee8429c8acad290d8b8daa9e9fb812761e93c89442d42fb07d",
+    "acceptance_reports/ASH-BASETRAIN-GPU-36C.md": "b23841e48da64b5a13e11c1bd5e7366edc17e600e2fa374eda323194263f5d21",
+    "patch_reports/ASH-BASETRAIN-GPU-36C_bake_report.md": "1bc30a09fe9e5463f149cb8b4fbbb55349ae074a5a61cf5371914ac1314fc90b",
+    "artifacts/ASH_BASETRAIN_GPU_36C_BOUNDED_WEIGHT_SLICE_ROW_ALIGNMENT_PROBE.json": "56628a4e2cf25862c09b55173fb2d5e4e9f1c16c03b32596c977c82992159376",
+    "artifacts/ASH_BASETRAIN_GPU_36C_STATIC_CHECKS.txt": "dc1d637992ac4a8b55ebc6905aa34c5a239993050d1ef927b76dada0e29b40dd"
+  }
+}

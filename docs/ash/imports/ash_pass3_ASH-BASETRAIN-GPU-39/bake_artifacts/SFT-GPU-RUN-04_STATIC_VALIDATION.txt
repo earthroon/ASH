@@ -1,0 +1,32 @@
+SFT-GPU-RUN-04 STATIC VALIDATION
+
+[PASS] ash_core promotion bridge module added
+[PASS] ash_core promotion bridge tests added
+[PASS] lora_train GPU-trained promotion bridge helper added
+[PASS] lora_train promotion bridge tests added
+[PASS] burn_webgpu_backend promotion bridge boundary added
+[PASS] burn_webgpu_backend promotion bridge boundary tests added
+[PASS] ash_core lib.rs module/export connected
+[PASS] lora_train lib.rs module/export connected
+[PASS] burn_webgpu_backend lib.rs module/export connected
+[PASS] new Rust files have balanced braces/brackets/parentheses
+[PASS] review queue intake gate present
+[PASS] promotion review packet gate present
+[PASS] LORA-07 bridge readiness gate present
+[PASS] duplicate review queue item fail-closed guard present
+[PASS] operator approval default closed
+[PASS] promotion apply default closed
+[PASS] runtime current pointer update default closed
+[PASS] lifecycle mutation default closed
+[PASS] slot action apply default closed
+[PASS] rollback execution default closed
+[PASS] ASH current binding default closed
+[PASS] acceptance report generated
+[PASS] bake report generated
+[PASS] static scan generated
+
+[PENDING] cargo test -p ash_core sft_gpu_run_04 -- --nocapture
+[PENDING] cargo test -p lora_train gpu_trained_promotion_bridge -- --nocapture
+[PENDING] cargo test -p burn_webgpu_backend gpu_trained_promotion_bridge -- --nocapture
+
+Reason: cargo/rustc/rustfmt are not available in this execution environment.

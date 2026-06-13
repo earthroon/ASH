@@ -1,0 +1,128 @@
+--- crates/model_core/src/lib.rs.orig
++++ crates/model_core/src/lib.rs.patched
+@@ -14,7 +14,7 @@
+ use serde::{Deserialize, Serialize};
+ use tokenizer_core::TokenizerManifest;
+ use text_kernel::StructureRoutingPrior;
+-use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
++use std::{collections::BTreeMap, fs, path::Path, sync::Arc, time::Instant};
+ 
+ pub use gpu_penalty::{AdapterGateBuffer, GpuPenaltyArgmaxResult, GpuPenaltyPass, GpuPenaltyTelemetry, GpuPenaltyTopNCandidate, PenaltyCoeffBuffer, TokenPenaltyFeature};
+ 
+@@ -1249,14 +1249,25 @@
+ }
+ 
+ #[derive(Debug, Clone)]
++pub struct NativeTraceGpuTicket {
++    pub slot_id: usize,
++}
++
++#[derive(Debug, Clone)]
+ pub enum TraceSlotState {
+     Idle,
+     Submitted {
+         meta: PendingTraceBatchMeta,
++        submit_at: Instant,
++        poll_count: u64,
++        request: ModuleTraceTapRequest,
++        padded_token_ids: Vec<u32>,
++        gpu_ticket: NativeTraceGpuTicket,
+     },
+     Ready {
+         meta: PendingTraceBatchMeta,
+         captures: Vec<CapturedModuleIo>,
++        ready_at: Instant,
+     },
+ }
+ 
+@@ -2599,7 +2610,7 @@
+ 
+         let meta = PendingTraceBatchMeta {
+             batch_index,
+-            target_key: target_key.clone(),
++            target_key,
+             seq_lens: request.seq_lens.clone(),
+             sample_ids,
+             record_ids,
+@@ -2608,15 +2619,57 @@
+             expected_in,
+             expected_out,
+         };
+-        self.trace_ring.slots[slot_id].state = TraceSlotState::Submitted { meta: meta.clone() };
+-
+-        match self.capture_module_io_native_padded_batch(&request, padded_token_ids) {
++        self.trace_ring.slots[slot_id].state = TraceSlotState::Submitted {
++            meta,
++            submit_at: Instant::now(),
++            poll_count: 0,
++            request,
++            padded_token_ids: padded_token_ids.to_vec(),
++            gpu_ticket: NativeTraceGpuTicket { slot_id },
++        };
++
++        Ok(slot_id)
++    }
++
++    pub fn poll_trace_slot(&mut self, slot_id: usize) -> Result<bool> {
++        let slot = self
++            .trace_ring
++            .slots
++            .get_mut(slot_id)
++            .ok_or_else(|| anyhow!("invalid native trace slot id: {}", slot_id))?;
++
++        let (meta, request, padded_token_ids, _gpu_ticket) = match &mut slot.state {
++            TraceSlotState::Submitted {
++                meta,
++                submit_at: _,
++                poll_count,
++                request,
++                padded_token_ids,
++                gpu_ticket,
++            } => {
++                *poll_count += 1;
++                (
++                    meta.clone(),
++                    request.clone(),
++                    padded_token_ids.clone(),
++                    gpu_ticket.clone(),
++                )
++            }
++            TraceSlotState::Ready { .. } => return Ok(true),
++            TraceSlotState::Idle => return Ok(false),
++        };
++
++        match self.capture_module_io_native_padded_batch(&request, &padded_token_ids) {
+             Ok(captures) => {
+-                self.trace_ring.slots[slot_id].state = TraceSlotState::Ready { meta, captures };
+-                Ok(slot_id)
++                slot.state = TraceSlotState::Ready {
++                    meta,
++                    captures,
++                    ready_at: Instant::now(),
++                };
++                Ok(true)
+             }
+             Err(err) => {
+-                self.trace_ring.slots[slot_id].state = TraceSlotState::Idle;
++                slot.state = TraceSlotState::Idle;
+                 Err(err)
+             }
+         }
+@@ -2634,7 +2687,7 @@
+ 
+         let prev = std::mem::replace(&mut slot.state, TraceSlotState::Idle);
+         match prev {
+-            TraceSlotState::Ready { meta, captures } => Ok(Some((meta, captures))),
++            TraceSlotState::Ready { meta, captures, ready_at: _ } => Ok(Some((meta, captures))),
+             other => {
+                 slot.state = other;
+                 Ok(None)
+@@ -2648,7 +2701,7 @@
+         for slot in &mut self.trace_ring.slots {
+             let prev = std::mem::replace(&mut slot.state, TraceSlotState::Idle);
+             match prev {
+-                TraceSlotState::Ready { meta, captures } => {
++                TraceSlotState::Ready { meta, captures, ready_at: _ } => {
+                     return Ok(Some((slot.slot_id, meta, captures)));
+                 }
+                 other => {

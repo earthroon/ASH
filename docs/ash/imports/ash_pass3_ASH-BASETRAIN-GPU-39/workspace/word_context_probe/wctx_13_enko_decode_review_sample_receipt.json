@@ -1,0 +1,106 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-13",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX03-C001",
+  "source_decode_staging_receipt_key": "sha256:121f1046975a4b97ca33f04cb7dc364d401c1ee5f78a87fd9e500b8fedca69ab",
+  "review_status": "no_candidate_available",
+  "candidate_availability": "candidate_missing_not_executed",
+  "target_diff": {
+    "diff_id": "target_diff:WCTX03-C001:no_candidate",
+    "original_target_korean": null,
+    "candidate_target_korean": null,
+    "candidate_available": false,
+    "diff_kind": "candidate_missing",
+    "original_char_count": 0,
+    "candidate_char_count": 0,
+    "original_line_count": 0,
+    "candidate_line_count": 0,
+    "char_delta": 0,
+    "line_delta": 0,
+    "exact_match": false,
+    "changed_from_original": false,
+    "committed": false,
+    "spans": [],
+    "diff_summary": "decode candidate output is not available; no target diff was applied"
+  },
+  "checks": [
+    {
+      "check_id": "review_check:WCTX03-C001:1765c6cac214703e",
+      "kind": "target_original_preserved",
+      "result": "pass",
+      "severity": "critical",
+      "confidence": 1.0,
+      "evidence": [
+        "target_text_mutated=false",
+        "target_subtitle_committed=false"
+      ],
+      "reason": "original target subtitle preservation invariant"
+    },
+    {
+      "check_id": "review_check:WCTX03-C001:b9a6ed7436e2b6a3",
+      "kind": "candidate_not_committed",
+      "result": "pass",
+      "severity": "critical",
+      "confidence": 1.0,
+      "evidence": [
+        "candidate_output_committed=false"
+      ],
+      "reason": "candidate output must remain uncommitted in WCTX-13"
+    },
+    {
+      "check_id": "review_check:WCTX03-C001:9df8cff8ce567dc0",
+      "kind": "commit_gate_closed",
+      "result": "pass",
+      "severity": "critical",
+      "confidence": 1.0,
+      "evidence": [
+        "commit_gate_open=false"
+      ],
+      "reason": "commit gate must remain closed during review"
+    },
+    {
+      "check_id": "review_check:WCTX03-C001:c1d49168150e3f3b",
+      "kind": "source_meaning_shadow",
+      "result": "not_applicable",
+      "severity": "info",
+      "confidence": 1.0,
+      "evidence": [
+        "candidate_target_korean=None"
+      ],
+      "reason": "no decode candidate is available; semantic preservation review not applicable"
+    }
+  ],
+  "decision": {
+    "decision": "no_candidate_to_review",
+    "can_proceed_to_candidate_approval": false,
+    "can_commit_target_update": false,
+    "can_apply_to_runtime": false,
+    "decision_reason": "no decode candidate text is available for review"
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "decode_executed_in_review": false,
+    "generation_executed_in_review": false,
+    "model_forward_executed_in_review": false,
+    "sampling_executed_in_review": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "candidate_output_committed": false,
+    "target_subtitle_committed": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "commit_gate_open": false,
+    "review_diff_created": true,
+    "candidate_available": false,
+    "critical_review_failure": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:a9dc7efc0d07883ed151ad5b8914e227484720dd57b3dc3572980d667af8141c",
+  "created_by": "ash_core::word_context_decode_review",
+  "schema_version": 1
+}

@@ -1,0 +1,48 @@
+{
+  "patch_id": "QW-52A-R1",
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "facade_module_exists",
+      "pass": true
+    },
+    {
+      "name": "lib_exports_facade",
+      "pass": true
+    },
+    {
+      "name": "q52a_awareness_attaches_facade",
+      "pass": true
+    },
+    {
+      "name": "validator_binary_exists",
+      "pass": true
+    },
+    {
+      "name": "schema_exists",
+      "pass": true
+    },
+    {
+      "name": "receipt_exists",
+      "pass": true
+    },
+    {
+      "name": "forbidden_absent:crates/tokenizer_core/src/new_cheonjiin_tensor.rs",
+      "pass": true
+    },
+    {
+      "name": "forbidden_absent:crates/tokenizer_core/src/new_hangul_decomposer.rs",
+      "pass": true
+    },
+    {
+      "name": "forbidden_absent:crates/tokenizer_core/src/new_qwave_phase.rs",
+      "pass": true
+    },
+    {
+      "name": "forbidden_absent:crates/burn_webgpu_backend/src/shaders/cheonjiin_candidate_awareness.wgsl",
+      "pass": true
+    }
+  ],
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE",
+  "runtime_probe": "NOT_RUN_CARGO_UNAVAILABLE"
+}

@@ -1,0 +1,1013 @@
+diff -ruN minp_c1a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md minp_c1a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md
+--- minp_c1a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md	2026-05-26 23:34:44.886185180 +0000
+@@ -0,0 +1,25 @@
++# Acceptance — 16AI-QW-38G-R6A-MINP-C1A
++
++## Static acceptance
++
++- smoke module exists: PASS
++- lib export wired: PASS
++- CPU semantic prior smoke fixtures present: PASS
++- Rust/GPU semantic fields present: PASS
++- WGSL weighted hooks present: PASS
++- candidate trace V2 semantic fields present: PASS
++- zero-source fallback contract receipt exists: PASS
++- strict readiness unknown/blocked guard receipt exists: PASS
++
++## Execution acceptance
++
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WGSL compile: NOT_RUN
++
++Execution acceptance is **NOT_RUN**, not PASS, because this container lacks the required Rust/WebGPU tools.
++
++## Result
++
++Static C1A bake artifacts are present. Promotion to C2 should wait for target-environment `cargo check`, `cargo test -p model_core minp_c1a`, and WGSL compile validation.
+diff -ruN minp_c1a_orig/crates/model_core/src/lib.rs minp_c1a_work/crates/model_core/src/lib.rs
+--- minp_c1a_orig/crates/model_core/src/lib.rs	2026-05-26 23:23:57.000000000 +0000
++++ minp_c1a_work/crates/model_core/src/lib.rs	2026-05-26 23:33:33.483747209 +0000
+@@ -12,6 +12,7 @@
+ mod cpu_oracle_sampler;
+ mod sampler_parity;
+ mod sampler_parity_validation;
++mod minp_c1a_smoke;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -61,6 +62,7 @@
+ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use generation_telemetry::{
+     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
+     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
+diff -ruN minp_c1a_orig/crates/model_core/src/minp_c1a_smoke.rs minp_c1a_work/crates/model_core/src/minp_c1a_smoke.rs
+--- minp_c1a_orig/crates/model_core/src/minp_c1a_smoke.rs	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/crates/model_core/src/minp_c1a_smoke.rs	2026-05-26 23:33:31.266815261 +0000
+@@ -0,0 +1,185 @@
++use serde::{Deserialize, Serialize};
++
++use crate::cpu_oracle_sampler::{
++    sample_with_cpu_oracle,
++    sample_with_cpu_oracle_with_semantic_prior,
++    CpuOracleContext,
++    SemanticPriorScores,
++};
++use crate::generation_sampling::{GenerationSamplingConfig, SemanticPriorConfig};
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC1aFixtureReceipt {
++    pub name: String,
++    pub status: String,
++    pub semantic_prior_effective: bool,
++    pub active_ids: Vec<u32>,
++    pub final_ids: Vec<u32>,
++    pub semantic_bias: Option<f32>,
++    pub weighted_logit: Option<f32>,
++    pub expected_note: String,
++}
++
++fn base_ctx() -> CpuOracleContext {
++    CpuOracleContext {
++        step: 0,
++        seed: 1,
++        eos_token_id: None,
++        pad_token_id: Some(0),
++        banned_token_ids: Vec::new(),
++        recent_token_ids: Vec::new(),
++        min_new_tokens: 0,
++    }
++}
++
++fn minp_cfg() -> GenerationSamplingConfig {
++    GenerationSamplingConfig {
++        temperature: 1.0,
++        top_k: 0,
++        top_p: 1.0,
++        min_p: 0.1,
++        ..Default::default()
++    }
++}
++
++fn semantic_cfg() -> GenerationSamplingConfig {
++    let mut cfg = minp_cfg();
++    cfg.semantic_prior = SemanticPriorConfig {
++        enabled: true,
++        qwave_weight: 0.20,
++        deltak_weight: 0.15,
++        cross_weight: 0.10,
++        bias_cap: 0.75,
++        apply_to_min_p: true,
++        apply_to_top_p: true,
++        apply_to_sampling_score: true,
++        require_sampler04_strict_ready: true,
++    };
++    cfg
++}
++
++pub fn semantic_bias_formula_fixture() -> MinpC1aFixtureReceipt {
++    let cfg = semantic_cfg();
++    let q = 0.8f32;
++    let k = 0.5f32;
++    let bias = cfg.semantic_prior.bias_from_scores(q, k);
++    MinpC1aFixtureReceipt {
++        name: "semantic_bias_formula".to_string(),
++        status: if (bias - 0.275).abs() < 1e-6 { "PASS" } else { "FAIL" }.to_string(),
++        semantic_prior_effective: true,
++        active_ids: Vec::new(),
++        final_ids: Vec::new(),
++        semantic_bias: Some(bias),
++        weighted_logit: Some(10.0 + bias),
++        expected_note: "0.2*0.8 + 0.15*0.5 + 0.1*0.8*0.5 = 0.275".to_string(),
++    }
++}
++
++pub fn zero_source_fallback_fixture() -> MinpC1aFixtureReceipt {
++    let logits = [10.0, 9.0, 8.0, 2.0];
++    let cfg = semantic_cfg();
++    let ctx = base_ctx();
++    let vanilla = sample_with_cpu_oracle(&logits, &minp_cfg(), &ctx);
++    let zero_source = sample_with_cpu_oracle_with_semantic_prior(
++        &logits,
++        &cfg,
++        &ctx,
++        SemanticPriorScores::default(),
++    );
++    let same_candidates = vanilla.trace.active_ids == zero_source.trace.active_ids
++        && vanilla.trace.final_ids == zero_source.trace.final_ids;
++    MinpC1aFixtureReceipt {
++        name: "zero_source_fallback".to_string(),
++        status: if same_candidates && !zero_source.trace.semantic_prior_effective { "PASS" } else { "FAIL" }.to_string(),
++        semantic_prior_effective: zero_source.trace.semantic_prior_effective,
++        active_ids: zero_source.trace.active_ids,
++        final_ids: zero_source.trace.final_ids,
++        semantic_bias: zero_source.trace.semantic_bias_mean,
++        weighted_logit: zero_source.trace.weighted_active_max,
++        expected_note: "no qwave/deltak source keeps weighted path identical to vanilla scaled logits".to_string(),
++    }
++}
++
++pub fn prior_rescue_fixture() -> MinpC1aFixtureReceipt {
++    let logits = [10.0, 7.6, 7.0];
++    let cfg = semantic_cfg();
++    let ctx = CpuOracleContext { pad_token_id: None, ..base_ctx() };
++    let qwave = [0.0, 1.0, 0.0];
++    let weighted = sample_with_cpu_oracle_with_semantic_prior(
++        &logits,
++        &cfg,
++        &ctx,
++        SemanticPriorScores { qwave_scores: Some(&qwave), deltak_scores: None },
++    );
++    let rescued = weighted.trace.active_ids.contains(&1);
++    MinpC1aFixtureReceipt {
++        name: "prior_rescue".to_string(),
++        status: if rescued { "PASS" } else { "FAIL" }.to_string(),
++        semantic_prior_effective: weighted.trace.semantic_prior_effective,
++        active_ids: weighted.trace.active_ids,
++        final_ids: weighted.trace.final_ids,
++        semantic_bias: weighted.trace.semantic_bias_max,
++        weighted_logit: weighted.trace.weighted_active_max,
++        expected_note: "token 1 moves from 7.6 to 7.8 and survives min_p=0.1".to_string(),
++    }
++}
++
++pub fn banned_token_cannot_resurrect_fixture() -> MinpC1aFixtureReceipt {
++    let logits = [10.0, 7.6];
++    let cfg = semantic_cfg();
++    let mut ctx = CpuOracleContext { pad_token_id: None, ..base_ctx() };
++    ctx.banned_token_ids = vec![1];
++    let qwave = [0.0, 10.0];
++    let deltak = [0.0, 10.0];
++    let result = sample_with_cpu_oracle_with_semantic_prior(
++        &logits,
++        &cfg,
++        &ctx,
++        SemanticPriorScores { qwave_scores: Some(&qwave), deltak_scores: Some(&deltak) },
++    );
++    let banned_absent = !result.trace.active_ids.contains(&1) && !result.trace.final_ids.contains(&1);
++    MinpC1aFixtureReceipt {
++        name: "banned_token_cannot_resurrect".to_string(),
++        status: if banned_absent { "PASS" } else { "FAIL" }.to_string(),
++        semantic_prior_effective: result.trace.semantic_prior_effective,
++        active_ids: result.trace.active_ids,
++        final_ids: result.trace.final_ids,
++        semantic_bias: result.trace.semantic_bias_max,
++        weighted_logit: result.trace.weighted_active_max,
++        expected_note: "ban/eos guard precedes semantic prior; token 1 must stay removed".to_string(),
++    }
++}
++
++pub fn run_minp_c1a_cpu_smoke_fixtures() -> Vec<MinpC1aFixtureReceipt> {
++    vec![
++        semantic_bias_formula_fixture(),
++        zero_source_fallback_fixture(),
++        prior_rescue_fixture(),
++        banned_token_cannot_resurrect_fixture(),
++    ]
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn minp_c1a_semantic_bias_formula() {
++        assert_eq!(semantic_bias_formula_fixture().status, "PASS");
++    }
++
++    #[test]
++    fn minp_c1a_zero_source_falls_back_to_vanilla() {
++        assert_eq!(zero_source_fallback_fixture().status, "PASS");
++    }
++
++    #[test]
++    fn minp_c1a_prior_can_rescue_near_threshold_token() {
++        assert_eq!(prior_rescue_fixture().status, "PASS");
++    }
++
++    #[test]
++    fn minp_c1a_banned_token_cannot_resurrect() {
++        assert_eq!(banned_token_cannot_resurrect_fixture().status, "PASS");
++    }
++}
+diff -ruN minp_c1a_orig/workspace/minp_c1a.patch minp_c1a_work/workspace/minp_c1a.patch
+--- minp_c1a_orig/workspace/minp_c1a.patch	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a.patch	2026-05-26 23:35:05.897887605 +0000
+@@ -0,0 +1,237 @@
++diff -ruN minp_c1a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md minp_c1a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md
++--- minp_c1a_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c1a_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md	2026-05-26 23:34:44.886185180 +0000
++@@ -0,0 +1,25 @@
+++# Acceptance — 16AI-QW-38G-R6A-MINP-C1A
+++
+++## Static acceptance
+++
+++- smoke module exists: PASS
+++- lib export wired: PASS
+++- CPU semantic prior smoke fixtures present: PASS
+++- Rust/GPU semantic fields present: PASS
+++- WGSL weighted hooks present: PASS
+++- candidate trace V2 semantic fields present: PASS
+++- zero-source fallback contract receipt exists: PASS
+++- strict readiness unknown/blocked guard receipt exists: PASS
+++
+++## Execution acceptance
+++
+++- cargo check: NOT_RUN
+++- cargo test: NOT_RUN
+++- rustfmt: NOT_RUN
+++- WGSL compile: NOT_RUN
+++
+++Execution acceptance is **NOT_RUN**, not PASS, because this container lacks the required Rust/WebGPU tools.
+++
+++## Result
+++
+++Static C1A bake artifacts are present. Promotion to C2 should wait for target-environment `cargo check`, `cargo test -p model_core minp_c1a`, and WGSL compile validation.
++diff -ruN minp_c1a_orig/crates/model_core/src/lib.rs minp_c1a_work/crates/model_core/src/lib.rs
++--- minp_c1a_orig/crates/model_core/src/lib.rs	2026-05-26 23:23:57.000000000 +0000
+++++ minp_c1a_work/crates/model_core/src/lib.rs	2026-05-26 23:33:33.483747209 +0000
++@@ -12,6 +12,7 @@
++ mod cpu_oracle_sampler;
++ mod sampler_parity;
++ mod sampler_parity_validation;
+++mod minp_c1a_smoke;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -61,6 +62,7 @@
++ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+++pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++ pub use generation_telemetry::{
++     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
++     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
++diff -ruN minp_c1a_orig/crates/model_core/src/minp_c1a_smoke.rs minp_c1a_work/crates/model_core/src/minp_c1a_smoke.rs
++--- minp_c1a_orig/crates/model_core/src/minp_c1a_smoke.rs	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c1a_work/crates/model_core/src/minp_c1a_smoke.rs	2026-05-26 23:33:31.266815261 +0000
++@@ -0,0 +1,185 @@
+++use serde::{Deserialize, Serialize};
+++
+++use crate::cpu_oracle_sampler::{
+++    sample_with_cpu_oracle,
+++    sample_with_cpu_oracle_with_semantic_prior,
+++    CpuOracleContext,
+++    SemanticPriorScores,
+++};
+++use crate::generation_sampling::{GenerationSamplingConfig, SemanticPriorConfig};
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC1aFixtureReceipt {
+++    pub name: String,
+++    pub status: String,
+++    pub semantic_prior_effective: bool,
+++    pub active_ids: Vec<u32>,
+++    pub final_ids: Vec<u32>,
+++    pub semantic_bias: Option<f32>,
+++    pub weighted_logit: Option<f32>,
+++    pub expected_note: String,
+++}
+++
+++fn base_ctx() -> CpuOracleContext {
+++    CpuOracleContext {
+++        step: 0,
+++        seed: 1,
+++        eos_token_id: None,
+++        pad_token_id: Some(0),
+++        banned_token_ids: Vec::new(),
+++        recent_token_ids: Vec::new(),
+++        min_new_tokens: 0,
+++    }
+++}
+++
+++fn minp_cfg() -> GenerationSamplingConfig {
+++    GenerationSamplingConfig {
+++        temperature: 1.0,
+++        top_k: 0,
+++        top_p: 1.0,
+++        min_p: 0.1,
+++        ..Default::default()
+++    }
+++}
+++
+++fn semantic_cfg() -> GenerationSamplingConfig {
+++    let mut cfg = minp_cfg();
+++    cfg.semantic_prior = SemanticPriorConfig {
+++        enabled: true,
+++        qwave_weight: 0.20,
+++        deltak_weight: 0.15,
+++        cross_weight: 0.10,
+++        bias_cap: 0.75,
+++        apply_to_min_p: true,
+++        apply_to_top_p: true,
+++        apply_to_sampling_score: true,
+++        require_sampler04_strict_ready: true,
+++    };
+++    cfg
+++}
+++
+++pub fn semantic_bias_formula_fixture() -> MinpC1aFixtureReceipt {
+++    let cfg = semantic_cfg();
+++    let q = 0.8f32;
+++    let k = 0.5f32;
+++    let bias = cfg.semantic_prior.bias_from_scores(q, k);
+++    MinpC1aFixtureReceipt {
+++        name: "semantic_bias_formula".to_string(),
+++        status: if (bias - 0.275).abs() < 1e-6 { "PASS" } else { "FAIL" }.to_string(),
+++        semantic_prior_effective: true,
+++        active_ids: Vec::new(),
+++        final_ids: Vec::new(),
+++        semantic_bias: Some(bias),
+++        weighted_logit: Some(10.0 + bias),
+++        expected_note: "0.2*0.8 + 0.15*0.5 + 0.1*0.8*0.5 = 0.275".to_string(),
+++    }
+++}
+++
+++pub fn zero_source_fallback_fixture() -> MinpC1aFixtureReceipt {
+++    let logits = [10.0, 9.0, 8.0, 2.0];
+++    let cfg = semantic_cfg();
+++    let ctx = base_ctx();
+++    let vanilla = sample_with_cpu_oracle(&logits, &minp_cfg(), &ctx);
+++    let zero_source = sample_with_cpu_oracle_with_semantic_prior(
+++        &logits,
+++        &cfg,
+++        &ctx,
+++        SemanticPriorScores::default(),
+++    );
+++    let same_candidates = vanilla.trace.active_ids == zero_source.trace.active_ids
+++        && vanilla.trace.final_ids == zero_source.trace.final_ids;
+++    MinpC1aFixtureReceipt {
+++        name: "zero_source_fallback".to_string(),
+++        status: if same_candidates && !zero_source.trace.semantic_prior_effective { "PASS" } else { "FAIL" }.to_string(),
+++        semantic_prior_effective: zero_source.trace.semantic_prior_effective,
+++        active_ids: zero_source.trace.active_ids,
+++        final_ids: zero_source.trace.final_ids,
+++        semantic_bias: zero_source.trace.semantic_bias_mean,
+++        weighted_logit: zero_source.trace.weighted_active_max,
+++        expected_note: "no qwave/deltak source keeps weighted path identical to vanilla scaled logits".to_string(),
+++    }
+++}
+++
+++pub fn prior_rescue_fixture() -> MinpC1aFixtureReceipt {
+++    let logits = [10.0, 7.6, 7.0];
+++    let cfg = semantic_cfg();
+++    let ctx = CpuOracleContext { pad_token_id: None, ..base_ctx() };
+++    let qwave = [0.0, 1.0, 0.0];
+++    let weighted = sample_with_cpu_oracle_with_semantic_prior(
+++        &logits,
+++        &cfg,
+++        &ctx,
+++        SemanticPriorScores { qwave_scores: Some(&qwave), deltak_scores: None },
+++    );
+++    let rescued = weighted.trace.active_ids.contains(&1);
+++    MinpC1aFixtureReceipt {
+++        name: "prior_rescue".to_string(),
+++        status: if rescued { "PASS" } else { "FAIL" }.to_string(),
+++        semantic_prior_effective: weighted.trace.semantic_prior_effective,
+++        active_ids: weighted.trace.active_ids,
+++        final_ids: weighted.trace.final_ids,
+++        semantic_bias: weighted.trace.semantic_bias_max,
+++        weighted_logit: weighted.trace.weighted_active_max,
+++        expected_note: "token 1 moves from 7.6 to 7.8 and survives min_p=0.1".to_string(),
+++    }
+++}
+++
+++pub fn banned_token_cannot_resurrect_fixture() -> MinpC1aFixtureReceipt {
+++    let logits = [10.0, 7.6];
+++    let cfg = semantic_cfg();
+++    let mut ctx = CpuOracleContext { pad_token_id: None, ..base_ctx() };
+++    ctx.banned_token_ids = vec![1];
+++    let qwave = [0.0, 10.0];
+++    let deltak = [0.0, 10.0];
+++    let result = sample_with_cpu_oracle_with_semantic_prior(
+++        &logits,
+++        &cfg,
+++        &ctx,
+++        SemanticPriorScores { qwave_scores: Some(&qwave), deltak_scores: Some(&deltak) },
+++    );
+++    let banned_absent = !result.trace.active_ids.contains(&1) && !result.trace.final_ids.contains(&1);
+++    MinpC1aFixtureReceipt {
+++        name: "banned_token_cannot_resurrect".to_string(),
+++        status: if banned_absent { "PASS" } else { "FAIL" }.to_string(),
+++        semantic_prior_effective: result.trace.semantic_prior_effective,
+++        active_ids: result.trace.active_ids,
+++        final_ids: result.trace.final_ids,
+++        semantic_bias: result.trace.semantic_bias_max,
+++        weighted_logit: result.trace.weighted_active_max,
+++        expected_note: "ban/eos guard precedes semantic prior; token 1 must stay removed".to_string(),
+++    }
+++}
+++
+++pub fn run_minp_c1a_cpu_smoke_fixtures() -> Vec<MinpC1aFixtureReceipt> {
+++    vec![
+++        semantic_bias_formula_fixture(),
+++        zero_source_fallback_fixture(),
+++        prior_rescue_fixture(),
+++        banned_token_cannot_resurrect_fixture(),
+++    ]
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    #[test]
+++    fn minp_c1a_semantic_bias_formula() {
+++        assert_eq!(semantic_bias_formula_fixture().status, "PASS");
+++    }
+++
+++    #[test]
+++    fn minp_c1a_zero_source_falls_back_to_vanilla() {
+++        assert_eq!(zero_source_fallback_fixture().status, "PASS");
+++    }
+++
+++    #[test]
+++    fn minp_c1a_prior_can_rescue_near_threshold_token() {
+++        assert_eq!(prior_rescue_fixture().status, "PASS");
+++    }
+++
+++    #[test]
+++    fn minp_c1a_banned_token_cannot_resurrect() {
+++        assert_eq!(banned_token_cannot_resurrect_fixture().status, "PASS");
+++    }
+++}
+diff -ruN minp_c1a_orig/workspace/minp_c1a_build_smoke_summary.json minp_c1a_work/workspace/minp_c1a_build_smoke_summary.json
+--- minp_c1a_orig/workspace/minp_c1a_build_smoke_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_build_smoke_summary.json	2026-05-26 23:34:44.883329602 +0000
+@@ -0,0 +1,29 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "status": "WEIGHTED_MINP_BUILD_AND_WGSL_SMOKE_BAKED_STATIC_RECEIPTS",
++  "input_patch": "16AI-QW-38G-R6A-MINP-C1",
++  "cargo_check": "NOT_RUN",
++  "cargo_test": "NOT_RUN",
++  "rustfmt": "NOT_RUN",
++  "wgsl_compile": "NOT_RUN",
++  "static_checks": "PASS",
++  "semantic_prior_default_enabled": false,
++  "strict_ready_required": true,
++  "zero_source_fallback_required": true,
++  "not_run_policy": "NOT_RUN is not PASS; execution remains judgment-unavailable until run in Rust/WebGPU environment",
++  "receipts": [
++    "workspace/minp_c1a_wgsl_compile_receipt.json",
++    "workspace/minp_c1a_layout_receipt.json",
++    "workspace/minp_c1a_zero_source_fallback_receipt.json",
++    "workspace/minp_c1a_weighted_fixture_receipt.json",
++    "workspace/minp_c1a_strict_readiness_guard_receipt.json",
++    "workspace/minp_c1a_static_checks.json"
++  ],
++  "non_scope": [
++    "qwave_deltak_score_provider",
++    "semantic_prior_default_enable",
++    "shader_formula_change",
++    "context_router",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_changed_files.txt minp_c1a_work/workspace/minp_c1a_changed_files.txt
+--- minp_c1a_orig/workspace/minp_c1a_changed_files.txt	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_changed_files.txt	2026-05-26 23:34:44.886417999 +0000
+@@ -0,0 +1,11 @@
++crates/model_core/src/minp_c1a_smoke.rs
++crates/model_core/src/lib.rs
++workspace/minp_c1a_build_smoke_summary.json
++workspace/minp_c1a_wgsl_compile_receipt.json
++workspace/minp_c1a_layout_receipt.json
++workspace/minp_c1a_zero_source_fallback_receipt.json
++workspace/minp_c1a_weighted_fixture_receipt.json
++workspace/minp_c1a_strict_readiness_guard_receipt.json
++workspace/minp_c1a_static_checks.json
++workspace/minp_c1a_report.md
++acceptance_reports/16AI-QW-38G-R6A-MINP-C1A_acceptance.md
+diff -ruN minp_c1a_orig/workspace/minp_c1a_layout_receipt.json minp_c1a_work/workspace/minp_c1a_layout_receipt.json
+--- minp_c1a_orig/workspace/minp_c1a_layout_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_layout_receipt.json	2026-05-26 23:34:44.884251534 +0000
+@@ -0,0 +1,243 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "uniform_layout_checked": true,
++  "uniform_layout_check_kind": "static_field_scan_no_rustc_layout_eval",
++  "rust_uniform_size_bytes_static": 80,
++  "rust_uniform_fields": [
++    {
++      "name": "vocab_size",
++      "ty": "u32"
++    },
++    {
++      "name": "top_k",
++      "ty": "u32"
++    },
++    {
++      "name": "temperature",
++      "ty": "f32"
++    },
++    {
++      "name": "top_p",
++      "ty": "f32"
++    },
++    {
++      "name": "seed_lo",
++      "ty": "u32"
++    },
++    {
++      "name": "seed_hi",
++      "ty": "u32"
++    },
++    {
++      "name": "stage",
++      "ty": "u32"
++    },
++    {
++      "name": "block_count",
++      "ty": "u32"
++    },
++    {
++      "name": "min_p",
++      "ty": "f32"
++    },
++    {
++      "name": "_pad0",
++      "ty": "[u32; 3]"
++    },
++    {
++      "name": "semantic_prior_enabled",
++      "ty": "u32"
++    },
++    {
++      "name": "semantic_prior_source_mask",
++      "ty": "u32"
++    },
++    {
++      "name": "_semantic_pad0",
++      "ty": "[u32; 2]"
++    },
++    {
++      "name": "qwave_weight",
++      "ty": "f32"
++    },
++    {
++      "name": "deltak_weight",
++      "ty": "f32"
++    },
++    {
++      "name": "cross_weight",
++      "ty": "f32"
++    },
++    {
++      "name": "bias_cap",
++      "ty": "f32"
++    }
++  ],
++  "wgsl_uniform_fields_required": [
++    "semantic_prior_enabled",
++    "semantic_prior_source_mask",
++    "qwave_weight",
++    "deltak_weight",
++    "cross_weight",
++    "bias_cap"
++  ],
++  "binding_layout_checked": true,
++  "score_buffers": {
++    "topk": {
++      "qwave_binding": 5,
++      "deltak_binding": 6,
++      "binding_match": true
++    },
++    "topp": {
++      "qwave_binding": 9,
++      "deltak_binding": 10,
++      "binding_match": true
++    },
++    "select": {
++      "qwave_binding": 7,
++      "deltak_binding": 8,
++      "binding_match": true
++    },
++    "legacy": {
++      "score_buffers": "not_bound",
++      "reason": "legacy zero-source fallback path keeps semantic_bias=0.0"
++    }
++  },
++  "candidate_trace_version": 2,
++  "candidate_trace_v2_fields": [
++    "scaled_logit/logit",
++    "semantic_bias",
++    "weighted_logit",
++    "prob"
++  ],
++  "shader_bindings": {
++    "gpu_sampling_topk.wgsl": [
++      [
++        "0",
++        "SamplingUniform"
++      ],
++      [
++        "1",
++        "array<f32>"
++      ],
++      [
++        "2",
++        "array<u32>"
++      ],
++      [
++        "3",
++        "array<u32>"
++      ],
++      [
++        "4",
++        "array<f32>"
++      ],
++      [
++        "5",
++        "array<f32>"
++      ],
++      [
++        "6",
++        "array<f32>"
++      ]
++    ],
++    "gpu_sampling_topp_scan.wgsl": [
++      [
++        "0",
++        "SamplingUniform"
++      ],
++      [
++        "1",
++        "array<f32>"
++      ],
++      [
++        "2",
++        "array<u32>"
++      ],
++      [
++        "3",
++        "array<SamplingStats>"
++      ],
++      [
++        "4",
++        "array<f32>"
++      ],
++      [
++        "5",
++        "array<u32>"
++      ],
++      [
++        "6",
++        "array<u32>"
++      ],
++      [
++        "7",
++        "CandidateTraceHeader"
++      ],
++      [
++        "8",
++        "array<CandidateTraceEntry>"
++      ],
++      [
++        "9",
++        "array<f32>"
++      ],
++      [
++        "10",
++        "array<f32>"
++      ]
++    ],
++    "gpu_sampling_select.wgsl": [
++      [
++        "0",
++        "SamplingUniform"
++      ],
++      [
++        "1",
++        "array<f32>"
++      ],
++      [
++        "2",
++        "array<f32>"
++      ],
++      [
++        "3",
++        "array<f32>"
++      ],
++      [
++        "4",
++        "array<u32>"
++      ],
++      [
++        "5",
++        "SelectionOut"
++      ],
++      [
++        "6",
++        "array<SelectionOut>"
++      ],
++      [
++        "7",
++        "array<f32>"
++      ],
++      [
++        "8",
++        "array<f32>"
++      ]
++    ],
++    "gpu_sampling_select_legacy.wgsl": [
++      [
++        "0",
++        "SamplingUniform"
++      ],
++      [
++        "1",
++        "array<f32>"
++      ],
++      [
++        "2",
++        "SelectionOut"
++      ]
++    ]
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_report.md minp_c1a_work/workspace/minp_c1a_report.md
+--- minp_c1a_orig/workspace/minp_c1a_report.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_report.md	2026-05-26 23:34:44.885917673 +0000
+@@ -0,0 +1,39 @@
++# 16AI-QW-38G-R6A-MINP-C1A — Weighted Min-P Build / WGSL Compile Smoke Receipt Bake Report
++
++## Scope
++
++This patch does not add a new QWave/DeltaK score provider. It adds smoke fixtures and receipts for the MINP-C1 weighted Min-P path.
++
++## Code changes
++
++- Added `crates/model_core/src/minp_c1a_smoke.rs`.
++- Exported `MinpC1aFixtureReceipt` and `run_minp_c1a_cpu_smoke_fixtures()` from `model_core`.
++- Added static receipts for Rust build smoke, WGSL compile smoke, binding layout, zero-source fallback, weighted fixture formula, and strict readiness guard.
++
++## Executed checks in this container
++
++- Static file checks: PASS
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WGSL runtime compile: NOT_RUN
++
++`NOT_RUN` is intentionally not treated as PASS. The container does not expose cargo/rustc/rustfmt or a WebGPU/WGSL validator, so execution is still judgment-unavailable until run in the target Rust/WebGPU environment.
++
++## Smoke contracts baked
++
++- Zero-source fallback: semantic prior enabled without qwave/deltak score buffers must remain equivalent to vanilla scaled-logit sampling.
++- Weighted fixture: `0.2*0.8 + 0.15*0.5 + 0.1*0.8*0.5 = 0.275`.
++- Prior rescue: a near-threshold candidate may survive only through bounded semantic bias.
++- Banned token cannot resurrect: ban/eos guard precedes semantic prior.
++- Strict readiness unknown/blocked disables semantic prior effectiveness.
++
++## Next gate
++
++Run in the target environment:
++
++```bash
++cargo check
++cargo test -p model_core minp_c1a
++# plus the project-specific WebGPU/WGSL shader validation path
++```
+diff -ruN minp_c1a_orig/workspace/minp_c1a_static_checks.json minp_c1a_work/workspace/minp_c1a_static_checks.json
+--- minp_c1a_orig/workspace/minp_c1a_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_static_checks.json	2026-05-26 23:34:44.885635271 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "status": "PASS",
++  "checks": {
++    "smoke_module_exists": true,
++    "lib_declares_minp_c1a_smoke": true,
++    "lib_exports_minp_c1a_smoke": true,
++    "semantic_bias_formula_fixture": true,
++    "zero_source_fallback_fixture": true,
++    "prior_rescue_fixture": true,
++    "banned_token_cannot_resurrect_fixture": true,
++    "semantic_prior_config_exists": true,
++    "cpu_oracle_semantic_prior_path": true,
++    "gpu_uniform_semantic_fields": true,
++    "candidate_trace_v2_fields": true,
++    "topk_qwave_deltak_bindings": true,
++    "topp_qwave_deltak_bindings": true,
++    "select_qwave_deltak_bindings": true,
++    "legacy_zero_source_fallback": true,
++    "weighted_logit_in_topk": true,
++    "weighted_logit_in_topp": true,
++    "weighted_logit_in_select": true,
++    "bias_cap_clamp_cpu": true,
++    "nan_inf_score_guard": true,
++    "strict_ready_default_required": true
++  },
++  "tool_availability": {
++    "cargo": null,
++    "rustc": null,
++    "rustfmt": null
++  },
++  "cargo_check": {
++    "status": "NOT_RUN",
++    "reason": "cargo not available"
++  },
++  "cargo_test": {
++    "status": "NOT_RUN",
++    "reason": "cargo not available"
++  },
++  "rustfmt": {
++    "status": "NOT_RUN",
++    "reason": "rustfmt not available"
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_strict_readiness_guard_receipt.json minp_c1a_work/workspace/minp_c1a_strict_readiness_guard_receipt.json
+--- minp_c1a_orig/workspace/minp_c1a_strict_readiness_guard_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_strict_readiness_guard_receipt.json	2026-05-26 23:34:44.885305808 +0000
+@@ -0,0 +1,8 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "strict_ready_required": true,
++  "sampler04_promotion_status": "UNKNOWN_IN_STATIC_BAKE",
++  "semantic_prior_effective": false,
++  "reason": "SAMPLER04_STRICT_STATUS_UNKNOWN",
++  "status": "PASS_STATIC_GUARD_CONTRACT"
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_weighted_fixture_receipt.json minp_c1a_work/workspace/minp_c1a_weighted_fixture_receipt.json
+--- minp_c1a_orig/workspace/minp_c1a_weighted_fixture_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_weighted_fixture_receipt.json	2026-05-26 23:34:44.884936511 +0000
+@@ -0,0 +1,64 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "semantic_bias_formula": {
++    "input": {
++      "scaled_logit": 10.0,
++      "qwave_score": 0.8,
++      "deltak_score": 0.5,
++      "qwave_weight": 0.2,
++      "deltak_weight": 0.15,
++      "cross_weight": 0.1,
++      "bias_cap": 0.75
++    },
++    "semantic_bias": 0.275,
++    "weighted_logit": 10.275,
++    "status": "PASS"
++  },
++  "prior_rescue": {
++    "logits": [
++      10.0,
++      7.6,
++      7.0
++    ],
++    "semantic_bias": [
++      0.0,
++      0.2,
++      0.0
++    ],
++    "weighted_logits": [
++      10.0,
++      7.8,
++      7.0
++    ],
++    "min_p": 0.1,
++    "threshold": 7.697414907005955,
++    "vanilla_kept": [
++      0
++    ],
++    "weighted_kept": [
++      0,
++      1
++    ],
++    "rescued_by_semantic_prior": [
++      1
++    ],
++    "status": "PASS"
++  },
++  "banned_token_cannot_resurrect": {
++    "logits": [
++      10.0,
++      7.6
++    ],
++    "semantic_bias": [
++      0.0,
++      0.75
++    ],
++    "banned": [
++      1
++    ],
++    "expected_active_ids": [
++      0
++    ],
++    "status": "PASS"
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_wgsl_compile_receipt.json minp_c1a_work/workspace/minp_c1a_wgsl_compile_receipt.json
+--- minp_c1a_orig/workspace/minp_c1a_wgsl_compile_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_wgsl_compile_receipt.json	2026-05-26 23:34:44.883743853 +0000
+@@ -0,0 +1,33 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "wgsl_compile": {
++    "status": "NOT_RUN",
++    "reason": "NO_WGPU_RUNTIME_OR_WGSL_VALIDATOR_IN_CONTAINER",
++    "static_shader_scan": {
++      "gpu_sampling_topk.wgsl": {
++        "has_sampling_uniform": true,
++        "has_semantic_bias_function": true,
++        "has_weighted_logit_function_or_call": true,
++        "has_bias_cap_field": true
++      },
++      "gpu_sampling_topp_scan.wgsl": {
++        "has_sampling_uniform": true,
++        "has_semantic_bias_function": true,
++        "has_weighted_logit_function_or_call": true,
++        "has_bias_cap_field": true
++      },
++      "gpu_sampling_select.wgsl": {
++        "has_sampling_uniform": true,
++        "has_semantic_bias_function": true,
++        "has_weighted_logit_function_or_call": true,
++        "has_bias_cap_field": true
++      },
++      "gpu_sampling_select_legacy.wgsl": {
++        "has_sampling_uniform": true,
++        "has_semantic_bias_function": true,
++        "has_weighted_logit_function_or_call": true,
++        "has_bias_cap_field": true
++      }
++    }
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c1a_orig/workspace/minp_c1a_zero_source_fallback_receipt.json minp_c1a_work/workspace/minp_c1a_zero_source_fallback_receipt.json
+--- minp_c1a_orig/workspace/minp_c1a_zero_source_fallback_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c1a_work/workspace/minp_c1a_zero_source_fallback_receipt.json	2026-05-26 23:34:44.884577610 +0000
+@@ -0,0 +1,21 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
++  "name": "zero_source_fallback",
++  "semantic_prior_enabled": true,
++  "qwave_source_available": false,
++  "deltak_source_available": false,
++  "semantic_prior_effective": false,
++  "semantic_bias_all": 0.0,
++  "vanilla_active_ids": [
++    0,
++    1,
++    2
++  ],
++  "weighted_active_ids": [
++    0,
++    1,
++    2
++  ],
++  "same_as_vanilla": true,
++  "status": "PASS"
++}
+\ No newline at end of file

@@ -1,0 +1,18 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-PERF-REVIEW-00",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "operator_expected_runtime_vocab_cap": 48256,
+  "model_spec_vocab_size": 56000,
+  "v5_model_spec_vocab_size": 48259,
+  "tokenizer_manifest_vocab_count": 48259,
+  "checkpoint_embedding_vocab_size": 48259,
+  "effective_vocab_cap_detected": 48259,
+  "vocab_cap_48256_source_found": false,
+  "vocab_48259_source_found": true,
+  "cap_applies_to_logits": "unknown",
+  "cap_applies_to_sampling": "unknown",
+  "cap_applies_to_argmax": "unknown",
+  "cap_applies_to_decode": "unknown",
+  "cap_risk": "Vocab cap SSOT mismatch: operator says 48256, archive static evidence strongly confirms 48259 for v5 checkpoint/tokenizer/model spec; 48256 appears as token id/banlist entry, not cap.",
+  "recommended_next_patch": "16AI-QW-38G-R6A-VOCAB-00 Runtime Vocab Cap 48256 Trace / Logit Head Range Seal"
+}

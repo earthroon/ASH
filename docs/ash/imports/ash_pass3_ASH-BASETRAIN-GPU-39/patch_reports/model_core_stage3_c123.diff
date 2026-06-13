@@ -1,0 +1,189 @@
+--- /tmp/origstage3c/crates/model_core/src/lib.rs	2026-04-19 13:12:26.000000000 +0000
++++ /tmp/stage3c/crates/model_core/src/lib.rs	2026-04-19 13:25:12.904089090 +0000
+@@ -1236,6 +1236,72 @@
+ }
+ 
+ #[derive(Debug, Clone)]
++pub struct PendingTraceBatchMeta {
++    pub batch_index: u64,
++    pub target_key: String,
++    pub seq_lens: Vec<usize>,
++    pub sample_ids: Vec<u64>,
++    pub record_ids: Vec<Option<String>>,
++    pub batch_size: usize,
++    pub max_seq_len: usize,
++    pub expected_in: usize,
++    pub expected_out: usize,
++}
++
++#[derive(Debug, Clone)]
++pub enum TraceSlotState {
++    Idle,
++    Submitted {
++        meta: PendingTraceBatchMeta,
++    },
++    Ready {
++        meta: PendingTraceBatchMeta,
++        captures: Vec<CapturedModuleIo>,
++    },
++}
++
++#[derive(Debug, Clone)]
++pub struct NativeTraceSlot {
++    pub slot_id: usize,
++    pub state: TraceSlotState,
++}
++
++#[derive(Debug, Clone)]
++pub struct NativeTraceRing {
++    pub slots: Vec<NativeTraceSlot>,
++    pub next_submit_slot: usize,
++}
++
++impl NativeTraceRing {
++    pub fn new(slot_count: usize) -> Self {
++        let count = slot_count.max(2);
++        let mut slots = Vec::with_capacity(count);
++        for slot_id in 0..count {
++            slots.push(NativeTraceSlot {
++                slot_id,
++                state: TraceSlotState::Idle,
++            });
++        }
++        Self {
++            slots,
++            next_submit_slot: 0,
++        }
++    }
++
++    pub fn try_acquire_idle_slot(&mut self) -> Option<usize> {
++        let len = self.slots.len();
++        for offset in 0..len {
++            let idx = (self.next_submit_slot + offset) % len;
++            if matches!(self.slots[idx].state, TraceSlotState::Idle) {
++                self.next_submit_slot = (idx + 1) % len;
++                return Some(idx);
++            }
++        }
++        None
++    }
++}
++
++#[derive(Debug, Clone)]
+ pub struct CapturedModuleIo {
+     pub target_key: String,
+     pub input_dim: usize,
+@@ -2353,6 +2419,7 @@
+     structure_routing_state: StructureRoutingState,
+     active_penalty_coeffs: Option<PenaltyCoeffBuffer>,
+     active_adapter_gate: Option<AdapterGateBuffer>,
++    trace_ring: NativeTraceRing,
+ }
+ 
+ impl NativeWgpuModel {
+@@ -2501,6 +2568,97 @@
+         )
+     }
+ 
++    pub fn submit_module_trace_padded_batch(
++        &mut self,
++        batch_index: u64,
++        padded_token_ids: &[u32],
++        request: ModuleTraceTapRequest,
++        sample_ids: Vec<u64>,
++        record_ids: Vec<Option<String>>,
++    ) -> Result<usize> {
++        let target_key = request.target_key.clone();
++        let (expected_in, expected_out) =
++            resolve_runtime_lora_target_module_dims(&self.spec, &target_key)?;
++        ensure!(
++            sample_ids.len() == request.batch_size,
++            "native module trace submit sample_ids mismatch: batch_size={} sample_ids={}",
++            request.batch_size,
++            sample_ids.len(),
++        );
++        ensure!(
++            record_ids.len() == request.batch_size,
++            "native module trace submit record_ids mismatch: batch_size={} record_ids={}",
++            request.batch_size,
++            record_ids.len(),
++        );
++
++        let slot_id = self
++            .trace_ring
++            .try_acquire_idle_slot()
++            .ok_or_else(|| anyhow!("no idle native trace slot available for target_key={}", target_key))?;
++
++        let meta = PendingTraceBatchMeta {
++            batch_index,
++            target_key: target_key.clone(),
++            seq_lens: request.seq_lens.clone(),
++            sample_ids,
++            record_ids,
++            batch_size: request.batch_size,
++            max_seq_len: request.max_seq_len,
++            expected_in,
++            expected_out,
++        };
++        self.trace_ring.slots[slot_id].state = TraceSlotState::Submitted { meta: meta.clone() };
++
++        match self.capture_module_io_native_padded_batch(&request, padded_token_ids) {
++            Ok(captures) => {
++                self.trace_ring.slots[slot_id].state = TraceSlotState::Ready { meta, captures };
++                Ok(slot_id)
++            }
++            Err(err) => {
++                self.trace_ring.slots[slot_id].state = TraceSlotState::Idle;
++                Err(err)
++            }
++        }
++    }
++
++    pub fn try_collect_ready_module_trace(
++        &mut self,
++        slot_id: usize,
++    ) -> Result<Option<(PendingTraceBatchMeta, Vec<CapturedModuleIo>)>> {
++        let slot = self
++            .trace_ring
++            .slots
++            .get_mut(slot_id)
++            .ok_or_else(|| anyhow!("invalid native trace slot id: {}", slot_id))?;
++
++        let prev = std::mem::replace(&mut slot.state, TraceSlotState::Idle);
++        match prev {
++            TraceSlotState::Ready { meta, captures } => Ok(Some((meta, captures))),
++            other => {
++                slot.state = other;
++                Ok(None)
++            }
++        }
++    }
++
++    pub fn try_collect_any_ready_module_trace(
++        &mut self,
++    ) -> Result<Option<(usize, PendingTraceBatchMeta, Vec<CapturedModuleIo>)>> {
++        for slot in &mut self.trace_ring.slots {
++            let prev = std::mem::replace(&mut slot.state, TraceSlotState::Idle);
++            match prev {
++                TraceSlotState::Ready { meta, captures } => {
++                    return Ok(Some((slot.slot_id, meta, captures)));
++                }
++                other => {
++                    slot.state = other;
++                }
++            }
++        }
++        Ok(None)
++    }
++
+     pub fn same_device_runtime_handles(&self) -> Option<&NativeWgpuRuntimeHandles> {
+         self.runtime_handles.as_ref()
+     }
+@@ -2578,6 +2736,7 @@
+             structure_routing_state: StructureRoutingState::default(),
+             active_penalty_coeffs: None,
+             active_adapter_gate: None,
++            trace_ring: NativeTraceRing::new(2),
+         })
+     }
+ 

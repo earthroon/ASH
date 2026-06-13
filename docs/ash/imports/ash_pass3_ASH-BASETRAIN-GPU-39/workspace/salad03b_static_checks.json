@@ -1,0 +1,19 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-03B",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": {
+    "module_file_exists": true,
+    "lib_module_registered": true,
+    "lib_exports_patch": true,
+    "sampler_parity_hook": true,
+    "default_off": true,
+    "verified_snapshot_gate": true,
+    "string_only_rollback_safety": true,
+    "safe_stop_executed_false": true,
+    "runtime_trait_present": true,
+    "summary_writer_present": true,
+    "tests_present": true
+  }
+}

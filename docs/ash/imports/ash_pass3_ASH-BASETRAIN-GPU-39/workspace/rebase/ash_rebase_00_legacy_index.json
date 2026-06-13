@@ -1,0 +1,780 @@
+{
+  "patch_id": "ASH-REBASE-00",
+  "base_patch": "QW-50-R0V",
+  "legacy_entries": [
+    {
+      "family": "decode",
+      "source_family": "QW-38G-R6A-DECODE",
+      "legacy_patch_prefix": "16AI-QW-38G-R6A-DECODE",
+      "found": true,
+      "hit_count": 60,
+      "status": "candidate_only",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "receipt_index_only",
+      "sample_hits": [
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-00_acceptance.md",
+          "sha256": "0bfa0ec4e3ba9bc646ce658a21dd0208546a6a092c65dc813f278020d5d1aa3a",
+          "size_bytes": "941"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md",
+          "sha256": "6b2b361fe20e3bb1b21d68d3b8f2bd40f6f7d12fe4dc9ee14e8cad154735c6fe",
+          "size_bytes": "768"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md",
+          "sha256": "29664c92ada2b6566b870b28b798cc40a285169a01ba491c84cf5a0c27bf149d",
+          "size_bytes": "303"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md",
+          "sha256": "85d7cc0d6656c73664a02c3d7e823d9cb5974f8739c4a8f874f38c935ca560c2",
+          "size_bytes": "736"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md",
+          "sha256": "ecc087bdaa59e56908ced4ef52488107ab04e6762fd27ea1758a694076b045c4",
+          "size_bytes": "738"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02D_acceptance.md",
+          "sha256": "a8b68ebbfdec4fdfd9e64877d046950582cddf98048bf30daf15ff849f9ffc8a",
+          "size_bytes": "521"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02E_acceptance.md",
+          "sha256": "91b99450e871291a9fc72d1bbedf1d5be5a4f915274af3fb3af5a878a6d602dd",
+          "size_bytes": "1346"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-02_acceptance.md",
+          "sha256": "dd099a9e91fbfd4a77db57cad19c57006daa7d4a5529e24fb7dee063f1aa2176",
+          "size_bytes": "324"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03A_acceptance.md",
+          "sha256": "e33b8e38d5230a0ba9fce366c42dc72a29189c5fe1c74a616fb1328dffcefe17",
+          "size_bytes": "1553"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03B_acceptance.md",
+          "sha256": "6d2576f2902e48a48fedc13b49dbd93bcd1d6c2e24599401742bf2759ac64bc0",
+          "size_bytes": "906"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03C_acceptance.md",
+          "sha256": "8519640e7c55bb256d840bd7ca56f7b29762bcca53f5c8fbf1c1b5e404e28f90",
+          "size_bytes": "1451"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03D_acceptance.md",
+          "sha256": "30a70e1221907f6b6db432d2234a81e7614c1a7a567e4c1193522f1868215524",
+          "size_bytes": "881"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03E_acceptance.md",
+          "sha256": "09758e15159dbdb2d8874ef8db38c8df68a1432f7486426e626c99913352d226",
+          "size_bytes": "813"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md",
+          "sha256": "92a26fb8445de771e9266aa558aaf3418882151e3c92a8ca7698c0fdcfe40615",
+          "size_bytes": "582"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-04_enko_subtitle_decode_quality_ssot_candidate_decision_receipt_seal.md",
+          "sha256": "3ea965427c8b5119afbcfecf1457aeec57bfd030db6614b2f92a957267900fa8",
+          "size_bytes": "2484"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-05_sampler_step_propagation_runtime_context_integrity_seal.md",
+          "sha256": "3a09324ae8d8af56acb407616428e48c2036b594d4eea51d0689579ed409d571",
+          "size_bytes": "2116"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-06_transition_guard_controlled_enable_token_penalty_runtime_seal.md",
+          "sha256": "e5b877ee3a4425b34fdf26d50cb734c14933b628baa72a33deb9936c63f71ed8",
+          "size_bytes": "2049"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-07_korean_morph_salad_overlay_josa_eomi_loop_penalty_seal.md",
+          "sha256": "4558af0c8d667aed896af2fe3e1f0efab78f5713798a861906a70fd537ecdf0f",
+          "size_bytes": "2230"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-08_candidate_empty_recovery_rollback_first_decode_recovery_seal.md",
+          "sha256": "47abfae628b851c18cb4fc31a90075797e6867394bb49b636be63c9eff83bacf",
+          "size_bytes": "2015"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-09_nbest_subtitle_candidate_pool_multi_profile_decode_seal.md",
+          "sha256": "2228b92dd97b1f090f7c9919f1ad057125d2bf275dc036447e00453c4ba0353e",
+          "size_bytes": "1447"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-10_subtitle_surface_rerank_gate_cps_line_orphan_particle_seal.md",
+          "sha256": "30565b66557fc631bc4c6bf8edc835cec69e03c246e1b4d96eeb38834a592a7e",
+          "size_bytes": "1784"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-11_salad_aware_candidate_rejection_degeneration_risk_final_gate_seal.md",
+          "sha256": "64420ad55a6fd2dcdbec1981451c7fc26644ce7976d1402fc4eaa5d425a28194",
+          "size_bytes": "2487"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-12_reference_free_qe_adapter_stub_source_candidate_quality_slot_seal.md",
+          "sha256": "37b3f7f3b906a98952f82600011ee471503a5a9a7601046afc2208efb9202ea1",
+          "size_bytes": "2147"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-13_span_error_receipt_translation_error_region_seal.md",
+          "sha256": "ffa751cdf711662df0e97717a5339dfffe9c03ea0c5972865bfc27a9e525e4ca",
+          "size_bytes": "2496"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-DECODE-14_source_adequacy_guard_enko_meaning_preservation_seal.md",
+          "sha256": "2f5ef0850637ada8bc697ddfc0b5fb95c88069e27e23737ad54e18aa52c9af8c",
+          "size_bytes": "2789"
+        }
+      ],
+      "notes": [
+        "transition guard / min-p / dynamic overlay remain disabled until R0W token/top-k trace exists"
+      ]
+    },
+    {
+      "family": "eval",
+      "source_family": "QW-38G-R6A-EVAL",
+      "legacy_patch_prefix": "16AI-QW-38G-R6A-EVAL",
+      "found": true,
+      "hit_count": 8,
+      "status": "calibration_reference",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "fixture_reference_only",
+      "sample_hits": [
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-00_acceptance.md",
+          "sha256": "1123a0e3c2fa959a6e74e57750aff62134e911a1a251def1854f7e823b4798bc",
+          "size_bytes": "633"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-01_acceptance.md",
+          "sha256": "98d8b777bf1a6d4e1fee59209ea2de49dad482a6e559638eae2b322fb81b6f1a",
+          "size_bytes": "518"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md",
+          "sha256": "84de8b294716d47462ea0f0de91db20fb005c89521b6f95521bfcaff07390cef",
+          "size_bytes": "530"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md",
+          "sha256": "36258576fb0484077a2293d92ca5148412994eb63601a4059191396b913edfd8",
+          "size_bytes": "631"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-TRANS-00-R1_actual_output_runner_execution_runtime_availability_receipt_seal.md",
+          "sha256": "cf3e4ea305668a3959ede30df7ee1c1535cf05592ebe930925cbe0a3b3a8bb09",
+          "size_bytes": "1179"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-TRANS-00_en_ko_subtitle_actual_output_eval_translation_quality_baseline_seal.md",
+          "sha256": "fcba7fefa9fb8b60b3d34110c34a7a17578025ad1f017f9f54f984c0f9aa859f",
+          "size_bytes": "736"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-EVAL-TRANS-00-R1_bake_report.md",
+          "sha256": "cf3e4ea305668a3959ede30df7ee1c1535cf05592ebe930925cbe0a3b3a8bb09",
+          "size_bytes": "1179"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-EVAL-TRANS-00_bake_report.md",
+          "sha256": "27a45148a33a980b20a80b2e80f9e406e2e39e132616e24c50a0a2ff5a7a6744",
+          "size_bytes": "573"
+        }
+      ],
+      "notes": [
+        "candidate calibration and long horizon eval are replay inputs only"
+      ]
+    },
+    {
+      "family": "wctx_mock",
+      "source_family": "QW-38G-R6A-WCTX-MOCK",
+      "legacy_patch_prefix": "16AI-QW-38G-R6A-WCTX-MOCK",
+      "found": true,
+      "hit_count": 28,
+      "status": "audit_reference",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "archive_and_fixture_reference_only",
+      "sample_hits": [
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-01_enko_subtitle_mock_decode_candidate_text_fixture_review_path_unlock_seal.md",
+          "sha256": "a96c32d70886c89d4347136f89b2a1b945b76eaf57c9bcd4397a3ed92e335abe",
+          "size_bytes": "2608"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-02_enko_subtitle_mock_candidate_review_replay_candidatecreated_path_seal.md",
+          "sha256": "047e8377d2433c96b81a94eb4ac459b000113cf64fb7744fb0e60e3758ffc9fe",
+          "size_bytes": "2023"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-03_enko_subtitle_mock_candidate_human_approval_fixture_no_target_commit_seal.md",
+          "sha256": "ab5aa6ab3a8a4cd53b24e1415b1ec9c8d27962ee7fa20d22c3ecc86df771f342",
+          "size_bytes": "2537"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-04_enko_subtitle_mock_approved_target_update_candidate_replay_manual_commit_gate_seal.md",
+          "sha256": "8f1789eba8c1366b8297f0e4754f11b99ee877c84b3cafb6684472fcc8e18110",
+          "size_bytes": "2459"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-05_enko_subtitle_mock_target_update_candidate_commit_approval_fixture_no_apply_seal.md",
+          "sha256": "29b9b6bab8ef3715efbc9aeaaa3b67768b4fe61cce1cac1a8ec34b7bcc19b9b5",
+          "size_bytes": "1908"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-06_enko_subtitle_mock_approved_single_cue_commit_replay_target_apply_receipt_seal.md",
+          "sha256": "24a25fd7593b38f30d682614f7cc7bcc87a9653f4b3cd5d5f7a37e5432fe754a",
+          "size_bytes": "1883"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-07_enko_subtitle_mock_single_cue_commit_rollback_replay_revert_receipt_seal.md",
+          "sha256": "08e1b419a6323c646e02ca9b35af4031e08f99f4d250c121721dcfddad32fa2b",
+          "size_bytes": "1785"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-08_enko_subtitle_mock_commit_rollback_ledger_replay_ledgerbuilt_seal.md",
+          "sha256": "13824ca77b22de798e688fe8407ec5ab22e0b43a905516c06047a77945eb0945",
+          "size_bytes": "944"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-09_enko_subtitle_mock_ledger_query_replay_cue_history_latest_snapshot_seal.md",
+          "sha256": "941d78a2b1568bc0e52542eda9a23132fdfc1bc7413c51baa891203fb44d383a",
+          "size_bytes": "1489"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-10_enko_subtitle_mock_ledger_audit_packet_export_replay_non_empty_packet_seal.md",
+          "sha256": "d2ce8f4f7a259be76b80709d8619e68b9863ccefc0a1d4cb93a26b29e22eccee",
+          "size_bytes": "2755"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-11_enko_subtitle_mock_audit_packet_inspector_replay_non_empty_packet_integrity_seal.md",
+          "sha256": "fd0843ea09b8cfd0d6e3dcb0f05bfc2878415bdb6c16cad4c1239e4b977af788",
+          "size_bytes": "2760"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-12_enko_subtitle_mock_audit_packet_archive_replay_non_empty_registry_seal.md",
+          "sha256": "59e8a927ae965fca18d2405864075ccd11ebee46d96a8ff8baccd489717a90d1",
+          "size_bytes": "1598"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-13_enko_subtitle_mock_audit_archive_query_replay_non_empty_registry_inspector_seal.md",
+          "sha256": "ca0eb97a286c24adab5615e799ba7a565e4511e1cf3377fa3587ed35a550326a",
+          "size_bytes": "2002"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-14_enko_subtitle_mock_wctx_e2e_receipt_chain_index_path_closure_seal.md",
+          "sha256": "dc9ec6ca1471b4a950d5ef611f4e3f45e45d24ac6aa7dbe22a842f84cea84997",
+          "size_bytes": "2651"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-01_bake_report.md",
+          "sha256": "6d61f345afccf50d14f07bd5268a3942d908508bcfb4b9da18dfc12a834cf68b",
+          "size_bytes": "2345"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-02_bake_report.md",
+          "sha256": "3c6828c446b0151b29fb11ba97fb78e054a9d4dfd2f12c5345b81a26102bda07",
+          "size_bytes": "1857"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-03_bake_report.md",
+          "sha256": "c0fa4cc694d94a51931603639b7d0f944692d3cdf36ae5e4fdb5ed5ed28775c9",
+          "size_bytes": "2113"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-04_bake_report.md",
+          "sha256": "837b804daba7b6b43cc7056745950d96ee2b51f442d8498d7ffe71f1b42c24c1",
+          "size_bytes": "2458"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-05_bake_report.md",
+          "sha256": "0c36792876f7aefeaee09074a006e1841e58a6e3e2c1826c4e33a8ac8c19b39c",
+          "size_bytes": "2299"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-06_bake_report.md",
+          "sha256": "268d3c8f68fcdac0d25069fffcffd4e84f69cf102f1168d6e6f8d72b662aba78",
+          "size_bytes": "2269"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-07_bake_report.md",
+          "sha256": "4ebe13186ea9c20a7a9bb435c64435cafb03688f6d04983c995ddef46a280477",
+          "size_bytes": "2283"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-08_bake_report.md",
+          "sha256": "62eb42700be918ea4e568700f037bc84b813cd32987d1b5c19e0ec7b93f1f1e2",
+          "size_bytes": "1130"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-09_bake_report.md",
+          "sha256": "51854836e1668cf91480adf73e73997d48df0b7a4ff5056b7b5e88bdac180cb3",
+          "size_bytes": "1252"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-10_bake_report.md",
+          "sha256": "057649b684d2b51d613709b692c9cd951d3a80c3d90e9e1904cca4cbd3ac6b92",
+          "size_bytes": "2151"
+        },
+        {
+          "path": "patch_reports/16AI-QW-38G-R6A-WCTX-MOCK-11_bake_report.md",
+          "sha256": "1a1b14cfce9ec03e69f633dd4243002fec604eef805f8b7d5f962ffffb2af244",
+          "size_bytes": "2264"
+        }
+      ],
+      "notes": [
+        "mock audit packets are reference artifacts, not active inference context sources"
+      ]
+    },
+    {
+      "family": "lora_rt",
+      "source_family": "QW-38G-R6A-LORA-RT",
+      "legacy_patch_prefix": "16AI-QW-38G-R6A-LORA-RT",
+      "found": true,
+      "hit_count": 44,
+      "status": "runtime_support_reference",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "attach_ledger_reference_only",
+      "sample_hits": [
+        {
+          "path": "workspace/examples/lora_rt01_baseline.ps1",
+          "sha256": "0864c77304672f9cfe30191f0488517971388578f25ea18c1d52755c34974589",
+          "size_bytes": "1207"
+        },
+        {
+          "path": "workspace/examples/lora_rt01_scale025.ps1",
+          "sha256": "48dc7cc4a010be2f749f9dfc3b2596b71991888cb508ad6d03c1d018272a9f2f",
+          "size_bytes": "1802"
+        },
+        {
+          "path": "workspace/examples/lora_rt01_verify.ps1",
+          "sha256": "bb0f54bc01c2e3231053e8531c185741b5d6528a0d5cb564eee073d44b798b51",
+          "size_bytes": "750"
+        },
+        {
+          "path": "workspace/examples/lora_rt02_scale000.ps1",
+          "sha256": "73c0b4113e4ccd626bcae41ff1c29df8a8ba1c7a4126488ea758facf3f6b0a19",
+          "size_bytes": "2059"
+        },
+        {
+          "path": "workspace/examples/lora_rt02_scale025.ps1",
+          "sha256": "d264e8ea67dd4606de7197a90b13c31960417e02c6930eac2364d3beac7b9721",
+          "size_bytes": "2059"
+        },
+        {
+          "path": "workspace/examples/lora_rt02_verify.ps1",
+          "sha256": "ab2340084db226e298ac5e570e296d509b44d06c10be7c941f6f03eea177aa83",
+          "size_bytes": "894"
+        },
+        {
+          "path": "workspace/examples/lora_rt02b_f_backoff_request.json",
+          "sha256": "570525aef3e4b14b7a3d2f02463d9aec075aaa10e3ea8a3fdefbe22e04f52caf",
+          "size_bytes": "2694"
+        },
+        {
+          "path": "workspace/examples/lora_rt02b_f_run.md",
+          "sha256": "2f2b2bdbe325cb0e07d1012e1a07750754d3c16f0e4637603f62bc715afb0ddf",
+          "size_bytes": "694"
+        },
+        {
+          "path": "workspace/examples/lora_rt02b_full_backoff.ps1",
+          "sha256": "b854439baa63ef5d96a22badfa3aa962247e190c9f0b83ddbfc2d05627c66351",
+          "size_bytes": "174"
+        },
+        {
+          "path": "workspace/examples/lora_rt02b_scale_sweep_low.ps1",
+          "sha256": "9af69a389556d9e8a75f872540eec2528ccee3312c1444a8549a52a1754c46a0",
+          "size_bytes": "172"
+        },
+        {
+          "path": "workspace/examples/lora_rt02b_verify.ps1",
+          "sha256": "c1adf09f845f89246e51e53faaad16aa154245282aace4603444d53326ea756d",
+          "size_bytes": "142"
+        },
+        {
+          "path": "workspace/examples/mem03_lora_rt02_scale025.ps1",
+          "sha256": "d68beca81f74fccab03cf33e6b4696071bd780595059a838ab71b620506bc321",
+          "size_bytes": "2742"
+        },
+        {
+          "path": "workspace/lora_rt01_changed_files.txt",
+          "sha256": "33e83fb724a68128b3e1a87ce8dd990a6612ea3a60f6bcdee60b3d605212d7ef",
+          "size_bytes": "298"
+        },
+        {
+          "path": "workspace/lora_rt01_patch_report.md",
+          "sha256": "3218dcfe5ea6afdafb5964ae38dd77482a29a56aad5b1faf3ec1b4094484175a",
+          "size_bytes": "1885"
+        },
+        {
+          "path": "workspace/lora_rt01_source_hash_manifest.json",
+          "sha256": "820ed79af0273ac865cda226956178180436f11eb9f088b1f1525f26eeaa9a1a",
+          "size_bytes": "1087"
+        },
+        {
+          "path": "workspace/lora_rt01_static_validation_result.json",
+          "sha256": "94dabe5c0556fb15dbde4f116bb0cfa57f9f2ae99ada2b9a9095e32848f04837",
+          "size_bytes": "825"
+        },
+        {
+          "path": "workspace/lora_rt02_changed_files.txt",
+          "sha256": "5a70262474eaecaec1324daea2b6209003a7bce157a8538f035cabe4762a235d",
+          "size_bytes": "555"
+        },
+        {
+          "path": "workspace/lora_rt02_patch_report.md",
+          "sha256": "284650d46bd8919752140e55e5d250570c9f8de4a4b9e495b96635349c9262a2",
+          "size_bytes": "1179"
+        },
+        {
+          "path": "workspace/lora_rt02_source_hash_manifest.json",
+          "sha256": "e2e663e8d1150d338d223437ab9a1e9063668045c49e023c3350118f7043bf14",
+          "size_bytes": "2546"
+        },
+        {
+          "path": "workspace/lora_rt02_static_validation_result.json",
+          "sha256": "0f936414c8a97160e57940a758387687fafad3dc424a62d0ee9efb349514f2fe",
+          "size_bytes": "406"
+        },
+        {
+          "path": "workspace/lora_rt02b_b_changed_files.txt",
+          "sha256": "44c12c699c2aaba71a06227e753a54f872649a7beee0df4f117ccd24226c1095",
+          "size_bytes": "301"
+        },
+        {
+          "path": "workspace/lora_rt02b_b_native_stderr_wrapper_patch_report.md",
+          "sha256": "07d10a0389c350906736211e6e0f24c13e3f1f4bd0101838e066b8ec20d7525a",
+          "size_bytes": "873"
+        },
+        {
+          "path": "workspace/lora_rt02b_b_source_hash_manifest.json",
+          "sha256": "31af05a238aa1f5f4d90147a4ff28a0bd9e6a108ef116520b0bf1b352e6c43ed",
+          "size_bytes": "963"
+        },
+        {
+          "path": "workspace/lora_rt02b_b_static_validation_result.json",
+          "sha256": "17eb8ad54e059bb2cd076cfa80391a4d50d8d55e2a0f90de89653acdfefeb0f9",
+          "size_bytes": "661"
+        },
+        {
+          "path": "workspace/lora_rt02b_c_changed_files.txt",
+          "sha256": "f9e8fc59c7b94744a3266bcb5f18e90fcf89c8052248435ff3065e6ae1c61769",
+          "size_bytes": "177"
+        }
+      ],
+      "notes": [
+        "runtime attach lessons are ledger candidates only; do not alter current LoRA scale or attachment"
+      ]
+    },
+    {
+      "family": "r12",
+      "source_family": "QW-38G-R6A-R12",
+      "legacy_patch_prefix": "16AI-QW-38G-R6A-R12",
+      "found": true,
+      "hit_count": 59,
+      "status": "quarantined_low_confidence",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "quarantine_candidate_only",
+      "sample_hits": [
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R10A_explicit_enable_runtime_smoke.md",
+          "sha256": "e46011408420c7c6a4fd37dfd4c5f1506fc19600a01da36dd7a4f1264fb0ba9d",
+          "size_bytes": "656"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R10_guarded_attenuation_runtime_candidate.md",
+          "sha256": "156f71661cd2241e6bb0ce6023609cbd853a81e97c0997af0ca389d7d56da004",
+          "size_bytes": "484"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R11A-R1_readiness_min_count_guard_repair.md",
+          "sha256": "37937ad968b04dcb63ca388352669801a8d63cc9848321b5ee0ba4a44e8bb8d1",
+          "size_bytes": "732"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R11A-R2_user_case_schema_import_repair.md",
+          "sha256": "9eeb75b4bc3d9e9a09c64fe0f1bcc42e705a65d2cf30b6374e2a935ce61e9d57",
+          "size_bytes": "668"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R11A_validation_case_set_authoring.md",
+          "sha256": "97edd9c1c0da8426b8d02705a565375d9f563a54d94dfed634f224da57b8c1b4",
+          "size_bytes": "960"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R11_negative_control_and_prompt_variant_expansion.md",
+          "sha256": "3fb633305dafc5d2b80e145c1a55a4f4d2a685dde6069b47a7d8b05660f544ba",
+          "size_bytes": "965"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R12-R1_r11a_r2_repaired_execution_manifest_handoff.md",
+          "sha256": "0168da07d1ffc6c7f3a7c7d16bbe42a72d61b961cd928719a85cfb7f95a8d88d",
+          "size_bytes": "576"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R12B_scope_tightening_and_guard_repair.md",
+          "sha256": "dfa6e571cbc54c08fe283e833c9b9a15e2a631c0da4aaf30d078f003e4722eaf",
+          "size_bytes": "372"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R12C_guard_policy_recheck.md",
+          "sha256": "414156e9afecd760e350bf4e8171ba1e188696f2c8557073f382f465f7d1ad56",
+          "size_bytes": "268"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R12_case_set_execution_validation.md",
+          "sha256": "f495a067d82eabeab96855ac675a0a4aaddddb1ae7d5d86224adfd2b65ee5af7",
+          "size_bytes": "790"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R1A_powershell_native_stderr_capture_hotfix.md",
+          "sha256": "da9101de80c140f496e746de4e7ae04f06f91fe55d07e2e2bae3419eaa69d1c4",
+          "size_bytes": "416"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R1_final_hidden_trace_capture_expansion.md",
+          "sha256": "4f162e80f8ef24959da98a5810adda72f62e34e32a24b1c6dde1f9d28041a34c",
+          "size_bytes": "1073"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R2_final_hidden_direction_delta_adjudication.md",
+          "sha256": "8b0728a0350b529dcfb89bb43430227547154bfd3ad0f80cb7eda671867b52cb",
+          "size_bytes": "682"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R3_layerwise_hidden_direction_backtrace.md",
+          "sha256": "ddf4588cbb1a6c6e31fcf4536c764e1a1c303641ef1acdf7aa631e5e211e629d",
+          "size_bytes": "325"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R4-R1_component_attribution_runner_build_exit_capture.md",
+          "sha256": "0f0d739dcca7d05dccc81c11e4b2d5eff95a0029c0577dc7109d8428aa48dada",
+          "size_bytes": "587"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R4_layer_component_attribution.md",
+          "sha256": "41f9f416587a3069457094a9693f9a3ec596d1482b1ba71f98202fe4babada23",
+          "size_bytes": "329"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R5_layer21_attention_head_attribution.md",
+          "sha256": "eeac4876f0d7093ca7c5a6e68b81c146b2ea2f279f6b8ff9feae795515191842",
+          "size_bytes": "1318"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R6_layer21_head_source_token_attribution.md",
+          "sha256": "e85ba035907684feb041196b719b866ee0e143b4208f6bec697c1402d6a7d8b5",
+          "size_bytes": "1563"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R7-R1_powershell_json_depth_clamp_artifact_flattening.md",
+          "sha256": "928e3019d080a6416e6b8ea03770e6c6d924a96143d819aaf00719c6e8dc13f9",
+          "size_bytes": "467"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R7-R2_causal_adjudication_consistency_seal.md",
+          "sha256": "0b149458ffb82ac2250b1224048fc811482ead80c3a580d2aaf800377ae9a4f5",
+          "size_bytes": "775"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R7_head2_value_vector_causal_probe.md",
+          "sha256": "7a98a0fc9b6355a7fc8ef2febe46b5b51b40f0ffbf80a708dc068601b2a874c5",
+          "size_bytes": "629"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R8A_projection_removal_design_branch.md",
+          "sha256": "81fbe30d532f26a95c68373178fca5c0d237f99b1df9b7deb57e7cf3586c056d",
+          "size_bytes": "859"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R8_position55_source_token_causal_mask_design.md",
+          "sha256": "2d7db9a2a6c64eaf67a1da06a545a4b825636139080fd5bca3be90d9ec8e776e",
+          "size_bytes": "455"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A-R9_projection_attenuation_validation.md",
+          "sha256": "053113a8a69922573e2193b08b51aad6ed8390479bcc4e2c34482f43ae9780fe",
+          "size_bytes": "673"
+        },
+        {
+          "path": "acceptance_reports/16AI-QW-38G-R6A-R12A_final_hidden_direction_delta_probe.md",
+          "sha256": "94bdb8f4b72b34bce2887d55e0203891c86d057f1bcf172b7008230f3f6deb70",
+          "size_bytes": "2327"
+        }
+      ],
+      "notes": [
+        "R12 head-direction candidates remain reversible runtime-only / no-model-write / default-off"
+      ],
+      "safety": {
+        "runtime_only": true,
+        "reversible": true,
+        "no_model_write": true,
+        "production_safe_confirmed": false,
+        "root_cause_confirmed": false
+      }
+    },
+    {
+      "family": "tcu",
+      "source_family": "TCU",
+      "legacy_patch_prefix": "TCU",
+      "found": true,
+      "hit_count": 111,
+      "status": "health_ledger_reference",
+      "current_binding": "QW-50",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "rebind_policy": "operator_review_candidate",
+      "sample_hits": [
+        {
+          "path": "acceptance_reports/TCU-12_tensorcube_health_ash_apply_drift_bridge.md",
+          "sha256": "d72a3c177ef325187fe187302de36e5e54525a53d3114e632ba40cd8f4a335a1",
+          "size_bytes": "1449"
+        },
+        {
+          "path": "acceptance_reports/TCU-13_tensorcube_runtime_telemetry_canonical_snapshot.md",
+          "sha256": "36e063ad83490363535da4e1f9e2dc87af09b1d274cfed71d31006f593054d72",
+          "size_bytes": "1257"
+        },
+        {
+          "path": "acceptance_reports/TCU-14_tensorcube_native_path_preflight_same_device_borrow_gate.md",
+          "sha256": "f92844bf1059b3ea9bba9692f182deb2e4713c45dc610aa40b87c45703d54b1d",
+          "size_bytes": "1468"
+        },
+        {
+          "path": "acceptance_reports/TCU-15_tensorcube_host_fallback_pressure_guard.md",
+          "sha256": "438fdbe996a4622c116468097a2e1951c8e65a4595647fa8ca6741e8566c64e2",
+          "size_bytes": "1425"
+        },
+        {
+          "path": "acceptance_reports/TCU-16_tensorcube_lora_hot_reload_buffer_lease_seal.md",
+          "sha256": "9566f309b13845c07c65bab15614b90013c8a995ae36e1b1854c011544e3121e",
+          "size_bytes": "1732"
+        },
+        {
+          "path": "acceptance_reports/TCU-17_tensorcube_runtime_splice_replay_determinism_seal.md",
+          "sha256": "04a66cb80148815ec297d3277611e73c474f94eea20015ac217dca4e75aa1bb6",
+          "size_bytes": "1741"
+        },
+        {
+          "path": "acceptance_reports/TCU-18_tensorcube_perf_guard_integration_regression_router.md",
+          "sha256": "775a5218f9e6a22761b8a013d6e43bbf992377aed622e7cf7c0c7d52de4540c6",
+          "size_bytes": "1488"
+        },
+        {
+          "path": "acceptance_reports/TCU-19_tensorcube_emergency_demotion_safe_tensor_mode.md",
+          "sha256": "3ca4f621816c40054d19f96b84f0b83eb48ef064b9e370c2ef5c73121fd9b063",
+          "size_bytes": "1600"
+        },
+        {
+          "path": "acceptance_reports/TCU-20_tensorcube_long_horizon_health_ledger_backend_drift_score.md",
+          "sha256": "2d3cbe55fdc52d93d5ecf063bd3b062ad307585f38952c9664280bcc76e0a15d",
+          "size_bytes": "1513"
+        },
+        {
+          "path": "acceptance_reports/TCU-21_tensorcube_health_recommendation_review_gate.md",
+          "sha256": "5c7e100af7b5fba1790f038266fb6c8f08338f0dfaab3eb669f84a9b852b8dc4",
+          "size_bytes": "3735"
+        },
+        {
+          "path": "acceptance_reports/TCU-22_tensorcube_backend_policy_update_candidate_feature_gate.md",
+          "sha256": "fa8476e83af7b17e393641f6c7770dfc2e60a22429855efba8f5e196597e64f2",
+          "size_bytes": "3688"
+        },
+        {
+          "path": "acceptance_reports/TCU-23A_tensorcube_8x8_atlas_microtile_kernel_consolidation.md",
+          "sha256": "532960fac4710f895bbaadcd61959d7378b898e28c730c5cd336f676139c2200",
+          "size_bytes": "3441"
+        },
+        {
+          "path": "acceptance_reports/TCU-23B_tensorcube_8x8_microtile_wgsl_parity_runner.md",
+          "sha256": "30f53cee2806f12b67de6e7d736c47bb92354e179da7259b735ce10e1e47928b",
+          "size_bytes": "4076"
+        },
+        {
+          "path": "acceptance_reports/TCU-23C_tensorcube_8x8_microtile_native_wgpu_smoke.md",
+          "sha256": "94a3c9de43eda4c3690ebcc30e5c01eb1a6f19364fde768b0d4b907ec1ab3bab",
+          "size_bytes": "3312"
+        },
+        {
+          "path": "acceptance_reports/TCU-23D_tensorcube_8x8_microtile_native_dispatch_readback_telemetry.md",
+          "sha256": "5a71d70d9fc2be077022fa5c11a7d3aee3557986448f4771b8ca73ad1f2afd6e",
+          "size_bytes": "3338"
+        },
+        {
+          "path": "acceptance_reports/TCU-23E_tensorcube_8x8_microtile_readback_free_timing_probe.md",
+          "sha256": "414c42d073161ced5dfa3d681bbb3c0e07239cc3a225e919379548472f1d1bde",
+          "size_bytes": "3833"
+        },
+        {
+          "path": "acceptance_reports/TCU-24A_qwave_mega_atlas_output_buffer_legacy_11_map_consolidation.md",
+          "sha256": "b94128231f48a8b7a212b5dae48539bc74b7aa2253b8e070c2db66e4dfec08b1",
+          "size_bytes": "1278"
+        },
+        {
+          "path": "acceptance_reports/TCU-24B_qwave_8x8_tile_atlas_addressing_1d_dispatch_candidate.md",
+          "sha256": "d8cb2ff86c8ff0ceadbdd25de7eff62f98a01db5d6d7c346c789fd32f3015d91",
+          "size_bytes": "2045"
+        },
+        {
+          "path": "acceptance_reports/TCU-24C_qwave_vec4f32_tile_atlas_pack_owner_write_contract.md",
+          "sha256": "bb7b6e49bc5c163fec165a9fab96fa6944345bcbc02e4d9499b910f8372d61b1",
+          "size_bytes": "2106"
+        },
+        {
+          "path": "acceptance_reports/TCU-24D_qwave_workgroup_shared_memory_stencil_staging_tile_halo_contract.md",
+          "sha256": "b0764f77a3b42aafe0721c66c83f0c678d84ef255103f8d2f6c4ace11a1687aa",
+          "size_bytes": "866"
+        },
+        {
+          "path": "acceptance_reports/TCU-24E_qwave_atlas_parity_legacy_comparison.md",
+          "sha256": "61f2489062c4923eb7013f87a7e6ee65a20c2ee682949359edb529100ac2b148",
+          "size_bytes": "1899"
+        },
+        {
+          "path": "acceptance_reports/TCU-24F_qwave_atlas_dispatch_readback_telemetry_seal.md",
+          "sha256": "934a0215951ff6beb86279b7e03ceafcb761b9f92033cc08aef3b37df8668f6e",
+          "size_bytes": "1656"
+        },
+        {
+          "path": "acceptance_reports/TCU-24G_qwave_atlas_readback_free_timing_probe_benchmark_guard.md",
+          "sha256": "0bce2bfef2376d99ff50e4227a4efcbff69aba81fa216f8c13da7891cfc012e5",
+          "size_bytes": "1346"
+        },
+        {
+          "path": "acceptance_reports/TCU-24H_qwave_atlas_backend_selection_candidate_advisory_router.md",
+          "sha256": "655347ede7224488edb993a6c80bce4a81cc85d0514d8b9857341c2a54cd0d85",
+          "size_bytes": "2061"
+        },
+        {
+          "path": "acceptance_reports/TCU-24I_qwave_backend_switch_dryrun_operator_config_gate.md",
+          "sha256": "3332c8a6c0356ea83efa31b1e68273729248d43067e373a236c959eef6b4670b",
+          "size_bytes": "1351"
+        }
+      ],
+      "notes": [
+        "TCU health recommendations require operator approval before policy update"
+      ]
+    }
+  ]
+}

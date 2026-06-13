@@ -1,0 +1,15 @@
+{
+  "patch_id": "ASH-BODYTRAIN-ATLAS-00",
+  "bodytrain_route_kind": "atlas_grouped_sequential_streaming_body_training_candidate",
+  "bodytrain_route_stage": "umbrella_ssot_only",
+  "model_scale_claim": "1p1b_checkpoint_family_candidate",
+  "training_execution_claim": false,
+  "streaming_upload_execution_claim": false,
+  "weight_update_execution_claim": false,
+  "tok_tensor_route_bound": true,
+  "base_train_gpu_route_bound": true,
+  "ft_delta_route_bound": true,
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-27",
+  "route_binding_valid": true,
+  "pass": true
+}

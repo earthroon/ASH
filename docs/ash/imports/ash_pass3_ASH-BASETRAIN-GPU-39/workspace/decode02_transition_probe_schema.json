@@ -1,0 +1,39 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02",
+  "jsonl": "workspace/decode02_transition_probe.jsonl",
+  "fields": [
+    "step",
+    "prev",
+    "candidate",
+    "transition.risk",
+    "transition.penalty",
+    "transition.action",
+    "transition.reasons",
+    "transition.probe_only",
+    "scores.weighted_logit_before_transition",
+    "scores.weighted_logit_after_transition"
+  ],
+  "transition_actions": [
+    "Allow",
+    "Penalize",
+    "HardBlock",
+    "ProbeOnly",
+    "Unavailable"
+  ],
+  "transition_reasons": [
+    "PieceContextUnavailable",
+    "PadToken",
+    "ControlToken",
+    "EosBeforeMinNewTokens",
+    "GenericContinuationImmediateEos",
+    "InvalidByteToken",
+    "ByteTextBoundaryRisk",
+    "MojibakeSuspected",
+    "DoubleParticleLike",
+    "DoubleSentenceEndingLike",
+    "RepeatedPunctuation",
+    "WhitespaceOnlyToken",
+    "UnknownToken",
+    "RecentLoopRisk"
+  ]
+}

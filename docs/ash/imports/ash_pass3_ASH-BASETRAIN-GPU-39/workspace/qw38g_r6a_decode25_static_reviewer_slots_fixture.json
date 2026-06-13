@@ -1,0 +1,53 @@
+{
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "patch_id": "16AI-QW-38G-R6A-DECODE-25",
+  "reviewer_slots": [
+    {
+      "active": true,
+      "capabilities": [
+        "GeneralSubtitleReview"
+      ],
+      "capability_hashes": [
+        "4e90d8227f1056f42d613e000f2b57726457b63836b6eb11c1d380b660ffe65b"
+      ],
+      "priority_limit": "Normal",
+      "reviewer_identity_hash": "0f183335f25eb9164b77661fcb43863312b9a508c533560e00622aac576b6912",
+      "reviewer_slot_id": "slot-general-subtitle",
+      "slot_hash": "ab28f16ea23572710dd04b5e63745809744e424d53167e42b4a58ca43c63579f",
+      "slot_kind": "GeneralSubtitleReviewerSlot",
+      "static_fixture_only": true
+    },
+    {
+      "active": true,
+      "capabilities": [
+        "TranslationRewrite",
+        "SubtitleTimingReview"
+      ],
+      "capability_hashes": [
+        "2dea8ced954465ff0ec10f032b10ddebfd10d6544adf6c9fd9c118d283a99a0b",
+        "3b025fd1b08c6e0717b5d5f26734ab55761c842589adfdfd0ea9bc573cb6524b"
+      ],
+      "priority_limit": "High",
+      "reviewer_identity_hash": "ffcc7e4600bbf4f2949e14c602c60dc891d4e77dbbf854a3f52080242c8a08a2",
+      "reviewer_slot_id": "slot-rewrite-timing",
+      "slot_hash": "06fe6bac62916da4efa4125b725af830076a34d6c792fee4685d7f423594eed0",
+      "slot_kind": "RewriteReviewerSlot",
+      "static_fixture_only": true
+    },
+    {
+      "active": true,
+      "capabilities": [
+        "CandidateChainRepair"
+      ],
+      "capability_hashes": [
+        "d444d60f14c66c04ba00982cb59921cef96c73062cd440ae3b48b32154da7c14"
+      ],
+      "priority_limit": "Critical",
+      "reviewer_identity_hash": "1b5b456366e4ae31e371cf57a86ed03f3df95ead46318925cb6cec24c8f177e2",
+      "reviewer_slot_id": "slot-repair",
+      "slot_hash": "47d7d4b3aa1b2c3758fb1914aeb0d7478564ff0bdaeb39161afb9d6b258507e3",
+      "slot_kind": "ChainRepairReviewerSlot",
+      "static_fixture_only": true
+    }
+  ]
+}

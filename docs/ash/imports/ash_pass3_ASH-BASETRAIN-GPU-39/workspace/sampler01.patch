@@ -1,0 +1,951 @@
+diff -ruN /mnt/data/sampler01_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-01_acceptance.md /mnt/data/sampler01_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-01_acceptance.md
+--- /mnt/data/sampler01_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-01_acceptance.md	2026-05-26 15:44:08.559506726 +0000
+@@ -0,0 +1,25 @@
++# 16AI-QW-38G-R6A-SAMPLER-01 Acceptance
++
++## Static checks
++
++- GPU top-p active-set renormalization: PASS_STATIC
++- Full-vocab denominator removed from post-filter top-p math: PASS_STATIC
++- final_mask empty token-0 fallback removed: PASS_STATIC
++- legacy shader active-set semantics aligned: PASS_STATIC
++- recovery mode ABI-compatible encoding: PASS_STATIC
++- CPU/GPU parity fixtures generated: PASS_STATIC
++
++## Execution checks
++
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WebGPU shader runtime compile: NOT_RUN
++
++## Notes
++
++The patch intentionally avoids adding new GPU buffers. Recovery mode uses the existing `_pad0` field in `SelectionOut`.
++
++## Static check artifact
++
++- `workspace/sampler01_static_checks.json`: PASS
+diff -ruN /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 07:59:24.000000000 +0000
++++ /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 15:42:01.256869448 +0000
+@@ -1774,6 +1774,22 @@
+         let out = *bytemuck::from_bytes::<GpuSelectionOut>(
+             &bytes[..std::mem::size_of::<GpuSelectionOut>()],
+         );
++        let recovery_mode = match out._pad0 {
++            0 => "none",
++            1 => "active_top1",
++            2 => "valid_global_top1",
++            3 => "no_valid_token",
++            _ => "unknown",
++        };
++        if out._pad0 != 0 {
++            eprintln!(
++                "[gpu_sampling][sampler01_recovery] mode={} token_id={} score={} logprob={}",
++                recovery_mode,
++                out.token_id,
++                out.score,
++                out.logprob,
++            );
++        }
+ 
+         Ok(GpuSamplingResult {
+             token_id: out.token_id,
+diff -ruN /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl
+--- /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 08:04:55.000000000 +0000
++++ /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl	2026-05-26 15:41:43.770304496 +0000
+@@ -6,6 +6,11 @@
+ // group(0) binding(4): final_mask storage read
+ // group(0) binding(5): out_buf storage read_write
+ // group(0) binding(6): local_out storage read_write
++// 16AI-QW-38G-R6A-SAMPLER-01:
++//   final_mask empty no longer falls through to token 0. Stage 0 emits the best
++//   final candidate if present, otherwise the best active-probability candidate,
++//   otherwise the best finite global candidate. Stage 1 prefers lower recovery
++//   modes before comparing scores.
+ 
+ struct SamplingUniform {
+   vocab_size: u32,
+@@ -24,6 +29,8 @@
+ 
+ struct SelectionOut {
+   token_id: u32,
++  // Recovery mode: 0=final_mask, 1=active_prob_top1, 2=finite_global_top1,
++  // 3=no_valid_token. This preserves ABI while surfacing safe fallback state.
+   _pad0: u32,
+   score: f32,
+   logprob: f32,
+@@ -40,6 +47,14 @@
+ const BLOCK_SIZE: u32 = 256u;
+ const INVALID_INDEX: u32 = 0xffffffffu;
+ const NEG_INF: f32 = -3.402823e38;
++const RECOVERY_FINAL: u32 = 0u;
++const RECOVERY_ACTIVE_TOP1: u32 = 1u;
++const RECOVERY_VALID_GLOBAL_TOP1: u32 = 2u;
++const RECOVERY_NO_VALID_TOKEN: u32 = 3u;
++
++fn finite_f32(v: f32) -> bool {
++  return (v == v) && (abs(v) < 3.402823e38);
++}
+ 
+ fn score_at(i: u32) -> f32 {
+   return scaled_logits[i] + noise_buf[i];
+@@ -53,9 +68,16 @@
+   return !found || candidate_score > best_score || ((candidate_score == best_score) && (candidate_idx < best_idx));
+ }
+ 
+-fn write_selection(ptr_idx: u32, token_id: u32, score: f32, logprob: f32) {
++fn should_replace_mode(found: bool, candidate_mode: u32, candidate_idx: u32, candidate_score: f32, best_mode: u32, best_idx: u32, best_score: f32) -> bool {
++  if (!found) { return true; }
++  if (candidate_mode < best_mode) { return true; }
++  if (candidate_mode > best_mode) { return false; }
++  return candidate_score > best_score || ((candidate_score == best_score) && (candidate_idx < best_idx));
++}
++
++fn write_selection(ptr_idx: u32, token_id: u32, recovery_mode: u32, score: f32, logprob: f32) {
+   local_out[ptr_idx].token_id = token_id;
+-  local_out[ptr_idx]._pad0 = 0u;
++  local_out[ptr_idx]._pad0 = recovery_mode;
+   local_out[ptr_idx].score = score;
+   local_out[ptr_idx].logprob = logprob;
+ }
+@@ -69,52 +91,85 @@
+ 
+   if (vocab == 0u) {
+     if (stage == 1u && block_id == 0u) {
+-      out_buf.token_id = 0u;
+-      out_buf._pad0 = 0u;
++      out_buf.token_id = INVALID_INDEX;
++      out_buf._pad0 = RECOVERY_NO_VALID_TOKEN;
+       out_buf.score = NEG_INF;
+       out_buf.logprob = NEG_INF;
+     }
+     return;
+   }
+ 
+-  // Stage 0: block-local best over final_mask.
++  // Stage 0: block-local best. Prefer final_mask, then active prob, then finite global.
+   if (stage == 0u) {
+     if (block_id >= block_count) { return; }
+     let start = block_id * BLOCK_SIZE;
+     let end = min(start + BLOCK_SIZE, vocab);
+-    var found = false;
+-    var best_idx = INVALID_INDEX;
+-    var best_score = NEG_INF;
+-    var best_logprob = NEG_INF;
++
++    var found_final = false;
++    var best_final_idx = INVALID_INDEX;
++    var best_final_score = NEG_INF;
++    var best_final_logprob = NEG_INF;
++
++    var found_active = false;
++    var best_active_idx = INVALID_INDEX;
++    var best_active_score = NEG_INF;
++    var best_active_logprob = NEG_INF;
++
++    var found_global = false;
++    var best_global_idx = INVALID_INDEX;
++    var best_global_score = NEG_INF;
++    var best_global_logprob = NEG_INF;
+ 
+     var i = start;
+     loop {
+       if (i >= end) { break; }
+-      if (final_mask[i] != 0u) {
++      let scaled = scaled_logits[i];
++      if (finite_f32(scaled)) {
+         let s = score_at(i);
+-        if (should_replace(found, i, s, best_idx, best_score)) {
+-          found = true;
+-          best_idx = i;
+-          best_score = s;
+-          best_logprob = logprob_at(i);
++        if (final_mask[i] != 0u) {
++          if (should_replace(found_final, i, s, best_final_idx, best_final_score)) {
++            found_final = true;
++            best_final_idx = i;
++            best_final_score = s;
++            best_final_logprob = logprob_at(i);
++          }
++        }
++        if (probs[i] > 0.0) {
++          if (should_replace(found_active, i, s, best_active_idx, best_active_score)) {
++            found_active = true;
++            best_active_idx = i;
++            best_active_score = s;
++            best_active_logprob = logprob_at(i);
++          }
++        }
++        if (should_replace(found_global, i, s, best_global_idx, best_global_score)) {
++          found_global = true;
++          best_global_idx = i;
++          best_global_score = s;
++          best_global_logprob = logprob_at(i);
+         }
+       }
+       i = i + 1u;
+     }
+ 
+-    if (found) {
+-      write_selection(block_id, best_idx, best_score, best_logprob);
++    if (found_final) {
++      write_selection(block_id, best_final_idx, RECOVERY_FINAL, best_final_score, best_final_logprob);
++    } else if (found_active) {
++      write_selection(block_id, best_active_idx, RECOVERY_ACTIVE_TOP1, best_active_score, best_active_logprob);
++    } else if (found_global) {
++      write_selection(block_id, best_global_idx, RECOVERY_VALID_GLOBAL_TOP1, best_global_score, best_global_logprob);
+     } else {
+-      write_selection(block_id, INVALID_INDEX, NEG_INF, NEG_INF);
++      write_selection(block_id, INVALID_INDEX, RECOVERY_NO_VALID_TOKEN, NEG_INF, NEG_INF);
+     }
+     return;
+   }
+ 
+-  // Stage 1: global merge over block-local selections.
++  // Stage 1: global merge over block-local selections. Lower recovery mode wins.
+   if (stage == 1u) {
+     if (block_id != 0u) { return; }
+     var found = false;
+     var best_idx = INVALID_INDEX;
++    var best_mode = RECOVERY_NO_VALID_TOKEN;
+     var best_score = NEG_INF;
+     var best_logprob = NEG_INF;
+ 
+@@ -122,11 +177,13 @@
+     loop {
+       if (b >= block_count) { break; }
+       let candidate_idx = local_out[b].token_id;
+-      if (candidate_idx != INVALID_INDEX && candidate_idx < vocab) {
++      let candidate_mode = local_out[b]._pad0;
++      if (candidate_idx != INVALID_INDEX && candidate_idx < vocab && candidate_mode <= RECOVERY_VALID_GLOBAL_TOP1) {
+         let s = local_out[b].score;
+-        if (should_replace(found, candidate_idx, s, best_idx, best_score)) {
++        if (should_replace_mode(found, candidate_mode, candidate_idx, s, best_mode, best_idx, best_score)) {
+           found = true;
+           best_idx = candidate_idx;
++          best_mode = candidate_mode;
+           best_score = s;
+           best_logprob = local_out[b].logprob;
+         }
+@@ -135,15 +192,14 @@
+     }
+ 
+     if (!found) {
+-      // Should be unreachable because top-p keeps at least one token. Keep fail-closed-ish
+-      // deterministic output on GPU rather than escaping to CPU fallback.
+-      best_idx = 0u;
+-      best_score = score_at(0u);
+-      best_logprob = logprob_at(0u);
++      best_idx = INVALID_INDEX;
++      best_mode = RECOVERY_NO_VALID_TOKEN;
++      best_score = NEG_INF;
++      best_logprob = NEG_INF;
+     }
+ 
+     out_buf.token_id = best_idx;
+-    out_buf._pad0 = 0u;
++    out_buf._pad0 = best_mode;
+     out_buf.score = best_score;
+     out_buf.logprob = best_logprob;
+     return;
+diff -ruN /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl
+--- /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 08:04:55.000000000 +0000
++++ /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl	2026-05-26 15:41:43.788791502 +0000
+@@ -1,3 +1,8 @@
++// 16AI-QW-38G-R6A-SAMPLER-01:
++// Legacy single-dispatch sampling now mirrors CPU oracle candidate semantics:
++// top-k -> min-p -> active-set softmax renorm -> top-p. It no longer uses the
++// full-vocabulary denominator for top-p after active filters.
++
+ struct SamplingUniform {
+   vocab_size: u32,
+   top_k: u32,
+@@ -15,6 +20,8 @@
+ 
+ struct SelectionOut {
+   token_id: u32,
++  // Recovery mode: 0=final candidate, 1=active top1, 2=valid global top1,
++  // 3=no valid token.
+   _pad0: u32,
+   score: f32,
+   logprob: f32,
+@@ -24,6 +31,17 @@
+ @group(0) @binding(1) var<storage, read> logits: array<f32>;
+ @group(0) @binding(2) var<storage, read_write> out_buf: SelectionOut;
+ 
++const NEG_INF: f32 = -3.402823e38;
++const INVALID_INDEX: u32 = 0xffffffffu;
++const RECOVERY_FINAL: u32 = 0u;
++const RECOVERY_ACTIVE_TOP1: u32 = 1u;
++const RECOVERY_VALID_GLOBAL_TOP1: u32 = 2u;
++const RECOVERY_NO_VALID_TOKEN: u32 = 3u;
++
++fn finite_f32(v: f32) -> bool {
++  return (v == v) && (abs(v) < 3.402823e38);
++}
++
+ fn lcg_step(x: u32) -> u32 {
+   return x * 1664525u + 1013904223u;
+ }
+@@ -43,6 +61,13 @@
+   return -log(-log(u));
+ }
+ 
++fn temp_denom() -> f32 {
++  if (u.temperature > 0.0) {
++    return max(u.temperature, 1e-5);
++  }
++  return 1.0;
++}
++
+ fn scaled_logit(index: u32, denom: f32) -> f32 {
+   return logits[index] / denom;
+ }
+@@ -51,13 +76,17 @@
+   return scaled_logit(index, denom) + gumbel_noise(index, u.seed_lo, u.seed_hi);
+ }
+ 
++fn use_topk(vocab: u32) -> bool {
++  return u.top_k > 0u && u.top_k < vocab;
++}
++
+ fn is_in_exact_topk(index: u32, vocab: u32, k: u32) -> bool {
+   let li = logits[index];
+   var rank: u32 = 0u;
+   var j: u32 = 0u;
+   loop {
+     if (j >= vocab) { break; }
+-    if (logits[j] > li || (logits[j] == li && j < index)) {
++    if (finite_f32(logits[j]) && (logits[j] > li || (logits[j] == li && j < index))) {
+       rank = rank + 1u;
+     }
+     j = j + 1u;
+@@ -65,101 +94,154 @@
+   return rank < k;
+ }
+ 
++fn base_allowed(index: u32, vocab: u32, k: u32, denom: f32) -> bool {
++  return finite_f32(scaled_logit(index, denom)) && ((!use_topk(vocab)) || is_in_exact_topk(index, vocab, k));
++}
++
++fn should_precede(lhs_idx: u32, rhs_idx: u32, denom: f32) -> bool {
++  let lhs = scaled_logit(lhs_idx, denom);
++  let rhs = scaled_logit(rhs_idx, denom);
++  return (lhs > rhs) || ((lhs == rhs) && (lhs_idx < rhs_idx));
++}
++
+ @compute @workgroup_size(1)
+ fn main() {
+   let vocab = u.vocab_size;
+-  let denom = max(u.temperature, 1e-5);
+-
+-  var best_idx: u32 = 0u;
+-  var best_score: f32 = -3.402823e38;
+-  var best_logprob: f32 = -3.402823e38;
++  let denom = temp_denom();
+ 
+   if (vocab == 0u) {
+-    out_buf.token_id = 0u;
+-    out_buf._pad0 = 0u;
+-    out_buf.score = best_score;
+-    out_buf.logprob = best_logprob;
++    out_buf.token_id = INVALID_INDEX;
++    out_buf._pad0 = RECOVERY_NO_VALID_TOKEN;
++    out_buf.score = NEG_INF;
++    out_buf.logprob = NEG_INF;
+     return;
+   }
+ 
+-  // Global normalization constants over the full temperature-scaled distribution.
+-  var max_scaled: f32 = -3.402823e38;
++  let k = min(u.top_k, vocab);
++  let use_minp = u.min_p > 0.0 && u.min_p < 1.0;
++  let use_topp = u.top_p < 1.0;
++
++  var pre_found = false;
++  var pre_top1 = INVALID_INDEX;
++  var pre_max = NEG_INF;
+   var i: u32 = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let s = scaled_logit(i, denom);
+-    if (s > max_scaled) {
+-      max_scaled = s;
++    if (base_allowed(i, vocab, k, denom)) {
++      if (!pre_found || should_precede(i, pre_top1, denom)) {
++        pre_found = true;
++        pre_top1 = i;
++        pre_max = scaled_logit(i, denom);
++      }
+     }
+     i = i + 1u;
+   }
+ 
+-  var sum_exp: f32 = 0.0;
++  if (!pre_found) {
++    out_buf.token_id = INVALID_INDEX;
++    out_buf._pad0 = RECOVERY_NO_VALID_TOKEN;
++    out_buf.score = NEG_INF;
++    out_buf.logprob = NEG_INF;
++    return;
++  }
++
++  let min_p_threshold = pre_max + log(max(u.min_p, 1e-20));
++
++  var active_found = false;
++  var active_top1 = INVALID_INDEX;
++  var active_max = NEG_INF;
++  var active_count: u32 = 0u;
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    sum_exp = sum_exp + exp(scaled_logit(i, denom) - max_scaled);
++    let s = scaled_logit(i, denom);
++    if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
++      active_count = active_count + 1u;
++      if (!active_found || should_precede(i, active_top1, denom)) {
++        active_found = true;
++        active_top1 = i;
++        active_max = s;
++      }
++    }
+     i = i + 1u;
+   }
+ 
+-  let use_topk = u.top_k > 0u;
+-  let use_topp = u.top_p < 1.0;
+-  let use_minp = u.min_p > 0.0 && u.min_p < 1.0;
+-  let min_p_threshold = max_scaled + log(max(u.min_p, 1e-20));
+-  let k = min(u.top_k, vocab);
++  if (!active_found) {
++    let s = score_at(pre_top1, denom);
++    out_buf.token_id = pre_top1;
++    out_buf._pad0 = RECOVERY_ACTIVE_TOP1;
++    out_buf.score = s;
++    out_buf.logprob = 0.0;
++    return;
++  }
+ 
++  var active_sum_exp = 0.0;
+   i = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-
+-    var allowed = true;
+-    if (use_topk) {
+-      allowed = is_in_exact_topk(i, vocab, k);
+-    }
+-
+-    if (allowed && use_minp) {
+-      allowed = scaled_logit(i, denom) >= min_p_threshold;
++    let s = scaled_logit(i, denom);
++    if (base_allowed(i, vocab, k, denom) && ((!use_minp) || s >= min_p_threshold)) {
++      active_sum_exp = active_sum_exp + exp(s - active_max);
+     }
++    i = i + 1u;
++  }
++  active_sum_exp = max(active_sum_exp, 1e-12);
+ 
+-    if (allowed && use_topp) {
+-      let pi = exp(scaled_logit(i, denom) - max_scaled) / max(sum_exp, 1e-12);
+-      var cumulative_before: f32 = 0.0;
+-      var j: u32 = 0u;
+-      loop {
+-        if (j >= vocab) { break; }
+-        let pj = exp(scaled_logit(j, denom) - max_scaled) / max(sum_exp, 1e-12);
+-
+-        let higher = pj > pi;
+-        let equal_earlier = (pj == pi) && (j < i);
+-        let topk_ok = (!use_topk) || is_in_exact_topk(j, vocab, k);
+-        let minp_ok = (!use_minp) || scaled_logit(j, denom) >= min_p_threshold;
++  var best_idx = INVALID_INDEX;
++  var best_mode = RECOVERY_NO_VALID_TOKEN;
++  var best_score = NEG_INF;
++  var best_logprob = NEG_INF;
+ 
+-        if (topk_ok && minp_ok && (higher || equal_earlier)) {
+-          cumulative_before = cumulative_before + pj;
++  i = 0u;
++  loop {
++    if (i >= vocab) { break; }
++    let si = scaled_logit(i, denom);
++    if (base_allowed(i, vocab, k, denom) && ((!use_minp) || si >= min_p_threshold)) {
++      let pi = exp(si - active_max) / active_sum_exp;
++      var allowed = true;
++
++      if (use_topp) {
++        var cumulative_before = 0.0;
++        var j: u32 = 0u;
++        loop {
++          if (j >= vocab) { break; }
++          let sj = scaled_logit(j, denom);
++          if (base_allowed(j, vocab, k, denom) && ((!use_minp) || sj >= min_p_threshold)) {
++            let higher = sj > si;
++            let equal_earlier = (sj == si) && (j < i);
++            if (higher || equal_earlier) {
++              cumulative_before = cumulative_before + (exp(sj - active_max) / active_sum_exp);
++            }
++          }
++          j = j + 1u;
+         }
+-        j = j + 1u;
++        allowed = cumulative_before < u.top_p;
+       }
+ 
+-      // Keep token if it falls before the nucleus threshold, or if it is the token
+-      // that first crosses the threshold (to avoid empty nucleus sets).
+-      allowed = cumulative_before < u.top_p || (cumulative_before == 0.0 && pi > 0.0);
+-    }
+-
+-    if (allowed) {
+-      let s = score_at(i, denom);
+-      if (s > best_score) {
+-        best_score = s;
+-        best_idx = i;
+-        let p = exp(scaled_logit(i, denom) - max_scaled) / max(sum_exp, 1e-12);
+-        best_logprob = log(max(p, 1e-20));
++      if (allowed) {
++        let score = score_at(i, denom);
++        if (best_idx == INVALID_INDEX || score > best_score || ((score == best_score) && (i < best_idx))) {
++          best_idx = i;
++          best_mode = RECOVERY_FINAL;
++          best_score = score;
++          best_logprob = log(max(pi, 1e-20));
++        }
+       }
+     }
+-
+     i = i + 1u;
+   }
+ 
++  if (best_idx == INVALID_INDEX) {
++    let s = score_at(active_top1, denom);
++    let p = exp(scaled_logit(active_top1, denom) - active_max) / active_sum_exp;
++    best_idx = active_top1;
++    best_mode = RECOVERY_ACTIVE_TOP1;
++    best_score = s;
++    best_logprob = log(max(p, 1e-20));
++  }
++
+   out_buf.token_id = best_idx;
+-  out_buf._pad0 = 0u;
++  out_buf._pad0 = best_mode;
+   out_buf.score = best_score;
+   out_buf.logprob = best_logprob;
+ }
+diff -ruN /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
+--- /mnt/data/sampler01_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 08:04:55.000000000 +0000
++++ /mnt/data/sampler01_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 15:41:43.746035454 +0000
+@@ -6,6 +6,10 @@
+ // group(0) binding(4): probs storage read_write
+ // group(0) binding(5): topp_mask storage read_write
+ // group(0) binding(6): final_mask storage read_write
++// 16AI-QW-38G-R6A-SAMPLER-01:
++//   top-p is computed over the post top-k/min-p active set, not over the
++//   full-vocabulary softmax denominator. This keeps the GPU candidate set
++//   aligned with model_core::cpu_oracle_sampler.
+ 
+ struct SamplingUniform {
+   vocab_size: u32,
+@@ -37,10 +41,17 @@
+ @group(0) @binding(5) var<storage, read_write> topp_mask: array<u32>;
+ @group(0) @binding(6) var<storage, read_write> final_mask: array<u32>;
+ 
++const NEG_INF: f32 = -3.402823e38;
++const INVALID_INDEX: u32 = 0xffffffffu;
++
+ fn topk_enabled(vocab: u32, requested_k: u32) -> bool {
+   return requested_k > 0u && requested_k < vocab;
+ }
+ 
++fn finite_f32(v: f32) -> bool {
++  return (v == v) && (abs(v) < 3.402823e38);
++}
++
+ fn topk_allowed(index: u32, use_topk: bool) -> bool {
+   if (!use_topk) {
+     return true;
+@@ -48,11 +59,15 @@
+   return topk_mask[index] != 0u;
+ }
+ 
+-fn minp_allowed(index: u32, use_minp: bool, threshold: f32) -> bool {
++fn base_allowed(index: u32, use_topk: bool) -> bool {
++  return finite_f32(scaled_logits[index]) && topk_allowed(index, use_topk);
++}
++
++fn minp_allowed_scaled(value: f32, use_minp: bool, threshold: f32) -> bool {
+   if (!use_minp) {
+     return true;
+   }
+-  return scaled_logits[index] >= threshold;
++  return value >= threshold;
+ }
+ 
+ fn should_precede(lhs_idx: u32, rhs_idx: u32) -> bool {
+@@ -67,15 +82,11 @@
+   let use_topk = topk_enabled(vocab, u.top_k);
+   let use_topp = u.top_p < 1.0;
+   let use_minp = u.min_p > 0.0 && u.min_p < 1.0;
+-  let max_scaled = stats[0u].max_scaled;
+-  let min_p_threshold = max_scaled + log(max(u.min_p, 1e-20));
+-  let denom = max(stats[0u].sum_exp, 1e-12);
+ 
+   var i: u32 = 0u;
+   loop {
+     if (i >= vocab) { break; }
+-    let pi = exp(scaled_logits[i] - max_scaled) / denom;
+-    probs[i] = pi;
++    probs[i] = 0.0;
+     topp_mask[i] = 0u;
+     final_mask[i] = 0u;
+     i = i + 1u;
+@@ -85,11 +96,89 @@
+     return;
+   }
+ 
++  // First pass: compute the pre-min-p candidate max after finite/top-k guards.
++  // This intentionally does not use stats[0].max_scaled, because that value is
++  // full-vocabulary and can include tokens already excluded by top-k.
++  var pre_minp_found = false;
++  var pre_minp_top1: u32 = INVALID_INDEX;
++  var pre_minp_max: f32 = NEG_INF;
++
++  i = 0u;
++  loop {
++    if (i >= vocab) { break; }
++    if (base_allowed(i, use_topk)) {
++      if (!pre_minp_found || should_precede(i, pre_minp_top1)) {
++        pre_minp_found = true;
++        pre_minp_top1 = i;
++        pre_minp_max = scaled_logits[i];
++      }
++    }
++    i = i + 1u;
++  }
++
++  if (!pre_minp_found) {
++    return;
++  }
++
++  let min_p_threshold = pre_minp_max + log(max(u.min_p, 1e-20));
++
++  // Second pass: compute active set after min-p and its max.
++  var active_count: u32 = 0u;
++  var active_top1: u32 = INVALID_INDEX;
++  var active_max: f32 = NEG_INF;
++
++  i = 0u;
++  loop {
++    if (i >= vocab) { break; }
++    let s = scaled_logits[i];
++    if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++      active_count = active_count + 1u;
++      if (active_top1 == INVALID_INDEX || should_precede(i, active_top1)) {
++        active_top1 = i;
++        active_max = s;
++      }
++    }
++    i = i + 1u;
++  }
++
++  if (active_count == 0u) {
++    // Safe recovery: keep the pre-min-p valid top-1 instead of leaving the final
++    // selection empty. This prevents the select shader from falling through to
++    // token 0 / <pad> when min-p removes all candidates.
++    probs[pre_minp_top1] = 1.0;
++    topp_mask[pre_minp_top1] = 1u;
++    final_mask[pre_minp_top1] = 1u;
++    return;
++  }
++
++  // Third pass: active-set softmax denominator. This is the SAMPLER-01 core.
++  var active_sum_exp: f32 = 0.0;
++  i = 0u;
++  loop {
++    if (i >= vocab) { break; }
++    let s = scaled_logits[i];
++    if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++      active_sum_exp = active_sum_exp + exp(s - active_max);
++    }
++    i = i + 1u;
++  }
++  active_sum_exp = max(active_sum_exp, 1e-12);
++
++  i = 0u;
++  loop {
++    if (i >= vocab) { break; }
++    let s = scaled_logits[i];
++    if (base_allowed(i, use_topk) && minp_allowed_scaled(s, use_minp, min_p_threshold)) {
++      probs[i] = exp(s - active_max) / active_sum_exp;
++    }
++    i = i + 1u;
++  }
++
+   if (!use_topp) {
+     i = 0u;
+     loop {
+       if (i >= vocab) { break; }
+-      if (topk_allowed(i, use_topk) && minp_allowed(i, use_minp, min_p_threshold)) {
++      if (probs[i] > 0.0) {
+         topp_mask[i] = 1u;
+         final_mask[i] = 1u;
+       }
+@@ -98,18 +187,18 @@
+     return;
+   }
+ 
+-  // Nucleus build over the active mask. With top_k disabled this is full-vocabulary
+-  // exact; with top_k enabled this is candidate-bounded and must not be presented as
+-  // full-vocabulary exact.
++  // Nucleus build over active probabilities. The first crossing token is kept,
++  // which guarantees at least one candidate for non-empty active sets.
+   var cumulative: f32 = 0.0;
++  var final_count: u32 = 0u;
+   loop {
+     var found: bool = false;
+-    var best_idx: u32 = 0u;
++    var best_idx: u32 = INVALID_INDEX;
+ 
+     i = 0u;
+     loop {
+       if (i >= vocab) { break; }
+-      if (topk_allowed(i, use_topk) && minp_allowed(i, use_minp, min_p_threshold) && final_mask[i] == 0u) {
++      if (probs[i] > 0.0 && final_mask[i] == 0u) {
+         if (!found || should_precede(i, best_idx)) {
+           found = true;
+           best_idx = i;
+@@ -123,12 +212,19 @@
+     }
+ 
+     let pi = probs[best_idx];
+-    if (!(cumulative < u.top_p) && !(cumulative == 0.0 && pi > 0.0)) {
+-      break;
+-    }
+-
+     topp_mask[best_idx] = 1u;
+     final_mask[best_idx] = 1u;
++    final_count = final_count + 1u;
+     cumulative = cumulative + pi;
++
++    if (cumulative >= u.top_p) {
++      break;
++    }
++  }
++
++  if (final_count == 0u && active_top1 != INVALID_INDEX) {
++    topp_mask[active_top1] = 1u;
++    final_mask[active_top1] = 1u;
++    probs[active_top1] = max(probs[active_top1], 1e-20);
+   }
+ }
+diff -ruN /mnt/data/sampler01_orig/crates/model_core/src/sampling_helpers.rs /mnt/data/sampler01_work/crates/model_core/src/sampling_helpers.rs
+--- /mnt/data/sampler01_orig/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:33:01.000000000 +0000
++++ /mnt/data/sampler01_work/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:42:23.869492585 +0000
+@@ -111,6 +111,15 @@
+     pub candidate_count_after_top_p: Option<usize>,
+     pub min_p_threshold: Option<f32>,
+     pub active_softmax_renormalized: bool,
++    pub gpu_active_set_renormalized: bool,
++    pub gpu_active_count: Option<usize>,
++    pub gpu_final_count: Option<usize>,
++    pub gpu_final_mask_empty: bool,
++    pub gpu_final_mask_recovered: bool,
++    pub gpu_recovery_mode: Option<String>,
++    pub gpu_selected_from_recovery: bool,
++    pub cpu_gpu_candidate_parity_checked: bool,
++    pub cpu_gpu_candidate_parity_status: Option<String>,
+     pub finite_logits: bool,
+     pub nan_count: usize,
+     pub inf_count: usize,
+diff -ruN /mnt/data/sampler01_orig/workspace/sampler01_cpu_gpu_parity_report.json /mnt/data/sampler01_work/workspace/sampler01_cpu_gpu_parity_report.json
+--- /mnt/data/sampler01_orig/workspace/sampler01_cpu_gpu_parity_report.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/workspace/sampler01_cpu_gpu_parity_report.json	2026-05-26 15:43:13.572059212 +0000
+@@ -0,0 +1,46 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
++  "status": "STATIC_PARITY_FIXTURE_DEFINED_RUNTIME_NOT_RUN",
++  "semantic_reference": "model_core::cpu_oracle_sampler",
++  "candidate_parity_required": true,
++  "selected_token_parity_required": false,
++  "fixtures": [
++    {
++      "id": "minp_basic",
++      "cpu_expected_active_ids": [
++        0,
++        1,
++        2
++      ],
++      "gpu_expected_active_ids": [
++        0,
++        1,
++        2
++      ],
++      "status": "DEFINED_NOT_RUN"
++    },
++    {
++      "id": "topk_minp",
++      "cpu_expected_active_ids": [
++        0,
++        1
++      ],
++      "gpu_expected_active_ids": [
++        0,
++        1
++      ],
++      "status": "DEFINED_NOT_RUN"
++    },
++    {
++      "id": "active_topp",
++      "description": "top-p must accumulate active-set probabilities after top-k/min-p",
++      "status": "DEFINED_NOT_RUN"
++    },
++    {
++      "id": "final_mask_empty",
++      "description": "empty final mask recovers to active_top1 or valid_global_top1, never silent token0",
++      "status": "DEFINED_NOT_RUN"
++    }
++  ],
++  "runtime_execution": "NOT_RUN"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler01_orig/workspace/sampler01_gpu_active_set_fixture.json /mnt/data/sampler01_work/workspace/sampler01_gpu_active_set_fixture.json
+--- /mnt/data/sampler01_orig/workspace/sampler01_gpu_active_set_fixture.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/workspace/sampler01_gpu_active_set_fixture.json	2026-05-26 15:43:13.571397799 +0000
+@@ -0,0 +1,36 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
++  "fixture_id": "sampler01_minp_active_set_basic",
++  "logits": [
++    10.0,
++    9.0,
++    8.0,
++    2.0,
++    -1.0
++  ],
++  "config": {
++    "temperature": 1.0,
++    "top_k": 0,
++    "min_p": 0.1,
++    "top_p": 1.0
++  },
++  "expected": {
++    "min_p_threshold": 7.697414907005955,
++    "active_ids": [
++      0,
++      1,
++      2
++    ],
++    "removed_ids": [
++      3,
++      4
++    ],
++    "active_count": 3,
++    "active_probabilities": {
++      "0": 0.6652409557748218,
++      "1": 0.24472847105479764,
++      "2": 0.09003057317038046
++    },
++    "active_softmax_renormalized": true
++  }
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler01_orig/workspace/sampler01_gpu_active_set_summary.json /mnt/data/sampler01_work/workspace/sampler01_gpu_active_set_summary.json
+--- /mnt/data/sampler01_orig/workspace/sampler01_gpu_active_set_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/workspace/sampler01_gpu_active_set_summary.json	2026-05-26 15:44:08.558853751 +0000
+@@ -0,0 +1,52 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
++  "status": "GPU_ACTIVE_SET_RENORM_AND_FINAL_MASK_SAFE_FALLBACK_BAKED_STATIC",
++  "semantic_reference": "model_core::cpu_oracle_sampler",
++  "gpu_shader_targets": [
++    "gpu_sampling_topp_scan.wgsl",
++    "gpu_sampling_select.wgsl",
++    "gpu_sampling_select_legacy.wgsl"
++  ],
++  "sampling_order": [
++    "finite_check",
++    "guard_mask/top_k",
++    "min_p",
++    "active_set_softmax_renormalization",
++    "top_p",
++    "final_sample"
++  ],
++  "active_probability_denominator": "active_set_sum_exp",
++  "forbidden_denominator": "full_vocab_sum_exp_for_top_p_after_active_filters",
++  "final_mask_empty_policy": [
++    "active_top1",
++    "valid_global_top1",
++    "no_valid_token_sentinel"
++  ],
++  "pad_token_zero_fallback_allowed": false,
++  "abi_change": "none; recovery mode encoded in SelectionOut._pad0",
++  "probe_fields_extended": [
++    "gpu_active_set_renormalized",
++    "gpu_active_count",
++    "gpu_final_count",
++    "gpu_final_mask_empty",
++    "gpu_final_mask_recovered",
++    "gpu_recovery_mode",
++    "gpu_selected_from_recovery",
++    "cpu_gpu_candidate_parity_checked",
++    "cpu_gpu_candidate_parity_status"
++  ],
++  "artifacts": [
++    "workspace/sampler01_gpu_active_set_fixture.json",
++    "workspace/sampler01_cpu_gpu_parity_report.json",
++    "workspace/sampler01_report.md",
++    "workspace/sampler01.patch",
++    "workspace/sampler01_static_checks.json"
++  ],
++  "execution_validation": "NOT_RUN_cargo_rustfmt_unavailable",
++  "non_scope": [
++    "deltak_qwave_weighted_minp",
++    "context_router",
++    "tokenizer_decode_ssot",
++    "cpu_oracle_sampler_creation"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler01_orig/workspace/sampler01_report.md /mnt/data/sampler01_work/workspace/sampler01_report.md
+--- /mnt/data/sampler01_orig/workspace/sampler01_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/workspace/sampler01_report.md	2026-05-26 15:43:13.572405217 +0000
+@@ -0,0 +1,19 @@
++# 16AI-QW-38G-R6A-SAMPLER-01 Report
++
++## 확정
++
++- `gpu_sampling_topp_scan.wgsl` no longer uses the full-vocabulary `stats[0].sum_exp` as the top-p denominator after top-k/min-p filtering.
++- Active probabilities are now computed from the post top-k/min-p active set: `active_sum_exp`.
++- `gpu_sampling_select.wgsl` no longer falls through to `best_idx = 0u` when `final_mask` is empty. It prefers final candidates, then active-probability candidates, then finite global candidates.
++- `gpu_sampling_select_legacy.wgsl` was aligned to the same active-set renormalization semantics instead of retaining the old full-denominator path.
++- Recovery mode is encoded into `SelectionOut._pad0` without changing the GPU buffer ABI.
++
++## 추정
++
++This should reduce word-salad risk caused by mismatched CPU/GPU candidate sets and silent token-0 fallback, but runtime parity must still be checked with cargo/WGSL validation in an environment that has the Rust toolchain.
++
++## 판단불가
++
++- `cargo check` / `cargo test` / `rustfmt` were not run in this container.
++- Actual WebGPU shader compilation and dispatch parity were not run.
++- The runtime value of recovery mode is logged but not yet promoted into a high-level receipt object.
+diff -ruN /mnt/data/sampler01_orig/workspace/sampler01_static_checks.json /mnt/data/sampler01_work/workspace/sampler01_static_checks.json
+--- /mnt/data/sampler01_orig/workspace/sampler01_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/sampler01_work/workspace/sampler01_static_checks.json	2026-05-26 15:43:56.005405940 +0000
+@@ -0,0 +1,11 @@
++{
++  "topp_uses_active_sum_exp": true,
++  "topp_no_stats_sum_exp_in_math": true,
++  "select_no_best_idx_zero": true,
++  "select_has_recovery_modes": true,
++  "legacy_uses_active_sum_exp": true,
++  "legacy_no_full_distribution_sum": true,
++  "readback_logs_recovery": true,
++  "probe_gpu_fields": true,
++  "json_artifacts": true
++}
+\ No newline at end of file

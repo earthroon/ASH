@@ -1,0 +1,48 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01",
+  "ssot": "inference_decode_loop_not_snapshot_runner",
+  "profiles": [
+    {
+      "profile_id": "DEBUG_GREEDY_BASELINE",
+      "purpose": "decode_baseline",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "top_k": 1,
+      "min_p": 0.0,
+      "repetition_penalty": 1.0,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0,
+      "no_repeat_ngram_size": 0,
+      "max_new_tokens": 96,
+      "eos_boost_after_tokens": 0,
+      "stop_on_double_newline": false,
+      "stop_on_sentence_terminal": false,
+      "word_salad_guard": false
+    },
+    {
+      "profile_id": "SAFE_KOREAN_STABLE_V1",
+      "purpose": "word_salad_suppression",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 40,
+      "min_p": 0.05,
+      "repetition_penalty": 1.12,
+      "presence_penalty": 0.15,
+      "frequency_penalty": 0.25,
+      "no_repeat_ngram_size": 3,
+      "max_new_tokens": 96,
+      "eos_boost_after_tokens": 48,
+      "stop_on_double_newline": true,
+      "stop_on_sentence_terminal": true,
+      "word_salad_guard": true
+    }
+  ],
+  "model_mutation_flags": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  }
+}

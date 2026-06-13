@@ -1,0 +1,123 @@
+{
+  "patch_id": "QW-52C-R4",
+  "title": "RiskyDiff Feature Attribution Report / Safe Profile Candidate Seal",
+  "base_patch": "QW-52C-R3",
+  "status": "PASS_STATIC_RISKYDIFF_FEATURE_ATTRIBUTION_REPORT",
+  "report_policy": {
+    "report_policy_version": "riskydiff_feature_attribution_report_v1",
+    "safe_profile_policy_version": "safe_profile_candidate_seal_v1",
+    "no_apply_policy_version": "no_apply_no_commit_no_promotion_v1",
+    "min_attribution_confidence": 0.6,
+    "max_ranked_safe_profiles": 3
+  },
+  "summary": {
+    "risky_diff_case_count": 1,
+    "attributed_case_count": 1,
+    "ambiguous_case_count": 0,
+    "safe_profile_candidate_count": 3,
+    "ranked_safe_profile_candidate_ids": [
+      "reduced_dream_weight_v1",
+      "balanced_risk_support_v1",
+      "reduced_cji_cairo_weight_v1"
+    ],
+    "best_candidate_profile_id": "reduced_dream_weight_v1",
+    "dominant_suspected_causes": [
+      "DreamCollapseWeightTooHigh"
+    ],
+    "require_more_data": true,
+    "require_human_review": true,
+    "safe_profile_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "policy_promotion_allowed": false,
+    "runtime_apply_allowed": false
+  },
+  "fixture_results": [
+    {
+      "case_id": "report_detects_dominant_dream_weight_cause",
+      "status": "PASS",
+      "expected_status": "Attributed",
+      "safe_profile_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "policy_promotion_allowed": false,
+      "runtime_apply_allowed": false
+    },
+    {
+      "case_id": "safe_profile_candidates_ranked",
+      "status": "PASS",
+      "expected_status": "PASS",
+      "safe_profile_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "policy_promotion_allowed": false,
+      "runtime_apply_allowed": false
+    },
+    {
+      "case_id": "safe_profile_no_apply_seal",
+      "status": "PASS",
+      "expected_status": "PASS",
+      "safe_profile_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "policy_promotion_allowed": false,
+      "runtime_apply_allowed": false
+    },
+    {
+      "case_id": "runtime_sample_expansion_required",
+      "status": "PASS",
+      "expected_status": "PASS",
+      "safe_profile_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "policy_promotion_allowed": false,
+      "runtime_apply_allowed": false
+    },
+    {
+      "case_id": "missing_r3_sweep_unavailable",
+      "status": "PASS",
+      "expected_status": "Unavailable",
+      "safe_profile_apply_allowed": false,
+      "weight_commit_allowed": false,
+      "policy_promotion_allowed": false,
+      "runtime_apply_allowed": false
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_report_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R5",
+    "QW-52C-R6",
+    "QW-52D"
+  ],
+  "notes": [
+    "R4 generates a feature attribution report only.",
+    "Safe profile candidates are review artifacts only.",
+    "No weight profile is committed.",
+    "No runtime apply or policy promotion is allowed.",
+    "Human review and runtime sample expansion are required before any future apply path."
+  ]
+}

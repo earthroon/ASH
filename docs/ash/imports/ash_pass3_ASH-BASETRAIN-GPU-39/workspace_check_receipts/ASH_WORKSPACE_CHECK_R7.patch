@@ -1,0 +1,38 @@
+--- a/crates/model_core/src/bin/qw_tok_forge00_native_checkpoint_genesis.rs
++++ b/crates/model_core/src/bin/qw_tok_forge00_native_checkpoint_genesis.rs
+@@ -1,999 +1,29 @@
+-use model_core::{
+-    qw_tok_forge00_config_from_args, run_qw_tok_forge00_native_checkpoint_genesis,
+-    write_qw_tok_forge00_artifacts,
+-};
++use model_core::{
++    qw_tok_forge01_s0_config_from_args,
++    run_qw_tok_forge01_s0_namespace_rebase,
++    write_qw_tok_forge01_s0_artifacts,
++};
++use std::{env, path::Path};
++
++fn main() {
++    let args: Vec<String> = env::args().skip(1).collect();
++    let cfg = qw_tok_forge01_s0_config_from_args(&args);
++
++    match run_qw_tok_forge01_s0_namespace_rebase(cfg) {
++        Ok(bundle) => {
++            if let Err(err) = write_qw_tok_forge01_s0_artifacts(Path::new("."), &bundle) {
++                eprintln!("failed to write QW-TOK-FORGE-00 compatibility artifacts: {}", err);
++                std::process::exit(2);
++            }
++
++            let status = bundle.bake_manifest.status.as_str();
++            if status.starts_with("FAIL_") || status.starts_with("BLOCKED_") {
++                eprintln!("{}", status);
++                std::process::exit(1);
++            }
++            println!("{}", status);
++        }
++        Err(err) => {
++            eprintln!("QW-TOK-FORGE-00 compatibility bridge failed: {}", err);
++            std::process::exit(2);
++        }
++    }
++}

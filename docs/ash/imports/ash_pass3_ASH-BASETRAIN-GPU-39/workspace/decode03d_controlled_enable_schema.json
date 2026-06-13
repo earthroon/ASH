@@ -1,0 +1,43 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
+  "title": "Dynamic Temperature / Min-p Controlled Enable Seal receipt schema",
+  "type": "object",
+  "required": [
+    "patch_id", "schema_version", "mode", "controlled_enable", "gate",
+    "shadow_policy_seen", "current_config", "applied_config", "risk_flags"
+  ],
+  "properties": {
+    "patch_id": { "const": "16AI-QW-38G-R6A-DECODE-03D" },
+    "input_patch": { "const": "16AI-QW-38G-R6A-DECODE-03C" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "mode": { "enum": ["Off", "ShadowOnly", "Controlled", "StrictControlled"] },
+    "controlled_enable": { "type": "boolean" },
+    "gate": {
+      "type": "object",
+      "required": ["can_apply", "denied_reasons", "warning_reasons", "strict_fail"],
+      "properties": {
+        "can_apply": { "type": "boolean" },
+        "denied_reasons": { "type": "array", "items": { "type": "string" } },
+        "warning_reasons": { "type": "array", "items": { "type": "string" } },
+        "strict_fail": { "type": "boolean" }
+      }
+    },
+    "current_config": { "type": "object" },
+    "applied_config": {
+      "type": "object",
+      "required": [
+        "behavior_change", "applied_temperature", "applied_top_p", "applied_top_k", "applied_min_p",
+        "rollback_candidate_applied", "safe_stop_candidate_applied", "eos_bias_candidate_applied"
+      ],
+      "properties": {
+        "behavior_change": { "type": "boolean" },
+        "applied_temperature": { "type": "number", "minimum": 0.03, "maximum": 1.20 },
+        "applied_top_p": { "type": "number", "minimum": 0.50, "maximum": 1.00 },
+        "applied_min_p": { "type": "number", "minimum": 0.00, "maximum": 0.25 },
+        "rollback_candidate_applied": { "const": false },
+        "safe_stop_candidate_applied": { "const": false },
+        "eos_bias_candidate_applied": { "const": false }
+      }
+    }
+  }
+}

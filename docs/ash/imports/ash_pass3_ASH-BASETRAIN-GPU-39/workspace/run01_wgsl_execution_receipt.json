@@ -1,0 +1,48 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-RUN-01",
+  "input_patch": "16AI-QW-38G-R6A-RUN-00",
+  "wgsl_compile": {
+    "gpu_sampling_topk.wgsl": "NOT_RUN",
+    "gpu_sampling_topp_scan.wgsl": "NOT_RUN",
+    "gpu_sampling_select.wgsl": "NOT_RUN",
+    "gpu_sampling_select_legacy.wgsl": "NOT_RUN"
+  },
+  "shaders": [
+    {
+      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_topk.wgsl",
+      "file_exists": true,
+      "status": "NOT_RUN",
+      "validation_errors": [],
+      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
+    },
+    {
+      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl",
+      "file_exists": true,
+      "status": "NOT_RUN",
+      "validation_errors": [],
+      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
+    },
+    {
+      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_select.wgsl",
+      "file_exists": true,
+      "status": "NOT_RUN",
+      "validation_errors": [],
+      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
+    },
+    {
+      "shader_path": "crates/burn_webgpu_backend/src/shaders/gpu_sampling_select_legacy.wgsl",
+      "file_exists": true,
+      "status": "NOT_RUN",
+      "validation_errors": [],
+      "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
+    }
+  ],
+  "binding_layout": {
+    "semantic_prior_buffers": "NOT_RUN",
+    "candidate_trace_v4": "NOT_RUN",
+    "transition_hint_buffer": "NOT_RUN"
+  },
+  "status": "NOT_RUN",
+  "promotion_blocked": true,
+  "reason": "NO_WGPU_VALIDATOR_OR_RUNTIME"
+}

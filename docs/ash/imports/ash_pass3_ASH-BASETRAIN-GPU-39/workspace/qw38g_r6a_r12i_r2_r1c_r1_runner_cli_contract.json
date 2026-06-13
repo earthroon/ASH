@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12I-R2-R1C-R1",
+  "execution_owner": "RUST_NATIVE_BINARY",
+  "forbidden_execution_owner": "POWERSHELL_WRAPPER",
+  "required_args": [
+    "--target-token-id",
+    "--masked-top1-token-id",
+    "--target-layer",
+    "--target-head",
+    "--direction-basis",
+    "--profile",
+    "--overlay-mode",
+    "--runtime-forward-source-path",
+    "--snapshot-output-path",
+    "--receipt-output-path",
+    "--log-output-path",
+    "--runtime-default-apply",
+    "--no-model-write"
+  ],
+  "controlled_exit_codes": {
+    "0": "PASS_OR_PARTIAL",
+    "1": "FAIL",
+    "2": "CLI_ARGUMENT_INVALID",
+    "3": "FORBIDDEN_MODEL_WRITE_ATTEMPTED"
+  },
+  "contract_status": "DEFINED"
+}

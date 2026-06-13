@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1",
+  "status": "DELTAK_QWAVE_WEIGHTED_MINP_CORE_SAMPLER_BAKED",
+  "static_status": "STATIC_PASS",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
+  "min_p_ssot": "RuntimeSamplingConfig.min_p",
+  "semantic_prior_ssot": "RuntimeSamplingConfig.semantic_prior / GenerationSamplingConfig.semantic_prior",
+  "sampler_semantic_reference": "model_core::cpu_oracle_sampler",
+  "weighted_logit_formula": "scaled_logit + clamp(qw*qwave + dk*deltak + cross*qwave*deltak, -bias_cap, bias_cap)",
+  "threshold_basis": "weighted_logit when semantic score source is available; vanilla scaled_logit under zero-source fallback",
+  "default_enabled": false,
+  "requires_sampler04_strict_ready": true,
+  "default_weights": {
+    "qwave_weight": 0.2,
+    "deltak_weight": 0.15,
+    "cross_weight": 0.1,
+    "bias_cap": 0.75
+  },
+  "source_policy": {
+    "qwave_source_missing": "score=0.0, semantic_prior_effective=false",
+    "deltak_source_missing": "score=0.0, semantic_prior_effective=false",
+    "both_missing": "weighted_logit == scaled_logit, vanilla candidate set preserved"
+  },
+  "implemented": [
+    "model_core SemanticPriorConfig",
+    "runtime RuntimeSemanticPriorConfig and env gate",
+    "CPU oracle semantic score interface and weighted logits",
+    "GPU semantic prior config and score buffers",
+    "topk/topp/select WGSL weighted-logit hooks",
+    "candidate trace V2 semantic_bias/weighted_logit fields",
+    "zero-source fallback and SAMPLER-04 readiness guard"
+  ],
+  "non_scope": [
+    "QWave score generator implementation",
+    "DeltaK score generator implementation",
+    "context router training",
+    "LoRA/lm_head/vocab atlas changes",
+    "runtime WebGPU execution validation"
+  ],
+  "execution_validation": "NOT_RUN: cargo/rustc/WebGPU runtime unavailable in container",
+  "patch_file": "workspace/minp_c1.patch",
+  "patch_line_count": 2584,
+  "artifacts": [
+    "workspace/minp_c1_weighted_minp_summary.json",
+    "workspace/minp_c1_weighted_minp_receipt_schema.json",
+    "workspace/minp_c1_weighted_minp_receipt.jsonl",
+    "workspace/minp_c1_weighted_minp_fixtures.json",
+    "workspace/minp_c1_static_checks.json",
+    "workspace/minp_c1_report.md",
+    "workspace/minp_c1.patch",
+    "acceptance_reports/16AI-QW-38G-R6A-MINP-C1_acceptance.md"
+  ]
+}

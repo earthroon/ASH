@@ -1,0 +1,22 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-31",
+  "runtime_logits_gradient_buffer_created": true,
+  "runtime_buffer_descriptor_matches_contract": true,
+  "buffer_label": "ash_basetrain_gpu_31_logits_gradient_write_smoke_buffer",
+  "buffer_kind": "logits_gradient_candidate_buffer",
+  "buffer_size_bytes": 8192,
+  "buffer_element_count": 2048,
+  "buffer_dtype": "f32",
+  "buffer_shape": [
+    1,
+    1,
+    2048
+  ],
+  "buffer_commit_scope": "none",
+  "allowed_usages": [
+    "STORAGE",
+    "COPY_SRC",
+    "COPY_DST"
+  ],
+  "pass": true
+}

@@ -1,0 +1,31 @@
+crates/model_core/src/tokenizer_v5_subtitle_output_structure_receipt.rs: PASS
+crates/model_core/tests/qw_tok07_subtitle_output_structure_receipt.rs: PASS
+crates/model_core/tests/qw_tok07_control_token_leak_surface.rs: PASS
+crates/model_core/tests/qw_tok07_no_semantic_quality_claim.rs: PASS
+crates/model_core/tests/qw_tok07_no_reward_training_mutation.rs: PASS
+artifacts/qw_tok07_subtitle_output_structure_receipt_report.json: PASS
+artifacts/qw_tok07_subtitle_output_structure_table.json: PASS
+artifacts/qw_tok07_control_token_leak_surface_receipt.json: PASS
+artifacts/qw_tok07_no_semantic_quality_claim_receipt.json: PASS
+workspace/runtime_traces/qw_tok07_subtitle_output_structure_receipt_trace.jsonl: PASS
+workspace/trace/qw_tok07_subtitle_output_structure_receipt.json: PASS
+QwTok07SubtitleOutputStructureReceiptConfig: PASS
+QwTok07SubtitleOutputStructureRow: PASS
+QwTok07ControlTokenLeakSurfaceReceipt: PASS
+QwTok07NoSemanticQualityClaimSeal: PASS
+QwTok07NoRewardTrainingMutationSeal: PASS
+QwTok07SubtitleOutputStructureReceiptReport: PASS
+QW_TOK07_EXPECTED_VOCAB_SIZE: usize = 48_259: PASS
+allow_semantic_quality_evaluation: false: PASS
+allow_quality_score: false: PASS
+allow_qw_selector_execution: false: PASS
+allow_mcts_execution: false: PASS
+allow_model_inference: false: PASS
+allow_token_generation: false: PASS
+allow_sampler_execution: false: PASS
+allow_checkpoint_write: false: PASS
+allow_runtime_spec_write: false: PASS
+allow_tokenizer_rewrite: false: PASS
+lib module wired: PASS
+no tokenizer/model/checkpoint weight files in qw_tok07 artifacts: PASS
+overall: PASS

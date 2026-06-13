@@ -1,0 +1,111 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-20",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "source_ledger_receipt_key": "sha256:ffb8a566493286947e69172081e58fa36880d01ab6c44bb0acdf32259c4c7320",
+  "query_input": {
+    "query_id": "ledger_query:summary:empty",
+    "query_kind": "ledger_summary",
+    "source_ledger_receipt_key": "sha256:ffb8a566493286947e69172081e58fa36880d01ab6c44bb0acdf32259c4c7320",
+    "cue_id_filter": null,
+    "include_events": true,
+    "include_latest_snapshot": true,
+    "include_integrity_checks": true
+  },
+  "query_result": {
+    "query_status": "empty_result",
+    "ledger_status": "empty_ledger",
+    "ledger_empty": true,
+    "total_cue_chains": 0,
+    "total_revision_events": 0,
+    "total_commit_events": 0,
+    "total_revert_events": 0,
+    "cue_histories": [],
+    "latest_snapshot": null,
+    "integrity_checks": [
+      {
+        "check_id": "ledger_check:empty_ledger_allowed",
+        "kind": "empty_ledger_allowed",
+        "pass": true,
+        "severity": "info",
+        "detail": "no committed or reverted cue revision events are available; empty ledger is valid"
+      },
+      {
+        "check_id": "ledger_check:commit_receipt_included",
+        "kind": "commit_receipt_included",
+        "pass": true,
+        "severity": "info",
+        "detail": "commit revision events included: 0"
+      },
+      {
+        "check_id": "ledger_check:rollback_receipt_included",
+        "kind": "rollback_receipt_included",
+        "pass": true,
+        "severity": "info",
+        "detail": "revert revision events included: 0"
+      },
+      {
+        "check_id": "ledger_check:no_orphan_rollback",
+        "kind": "no_orphan_rollback",
+        "pass": true,
+        "severity": "critical",
+        "detail": "rollback events must reference an existing WCTX-17 commit event"
+      },
+      {
+        "check_id": "ledger_check:no_duplicate_event",
+        "kind": "no_duplicate_event",
+        "pass": true,
+        "severity": "critical",
+        "detail": "source receipt keys and cue revision indexes must not duplicate"
+      },
+      {
+        "check_id": "ledger_check:single_cue_boundary",
+        "kind": "single_cue_boundary",
+        "pass": true,
+        "severity": "critical",
+        "detail": "each revision event must affect exactly one cue"
+      },
+      {
+        "check_id": "ledger_check:runtime_apply_closed",
+        "kind": "runtime_apply_closed",
+        "pass": true,
+        "severity": "critical",
+        "detail": "ledger construction must not open runtime apply or default apply"
+      },
+      {
+        "check_id": "ledger_check:target_mutation_not_performed_in_ledger",
+        "kind": "target_mutation_not_performed_in_ledger",
+        "pass": true,
+        "severity": "critical",
+        "detail": "WCTX-19 records prior commit/revert events and never mutates target text"
+      }
+    ],
+    "result_summary": "ledger is empty; no cue revision events are available"
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "decode_executed_in_query": false,
+    "generation_executed_in_query": false,
+    "model_forward_executed_in_query": false,
+    "sampling_executed_in_query": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "ledger_mutated": false,
+    "revision_event_created": false,
+    "commit_executed_in_query": false,
+    "rollback_executed_in_query": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "query_receipt_created": true,
+    "empty_ledger_observed": true,
+    "cue_history_missing": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:e4e2ee47c661b9ff347c07d637028661b4fac19c2bf8c583c81814116a8c189b",
+  "created_by": "ash_core::word_context_commit_ledger_query",
+  "schema_version": 1
+}

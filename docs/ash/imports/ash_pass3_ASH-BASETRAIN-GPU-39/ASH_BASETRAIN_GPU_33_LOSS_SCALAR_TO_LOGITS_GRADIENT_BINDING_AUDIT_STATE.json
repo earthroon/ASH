@@ -1,0 +1,39 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-33",
+  "title": "Loss Scalar To Logits Gradient Binding Audit / Stable Loss Candidate CPU Gradient GPU Written Candidate Parity Closure No Backward No Optimizer Seal",
+  "pass": true,
+  "verdict": "PASS_ASH_BASETRAIN_GPU_33_LOSS_SCALAR_TO_LOGITS_GRADIENT_BINDING_AUDIT_STABLE_LOSS_CANDIDATE_CPU_GRADIENT_GPU_WRITTEN_CANDIDATE_PARITY_CLOSURE_NO_BACKWARD_NO_OPTIMIZER",
+  "source_32_validation": {
+    "source_32_pass": true,
+    "source_32_all_replay_digests_match_cpu": true,
+    "source_32_all_replay_digests_equal_each_other": true,
+    "source_32_write_closure_digest_match": true,
+    "source_32_write_closure_stats_stable": true,
+    "source_32_gpu_compute_dispatch_executed": false,
+    "source_32_backward_executed": false,
+    "source_32_optimizer_step_executed": false
+  },
+  "binding_contract": {
+    "stable_gpu_local_nll_loss": 7.624625205993652,
+    "cpu_reference_loss": 7.624619041439192,
+    "loss_cpu_gpu_delta_abs": 6.164554460674765e-06,
+    "loss_cpu_gpu_delta_within_epsilon": true,
+    "payload_digest_hex": "856552759fc5e7f0b0b7c7b2de78fe0f1e59f82b2ff7c935f819758572878052",
+    "cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+    "gpu_write_closure_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+    "payload_digest_equals_candidate_digest": false,
+    "payload_to_candidate_lineage_created": true,
+    "cpu_gradient_gpu_written_parity_valid": true,
+    "loss_to_logits_gradient_semantic_binding_valid": true,
+    "binding_chain_digest_hex": "431c13f73a8a111d9492ee30beb1dbe034c63120403d4c140d7d48a61826836a"
+  },
+  "closed_boundaries": {
+    "new_gpu_write_executed": false,
+    "gpu_compute_dispatch_executed": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "model_weight_gradient_contract_created": false,
+    "runtime_1p1b_training_claimed": false,
+    "safetensors_mutation_present": false
+  }
+}

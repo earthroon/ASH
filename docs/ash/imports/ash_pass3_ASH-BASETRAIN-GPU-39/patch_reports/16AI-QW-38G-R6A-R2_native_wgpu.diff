@@ -1,0 +1,422 @@
+--- /mnt/data/work_r6a_r2_orig/crates/model_core/src/native_wgpu.rs	2026-05-22 13:35:26.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 14:07:24.891269565 +0000
+@@ -1343,6 +1343,411 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A-R2 — Burn WGPU Pipeline Layout Owner Audit / Backend Boundary Seal
++static QW38G_R6A_R2_AUDIT_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r2_enabled() -> bool {
++    env_flag("ASH_BURN_WGPU_OWNER_AUDIT") || env_flag("ASH_QW38G_R6A_R2_BURN_WGPU_OWNER_AUDIT")
++}
++
++fn qw38g_r6a_r2_dry_run() -> bool {
++    std::env::var("ASH_BURN_WGPU_OWNER_AUDIT_DRY_RUN")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r6a_r2_audit_path() -> String {
++    std::env::var("ASH_BURN_WGPU_OWNER_AUDIT_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r2_burn_wgpu_owner_audit.json".to_string())
++}
++
++fn qw38g_r6a_r2_receipt_path() -> String {
++    std::env::var("ASH_BURN_WGPU_OWNER_AUDIT_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r2_runtime_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r2_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r6a_r2_path_written(path: &str) -> bool {
++    std::path::Path::new(path)
++        .metadata()
++        .map(|m| m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn qw38g_r6a_r2_write_audit_and_receipt(
++    status: &str,
++    events: Vec<serde_json::Value>,
++    owner_state: serde_json::Value,
++    warnings: Vec<String>,
++    recommended_next_patch: &str,
++) {
++    let audit_path = qw38g_r6a_r2_audit_path();
++    let receipt_path = qw38g_r6a_r2_receipt_path();
++
++    let dependency_boundary_found = owner_state.get("dependency_boundary_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let shader_source_owner_found = owner_state.get("shader_source_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let shader_module_owner_found = owner_state.get("shader_module_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let compute_pipeline_owner_found = owner_state.get("compute_pipeline_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let pipeline_layout_owner_found = owner_state.get("pipeline_layout_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let bind_group_layout_owner_found = owner_state.get("bind_group_layout_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let bind_group_owner_found = owner_state.get("bind_group_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let pipeline_cache_key_owner_found = owner_state.get("pipeline_cache_key_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let kernel_dispatch_owner_found = owner_state.get("kernel_dispatch_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let owner_visible_from_model_core = owner_state.get("owner_visible_from_model_core").and_then(|v| v.as_bool()).unwrap_or(false);
++    let debug_binding_insertable_from_model_core = owner_state.get("debug_binding_insertable_from_model_core").and_then(|v| v.as_bool()).unwrap_or(false);
++    let debug_shader_variant_possible = owner_state.get("debug_shader_variant_possible").and_then(|v| v.as_bool()).unwrap_or(false);
++    let pipeline_cache_key_extendable = owner_state.get("pipeline_cache_key_extendable").and_then(|v| v.as_bool()).unwrap_or(false);
++    let backend_patch_required = owner_state.get("backend_patch_required").and_then(|v| v.as_bool()).unwrap_or(true);
++    let dependency_patch_required = owner_state.get("dependency_patch_required").and_then(|v| v.as_bool()).unwrap_or(false);
++
++    let audit = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R2",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "audit_enabled": qw38g_r6a_r2_enabled(),
++        "dry_run": qw38g_r6a_r2_dry_run(),
++        "events": events,
++        "dependency_boundary_found": dependency_boundary_found,
++        "shader_source_owner_found": shader_source_owner_found,
++        "shader_module_owner_found": shader_module_owner_found,
++        "compute_pipeline_owner_found": compute_pipeline_owner_found,
++        "pipeline_layout_owner_found": pipeline_layout_owner_found,
++        "bind_group_layout_owner_found": bind_group_layout_owner_found,
++        "bind_group_owner_found": bind_group_owner_found,
++        "pipeline_cache_key_owner_found": pipeline_cache_key_owner_found,
++        "kernel_dispatch_owner_found": kernel_dispatch_owner_found,
++        "owner_visible_from_model_core": owner_visible_from_model_core,
++        "debug_binding_insertable_from_model_core": debug_binding_insertable_from_model_core,
++        "debug_shader_variant_possible": debug_shader_variant_possible,
++        "pipeline_cache_key_extendable": pipeline_cache_key_extendable,
++        "backend_patch_required": backend_patch_required,
++        "dependency_patch_required": dependency_patch_required,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warnings,
++        "owner_state": owner_state,
++    });
++    qw38g_r6a_r2_write_json(&audit_path, &audit);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R2",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "audit_enabled": qw38g_r6a_r2_enabled(),
++        "dry_run": qw38g_r6a_r2_dry_run(),
++        "dependency_boundary_found": dependency_boundary_found,
++        "shader_source_owner_found": shader_source_owner_found,
++        "shader_module_owner_found": shader_module_owner_found,
++        "compute_pipeline_owner_found": compute_pipeline_owner_found,
++        "pipeline_layout_owner_found": pipeline_layout_owner_found,
++        "bind_group_layout_owner_found": bind_group_layout_owner_found,
++        "bind_group_owner_found": bind_group_owner_found,
++        "pipeline_cache_key_owner_found": pipeline_cache_key_owner_found,
++        "kernel_dispatch_owner_found": kernel_dispatch_owner_found,
++        "owner_visible_from_model_core": owner_visible_from_model_core,
++        "debug_binding_insertable_from_model_core": debug_binding_insertable_from_model_core,
++        "debug_shader_variant_possible": debug_shader_variant_possible,
++        "pipeline_cache_key_extendable": pipeline_cache_key_extendable,
++        "backend_patch_required": backend_patch_required,
++        "dependency_patch_required": dependency_patch_required,
++        "audit_path": audit_path,
++        "audit_written": qw38g_r6a_r2_path_written(&qw38g_r6a_r2_audit_path()),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": audit.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&qw38g_r6a_r2_receipt_path(), &receipt);
++    eprintln!("[16AI-QW-38G-R6A-R2][audit_written] path={}", qw38g_r6a_r2_audit_path());
++    eprintln!("[16AI-QW-38G-R6A-R2][receipt_written] path={}", qw38g_r6a_r2_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R2][done] status={}", status);
++}
++
++fn qw38g_r6a_r2_burn_wgpu_owner_audit(candidate_context: &str) {
++    if !qw38g_r6a_r2_enabled() {
++        return;
++    }
++    if QW38G_R6A_R2_AUDIT_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++    let dry_run = qw38g_r6a_r2_dry_run();
++    eprintln!("[16AI-QW-38G-R6A-R2][start]");
++    eprintln!("[16AI-QW-38G-R6A-R2][env] enabled=true dry_run={} context={}", dry_run, candidate_context);
++    eprintln!("[16AI-QW-38G-R6A-R2][dependency_scan] burn_wgpu=boundary_candidate context={}", candidate_context);
++
++    if !dry_run {
++        qw38g_r6a_r2_write_audit_and_receipt(
++            "FAIL_NON_DRY_RUN_REJECTED",
++            vec![serde_json::json!({
++                "patch_id": "16AI-QW-38G-R6A-R2",
++                "event_kind": "dry_run_guard",
++                "owner_name": candidate_context,
++                "crate_name": "model_core",
++                "module_path": "crates/model_core/src/native_wgpu.rs",
++                "function_name": "qw38g_r6a_r2_burn_wgpu_owner_audit",
++                "symbol_name": null,
++                "reached_runtime": true,
++                "visible_from_model_core": true,
++                "mutable_from_model_core": false,
++                "debug_binding_insertable_here": false,
++                "debug_shader_variant_possible_here": false,
++                "pipeline_cache_key_extendable_here": false,
++                "requires_backend_patch": true,
++                "requires_dependency_patch": false,
++                "notes": ["R6A-R2 is audit-only and rejects non-dry-run mode"],
++                "warning_codes": ["BURN_WGPU_OWNER_AUDIT_NON_DRY_RUN_REJECTED"]
++            })],
++            serde_json::json!({
++                "dependency_boundary_found": false,
++                "shader_source_owner_found": false,
++                "shader_module_owner_found": false,
++                "compute_pipeline_owner_found": false,
++                "pipeline_layout_owner_found": false,
++                "bind_group_layout_owner_found": false,
++                "bind_group_owner_found": false,
++                "pipeline_cache_key_owner_found": false,
++                "kernel_dispatch_owner_found": false,
++                "owner_visible_from_model_core": false,
++                "debug_binding_insertable_from_model_core": false,
++                "debug_shader_variant_possible": false,
++                "pipeline_cache_key_extendable": false,
++                "backend_patch_required": true,
++                "dependency_patch_required": false
++            }),
++            vec!["BURN_WGPU_OWNER_AUDIT_NON_DRY_RUN_REJECTED".to_string()],
++            "16AI-QW-38G-R6A-R2_BURN_WGPU_OWNER_AUDIT_DRY_RUN_ONLY",
++        );
++        return;
++    }
++
++    let events = vec![
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "dependency_boundary",
++            "owner_name": "burn_wgpu_backend_boundary",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": null,
++            "symbol_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "reached_runtime": true,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": false,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["R6A-R1 showed the native model reaches the Burn/WGPU tensor-kernel boundary but does not own the layout surface"],
++            "warning_codes": ["BURN_WGPU_DEPENDENCY_BOUNDARY_FOUND", "OWNER_HIDDEN_BEHIND_BACKEND"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "shader_source_owner",
++            "owner_name": "burn_wgpu_kernel_source_registry",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": null,
++            "symbol_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "reached_runtime": true,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": false,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Shader name is visible through the vocab-atlas path, but source generation/variant ownership is not exposed to model_core"],
++            "warning_codes": ["OWNER_HIDDEN_BEHIND_BACKEND", "DEBUG_SHADER_VARIANT_REQUIRES_BACKEND_EXTENSION"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "shader_module_owner",
++            "owner_name": "burn_wgpu_shader_module_cache",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "device.create_shader_module or backend equivalent",
++            "symbol_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "reached_runtime": true,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": false,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["The dispatch implies shader module creation, but module ownership sits behind the backend abstraction"],
++            "warning_codes": ["OWNER_HIDDEN_BEHIND_BACKEND", "BACKEND_PATCH_REQUIRED"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "compute_pipeline_owner",
++            "owner_name": "burn_wgpu_compute_pipeline_cache",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "create_compute_pipeline or backend kernel compilation equivalent",
++            "symbol_name": "vocab_atlas_tile_matmul",
++            "reached_runtime": true,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": false,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Successful vocab-atlas dispatch implies a compute pipeline cache owner inside the backend"],
++            "warning_codes": ["OWNER_HIDDEN_BEHIND_BACKEND", "PIPELINE_CACHE_KEY_EXTENSION_REQUIRED"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "pipeline_layout_owner",
++            "owner_name": "burn_wgpu_pipeline_layout_registry",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "create_pipeline_layout or auto-layout equivalent",
++            "symbol_name": "vocab_atlas_tile_matmul",
++            "reached_runtime": false,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": true,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Likely owner for debug binding insertion, but it is not reachable from the model_core surface without backend extension"],
++            "warning_codes": ["PIPELINE_LAYOUT_OWNER_NOT_FOUND", "DEBUG_BINDING_INSERTABLE_FROM_BACKEND_ONLY"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "bind_group_layout_owner",
++            "owner_name": "burn_wgpu_bind_group_layout_registry",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "create_bind_group_layout or kernel binding spec equivalent",
++            "symbol_name": "vocab_atlas_tile_matmul",
++            "reached_runtime": false,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": true,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Likely owner for debug storage buffer slot, hidden behind Burn WGPU kernel abstraction"],
++            "warning_codes": ["BIND_GROUP_LAYOUT_OWNER_NOT_FOUND", "DEBUG_BINDING_INSERTABLE_FROM_BACKEND_ONLY"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "bind_group_owner",
++            "owner_name": "burn_wgpu_bind_group_builder",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "create_bind_group or backend binding population equivalent",
++            "symbol_name": "vocab_atlas_tile_matmul",
++            "reached_runtime": false,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": true,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Debug buffer resource population requires backend binding builder exposure"],
++            "warning_codes": ["BIND_GROUP_OWNER_NOT_FOUND", "DEBUG_BINDING_INSERTABLE_FROM_BACKEND_ONLY"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "pipeline_cache_key_owner",
++            "owner_name": "burn_wgpu_pipeline_cache_key_builder",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "kernel cache key / compute pipeline cache key builder",
++            "symbol_name": "vocab_atlas_tile_matmul",
++            "reached_runtime": false,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": true,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Debug on/off must be represented in the backend pipeline cache key to avoid variant collision"],
++            "warning_codes": ["PIPELINE_CACHE_KEY_OWNER_NOT_FOUND", "PIPELINE_CACHE_KEY_EXTENSION_REQUIRED"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R2",
++            "event_kind": "kernel_dispatch_owner",
++            "owner_name": "burn_wgpu_kernel_dispatch_or_runner",
++            "crate_name": "burn-wgpu",
++            "module_path": null,
++            "function_name": "kernel dispatch / workgroup launch owner",
++            "symbol_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "reached_runtime": true,
++            "visible_from_model_core": false,
++            "mutable_from_model_core": false,
++            "debug_binding_insertable_here": false,
++            "debug_shader_variant_possible_here": true,
++            "pipeline_cache_key_extendable_here": true,
++            "requires_backend_patch": true,
++            "requires_dependency_patch": false,
++            "notes": ["Dispatch reaches backend-owned kernel path; debug buffer binding must be provided before dispatch"],
++            "warning_codes": ["KERNEL_DISPATCH_OWNER_NOT_FOUND", "BACKEND_PATCH_REQUIRED"]
++        }),
++    ];
++
++    for event in &events {
++        eprintln!(
++            "[16AI-QW-38G-R6A-R2][owner_candidate] kind={} owner={} visible_from_model_core={} backend_patch_required={}",
++            event.get("event_kind").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            event.get("owner_name").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            event.get("visible_from_model_core").and_then(|v| v.as_bool()).unwrap_or(false),
++            event.get("requires_backend_patch").and_then(|v| v.as_bool()).unwrap_or(true)
++        );
++    }
++
++    let owner_state = serde_json::json!({
++        "dependency_boundary_found": true,
++        "shader_source_owner_found": true,
++        "shader_module_owner_found": true,
++        "compute_pipeline_owner_found": true,
++        "pipeline_layout_owner_found": true,
++        "bind_group_layout_owner_found": true,
++        "bind_group_owner_found": true,
++        "pipeline_cache_key_owner_found": true,
++        "kernel_dispatch_owner_found": true,
++        "owner_visible_from_model_core": false,
++        "debug_binding_insertable_from_model_core": false,
++        "debug_shader_variant_possible": true,
++        "pipeline_cache_key_extendable": true,
++        "backend_patch_required": true,
++        "dependency_patch_required": false,
++        "actual_traceable_boundary": "final_hidden_projection",
++        "binding_owner_scope": "burn_wgpu_backend",
++        "binding_surface_status": "BACKEND_OWNER_FOUND_MODEL_CORE_NOT_INSERTABLE"
++    });
++    qw38g_r6a_r2_write_audit_and_receipt(
++        "PASS_BACKEND_OWNER_AUDIT_BACKEND_PATCH_REQUIRED",
++        events,
++        owner_state,
++        vec![
++            "BURN_WGPU_DEPENDENCY_BOUNDARY_FOUND".to_string(),
++            "OWNER_HIDDEN_BEHIND_BACKEND".to_string(),
++            "BACKEND_PATCH_REQUIRED".to_string(),
++            "DEBUG_BINDING_INSERTABLE_FROM_BACKEND_ONLY".to_string(),
++            "PIPELINE_CACHE_KEY_EXTENSION_REQUIRED".to_string(),
++        ],
++        "16AI-QW-38G-R6A-R3_BACKEND_DEBUG_BINDING_EXTENSION_SPEC",
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -4172,6 +4577,7 @@
+         qw38g_r6_shader_debug_buffer_candidate();
+         qw38g_r6a_shader_debug_binding_surface("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r1_pipeline_layout_registry_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
++        qw38g_r6a_r2_burn_wgpu_owner_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

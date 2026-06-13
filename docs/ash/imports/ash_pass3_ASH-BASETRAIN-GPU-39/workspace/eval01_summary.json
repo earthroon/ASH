@@ -1,0 +1,45 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-01",
+  "input_patch": "16AI-QW-38G-R6A-EVAL-00",
+  "status": "PASS_STATIC_OR_EMPTY",
+  "mode": "ManifestOnly",
+  "canonical_backend": "B00_cpu_oracle",
+  "candidate_backends": [
+    "B01_standard_runtime",
+    "B02_burn_webgpu_runtime",
+    "B03_webgpu_gpu_sampler_trace",
+    "B04_fallback_runtime"
+  ],
+  "suite": {
+    "prompt_count": 12,
+    "profile_count": 5,
+    "seed_count": 3,
+    "expected_pair_count": 720,
+    "completed_pair_count": 0,
+    "not_comparable_count": 0
+  },
+  "overall": {
+    "pass_count": 0,
+    "warn_count": 0,
+    "fail_count": 0,
+    "critical_diff_count": 0
+  },
+  "by_backend": {},
+  "diffs": {
+    "min_p_threshold_kind_mismatch_count": 0,
+    "active_set_delta_fail_count": 0,
+    "selected_token_mismatch_count": 0,
+    "top5_low_overlap_count": 0,
+    "entropy_delta_fail_count": 0,
+    "pci_delta_fail_count": 0,
+    "salad_risk_divergence_count": 0,
+    "stop_decision_divergence_count": 0,
+    "fallback_divergence_count": 0
+  },
+  "acceptance": {
+    "ready_for_decode03e_guard_overlay_apply": true,
+    "ready_for_default_dynamic_sampler": false,
+    "ready_for_medusa00": false,
+    "reason": "backend replay matrix sealed; runtime parity evidence required before default enable or Medusa promotion"
+  }
+}

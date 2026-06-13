@@ -1,0 +1,17 @@
+SFT-GPU-STREAM-02 STATIC VALIDATION
+
+Checked:
+- Added sft_gpu_stream_runtime_inference.rs
+- Added sft_gpu_stream_02_runtime_inference_stream.rs
+- Linked module in crates/ash_core/src/lib.rs
+- Added acceptance report
+- Added bake report
+- Balanced braces/brackets/parentheses in added module and test file
+
+Not checked:
+- cargo test could not be executed because cargo/rustc/rustfmt are unavailable in this environment.
+
+Required local validation:
+- cargo test -p ash_core sft_gpu_stream_02 -- --nocapture
+- cargo test -p ash_core sft_gpu_stream_01 -- --nocapture
+- cargo test -p ash_core sft_run_04 -- --nocapture

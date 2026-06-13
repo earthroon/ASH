@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
+  "profile": "safe_v1",
+  "default_enabled": false,
+  "controlled_enable_requires_opt_in": true,
+  "requires_decode02d_ready": true,
+  "soft_penalty_scale": 0.5,
+  "max_soft_penalty": 0.75,
+  "hard_block_allowed": [
+    "PadToken",
+    "ControlToken",
+    "MojibakeSuspected",
+    "InvalidByteToken",
+    "EosBeforeMinNewTokens"
+  ],
+  "hard_block_forbidden": [
+    "NormalKoreanTransition",
+    "EmotionalRepeat",
+    "ParticleLikeAmbiguousTransition",
+    "RepeatedPunctuation",
+    "GenericContinuationImmediateEos"
+  ],
+  "observe_only": [
+    "EmotionalRepeat",
+    "KoreanAmbiguousTransition"
+  ]
+}

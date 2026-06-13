@@ -1,0 +1,78 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12E",
+  "status": "PASS_STATIC_VALIDATION",
+  "adjudication": "STABILITY_REPLAY_AND_POLICY_REGRESSION_LOCK_SCRIPT_BAKED",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12E_stability_replay_and_policy_regression_lock.ps1",
+  "script_sha256": "42d7a1399eb3392e19090d2db46fa4dfca8a6da2ab9dfbbe0886a24946ad3035",
+  "static_checks": [
+    {
+      "pattern": "PASS_STABILITY_REPLAY_AND_POLICY_REGRESSION_LOCK",
+      "present": true
+    },
+    {
+      "pattern": "GUARD_DECISION_REPLAY_STABLE_AND_REGRESSION_LOCKED",
+      "present": true
+    },
+    {
+      "pattern": "qw38g_r6a_r12e_stability_replay_receipt.json",
+      "present": true
+    },
+    {
+      "pattern": "qw38g_r6a_r12e_policy_regression_lock_audit.json",
+      "present": true
+    },
+    {
+      "pattern": "qw38g_r6a_r12e_decision_drift_audit.json",
+      "present": true
+    },
+    {
+      "pattern": "NEGATIVE_CONTROL_ACTUAL_APPLY_BLOCKED",
+      "present": true
+    },
+    {
+      "pattern": "TARGET_LIKE_MARGIN_ABOVE_THRESHOLD",
+      "present": true
+    },
+    {
+      "pattern": "BASELINE_MARGIN_NON_POSITIVE",
+      "present": true
+    },
+    {
+      "pattern": "NO_MODEL_ARTIFACT_MUTATION",
+      "present": true
+    },
+    {
+      "pattern": "16AI-QW-38G-R6A-R12A-R12F_POLICY_LOCKED_CANARY_CASE_EXPANSION",
+      "present": true
+    },
+    {
+      "pattern": "runtime_default_apply = $false",
+      "present": true
+    },
+    {
+      "pattern": "production_safe_confirmed = $false",
+      "present": true
+    },
+    {
+      "pattern": "root_cause_confirmed = $false",
+      "present": true
+    }
+  ],
+  "runtime_executed_here": false,
+  "runtime_execution_note": "PowerShell is not available in this container; run the script in the user local PowerShell environment with existing R12C/R12D artifacts.",
+  "expected_command": ".\\scripts\\run_16AI_QW_38G_R6A_R12A_R12E_stability_replay_and_policy_regression_lock.ps1 -Build -Strict -ReplayCount 3",
+  "changed_files": [
+    "scripts/run_16AI_QW_38G_R6A_R12A_R12E_stability_replay_and_policy_regression_lock.ps1",
+    "workspace/qw38g_r6a_r12e_static_validation_result.json",
+    "workspace/qw38g_r6a_r12e_static_validation_result.md",
+    "workspace/qw38g_r6a_r12e_changed_files.txt"
+  ],
+  "production_safe_confirmed": false,
+  "root_cause_confirmed": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

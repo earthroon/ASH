@@ -1,0 +1,7 @@
+{
+  "patch_id": "ASH-FT-05",
+  "kind": "single_group_compute_plan",
+  "selected_group": {"group_id": "", "group_kind": "", "tensor_keys": [], "selection_policy": "from_ft04_upload_plan"},
+  "compute_config": {"micro_batch": 1, "max_compute_elements": 262144, "max_readback_bytes": 1048576, "shader_policy": "local_smoke_only", "optimizer_mode": "none", "candidate_write_allowed": false, "allow_readback": true},
+  "planned_kernels": ["local_forward_projection_smoke", "local_backward_gradient_shape_smoke"]
+}

@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12I-R2",
+  "status": "PASS_STATIC_VALIDATION",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12I_R2_capture_input_row_wiring.ps1",
+  "script_sha256": "cb15083c5e21e846d57641b8714233b4b72a259719d0b107d4133f847f2366fd",
+  "cumulative_repairs_included": [
+    "16AI-QW-38G-R6A-R12A-R12I-R1-R1_PARTIAL_CAPTURE_DECISION_AGGREGATOR_REPAIR"
+  ],
+  "outputs_prefix": "workspace/qw38g_r6a_r12i_r2_*",
+  "capture_input_output_path": "workspace/qw38g_r6a_r12i_metric_capture_input.json",
+  "supports_partial_rows": true,
+  "fixture_mode_default": false,
+  "mock_positive_forbidden": true,
+  "mutation_safety_default": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "recommended_command": ".\\scripts\\run_16AI_QW_38G_R6A_R12A_R12I_R2_capture_input_row_wiring.ps1 -Build -Strict -TargetLikeCount 3 -NegativeControlCount 3 -AllowPartialRows"
+}

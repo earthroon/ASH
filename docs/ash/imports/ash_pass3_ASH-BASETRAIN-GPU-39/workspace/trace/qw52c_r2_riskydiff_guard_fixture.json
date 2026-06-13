@@ -1,0 +1,154 @@
+[
+  {
+    "case_id": "risky_diff_blocks_promotion",
+    "audit_summary": {
+      "sample_count": 5,
+      "supervised_audit_eligible_count": 3,
+      "same_top1_count": 1,
+      "different_top1_count": 3,
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 1,
+      "neutral_diff_count": 0,
+      "review_only_count": 1,
+      "unavailable_count": 1,
+      "hard_ban_count": 0,
+      "token_selection_change_count": 0,
+      "mean_shadow_improvement_score": 0.18000000000000002,
+      "mean_shadow_regression_score": 0.145,
+      "mean_shadow_net_benefit_score": 0.035000000000000024,
+      "audit_pass": true,
+      "runtime_apply": false,
+      "audit_manifest_available": true,
+      "audit_jsonl_available": true
+    },
+    "expected": {
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "promotion_status": "PromotionBlocked",
+      "block_reasons_contains": [
+        "RiskyDiffPresent"
+      ],
+      "required_next_patch": "QW-52C-R3"
+    }
+  },
+  {
+    "case_id": "no_risky_diff_allows_further_shadow_sweep",
+    "audit_summary": {
+      "sample_count": 5,
+      "supervised_audit_eligible_count": 3,
+      "same_top1_count": 1,
+      "different_top1_count": 3,
+      "beneficial_diff_count": 2,
+      "risky_diff_count": 0,
+      "neutral_diff_count": 0,
+      "review_only_count": 1,
+      "unavailable_count": 0,
+      "hard_ban_count": 0,
+      "token_selection_change_count": 0,
+      "mean_shadow_improvement_score": 0.18000000000000002,
+      "mean_shadow_regression_score": 0.145,
+      "mean_shadow_net_benefit_score": 0.035000000000000024,
+      "audit_pass": true,
+      "runtime_apply": false,
+      "audit_manifest_available": true,
+      "audit_jsonl_available": true
+    },
+    "expected": {
+      "guard_status": "Guarded",
+      "promotion_eligible": false,
+      "promotion_status": "EligibleForFurtherShadowSweep",
+      "policy_promotion": false
+    }
+  },
+  {
+    "case_id": "hard_ban_detected_blocks_promotion",
+    "audit_summary": {
+      "sample_count": 5,
+      "supervised_audit_eligible_count": 3,
+      "same_top1_count": 1,
+      "different_top1_count": 3,
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 0,
+      "neutral_diff_count": 0,
+      "review_only_count": 1,
+      "unavailable_count": 1,
+      "hard_ban_count": 1,
+      "token_selection_change_count": 0,
+      "mean_shadow_improvement_score": 0.18000000000000002,
+      "mean_shadow_regression_score": 0.145,
+      "mean_shadow_net_benefit_score": 0.035000000000000024,
+      "audit_pass": true,
+      "runtime_apply": false,
+      "audit_manifest_available": true,
+      "audit_jsonl_available": true
+    },
+    "expected": {
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "block_reasons_contains": [
+        "HardBanDetected"
+      ]
+    }
+  },
+  {
+    "case_id": "insufficient_supervised_audit_blocks_promotion",
+    "audit_summary": {
+      "sample_count": 5,
+      "supervised_audit_eligible_count": 1,
+      "same_top1_count": 1,
+      "different_top1_count": 3,
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 0,
+      "neutral_diff_count": 0,
+      "review_only_count": 1,
+      "unavailable_count": 1,
+      "hard_ban_count": 0,
+      "token_selection_change_count": 0,
+      "mean_shadow_improvement_score": 0.18000000000000002,
+      "mean_shadow_regression_score": 0.145,
+      "mean_shadow_net_benefit_score": 0.035000000000000024,
+      "audit_pass": true,
+      "runtime_apply": false,
+      "audit_manifest_available": true,
+      "audit_jsonl_available": true
+    },
+    "expected": {
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "block_reasons_contains": [
+        "SupervisedAuditInsufficient"
+      ]
+    }
+  },
+  {
+    "case_id": "missing_audit_manifest_unavailable",
+    "audit_summary": {
+      "sample_count": 5,
+      "supervised_audit_eligible_count": 3,
+      "same_top1_count": 1,
+      "different_top1_count": 3,
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 0,
+      "neutral_diff_count": 0,
+      "review_only_count": 1,
+      "unavailable_count": 1,
+      "hard_ban_count": 0,
+      "token_selection_change_count": 0,
+      "mean_shadow_improvement_score": 0.18000000000000002,
+      "mean_shadow_regression_score": 0.145,
+      "mean_shadow_net_benefit_score": 0.035000000000000024,
+      "audit_pass": true,
+      "runtime_apply": false,
+      "audit_manifest_available": false,
+      "audit_jsonl_available": false
+    },
+    "expected": {
+      "guard_status": "Unavailable",
+      "promotion_eligible": false,
+      "block_reasons_contains": [
+        "MissingAuditManifest",
+        "MissingAuditJsonl"
+      ]
+    }
+  }
+]

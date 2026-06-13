@@ -1,0 +1,38 @@
+{
+  "patch_id": "QW-52B-M2",
+  "status": "PASS_STATIC_SELF_ECHO_DETECTOR",
+  "json_static_validation": "PASS",
+  "cargo_check": "NOT RUN - cargo unavailable in bake environment",
+  "runtime_probe": "NOT RUN - cargo unavailable in bake environment",
+  "detector_count_before": 10,
+  "detector_count_after": 11,
+  "fixture_statuses": [
+    {
+      "case_id": "normal_non_echo_output",
+      "status": "PASS",
+      "risk_level": "None"
+    },
+    {
+      "case_id": "piece_echo_loop_output",
+      "status": "PASS",
+      "risk_level": "High"
+    },
+    {
+      "case_id": "contextless_reentry_attractor",
+      "status": "PASS",
+      "risk_level": "Medium"
+    },
+    {
+      "case_id": "missing_recent_window",
+      "status": "PASS",
+      "risk_level": "Unavailable"
+    }
+  ],
+  "mutation_policy_all_false": true,
+  "runtime_apply": false,
+  "hidden_state_mutation": false,
+  "logit_mutation": false,
+  "sampler_mutation": false,
+  "token_selection_mutation": false,
+  "token_ban": false
+}

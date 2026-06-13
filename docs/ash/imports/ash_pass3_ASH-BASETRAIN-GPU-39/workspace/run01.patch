@@ -1,0 +1,304 @@
+--- crates/model_core/src/lib.rs.before
++++ crates/model_core/src/lib.rs
+@@ -20,6 +20,7 @@
+ mod minp_c2_score_provider_smoke;
+ mod minp_c2a_snapshot_alignment;
+ mod run00_consolidated_smoke;
++mod run01_runtime_execution;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -84,6 +85,14 @@
+ };
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
++pub use run01_runtime_execution::{
++    RUN01_PATCH_ID, RUN01_INPUT_PATCH_ID, Run01ExecutionStatus,
++    Run01CommandExecutionReceipt, Run01CargoExecutionReceipt,
++    Run01WgslShaderExecutionReceipt, Run01WgslExecutionReceipt,
++    Run01RuntimeReceiptCaseExecution, Run01PromotionGateReceipt,
++    Run01RuntimeExecutionSummary, run01_evaluate_promotion_gates,
++    run01_not_run_cargo_receipt, run01_not_run_wgsl_receipt,
++};
+ pub use run00_consolidated_smoke::{
+     RUN00_PATCH_ID, Run00CheckStatus, Run00CommandReceipt, Run00CargoCheckReceipt,
+     Run00CargoTestReceipt, Run00WgslShaderReceipt, Run00WgslCompileReceipt,
+--- /dev/null
++++ crates/model_core/src/run01_runtime_execution.rs
+@@ -0,0 +1,266 @@
++use serde::{Deserialize, Serialize};
++use std::collections::BTreeMap;
++
++pub const RUN01_PATCH_ID: &str = "16AI-QW-38G-R6A-RUN-01";
++pub const RUN01_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-RUN-00";
++
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Run01ExecutionStatus {
++    Pass,
++    Fail,
++    Blocked,
++    NotRun,
++}
++
++impl Run01ExecutionStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::Fail => "FAIL",
++            Self::Blocked => "BLOCKED",
++            Self::NotRun => "NOT_RUN",
++        }
++    }
++
++    pub fn is_pass(&self) -> bool {
++        matches!(self, Self::Pass)
++    }
++
++    pub fn is_blocking(&self) -> bool {
++        matches!(self, Self::Fail | Self::Blocked | Self::NotRun)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01CommandExecutionReceipt {
++    pub command: String,
++    pub status: Run01ExecutionStatus,
++    pub exit_code: Option<i32>,
++    pub stdout_tail: Vec<String>,
++    pub stderr_tail: Vec<String>,
++    pub blocking: bool,
++    pub reason: Option<String>,
++}
++
++impl Run01CommandExecutionReceipt {
++    pub fn not_run(command: impl Into<String>, reason: impl Into<String>) -> Self {
++        Self {
++            command: command.into(),
++            status: Run01ExecutionStatus::NotRun,
++            exit_code: None,
++            stdout_tail: Vec::new(),
++            stderr_tail: Vec::new(),
++            blocking: true,
++            reason: Some(reason.into()),
++        }
++    }
++
++    pub fn pass(command: impl Into<String>) -> Self {
++        Self {
++            command: command.into(),
++            status: Run01ExecutionStatus::Pass,
++            exit_code: Some(0),
++            stdout_tail: Vec::new(),
++            stderr_tail: Vec::new(),
++            blocking: false,
++            reason: None,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01CargoExecutionReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub cargo_check: BTreeMap<String, Run01CommandExecutionReceipt>,
++    pub cargo_test: BTreeMap<String, Run01CommandExecutionReceipt>,
++    pub failures: Vec<Run01CommandExecutionReceipt>,
++    pub check_status: Run01ExecutionStatus,
++    pub test_status: Run01ExecutionStatus,
++    pub status: Run01ExecutionStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01WgslShaderExecutionReceipt {
++    pub shader_path: String,
++    pub status: Run01ExecutionStatus,
++    pub file_exists: bool,
++    pub validation_errors: Vec<String>,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01WgslExecutionReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub shaders: Vec<Run01WgslShaderExecutionReceipt>,
++    pub semantic_prior_buffers: Run01ExecutionStatus,
++    pub candidate_trace_v4: Run01ExecutionStatus,
++    pub transition_hint_buffer: Run01ExecutionStatus,
++    pub status: Run01ExecutionStatus,
++    pub promotion_blocked: bool,
++    pub reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01RuntimeReceiptCaseExecution {
++    pub patch_id: String,
++    pub case: String,
++    pub prompt: String,
++    pub status: Run01ExecutionStatus,
++    pub receipts_expected: Vec<String>,
++    pub receipts_found: Vec<String>,
++    pub sampler04_status: String,
++    pub decode02d_status: String,
++    pub minp_c2a_status: String,
++    pub blocking_reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Run01PromotionGateReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub sampler_strict_ready: bool,
++    pub transition_on_candidate_ready: bool,
++    pub semantic_prior_enable_ready: bool,
++    pub gate_inputs: BTreeMap<String, String>,
++    pub blocking_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Run01RuntimeExecutionSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub cargo_check_status: Run01ExecutionStatus,
++    pub cargo_test_status: Run01ExecutionStatus,
++    pub wgsl_compile_status: Run01ExecutionStatus,
++    pub runtime_smoke_status: Run01ExecutionStatus,
++    pub checked_cases: usize,
++    pub pass_cases: usize,
++    pub fail_cases: usize,
++    pub blocked_cases: usize,
++    pub promotion_gates: Run01PromotionGateReceipt,
++    pub default_modes_changed: bool,
++    pub non_scope: Vec<String>,
++}
++
++pub fn run01_evaluate_promotion_gates(
++    cargo_check: Run01ExecutionStatus,
++    wgsl_compile: Run01ExecutionStatus,
++    runtime_smoke: Run01ExecutionStatus,
++    sampler04_status: &str,
++    decode02d_status: &str,
++    minp_c2a_status: &str,
++) -> Run01PromotionGateReceipt {
++    let mut gate_inputs = BTreeMap::new();
++    gate_inputs.insert("cargo_check".to_string(), cargo_check.as_str().to_string());
++    gate_inputs.insert("wgsl_compile".to_string(), wgsl_compile.as_str().to_string());
++    gate_inputs.insert("runtime_smoke".to_string(), runtime_smoke.as_str().to_string());
++    gate_inputs.insert("sampler04_status".to_string(), sampler04_status.to_string());
++    gate_inputs.insert("decode02d_status".to_string(), decode02d_status.to_string());
++    gate_inputs.insert("minp_c2a_status".to_string(), minp_c2a_status.to_string());
++
++    let build_ready = cargo_check.is_pass() && wgsl_compile.is_pass();
++    let runtime_ready = runtime_smoke.is_pass();
++
++    let sampler_strict_ready = build_ready
++        && runtime_ready
++        && sampler04_status == "STRICT_CANDIDATE_READY";
++    let transition_on_candidate_ready = build_ready
++        && runtime_ready
++        && decode02d_status == "TRANSITION_ON_CANDIDATE_READY";
++    let semantic_prior_enable_ready = build_ready
++        && sampler04_status == "STRICT_CANDIDATE_READY"
++        && minp_c2a_status == "PASS";
++
++    let mut blocking_reasons = Vec::new();
++    if !cargo_check.is_pass() {
++        blocking_reasons.push(format!("CARGO_CHECK_{}", cargo_check.as_str()));
++    }
++    if !wgsl_compile.is_pass() {
++        blocking_reasons.push(format!("WGSL_COMPILE_{}", wgsl_compile.as_str()));
++    }
++    if !runtime_smoke.is_pass() {
++        blocking_reasons.push(format!("RUNTIME_SMOKE_{}", runtime_smoke.as_str()));
++    }
++    if sampler04_status != "STRICT_CANDIDATE_READY" {
++        blocking_reasons.push(format!("SAMPLER04_{}", sampler04_status));
++    }
++    if decode02d_status != "TRANSITION_ON_CANDIDATE_READY" {
++        blocking_reasons.push(format!("DECODE02D_{}", decode02d_status));
++    }
++    if minp_c2a_status != "PASS" {
++        blocking_reasons.push(format!("MINP_C2A_{}", minp_c2a_status));
++    }
++
++    Run01PromotionGateReceipt {
++        patch_id: RUN01_PATCH_ID.to_string(),
++        input_patch: RUN01_INPUT_PATCH_ID.to_string(),
++        sampler_strict_ready,
++        transition_on_candidate_ready,
++        semantic_prior_enable_ready,
++        gate_inputs,
++        blocking_reasons,
++    }
++}
++
++pub fn run01_not_run_cargo_receipt() -> Run01CargoExecutionReceipt {
++    let reason = "RUN01_BAKE_ENVIRONMENT_HAS_NO_CARGO_OR_RUSTC";
++    let mut cargo_check = BTreeMap::new();
++    for (name, command) in [
++        ("model_core", "cargo check -p model_core"),
++        ("runtime", "cargo check -p runtime"),
++        ("burn_webgpu_backend", "cargo check -p burn_webgpu_backend"),
++        ("orchestrator_local", "cargo check -p orchestrator_local"),
++        ("workspace", "cargo check --workspace"),
++    ] {
++        cargo_check.insert(name.to_string(), Run01CommandExecutionReceipt::not_run(command, reason));
++    }
++
++    let mut cargo_test = BTreeMap::new();
++    for (name, command) in [
++        ("model_core_decode", "cargo test -p model_core decode"),
++        ("model_core_sampler", "cargo test -p model_core sampler"),
++        ("model_core_minp", "cargo test -p model_core minp"),
++        ("model_core_transition", "cargo test -p model_core transition"),
++        ("burn_webgpu_backend_gpu_sampling", "cargo test -p burn_webgpu_backend gpu_sampling"),
++    ] {
++        cargo_test.insert(name.to_string(), Run01CommandExecutionReceipt::not_run(command, reason));
++    }
++
++    Run01CargoExecutionReceipt {
++        patch_id: RUN01_PATCH_ID.to_string(),
++        input_patch: RUN01_INPUT_PATCH_ID.to_string(),
++        cargo_check,
++        cargo_test,
++        failures: Vec::new(),
++        check_status: Run01ExecutionStatus::NotRun,
++        test_status: Run01ExecutionStatus::NotRun,
++        status: Run01ExecutionStatus::NotRun,
++    }
++}
++
++pub fn run01_not_run_wgsl_receipt(shader_paths: &[&str]) -> Run01WgslExecutionReceipt {
++    let reason = "NO_WGPU_VALIDATOR_OR_RUNTIME";
++    Run01WgslExecutionReceipt {
++        patch_id: RUN01_PATCH_ID.to_string(),
++        input_patch: RUN01_INPUT_PATCH_ID.to_string(),
++        shaders: shader_paths
++            .iter()
++            .map(|path| Run01WgslShaderExecutionReceipt {
++                shader_path: (*path).to_string(),
++                status: Run01ExecutionStatus::NotRun,
++                file_exists: std::path::Path::new(path).exists(),
++                validation_errors: Vec::new(),
++                reason: Some(reason.to_string()),
++            })
++            .collect(),
++        semantic_prior_buffers: Run01ExecutionStatus::NotRun,
++        candidate_trace_v4: Run01ExecutionStatus::NotRun,
++        transition_hint_buffer: Run01ExecutionStatus::NotRun,
++        status: Run01ExecutionStatus::NotRun,
++        promotion_blocked: true,
++        reason: Some(reason.to_string()),
++    }
++}
+
+# RUN-01 generated artifacts
+# added workspace/run01_runtime_execution_summary.json
+# added workspace/run01_cargo_execution_receipt.json
+# added workspace/run01_wgsl_execution_receipt.json
+# added workspace/run01_runtime_receipt_execution.jsonl
+# added workspace/run01_promotion_gate_receipt.json
+# added workspace/run01_static_checks.json
+# added workspace/run01_report.md
+# added acceptance_reports/16AI-QW-38G-R6A-RUN-01_acceptance.md

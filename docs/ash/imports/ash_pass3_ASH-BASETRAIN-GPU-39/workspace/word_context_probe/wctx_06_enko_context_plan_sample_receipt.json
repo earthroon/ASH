@@ -1,0 +1,176 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-06",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX02-C003",
+  "source_attachment_receipt_key": "sha256:sample_wctx05_attachment_key",
+  "source_registry_receipt_key": "sha256:sample_wctx04_registry_key",
+  "source_split_receipt_key": "sha256:sample_wctx03_split_key",
+  "context_plan": {
+    "cue_id": "WCTX02-C003",
+    "domain_ssot": "en_to_ko_translation_subtitle_machine",
+    "source_english": "Don't add what isn't there.",
+    "target_korean": "없는 말은 추가하지 마.",
+    "start_ms": 7000,
+    "end_ms": 9100,
+    "window_radius": 2,
+    "items": [
+      {
+        "item_id": "ctx_item:sample:negation_alignment",
+        "kind": "negation_alignment",
+        "priority": "critical",
+        "cue_id": "WCTX02-C003",
+        "source_surface": "Don't",
+        "target_surface": "마",
+        "related_node_ids": [],
+        "related_edge_ids": [
+          "typed_edge:sample:negation"
+        ],
+        "related_attachment_ids": [
+          "ko_attach:sample:ma"
+        ],
+        "instruction": "영어 부정/금지 cue와 한국어 금지 꼬리 \"마\"의 대응을 보존 조건으로 관측한다. 자동 수정은 하지 않는다.",
+        "evidence_summary": "EnglishNegationCue + Korean NegativeImperativeTail + WCTX-05 Prohibition attachment",
+        "confidence": 0.86,
+        "estimated_budget_cost": 42,
+        "shadow_only": true
+      },
+      {
+        "item_id": "ctx_item:sample:timing_constraint",
+        "kind": "timing_constraint",
+        "priority": "critical",
+        "cue_id": "WCTX02-C003",
+        "source_surface": null,
+        "target_surface": null,
+        "related_node_ids": [],
+        "related_edge_ids": [
+          "typed_edge:sample:timing"
+        ],
+        "related_attachment_ids": [],
+        "instruction": "타임코드는 현재 cue의 불변 제약으로 관측한다. 자동 보정 또는 재타이밍은 하지 않는다.",
+        "evidence_summary": "TimingContains typed edge; timing_mutated=false",
+        "confidence": 0.82,
+        "estimated_budget_cost": 34,
+        "shadow_only": true
+      },
+      {
+        "item_id": "ctx_item:sample:korean_particle",
+        "kind": "korean_particle_attachment",
+        "priority": "medium",
+        "cue_id": "WCTX02-C003",
+        "source_surface": null,
+        "target_surface": "말은",
+        "related_node_ids": [
+          "node:sample:target:mal-eun"
+        ],
+        "related_edge_ids": [],
+        "related_attachment_ids": [
+          "ko_attach:sample:eun"
+        ],
+        "instruction": "target Korean \"말은\"의 조사 \"은\"은 topic/contrast 기능 후보로 관측된다. 조사 교정은 하지 않는다.",
+        "evidence_summary": "WCTX-05 Particle attachment: base 말 + tail 은",
+        "confidence": 0.85,
+        "estimated_budget_cost": 38,
+        "shadow_only": true
+      }
+    ],
+    "budget_gate": {
+      "budget": {
+        "max_items": 12,
+        "max_chars": 900,
+        "max_estimated_tokens": 256,
+        "reserved_critical_items": 4,
+        "used_items": 3,
+        "used_chars": 355,
+        "used_estimated_tokens": 119
+      },
+      "accepted_items": [
+        {
+          "item_id": "ctx_item:sample:negation_alignment",
+          "kind": "negation_alignment",
+          "priority": "critical",
+          "cue_id": "WCTX02-C003",
+          "source_surface": "Don't",
+          "target_surface": "마",
+          "related_node_ids": [],
+          "related_edge_ids": [
+            "typed_edge:sample:negation"
+          ],
+          "related_attachment_ids": [
+            "ko_attach:sample:ma"
+          ],
+          "instruction": "영어 부정/금지 cue와 한국어 금지 꼬리 \"마\"의 대응을 보존 조건으로 관측한다. 자동 수정은 하지 않는다.",
+          "evidence_summary": "EnglishNegationCue + Korean NegativeImperativeTail + WCTX-05 Prohibition attachment",
+          "confidence": 0.86,
+          "estimated_budget_cost": 42,
+          "shadow_only": true
+        },
+        {
+          "item_id": "ctx_item:sample:timing_constraint",
+          "kind": "timing_constraint",
+          "priority": "critical",
+          "cue_id": "WCTX02-C003",
+          "source_surface": null,
+          "target_surface": null,
+          "related_node_ids": [],
+          "related_edge_ids": [
+            "typed_edge:sample:timing"
+          ],
+          "related_attachment_ids": [],
+          "instruction": "타임코드는 현재 cue의 불변 제약으로 관측한다. 자동 보정 또는 재타이밍은 하지 않는다.",
+          "evidence_summary": "TimingContains typed edge; timing_mutated=false",
+          "confidence": 0.82,
+          "estimated_budget_cost": 34,
+          "shadow_only": true
+        },
+        {
+          "item_id": "ctx_item:sample:korean_particle",
+          "kind": "korean_particle_attachment",
+          "priority": "medium",
+          "cue_id": "WCTX02-C003",
+          "source_surface": null,
+          "target_surface": "말은",
+          "related_node_ids": [
+            "node:sample:target:mal-eun"
+          ],
+          "related_edge_ids": [],
+          "related_attachment_ids": [
+            "ko_attach:sample:eun"
+          ],
+          "instruction": "target Korean \"말은\"의 조사 \"은\"은 topic/contrast 기능 후보로 관측된다. 조사 교정은 하지 않는다.",
+          "evidence_summary": "WCTX-05 Particle attachment: base 말 + tail 은",
+          "confidence": 0.85,
+          "estimated_budget_cost": 38,
+          "shadow_only": true
+        }
+      ],
+      "dropped_items": [],
+      "truncated": false,
+      "reason": "all candidate ContextPlan items fit within deterministic budget; plan remains shadow-only"
+    },
+    "plan_text_shadow": "[CRITICAL] negation_alignment: 영어 부정/금지 cue와 한국어 금지 꼬리 \"마\"의 대응을 보존 조건으로 관측한다. 자동 수정은 하지 않는다.\n[CRITICAL] timing_constraint: 타임코드는 현재 cue의 불변 제약으로 관측한다. 자동 보정 또는 재타이밍은 하지 않는다.\n[MEDIUM] korean_particle_attachment: target Korean \"말은\"의 조사 \"은\"은 topic/contrast 기능 후보로 관측된다. 조사 교정은 하지 않는다.",
+    "shadow_only": true
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "context_plan_created": true,
+    "context_plan_applied": false,
+    "prompt_mutated": false,
+    "rerank_applied": false,
+    "runtime_default_apply": false,
+    "glossary_auto_applied": false,
+    "preserve_auto_applied": false,
+    "particle_auto_corrected": false,
+    "ending_auto_corrected": false,
+    "budget_overflow": false,
+    "budget_truncated": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "created_by": "ash_core::word_context_context_plan",
+  "schema_version": 1,
+  "deterministic_receipt_key": "sha256:17612bf0cc2ea697b6e2ec2b8f49c373c42a02faa3678019a8725783f5dd2995"
+}

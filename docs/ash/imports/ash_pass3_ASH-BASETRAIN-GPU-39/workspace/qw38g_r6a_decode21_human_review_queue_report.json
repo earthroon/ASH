@@ -1,0 +1,78 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-21",
+  "status": "PASS_STATIC_HUMAN_REVIEW_QUEUE_CANDIDATE_CONTRACT",
+  "rows": [
+    {
+      "fixture_id": "auto_accept_no_queue",
+      "decision": "QueueCandidateNotRequired",
+      "target": "None",
+      "priority": "None",
+      "created": false,
+      "approval_required": false,
+      "key": "q4sha256:f7dad07c3edbfde55e384cc2e063ae6f073271e20eb98097e59ad3e53b2b6e7f"
+    },
+    {
+      "fixture_id": "human_review_queue_candidate",
+      "decision": "QueueCandidatePreparedPendingApproval",
+      "target": "HumanReview",
+      "priority": "Normal",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:a4915a80fe2d3ccd58778107fe50bb8413b3ce254e9d9ffeb11280d0dda6c12c"
+    },
+    {
+      "fixture_id": "rewrite_hold_queue_candidate",
+      "decision": "QueueCandidatePreparedPendingApproval",
+      "target": "RewriteHold",
+      "priority": "High",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:ff264c4f0ea6499720af35ec6dfed2f2b2924fa0afb9910b96b6cbef72c3588c"
+    },
+    {
+      "fixture_id": "reject_rework_queue_candidate",
+      "decision": "QueueCandidatePreparedPendingApproval",
+      "target": "RejectOrRework",
+      "priority": "Critical",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:ae7060c2f2ccf8057a2f55fc0e74ea9e582cee6d380af7b59a9768949131c597"
+    },
+    {
+      "fixture_id": "repair_required_queue_candidate",
+      "decision": "QueueCandidateRepairRequired",
+      "target": "RepairRequired",
+      "priority": "Critical",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:329983a775ec4a9498eb51ed92f4d612dcaaf75b6b825520d7d58d414cb4f91d"
+    },
+    {
+      "fixture_id": "calibration_insufficient_queue_candidate",
+      "decision": "QueueCandidateCalibrationInsufficient",
+      "target": "CalibrationInsufficient",
+      "priority": "High",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:48df2c00e62cb35702d2a10dd684b654c819649ad9a5ca669aae7f90d7be2cfe"
+    },
+    {
+      "fixture_id": "missing_calibration_receipt",
+      "decision": "SkippedMissingCalibrationReceipt",
+      "target": "None",
+      "priority": "None",
+      "created": false,
+      "approval_required": false,
+      "key": "q4sha256:2cb6a893cd3ed5803cdbb2a3964f11057fb77672b0d1b3768d6b65071b774e7d"
+    },
+    {
+      "fixture_id": "approval_gate_pending",
+      "decision": "QueueCandidatePreparedPendingApproval",
+      "target": "HumanReview",
+      "priority": "Normal",
+      "created": true,
+      "approval_required": true,
+      "key": "q4sha256:84b738aeda22f6013697ac6f209770e65fb95c9018c82e0f374f57b135bcabb3"
+    }
+  ]
+}

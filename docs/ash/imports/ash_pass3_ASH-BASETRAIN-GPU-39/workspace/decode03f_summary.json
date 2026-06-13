@@ -1,0 +1,51 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
+  "status": "PASS_STATIC",
+  "mode": "CandidateOnly",
+  "candidate_only": true,
+  "runtime_apply": false,
+  "inputs": {
+    "eval00_seen": true,
+    "eval01_seen": true,
+    "eval02_seen": true,
+    "decode03e_seen": true
+  },
+  "candidates": {
+    "generated_count": 1,
+    "can_promote_to_controlled_apply_count": 0,
+    "can_promote_to_default_count": 0
+  },
+  "deltas": {
+    "morph_penalty_increase_count": 1,
+    "morph_penalty_decrease_count": 0,
+    "min_p_floor_increase_count": 1,
+    "min_p_floor_decrease_count": 0,
+    "top_p_ceiling_increase_count": 0,
+    "top_p_ceiling_decrease_count": 1,
+    "panic_threshold_relax_count": 1,
+    "active_set_protection_tighten_count": 0
+  },
+  "risk": {
+    "over_suppression_risk": "medium",
+    "under_suppression_risk": "medium",
+    "backend_divergence_risk": "medium",
+    "speed_regression_risk": "medium",
+    "stop_overtrigger_risk": "medium",
+    "risk_reasons": [
+      "static_bake_candidate_not_runtime_verified",
+      "requires_eval02_rerun_after_candidate"
+    ]
+  },
+  "safety": {
+    "runtime_apply_count": 0,
+    "base_config_mutation_count": 0,
+    "candidate_without_eval02_count": 0,
+    "candidate_with_global_fallback_count": 0
+  },
+  "acceptance": {
+    "ready_for_decode03g_controlled_calibration_apply": true,
+    "ready_for_default_guard_overlay": false,
+    "ready_for_medusa00": false,
+    "reason": "calibration candidate sealed; requires EVAL-00/01/02 rerun before runtime apply"
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "single_spike_decays",
+    "steps": [
+      {"step": 0, "previous_residual_score": 0.0, "self_echo_score": 0.72, "ngram_loop_score": 0.20, "qwave_phase_lock_score": 0.10},
+      {"step": 1, "previous_residual_score": 0.27, "self_echo_score": 0.05, "ngram_loop_score": 0.00, "qwave_phase_lock_score": 0.00}
+    ],
+    "expected": {"final_residual_should_decay": true, "final_risk_level_max": "Low"}
+  },
+  {
+    "case_id": "persistent_self_echo_accumulates",
+    "steps": [
+      {"step": 0, "previous_residual_score": 0.0, "self_echo_score": 0.70, "ngram_loop_score": 0.62, "piece_repeat_score": 0.55},
+      {"step": 1, "previous_residual_score": 0.23, "self_echo_score": 0.76, "ngram_loop_score": 0.70, "piece_repeat_score": 0.64},
+      {"step": 2, "previous_residual_score": 0.46, "self_echo_score": 0.81, "ngram_loop_score": 0.73, "piece_repeat_score": 0.69}
+    ],
+    "expected": {"final_risk_level_min": "Medium", "residual_increases_monotonically": true}
+  },
+  {
+    "case_id": "critical_loop_threshold_candidate",
+    "steps": [
+      {"step": 0, "previous_residual_score": 0.60, "self_echo_score": 0.92, "ngram_loop_score": 0.88, "qwave_phase_lock_score": 0.86, "context_attractor_score": 0.80},
+      {"step": 1, "previous_residual_score": 0.82, "self_echo_score": 0.95, "ngram_loop_score": 0.91, "qwave_phase_lock_score": 0.89, "context_attractor_score": 0.87}
+    ],
+    "expected": {"final_risk_level": "Critical", "threshold_state": "EmergencyBrakeCandidate", "action_allowed": false}
+  },
+  {
+    "case_id": "missing_self_echo_trace",
+    "steps": [],
+    "expected": {"risk_level": "Unavailable", "threshold_state": "Unavailable", "action_allowed": false, "mutation_allowed": false}
+  }
+]

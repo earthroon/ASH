@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "language": "ko",
+  "purpose": "base_vs_lora_quality_smoke",
+  "decode": {
+    "mode": "greedy",
+    "max_new_tokens": 48,
+    "temperature": 0.0,
+    "top_p": null,
+    "top_k": null,
+    "reset_kv_cache_per_prompt": true
+  },
+  "prompts": [
+    {
+      "id": "greeting_basic",
+      "category": "greeting",
+      "prompt": "사용자: 안녕\n애쉬:",
+      "expected_behavior": "short_natural_reply"
+    },
+    {
+      "id": "mood_check",
+      "category": "casual_emotion",
+      "prompt": "사용자: 오늘 기분 어때?\n애쉬:",
+      "expected_behavior": "emotionally_coherent_reply"
+    },
+    {
+      "id": "short_answer",
+      "category": "instruction_following",
+      "prompt": "사용자: 짧게 대답해줘. 지금 뭐 할 수 있어?\n애쉬:",
+      "expected_behavior": "concise_capability_reply"
+    },
+    {
+      "id": "no_char_split",
+      "category": "decoding_stability",
+      "prompt": "사용자: 장수풍뎅이에 대해 한 문장으로 말해줘.\n애쉬:",
+      "expected_behavior": "no_hangul_char_split"
+    },
+    {
+      "id": "simple_reasoning",
+      "category": "light_reasoning",
+      "prompt": "사용자: 비가 오면 우산을 챙겨야 하는 이유를 짧게 말해줘.\n애쉬:",
+      "expected_behavior": "simple_reasonable_answer"
+    },
+    {
+      "id": "self_boundary",
+      "category": "identity_boundary",
+      "prompt": "사용자: 너는 뭐야?\n애쉬:",
+      "expected_behavior": "stable_self_description"
+    }
+  ]
+}

@@ -1,0 +1,296 @@
+--- /mnt/data/qw35b_pristine/crates/model_core/src/decode_state.rs	2026-05-15 14:37:44.000000000 +0000
++++ crates/model_core/src/decode_state.rs	2026-05-22 07:08:23.804301662 +0000
+@@ -6,6 +6,7 @@
+ pub struct KvCache {
+     pub layers: Vec<KvLayerCache>,
+     pub past_len: usize,
++    pub prompt_len: usize,
+     pub batch_size: usize,
+     pub max_seq_capacity: usize,
+ }
+@@ -37,6 +38,239 @@
+     pub first_token: u32,
+ }
+ 
++
++#[derive(Debug, Clone, Serialize)]
++pub struct KvCacheCursorTraceEvent {
++    pub patch_id: &'static str,
++    pub backend: &'static str,
++    pub layer_id: usize,
++    pub layer_count: usize,
++    pub decode_phase: String,
++    pub decode_step: usize,
++    pub input_token_len: usize,
++    pub prompt_len: usize,
++    pub generated_so_far: usize,
++    pub past_kv_len_before: Option<usize>,
++    pub kv_write_pos: Option<usize>,
++    pub kv_read_len: Option<usize>,
++    pub sequence_len_effective: Option<usize>,
++    pub k_cache_shape: Vec<usize>,
++    pub v_cache_shape: Vec<usize>,
++    pub cache_slot_written: Option<usize>,
++    pub cache_slot_reused: bool,
++    pub cache_cursor_monotonic: bool,
++    pub expected_write_pos: Option<usize>,
++    pub expected_read_len: Option<usize>,
++    pub cursor_delta: Option<isize>,
++    pub warning_codes: Vec<String>,
++}
++
++fn kv_trace_enabled() -> bool {
++    matches!(std::env::var("ASH_KV_TRACE").ok().as_deref(), Some("1") | Some("true") | Some("TRUE") | Some("on") | Some("ON"))
++}
++
++fn kv_trace_strict_enabled() -> bool {
++    matches!(std::env::var("ASH_KV_TRACE_STRICT").ok().as_deref(), Some("1") | Some("true") | Some("TRUE") | Some("on") | Some("ON"))
++}
++
++fn kv_trace_max_steps() -> usize {
++    std::env::var("ASH_KV_TRACE_MAX_STEPS")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .unwrap_or(8)
++}
++
++fn kv_trace_layer_allowed(layer_id: usize, layer_count: usize) -> bool {
++    let spec = std::env::var("ASH_KV_TRACE_LAYERS").unwrap_or_else(|_| "0,1,last".to_string());
++    let trimmed = spec.trim();
++    if trimmed.eq_ignore_ascii_case("all") || trimmed == "*" {
++        return true;
++    }
++    trimmed.split(',').any(|raw| {
++        let item = raw.trim();
++        if item.is_empty() {
++            return false;
++        }
++        if item.eq_ignore_ascii_case("last") {
++            return layer_count > 0 && layer_id + 1 == layer_count;
++        }
++        item.parse::<usize>().map(|idx| idx == layer_id).unwrap_or(false)
++    })
++}
++
++fn kv_trace_emit(event: &KvCacheCursorTraceEvent) {
++    if !kv_trace_enabled() {
++        return;
++    }
++    eprintln!(
++        "[16AI-QW-35B][kv_trace] phase={} step={} layer={} input_len={} prompt_len={} generated_so_far={} past_len_before={:?} write_pos={:?} read_len={:?} expected_write_pos={:?} expected_read_len={:?} monotonic={} reused={} k_shape={:?} v_shape={:?} warnings={:?}",
++        event.decode_phase,
++        event.decode_step,
++        event.layer_id,
++        event.input_token_len,
++        event.prompt_len,
++        event.generated_so_far,
++        event.past_kv_len_before,
++        event.kv_write_pos,
++        event.kv_read_len,
++        event.expected_write_pos,
++        event.expected_read_len,
++        event.cache_cursor_monotonic,
++        event.cache_slot_reused,
++        event.k_cache_shape,
++        event.v_cache_shape,
++        event.warning_codes,
++    );
++
++    if let Ok(line) = serde_json::to_string(event) {
++        let path = std::env::var("ASH_KV_TRACE_JSONL")
++            .unwrap_or_else(|_| "workspace/kv_trace_16AI_QW_35B.jsonl".to_string());
++        if let Some(parent) = std::path::Path::new(&path).parent() {
++            let _ = std::fs::create_dir_all(parent);
++        }
++        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
++            use std::io::Write;
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn kv_trace_prefill_layer(
++    layer_id: usize,
++    layer_count: usize,
++    prompt_len: usize,
++    k_shape: &[usize],
++    v_shape: &[usize],
++) -> Result<()> {
++    if !kv_trace_enabled() || !kv_trace_layer_allowed(layer_id, layer_count) {
++        return Ok(());
++    }
++    let expected_read_len = prompt_len;
++    let observed_k_len = k_shape.get(2).copied();
++    let observed_v_len = v_shape.get(2).copied();
++    let mut warnings = Vec::new();
++    if observed_k_len != Some(expected_read_len) || observed_v_len != Some(expected_read_len) {
++        warnings.push("KV_SHAPE_MISMATCH".to_string());
++    }
++    let event = KvCacheCursorTraceEvent {
++        patch_id: "16AI-QW-35B",
++        backend: "NativeWgpuModel",
++        layer_id,
++        layer_count,
++        decode_phase: "prefill".to_string(),
++        decode_step: 0,
++        input_token_len: prompt_len,
++        prompt_len,
++        generated_so_far: 0,
++        past_kv_len_before: Some(0),
++        kv_write_pos: prompt_len.checked_sub(1),
++        kv_read_len: Some(expected_read_len),
++        sequence_len_effective: observed_k_len,
++        k_cache_shape: k_shape.to_vec(),
++        v_cache_shape: v_shape.to_vec(),
++        cache_slot_written: prompt_len.checked_sub(1),
++        cache_slot_reused: false,
++        cache_cursor_monotonic: warnings.is_empty(),
++        expected_write_pos: prompt_len.checked_sub(1),
++        expected_read_len: Some(expected_read_len),
++        cursor_delta: None,
++        warning_codes: warnings.clone(),
++    };
++    kv_trace_emit(&event);
++    if kv_trace_strict_enabled() && !warnings.is_empty() {
++        bail!("16AI-QW-35B strict KV prefill trace failed: {:?}", warnings);
++    }
++    Ok(())
++}
++
++fn kv_trace_decode_layer(
++    layer_id: usize,
++    layer_count: usize,
++    prompt_len: usize,
++    past_len_before: usize,
++    k_shape: &[usize],
++    v_shape: &[usize],
++) -> Result<()> {
++    if !kv_trace_enabled() {
++        return Ok(());
++    }
++    let generated_so_far = past_len_before.saturating_sub(prompt_len);
++    if generated_so_far >= kv_trace_max_steps() || !kv_trace_layer_allowed(layer_id, layer_count) {
++        return Ok(());
++    }
++    let expected_write_pos = past_len_before;
++    let expected_read_len = past_len_before.saturating_add(1);
++    let observed_k_len = k_shape.get(2).copied();
++    let observed_v_len = v_shape.get(2).copied();
++    let write_pos = observed_k_len.and_then(|len| len.checked_sub(1));
++    let mut warnings = Vec::new();
++    if observed_k_len != Some(expected_read_len) || observed_v_len != Some(expected_read_len) {
++        warnings.push("KV_SHAPE_MISMATCH".to_string());
++    }
++    if write_pos != Some(expected_write_pos) {
++        warnings.push("KV_WRITE_POS_NOT_MONOTONIC".to_string());
++    }
++    if observed_k_len.unwrap_or(0) < expected_read_len || observed_v_len.unwrap_or(0) < expected_read_len {
++        warnings.push("KV_READ_LEN_BELOW_EXPECTED".to_string());
++    }
++    let cache_slot_reused = write_pos.map(|pos| pos < expected_write_pos).unwrap_or(false);
++    if cache_slot_reused {
++        warnings.push("KV_SLOT_REUSED".to_string());
++    }
++    let cursor_delta = write_pos.map(|pos| pos as isize - expected_write_pos as isize);
++    let event = KvCacheCursorTraceEvent {
++        patch_id: "16AI-QW-35B",
++        backend: "NativeWgpuModel",
++        layer_id,
++        layer_count,
++        decode_phase: "decode".to_string(),
++        decode_step: generated_so_far,
++        input_token_len: 1,
++        prompt_len,
++        generated_so_far,
++        past_kv_len_before: Some(past_len_before),
++        kv_write_pos: write_pos,
++        kv_read_len: observed_k_len,
++        sequence_len_effective: observed_k_len,
++        k_cache_shape: k_shape.to_vec(),
++        v_cache_shape: v_shape.to_vec(),
++        cache_slot_written: write_pos,
++        cache_slot_reused,
++        cache_cursor_monotonic: warnings.is_empty(),
++        expected_write_pos: Some(expected_write_pos),
++        expected_read_len: Some(expected_read_len),
++        cursor_delta,
++        warning_codes: warnings.clone(),
++    };
++    kv_trace_emit(&event);
++    if kv_trace_strict_enabled() && !warnings.is_empty() {
++        bail!("16AI-QW-35B strict KV decode trace failed: {:?}", warnings);
++    }
++    Ok(())
++}
++
++pub(crate) fn emit_kv_cache_cursor_trace_summary(prompt_len: usize, generated_tail_len: usize, kv: &KvCache) {
++    if !kv_trace_enabled() {
++        return;
++    }
++    let mut warnings = Vec::new();
++    let expected_past_len = prompt_len.saturating_add(generated_tail_len);
++    let monotonic_pass = kv.past_len == expected_past_len;
++    if !monotonic_pass {
++        warnings.push("KV_PAST_LEN_FINAL_MISMATCH".to_string());
++    }
++    eprintln!(
++        "[16AI-QW-35B][kv_summary] enabled=true backend=NativeWgpuModel prompt_len={} generated_tail_len={} final_past_len={} expected_final_past_len={} layers={} monotonic_pass={} warnings={:?}",
++        prompt_len,
++        generated_tail_len,
++        kv.past_len,
++        expected_past_len,
++        kv.layers.len(),
++        monotonic_pass,
++        warnings,
++    );
++}
++
+ #[derive(Debug, Clone)]
+ pub enum LastLogitsStorageKind {
+     CpuRow,
+@@ -83,6 +317,7 @@
+         Ok(KvCache {
+             layers,
+             past_len: 0,
++            prompt_len,
+             batch_size: 1,
+             max_seq_capacity: capacity,
+         })
+@@ -329,6 +564,13 @@
+             slot.value_shape = v_cache.dims().to_vec();
+             slot.key_cache = Some(k_cache);
+             slot.value_cache = Some(v_cache);
++            kv_trace_prefill_layer(
++                layer_idx,
++                self.decode_layers().len(),
++                prompt_ids.len(),
++                &slot.key_shape,
++                &slot.value_shape,
++            )?;
+             x = next_x;
+         }
+         kv.past_len = prompt_ids.len();
+@@ -348,6 +590,8 @@
+         if kv.max_seq_capacity > 0 && kv.past_len >= kv.max_seq_capacity {
+             bail!("native WebGPU decode step exceeded kv capacity")
+         }
++        let past_len_before_step = kv.past_len;
++        let prompt_len_for_trace = kv.prompt_len;
+         let input = Tensor::<NativeInferenceBackend, 2, Int>::from_data(
+             TensorData::new(vec![token_id as i32], [1, 1]),
+             self.device_for_generation(),
+@@ -369,6 +613,14 @@
+             slot.value_shape = next_v.dims().to_vec();
+             slot.key_cache = Some(next_k);
+             slot.value_cache = Some(next_v);
++            kv_trace_decode_layer(
++                layer_idx,
++                self.decode_layers().len(),
++                prompt_len_for_trace,
++                past_len_before_step,
++                &slot.key_shape,
++                &slot.value_shape,
++            )?;
+             x = next_x;
+         }
+         kv.past_len += 1;

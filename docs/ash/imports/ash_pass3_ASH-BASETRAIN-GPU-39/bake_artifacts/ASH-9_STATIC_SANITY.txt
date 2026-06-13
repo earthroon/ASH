@@ -1,0 +1,19 @@
+PASS crates/runtime/src/ash_runtime_bridge.rs
+PASS crates/runtime/tests/ash_runtime_bridge.rs
+PASS crates/lora_train/src/ash_curriculum_bridge.rs
+PASS crates/lora_train/tests/ash_curriculum_bridge.rs
+PASS crates/artifact_store/src/ash_promotion_store.rs
+PASS crates/artifact_store/tests/ash_promotion_store.rs
+PASS crates/orchestrator_local/src/ash_integration.rs
+PASS crates/orchestrator_local/tests/ash_integration.rs
+PASS crates/orchestrator_local/src/bin/ash_9_integration_audit.rs
+PASS acceptance_reports/ASH-9_lora_train_runtime_artifact_store_integration.md
+PASS bake_artifacts/ASH-9_BAKE_REPORT.md
+PASS string PASS_ASH_RUNTIME_ATTACHMENT_BRIDGE
+PASS string PASS_ASH_LORA_TRAIN_CURRICULUM_BRIDGE
+PASS string PASS_ASH_PROMOTION_ARTIFACT_STORE_BRIDGE
+PASS string PASS_ASH_ORCHESTRATOR_INTEGRATION_BRIDGE
+PASS string PASS_ASH_EXECUTION_CRATE_INTEGRATION
+PASS no Python ASH-9 validator
+PASS no forbidden ash_core execution dependency
+PASS_STATIC_SANITY ASH-9 checks=18 fail=0

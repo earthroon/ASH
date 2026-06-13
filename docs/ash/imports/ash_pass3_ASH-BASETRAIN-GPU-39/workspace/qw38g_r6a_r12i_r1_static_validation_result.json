@@ -1,0 +1,33 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12I-R1",
+  "source_patch_id": "16AI-QW-38G-R6A-R12A-R12I",
+  "status": "PASS_STATIC_VALIDATION",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12I_R1_metric_capture_wiring.ps1",
+  "script_sha256": "0064ef6bf2718a3236c0f528200c74242495f0a22bc714c365007cc2089b0622",
+  "r12i_cumulative_script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12I_overlay_effect_metric_instrumentation.ps1",
+  "r12i_cumulative_script_sha256": "b36b9be22311bdbcf29689579a8c5966edada2ec8a7ae21798c5730ebe791cd6",
+  "checks": {
+    "status = \"PASS_METRIC_CAPTURE_WIRING\"": true,
+    "status = \"PARTIAL_METRIC_CAPTURE_WIRING\"": true,
+    "LOGIT_RANK_MARGIN_CAPTURE_WIRED_AND_PROBED": true,
+    "METRIC_CAPTURE_PARTIALLY_WIRED_EFFECT_STILL_INCOMPLETE": true,
+    "mock_positive_generated = $false": true,
+    "actual_overlay_apply_allowed = $false": true,
+    "NO_MODEL_ARTIFACT_MUTATION": true,
+    "production_safe_confirmed = $false": true,
+    "root_cause_confirmed = $false": true,
+    "workspace": true,
+    "r12i_final_artifact_normalization_present": true,
+    "r12i_r1_script_exists": true,
+    "capture_input_path_supported": true,
+    "partial_capture_requires_flag_or_input": true
+  },
+  "production_safe_confirmed": false,
+  "root_cause_confirmed": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

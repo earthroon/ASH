@@ -1,0 +1,351 @@
+[
+  {
+    "fixture": "glossary_pass",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-glossary-pass",
+      "cue_id": "mock-cue-0001",
+      "candidate_id": "candidate-glossary-pass",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7"
+      ],
+      "target_expectation_hashes": [
+        "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617"
+      ],
+      "candidate_match_hashes": [
+        "sha256:55d1b2b6afc5697e4f2570eea674e1ea06889c91ca3ac8ec8943d8a814c9a2e8"
+      ],
+      "violation_snapshot_hashes": [],
+      "term_match_count": 1,
+      "required_term_count": 1,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 1.0,
+      "glossary_risk_score": 0.0,
+      "decision": "PassGlossaryConstraint",
+      "action_hints": [
+        "NoAction"
+      ],
+      "review_required": false,
+      "reject_recommended": false,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:f7adee191f8eabe754e604d73823a028886127c979fd2af7e7a6068a0e00c7ca"
+  },
+  {
+    "fixture": "required_term_missing",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-required-missing",
+      "cue_id": "mock-cue-0002",
+      "candidate_id": "candidate-required-term-missing",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7"
+      ],
+      "target_expectation_hashes": [
+        "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617"
+      ],
+      "candidate_match_hashes": [
+        "sha256:8c481b6cc32e0035aff102ffd512eff6623e749f0dd9e225c811f86ac563f2fd"
+      ],
+      "violation_snapshot_hashes": [
+        "sha256:85a41fe5fb1a331a29329866a963abff59662f794443a5ab744b6413e314d3ad"
+      ],
+      "term_match_count": 1,
+      "required_term_count": 1,
+      "required_term_missing_count": 1,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 0.7,
+      "glossary_risk_score": 0.3,
+      "decision": "RewriteRecommended",
+      "action_hints": [
+        "RewriteCandidate"
+      ],
+      "review_required": false,
+      "reject_recommended": false,
+      "rewrite_recommended": true,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:d4723c9bd37595dfef1bc657a224317424b6cfb42b7f10a2c5685c6c8ac060cd"
+  },
+  {
+    "fixture": "wrong_term",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-wrong-term",
+      "cue_id": "mock-cue-0003",
+      "candidate_id": "candidate-wrong-term",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:b812dcf6a7225872359ad0fbb00c98473ab2c3636f887988833cb6ba4f965708"
+      ],
+      "target_expectation_hashes": [
+        "sha256:a80aece79b6f97e1e4622a0018930e5cce22f09c0cb08a89417aa8696b8a2ad9"
+      ],
+      "candidate_match_hashes": [
+        "sha256:9761f88ae92d5b45ec78307f725c939b0deada8ff7e5b0a0b8db2aeac1be040d"
+      ],
+      "violation_snapshot_hashes": [
+        "sha256:97ec80eeb41b6046e9368bdcfcf05f4aa1aafea6575330a534df1122717a2509"
+      ],
+      "term_match_count": 1,
+      "required_term_count": 1,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 1,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 0.7,
+      "glossary_risk_score": 0.3,
+      "decision": "ReviewRequired",
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "review_required": true,
+      "reject_recommended": false,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:5ddb5a9c8611a36d6b8c5120366d330d2a2644b815c79356bc81d093693dd712"
+  },
+  {
+    "fixture": "forbidden_alias",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-forbidden-alias",
+      "cue_id": "mock-cue-0004",
+      "candidate_id": "candidate-forbidden-alias",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7"
+      ],
+      "target_expectation_hashes": [
+        "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617"
+      ],
+      "candidate_match_hashes": [
+        "sha256:3ff2b52f2e96ec618fd1c9257f62c8ba96becaf55a8c22396990144beb9a0092"
+      ],
+      "violation_snapshot_hashes": [
+        "sha256:dcb071c24b034e7c6d7f7ad7e732db80239dabb835cdde1c5d26d9637d5717d2"
+      ],
+      "term_match_count": 1,
+      "required_term_count": 1,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 1,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 0.65,
+      "glossary_risk_score": 0.35,
+      "decision": "RejectCandidateRecommended",
+      "action_hints": [
+        "RejectCandidate"
+      ],
+      "review_required": false,
+      "reject_recommended": true,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:e045a45e8c180946c136ab38183a6ef46ee8f025b2921615bcfe6e68a97221e7"
+  },
+  {
+    "fixture": "optional_term_review",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-optional-review",
+      "cue_id": "mock-cue-0005",
+      "candidate_id": "candidate-optional-review",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:b1364b8cf2f3d6f283bfda8cc1ff3f74f78ea8257099312b22773b814876ac5b"
+      ],
+      "target_expectation_hashes": [
+        "sha256:796b446b97ac15727cabd701fbd1f1b03de64e9bef818349e15a43dae49cf842"
+      ],
+      "candidate_match_hashes": [
+        "sha256:34b667b2985796c7d887fc054edf2674ea76c6819362665f638623f983be83c2"
+      ],
+      "violation_snapshot_hashes": [
+        "sha256:ac71ef27907d4cc122f9a32924964cb86de3018947ee190aa48e8ebdee77233c"
+      ],
+      "term_match_count": 1,
+      "required_term_count": 0,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 0.92,
+      "glossary_risk_score": 0.08,
+      "decision": "ReviewRequired",
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "review_required": true,
+      "reject_recommended": false,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:0f74c1a4a99ef250997eb786441634f8d4f08d3bc8735b239b0ac43a956e5eef"
+  },
+  {
+    "fixture": "named_entity_gate",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-named-entity-gate",
+      "cue_id": "mock-cue-0006",
+      "candidate_id": "candidate-named-entity-gate",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash-with-glossary-gate-required",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "sha256:f03bc220e78a59df6b18b0750612742cc8462a7825c37400a0f33fd70afef58d",
+      "source_term_match_hashes": [
+        "sha256:0ad49a7e950293fa97f8e42f7bddd236e74bc457cd15529907985cfa9d75b9c7"
+      ],
+      "target_expectation_hashes": [
+        "sha256:cdc92def137cbed84848f5f79c4e44a6748c547958a6c6c2f1a1f7f0a1ee7617"
+      ],
+      "candidate_match_hashes": [
+        "sha256:69c1b21b52eac3a5e024f15874585007710014a4b1b4fe2a8a699598e38ae6d4"
+      ],
+      "violation_snapshot_hashes": [
+        "sha256:1430d8fff01e380b6052e4a0cfe34e0284e490a14143b06898c1c88ac0c4435c"
+      ],
+      "term_match_count": 1,
+      "required_term_count": 1,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 1,
+      "glossary_score": 0.65,
+      "glossary_risk_score": 0.35,
+      "decision": "RejectCandidateRecommended",
+      "action_hints": [
+        "RejectCandidate",
+        "RequireGlossaryReview"
+      ],
+      "review_required": false,
+      "reject_recommended": true,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:06efbc846468d1c413e2d9caac16c717c5cd75c358cfdb067ee9b02ba5d51d10"
+  },
+  {
+    "fixture": "missing_glossary_registry",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-15",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-missing-glossary",
+      "cue_id": "mock-cue-0007",
+      "candidate_id": "candidate-missing-glossary",
+      "source_adequacy_receipt_hash": "mock-source-adequacy-receipt-hash",
+      "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+      "glossary_policy_hash": "sha256:f391ea633b3fedbfa7fc323ac4f226929a040b7a15be1fa8203ac67bc169a348",
+      "glossary_registry_hash": "",
+      "source_term_match_hashes": [],
+      "target_expectation_hashes": [],
+      "candidate_match_hashes": [],
+      "violation_snapshot_hashes": [],
+      "term_match_count": 0,
+      "required_term_count": 0,
+      "required_term_missing_count": 0,
+      "forbidden_alias_used_count": 0,
+      "wrong_target_term_used_count": 0,
+      "named_entity_mismatch_count": 0,
+      "glossary_score": 0.0,
+      "glossary_risk_score": 1.0,
+      "decision": "SkippedMissingGlossaryRegistry",
+      "action_hints": [
+        "ReviewRequired",
+        "RequireTermRegistryUpdate"
+      ],
+      "review_required": true,
+      "reject_recommended": false,
+      "rewrite_recommended": false,
+      "fallback_recommended": false,
+      "candidate_reject_executed": false,
+      "rewrite_executed": false,
+      "fallback_apply_executed": false,
+      "rollback_executed": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "external_glossary_lookup_executed": false
+    },
+    "deterministic_receipt_key": "q4sha256:a373b0a7af73b5d82d040790d88bc7ac50d7b0a6e68fc9a84e05f0e053671ae6"
+  }
+]

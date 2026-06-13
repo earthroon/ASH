@@ -1,0 +1,30 @@
+{
+  "operator_manifest_repair_packet_created": true,
+  "pass": true,
+  "patch_id": "ASH-BASETRAIN-GPU-35-R2A",
+  "repair_guard": "values_must_come_from_operator_or_atlas_group_plan_receipt",
+  "repair_hints": [
+    "create target/selected_atlas_group_slot_0_manifest.operator.json",
+    "do not copy template nulls as final values",
+    "fill selected_group_tensor_shape from atlas group plan receipt",
+    "fill selected_group_dtype from atlas group plan receipt",
+    "compute selected_group_element_count as product(shape)",
+    "fill byte_start and byte_end from atlas group byte range receipt",
+    "compute byte_len as byte_end - byte_start",
+    "verify byte_len equals element_count * dtype_byte_size",
+    "rerun ASH-BASETRAIN-GPU-35-R2"
+  ],
+  "repair_packet_kind": "operator_manifest_materialization_failure_repair_packet",
+  "repair_required_fields": [
+    "selected_group_id",
+    "selected_group_slot",
+    "selected_group_tensor_shape",
+    "selected_group_dtype",
+    "selected_group_element_count",
+    "selected_group_weight_byte_start",
+    "selected_group_weight_byte_end",
+    "selected_group_weight_byte_len",
+    "source_atlas_group_plan_digest_hex"
+  ],
+  "repair_target_path": "target/selected_atlas_group_slot_0_manifest.operator.json"
+}

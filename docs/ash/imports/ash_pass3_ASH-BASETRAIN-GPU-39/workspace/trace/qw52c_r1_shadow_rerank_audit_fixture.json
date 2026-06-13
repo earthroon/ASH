@@ -1,0 +1,52 @@
+{
+  "patch_id": "QW-52C-R1",
+  "audit_policy_version": "shadow_top1_diff_audit_v1",
+  "top1_diff_policy_version": "actual_vs_shadow_top1_v1",
+  "cases": [
+    {
+      "case_id": "beneficial_salad_top1_demoted",
+      "final_status": "Salad",
+      "expected": {
+        "top1_diff_status": "DifferentTop1",
+        "top1_diff_class": "BeneficialDiff",
+        "shadow_net_benefit_score_min": 0.5,
+        "token_selection_change_count": 0
+      }
+    },
+    {
+      "case_id": "stable_top1_preserved",
+      "final_status": "Normal",
+      "expected": {
+        "top1_diff_status": "SameTop1",
+        "top1_diff_class": "NoDiff"
+      }
+    },
+    {
+      "case_id": "risky_shadow_promotes_loop_candidate",
+      "final_status": "Normal",
+      "expected": {
+        "top1_diff_status": "DifferentTop1",
+        "top1_diff_class": "RiskyDiff",
+        "shadow_regression_score_min": 0.4,
+        "runtime_apply": false
+      }
+    },
+    {
+      "case_id": "review_sample_not_supervised_audit",
+      "final_status": "Review",
+      "expected": {
+        "supervised_audit_eligible": false,
+        "top1_diff_class": "ReviewOnly"
+      }
+    },
+    {
+      "case_id": "missing_shadow_candidates_unavailable",
+      "shadow_candidates_available": false,
+      "expected": {
+        "audit_status": "Unavailable",
+        "top1_diff_status": "Unavailable",
+        "runtime_apply": false
+      }
+    }
+  ]
+}

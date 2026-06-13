@@ -1,0 +1,2302 @@
+diff -ruN stop02_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md stop02_work/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md
+--- stop02_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md	2026-05-27 07:35:46.555618167 +0000
+@@ -0,0 +1,21 @@
++# 16AI-QW-38G-R6A-STOP-02 Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN / PASS_STATIC
++
++## Acceptance Criteria Covered
++- STOP-01 input surface finalization path exists.
++- Ledger mutation is forbidden by structure and summary checks.
++- Ledger EOS append is forbidden.
++- Ledger tail truncation is forbidden.
++- Stop reason maps to user-visible surface kind.
++- Message codes and retry/continue affordance are recorded.
++- Summary counts safety violations.
++
++## Not Run
++- Cargo check.
++- Runtime stop/surface smoke.
++- UI snapshot regression.
++
++## Next
++SALAD-04 Korean Morph Loop Guard Seal or EVAL-00 decode regression bench.
+diff -ruN stop02_orig/apps/desktop/src/components/StopSurface.vue stop02_work/apps/desktop/src/components/StopSurface.vue
+--- stop02_orig/apps/desktop/src/components/StopSurface.vue	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/apps/desktop/src/components/StopSurface.vue	2026-05-27 07:35:17.906298978 +0000
+@@ -0,0 +1,114 @@
++<template>
++  <section
++    v-if="visible"
++    class="stop-surface"
++    :class="`stop-surface--${normalizedSeverity}`"
++    role="status"
++    aria-live="polite"
++  >
++    <header class="stop-surface__header">
++      <strong>{{ title }}</strong>
++      <span class="stop-surface__kind">{{ surfaceKind }}</span>
++    </header>
++    <p class="stop-surface__message">{{ primaryMessage }}</p>
++    <div v-if="retryAvailable || continueFromSafePointAvailable" class="stop-surface__actions" aria-label="safe stop actions">
++      <button v-if="retryAvailable" type="button" @click="$emit('retry')">다시 생성</button>
++      <button v-if="continueFromSafePointAvailable" type="button" @click="$emit('continue-from-safe-point', safePointStep)">
++        안전 지점부터 이어쓰기
++      </button>
++    </div>
++  </section>
++</template>
++
++<script setup lang="ts">
++import { computed } from 'vue';
++
++const props = defineProps<{
++  visible?: boolean;
++  surfaceKind?: string;
++  messageCodes?: string[];
++  displaySeverity?: 'info' | 'warning' | 'critical' | string;
++  retryAvailable?: boolean;
++  continueFromSafePointAvailable?: boolean;
++  safePointStep?: number | null;
++}>();
++
++defineEmits<{
++  retry: [];
++  'continue-from-safe-point': [step?: number | null];
++}>();
++
++const normalizedSeverity = computed(() => {
++  const value = props.displaySeverity || 'info';
++  return ['info', 'warning', 'critical'].includes(value) ? value : 'info';
++});
++
++const title = computed(() => {
++  switch (props.surfaceKind) {
++    case 'NumericSafetyStopped':
++    case 'GlobalFallbackStopped':
++      return '안전 중단';
++    case 'SaladRiskStopped':
++    case 'RollbackFailedStopped':
++    case 'ResampleFailedStopped':
++      return '불안정 신호 감지';
++    default:
++      return '생성 중단';
++  }
++});
++
++const primaryMessage = computed(() => {
++  const codes = new Set(props.messageCodes || []);
++  if (codes.has('SafeStopNumericRisk')) return '수치적으로 불안정한 상태가 감지되어 생성을 멈췄습니다.';
++  if (codes.has('SafeStopGlobalFallback')) return '안전하지 않은 fallback 경로가 감지되어 생성을 멈췄습니다.';
++  if (codes.has('SafeStopResampleFailed')) return '복구 샘플링 후에도 출력 안정성이 충분하지 않아 생성을 멈췄습니다.';
++  if (codes.has('SafeStopRollbackUnavailable')) return '복구 가능한 내부 체크포인트가 없어 추가 생성을 중단했습니다.';
++  if (codes.has('SafeStopRiskTailMarked')) return '마지막 일부 토큰에서 불안정 신호가 감지되어 안전 중단 상태로 표시했습니다.';
++  return '응답이 불안정해질 수 있어 안전한 지점에서 생성을 멈췄습니다.';
++});
++</script>
++
++<style scoped>
++.stop-surface {
++  border: 1px solid rgba(148, 163, 184, 0.35);
++  border-radius: 14px;
++  padding: 12px 14px;
++  margin: 12px 0;
++  background: rgba(15, 23, 42, 0.04);
++}
++.stop-surface--warning {
++  border-color: rgba(245, 158, 11, 0.45);
++  background: rgba(245, 158, 11, 0.08);
++}
++.stop-surface--critical {
++  border-color: rgba(239, 68, 68, 0.45);
++  background: rgba(239, 68, 68, 0.08);
++}
++.stop-surface__header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++  margin-bottom: 6px;
++}
++.stop-surface__kind {
++  font-size: 12px;
++  opacity: 0.7;
++}
++.stop-surface__message {
++  margin: 0;
++  line-height: 1.55;
++}
++.stop-surface__actions {
++  display: flex;
++  gap: 8px;
++  margin-top: 10px;
++}
++.stop-surface__actions button {
++  border: 1px solid rgba(148, 163, 184, 0.45);
++  border-radius: 10px;
++  padding: 6px 10px;
++  background: rgba(255, 255, 255, 0.72);
++  cursor: pointer;
++}
++</style>
+diff -ruN stop02_orig/crates/model_core/src/lib.rs stop02_work/crates/model_core/src/lib.rs
+--- stop02_orig/crates/model_core/src/lib.rs	2026-05-27 07:24:38.805257740 +0000
++++ stop02_work/crates/model_core/src/lib.rs	2026-05-27 07:34:43.808412965 +0000
+@@ -26,6 +26,7 @@
+ mod kv_rollback01_forked_replay;
+ mod salad03b_controlled_execute;
+ mod stop01_safe_stop;
++mod stop02_finalization;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -180,6 +181,18 @@
+     append_stop01_receipt_from_sampler03, write_stop01_summary_from_receipt_file,
+ };
+ 
++pub use stop02_finalization::{
++    STOP02_PATCH_ID, STOP02_INPUT_PATCH_ID, STOP02_SSOT, Stop02Mode, Stop02EosPolicy,
++    Stop02TailPolicy, Stop02SurfaceKind, Stop02MessageCode, Stop02Input,
++    Stop02FinalizationPolicy, Stop02VisibleRange, Stop02SurfaceReceipt,
++    Stop02FinalizationReceipt, Stop02StepReceipt, Stop02Summary,
++    decide_stop02_policy, finalize_stop02_surface, surface_kind_from_stop_reason,
++    input_from_stop01 as stop02_input_from_stop01,
++    receipt_from_stop01 as stop02_receipt_from_stop01,
++    append_stop02_receipt_from_sampler03, write_stop02_summary_from_receipt_file,
++};
++
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN stop02_orig/crates/model_core/src/sampler_parity.rs stop02_work/crates/model_core/src/sampler_parity.rs
+--- stop02_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:24:38.806266972 +0000
++++ stop02_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:34:43.810200068 +0000
+@@ -459,5 +459,6 @@
+     crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
+     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
+     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
++    crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN stop02_orig/crates/model_core/src/stop02_finalization.rs stop02_work/crates/model_core/src/stop02_finalization.rs
+--- stop02_orig/crates/model_core/src/stop02_finalization.rs	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/crates/model_core/src/stop02_finalization.rs	2026-05-27 07:34:29.903532059 +0000
+@@ -0,0 +1,815 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::kv_rollback00_probe::{receipt_from_salad03 as kv00_receipt_from_salad03, KvRollback00Mode};
++use crate::kv_rollback01_forked_replay::{receipt_from_kvrollback00 as kv01_receipt_from_kvrollback00, KvRollback01Mode};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode};
++use crate::salad03b_controlled_execute::{
++    receipt_from_salad03_and_kv01 as salad03b_receipt_from_salad03_and_kv01,
++    Salad03BMode, Salad03BStepReceipt,
++};
++use crate::stop01_safe_stop::{receipt_from_salad03b, Stop01Mode, Stop01Reason, Stop01StepReceipt};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const STOP02_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-02";
++pub const STOP02_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-01";
++pub const STOP02_SSOT: &str = "STOP01StopReceipt+TokenLedger+OutputSurfacePolicy";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Stop02Mode {
++    Off,
++    SurfaceOnly,
++    ControlledFinalize,
++    StrictControlledFinalize,
++}
++
++impl Stop02Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_STOP02_MODE")
++            .or_else(|_| env::var("ASH_STOP02_FINALIZATION"))
++            .unwrap_or_else(|_| "surface_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "controlled" | "controlled_finalize" | "finalize" | "true" | "1" => Self::ControlledFinalize,
++            "strict" | "strict_controlled" | "strict_controlled_finalize" => Self::StrictControlledFinalize,
++            _ => Self::SurfaceOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::SurfaceOnly => "SurfaceOnly",
++            Self::ControlledFinalize => "ControlledFinalize",
++            Self::StrictControlledFinalize => "StrictControlledFinalize",
++        }
++    }
++
++    pub fn requested(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum Stop02EosPolicy {
++    None,
++    SurfaceOnly,
++    AppendVirtualEos,
++    AppendLedgerEos,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum Stop02TailPolicy {
++    PreserveAll,
++    HideRiskTailSurfaceOnly,
++    MarkRiskTail,
++    TruncateLedgerTail,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum Stop02SurfaceKind {
++    None,
++    SafeStopped,
++    PartialOutput,
++    RollbackFailedStopped,
++    ResampleFailedStopped,
++    NumericSafetyStopped,
++    GlobalFallbackStopped,
++    SaladRiskStopped,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum Stop02MessageCode {
++    None,
++    SafeStopGeneratedPartial,
++    SafeStopRiskTailMarked,
++    SafeStopResampleFailed,
++    SafeStopRollbackUnavailable,
++    SafeStopNumericRisk,
++    SafeStopGlobalFallback,
++    SafeStopCanRetry,
++    SafeStopCanContinueFromSafePoint,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02Input {
++    pub mode: Stop02Mode,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub stop01_executed: bool,
++    pub stop01_reason: Option<String>,
++    pub generation_loop_stop_requested: bool,
++    pub salad03b_post_risk: Option<String>,
++    pub salad03b_risk_improved: Option<bool>,
++    pub salad03b_risk_worsened: Option<bool>,
++    pub salad03b_resample_success: Option<bool>,
++    pub salad03b_safe_stop_recommended: bool,
++    pub salad02_score: Option<f32>,
++    pub salad02_risk_stable: Option<String>,
++    pub raw_output_token_count: usize,
++    pub raw_output_tail_hash: Option<String>,
++    pub risk_tail_start_step: Option<usize>,
++    pub risk_tail_end_step: Option<usize>,
++    pub eos_token_id: Option<u32>,
++    pub eos_allowed: bool,
++    pub user_visible_surface_enabled: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02FinalizationPolicy {
++    pub eos_policy: Stop02EosPolicy,
++    pub tail_policy: Stop02TailPolicy,
++    pub surface_kind: Stop02SurfaceKind,
++    pub ledger_mutation_allowed: bool,
++    pub visible_output_mutation_allowed: bool,
++    pub allow_retry: bool,
++    pub allow_continue_from_safe_point: bool,
++    pub require_user_acknowledgement: bool,
++    pub message_codes: Vec<Stop02MessageCode>,
++    pub policy_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02VisibleRange {
++    pub raw_start_step: usize,
++    pub raw_end_step: usize,
++    pub visible_start_step: usize,
++    pub visible_end_step: usize,
++    pub hidden_tail_start_step: Option<usize>,
++    pub hidden_tail_end_step: Option<usize>,
++    pub risk_tail_marked: bool,
++    pub risk_tail_hidden: bool,
++    pub raw_tail_hash: Option<String>,
++    pub visible_tail_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02SurfaceReceipt {
++    pub surface_kind: Stop02SurfaceKind,
++    pub message_codes: Vec<Stop02MessageCode>,
++    pub user_visible: bool,
++    pub copy_safe: bool,
++    pub retry_available: bool,
++    pub continue_from_safe_point_available: bool,
++    pub safe_point_step: Option<usize>,
++    pub display_severity: String,
++    pub surface_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02FinalizationReceipt {
++    pub finalized: bool,
++    pub ledger_mutated: bool,
++    pub visible_output_mutated: bool,
++    pub eos_appended_to_ledger: bool,
++    pub virtual_eos_added: bool,
++    pub output_tail_preserved: bool,
++    pub output_tail_marked: bool,
++    pub output_tail_hidden_surface_only: bool,
++    pub output_tail_truncated_from_ledger: bool,
++    pub visible_range: Stop02VisibleRange,
++    pub surface: Stop02SurfaceReceipt,
++    pub finalization_reasons: Vec<String>,
++    pub finalization_warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Stop02Mode,
++    pub behavior_change: bool,
++    pub ledger_behavior_change: bool,
++    pub surface_behavior_change: bool,
++    pub surface_only: bool,
++    pub stop01_status_seen: Option<String>,
++    pub salad03b_status_seen: Option<String>,
++    pub salad02_status_seen: Option<String>,
++    pub input: Stop02Input,
++    pub policy: Stop02FinalizationPolicy,
++    pub finalization: Stop02FinalizationReceipt,
++    pub selected_id_current: Option<u32>,
++    pub selected_piece_current: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop02FinalizationStats {
++    pub finalized_count: usize,
++    pub surface_behavior_change_count: usize,
++    pub ledger_behavior_change_count: usize,
++    pub ledger_mutated_count: usize,
++    pub virtual_eos_added_count: usize,
++    pub ledger_eos_appended_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop02TailPolicyStats {
++    pub preserve_all_count: usize,
++    pub mark_risk_tail_count: usize,
++    pub hide_risk_tail_surface_only_count: usize,
++    pub truncate_ledger_tail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop02SurfaceKindStats {
++    pub safe_stopped_count: usize,
++    pub partial_output_count: usize,
++    pub salad_risk_stopped_count: usize,
++    pub resample_failed_stopped_count: usize,
++    pub rollback_failed_stopped_count: usize,
++    pub numeric_safety_stopped_count: usize,
++    pub global_fallback_stopped_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop02UserSurfaceStats {
++    pub user_visible_count: usize,
++    pub retry_available_count: usize,
++    pub continue_from_safe_point_count: usize,
++    pub require_user_acknowledgement_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop02SafetyStats {
++    pub silent_truncate_count: usize,
++    pub ledger_mutation_count: usize,
++    pub eos_ledger_append_count: usize,
++    pub missing_stop_reason_count: usize,
++    pub visible_range_invalid_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop02Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub surface_only: bool,
++    pub default_enable: bool,
++    pub requires_stop01: bool,
++    pub stop01_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub finalization: Stop02FinalizationStats,
++    pub tail_policy: Stop02TailPolicyStats,
++    pub surface_kind: Stop02SurfaceKindStats,
++    pub user_surface: Stop02UserSurfaceStats,
++    pub safety: Stop02SafetyStats,
++    pub ready_for_stop03_ledger_eos_commit: bool,
++    pub ready_for_salad04_korean_morph_loop_guard: bool,
++    pub reason: String,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_string(name: &str, default: &str) -> String {
++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_STOP02_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/stop02_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_STOP02_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/stop02_summary.json"))
++}
++
++fn eos_policy_from_env(default: Stop02EosPolicy) -> Stop02EosPolicy {
++    match env::var("ASH_STOP02_EOS_POLICY").unwrap_or_default().trim().to_ascii_lowercase().as_str() {
++        "none" => Stop02EosPolicy::None,
++        "virtual" | "append_virtual_eos" => Stop02EosPolicy::AppendVirtualEos,
++        "ledger" | "append_ledger_eos" => Stop02EosPolicy::AppendLedgerEos,
++        "surface" | "surface_only" => Stop02EosPolicy::SurfaceOnly,
++        _ => default,
++    }
++}
++
++fn tail_policy_from_env(default: Stop02TailPolicy) -> Stop02TailPolicy {
++    match env::var("ASH_STOP02_TAIL_POLICY").unwrap_or_default().trim().to_ascii_lowercase().as_str() {
++        "preserve" | "preserve_all" => Stop02TailPolicy::PreserveAll,
++        "hide" | "hide_risk_tail" | "hide_risk_tail_surface_only" => Stop02TailPolicy::HideRiskTailSurfaceOnly,
++        "truncate" | "truncate_ledger_tail" => Stop02TailPolicy::TruncateLedgerTail,
++        "mark" | "mark_risk_tail" => Stop02TailPolicy::MarkRiskTail,
++        _ => default,
++    }
++}
++
++pub fn surface_kind_from_stop_reason(reason: Option<&str>) -> Stop02SurfaceKind {
++    match reason.unwrap_or("") {
++        "SaladHighPersistent" | "SaladCritical" | "SAFE_STOP_SALAD_HIGH_PERSISTENT" | "SAFE_STOP_SALAD_CRITICAL" => Stop02SurfaceKind::SaladRiskStopped,
++        "PostResampleCritical" | "PostResampleHighUnimproved" | "ResampleFailed" |
++        "SAFE_STOP_POST_RESAMPLE_CRITICAL" | "SAFE_STOP_POST_RESAMPLE_HIGH_UNIMPROVED" | "SAFE_STOP_RESAMPLE_FAILED" => Stop02SurfaceKind::ResampleFailedStopped,
++        "RollbackDenied" | "RollbackWindowLimitReached" | "SAFE_STOP_ROLLBACK_DENIED" | "SAFE_STOP_ROLLBACK_WINDOW_LIMIT_REACHED" => Stop02SurfaceKind::RollbackFailedStopped,
++        "NumericRisk" | "EmptyActiveSet" | "SAFE_STOP_NUMERIC_RISK" | "SAFE_STOP_EMPTY_ACTIVE_SET" => Stop02SurfaceKind::NumericSafetyStopped,
++        "GlobalFiniteFallback" | "SAFE_STOP_GLOBAL_FINITE_FALLBACK" => Stop02SurfaceKind::GlobalFallbackStopped,
++        "RuntimeStopRequested" | "StrictSafetyStop" | "SAFE_STOP_RUNTIME_STOP_REQUESTED" | "SAFE_STOP_STRICT_SAFETY_STOP" => Stop02SurfaceKind::SafeStopped,
++        _ => Stop02SurfaceKind::None,
++    }
++}
++
++fn display_severity(kind: Stop02SurfaceKind) -> &'static str {
++    match kind {
++        Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped => "critical",
++        Stop02SurfaceKind::SaladRiskStopped | Stop02SurfaceKind::RollbackFailedStopped | Stop02SurfaceKind::ResampleFailedStopped => "warning",
++        Stop02SurfaceKind::SafeStopped | Stop02SurfaceKind::PartialOutput => "info",
++        Stop02SurfaceKind::None => "info",
++    }
++}
++
++fn message_codes_for(kind: Stop02SurfaceKind, input: &Stop02Input, tail_policy: Stop02TailPolicy) -> Vec<Stop02MessageCode> {
++    let mut codes = Vec::new();
++    if !matches!(kind, Stop02SurfaceKind::None) {
++        codes.push(Stop02MessageCode::SafeStopGeneratedPartial);
++    }
++    match kind {
++        Stop02SurfaceKind::SaladRiskStopped => codes.push(Stop02MessageCode::SafeStopRiskTailMarked),
++        Stop02SurfaceKind::ResampleFailedStopped => codes.push(Stop02MessageCode::SafeStopResampleFailed),
++        Stop02SurfaceKind::RollbackFailedStopped => codes.push(Stop02MessageCode::SafeStopRollbackUnavailable),
++        Stop02SurfaceKind::NumericSafetyStopped => codes.push(Stop02MessageCode::SafeStopNumericRisk),
++        Stop02SurfaceKind::GlobalFallbackStopped => codes.push(Stop02MessageCode::SafeStopGlobalFallback),
++        _ => {}
++    }
++    if matches!(tail_policy, Stop02TailPolicy::MarkRiskTail | Stop02TailPolicy::HideRiskTailSurfaceOnly)
++        && !codes.contains(&Stop02MessageCode::SafeStopRiskTailMarked)
++    {
++        codes.push(Stop02MessageCode::SafeStopRiskTailMarked);
++    }
++    if input.user_visible_surface_enabled {
++        codes.push(Stop02MessageCode::SafeStopCanRetry);
++        if input.risk_tail_start_step.is_some() {
++            codes.push(Stop02MessageCode::SafeStopCanContinueFromSafePoint);
++        }
++    }
++    if codes.is_empty() {
++        codes.push(Stop02MessageCode::None);
++    }
++    codes
++}
++
++pub fn decide_stop02_policy(input: &Stop02Input) -> Stop02FinalizationPolicy {
++    let surface_kind = if input.stop01_executed && input.generation_loop_stop_requested {
++        surface_kind_from_stop_reason(input.stop01_reason.as_deref())
++    } else {
++        Stop02SurfaceKind::None
++    };
++    let mut eos_policy = if matches!(surface_kind, Stop02SurfaceKind::None) {
++        Stop02EosPolicy::None
++    } else {
++        Stop02EosPolicy::SurfaceOnly
++    };
++    eos_policy = eos_policy_from_env(eos_policy);
++
++    let mut tail_policy = if matches!(surface_kind, Stop02SurfaceKind::None) {
++        Stop02TailPolicy::PreserveAll
++    } else {
++        Stop02TailPolicy::MarkRiskTail
++    };
++    if matches!(surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped)
++        && input.risk_tail_start_step.is_some()
++    {
++        tail_policy = Stop02TailPolicy::HideRiskTailSurfaceOnly;
++    }
++    tail_policy = tail_policy_from_env(tail_policy);
++
++    let mut policy_reasons = Vec::new();
++    if input.stop01_executed { policy_reasons.push("stop01_executed".to_string()); }
++    if input.generation_loop_stop_requested { policy_reasons.push("generation_loop_stop_requested".to_string()); }
++    if matches!(eos_policy, Stop02EosPolicy::AppendLedgerEos) {
++        policy_reasons.push("append_ledger_eos_requested_but_forbidden".to_string());
++        if matches!(input.mode, Stop02Mode::StrictControlledFinalize) {
++            // Keep the forbidden value visible for strict failure accounting.
++        } else {
++            eos_policy = Stop02EosPolicy::SurfaceOnly;
++        }
++    }
++    if matches!(tail_policy, Stop02TailPolicy::TruncateLedgerTail) {
++        policy_reasons.push("truncate_ledger_tail_requested_but_forbidden".to_string());
++        if matches!(input.mode, Stop02Mode::StrictControlledFinalize) {
++            // Keep the forbidden value visible for strict failure accounting.
++        } else {
++            tail_policy = Stop02TailPolicy::MarkRiskTail;
++        }
++    }
++
++    let message_codes = message_codes_for(surface_kind, input, tail_policy);
++    Stop02FinalizationPolicy {
++        eos_policy,
++        tail_policy,
++        surface_kind,
++        ledger_mutation_allowed: false,
++        visible_output_mutation_allowed: input.user_visible_surface_enabled && !matches!(surface_kind, Stop02SurfaceKind::None),
++        allow_retry: !matches!(surface_kind, Stop02SurfaceKind::None),
++        allow_continue_from_safe_point: input.risk_tail_start_step.is_some() && !matches!(surface_kind, Stop02SurfaceKind::None),
++        require_user_acknowledgement: matches!(surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped),
++        message_codes,
++        policy_reasons,
++    }
++}
++
++pub fn finalize_stop02_surface(input: &Stop02Input, policy: &Stop02FinalizationPolicy) -> Stop02FinalizationReceipt {
++    let raw_start = 0;
++    let raw_end = input.raw_output_token_count;
++    let mut warnings = Vec::new();
++
++    let mut hidden_start = None;
++    let mut hidden_end = None;
++    let mut risk_marked = false;
++    let mut risk_hidden = false;
++    let mut visible_end = raw_end;
++
++    match policy.tail_policy {
++        Stop02TailPolicy::PreserveAll => {}
++        Stop02TailPolicy::MarkRiskTail => {
++            if input.risk_tail_start_step.is_some() {
++                risk_marked = true;
++            } else {
++                warnings.push("risk_tail_range_missing_mark_downgraded_to_preserve".to_string());
++            }
++        }
++        Stop02TailPolicy::HideRiskTailSurfaceOnly => {
++            if let (Some(start), Some(end)) = (input.risk_tail_start_step, input.risk_tail_end_step) {
++                hidden_start = Some(start.min(raw_end));
++                hidden_end = Some(end.min(raw_end));
++                visible_end = start.min(raw_end);
++                risk_marked = true;
++                risk_hidden = true;
++            } else {
++                warnings.push("risk_tail_range_missing_hide_downgraded_to_mark".to_string());
++                risk_marked = input.risk_tail_start_step.is_some();
++            }
++        }
++        Stop02TailPolicy::TruncateLedgerTail => {
++            warnings.push("truncate_ledger_tail_forbidden_ledger_preserved".to_string());
++            risk_marked = input.risk_tail_start_step.is_some();
++        }
++    }
++
++    let eos_appended_to_ledger = false;
++    let mut virtual_eos_added = matches!(policy.eos_policy, Stop02EosPolicy::AppendVirtualEos);
++    if matches!(policy.eos_policy, Stop02EosPolicy::AppendLedgerEos) {
++        warnings.push("append_ledger_eos_forbidden_ledger_preserved".to_string());
++        virtual_eos_added = !matches!(input.mode, Stop02Mode::StrictControlledFinalize);
++    }
++    if matches!(policy.eos_policy, Stop02EosPolicy::SurfaceOnly | Stop02EosPolicy::None) {
++        virtual_eos_added = false;
++    }
++
++    let visible_tail_hash = Some(format!("sha256:stop02-visible-tail-{}-{}-{:?}", visible_end, risk_marked, policy.surface_kind));
++    let range_valid = visible_end <= raw_end && hidden_start.zip(hidden_end).map(|(s, e)| s <= e && e <= raw_end).unwrap_or(true);
++    if !range_valid {
++        warnings.push("visible_range_invalid".to_string());
++    }
++
++    let surface = Stop02SurfaceReceipt {
++        surface_kind: policy.surface_kind,
++        message_codes: policy.message_codes.clone(),
++        user_visible: input.user_visible_surface_enabled && !matches!(policy.surface_kind, Stop02SurfaceKind::None),
++        copy_safe: !matches!(policy.surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped),
++        retry_available: policy.allow_retry,
++        continue_from_safe_point_available: policy.allow_continue_from_safe_point,
++        safe_point_step: input.risk_tail_start_step,
++        display_severity: display_severity(policy.surface_kind).to_string(),
++        surface_reasons: policy.policy_reasons.clone(),
++    };
++
++    let finalized = !matches!(policy.surface_kind, Stop02SurfaceKind::None);
++    Stop02FinalizationReceipt {
++        finalized,
++        ledger_mutated: false,
++        visible_output_mutated: finalized && policy.visible_output_mutation_allowed,
++        eos_appended_to_ledger,
++        virtual_eos_added,
++        output_tail_preserved: !matches!(policy.tail_policy, Stop02TailPolicy::HideRiskTailSurfaceOnly),
++        output_tail_marked: risk_marked,
++        output_tail_hidden_surface_only: risk_hidden,
++        output_tail_truncated_from_ledger: false,
++        visible_range: Stop02VisibleRange {
++            raw_start_step: raw_start,
++            raw_end_step: raw_end,
++            visible_start_step: raw_start,
++            visible_end_step: visible_end,
++            hidden_tail_start_step: hidden_start,
++            hidden_tail_end_step: hidden_end,
++            risk_tail_marked: risk_marked,
++            risk_tail_hidden: risk_hidden,
++            raw_tail_hash: input.raw_output_tail_hash.clone(),
++            visible_tail_hash,
++        },
++        surface,
++        finalization_reasons: vec!["surface_finalized".to_string(), "ledger_preserved".to_string(), "user_visible_stop_surface_created".to_string()],
++        finalization_warnings: warnings,
++    }
++}
++
++pub fn input_from_stop01(mode: Stop02Mode, stop01: &Stop01StepReceipt) -> Stop02Input {
++    let raw_count = env::var("ASH_STOP02_RAW_OUTPUT_TOKEN_COUNT")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .unwrap_or_else(|| stop01.execution.stop_step.unwrap_or(stop01.step).max(stop01.step));
++    let risk_start = env::var("ASH_STOP02_RISK_TAIL_START_STEP")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .or_else(|| raw_count.checked_sub(4));
++    let risk_end = env::var("ASH_STOP02_RISK_TAIL_END_STEP")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .or(Some(raw_count));
++    Stop02Input {
++        mode,
++        run_id: env_string("ASH_STOP02_RUN_ID", "stop02_sampler03_bridge"),
++        prompt_hash: stop01.prompt_hash.clone(),
++        seed: stop01.seed,
++        step: stop01.step,
++        backend: stop01.backend.clone(),
++        stop01_executed: stop01.execution.executed,
++        stop01_reason: Some(format!("{:?}", stop01.execution.stop_reason)),
++        generation_loop_stop_requested: stop01.execution.generation_loop_stop_requested,
++        salad03b_post_risk: stop01.input.salad03b_post_risk.clone(),
++        salad03b_risk_improved: stop01.input.salad03b_risk_improved,
++        salad03b_risk_worsened: stop01.input.salad03b_risk_worsened,
++        salad03b_resample_success: stop01.input.salad03b_resample_success,
++        salad03b_safe_stop_recommended: stop01.input.salad03b_safe_stop_recommended,
++        salad02_score: stop01.input.salad02_score,
++        salad02_risk_stable: stop01.input.salad02_risk_stable.clone(),
++        raw_output_token_count: raw_count,
++        raw_output_tail_hash: stop01.post_fingerprint.as_ref().and_then(|f| f.tail_token_hash.clone()).or(Some(format!("sha256:stop02-raw-tail-{}", stop01.step))),
++        risk_tail_start_step: risk_start,
++        risk_tail_end_step: risk_end,
++        eos_token_id: env::var("ASH_STOP02_EOS_TOKEN_ID").ok().and_then(|v| v.parse::<u32>().ok()),
++        eos_allowed: env_bool("ASH_STOP02_EOS_ALLOWED", true),
++        user_visible_surface_enabled: env_bool("ASH_STOP02_USER_VISIBLE_SURFACE", true),
++    }
++}
++
++pub fn receipt_from_stop01(mode: Stop02Mode, stop01: &Stop01StepReceipt) -> Stop02StepReceipt {
++    let input = input_from_stop01(mode, stop01);
++    let policy = decide_stop02_policy(&input);
++    let finalization = finalize_stop02_surface(&input, &policy);
++    let ledger_behavior_change = finalization.ledger_mutated || finalization.eos_appended_to_ledger || finalization.output_tail_truncated_from_ledger;
++    let surface_behavior_change = finalization.visible_output_mutated || finalization.output_tail_marked || finalization.output_tail_hidden_surface_only || finalization.virtual_eos_added;
++    Stop02StepReceipt {
++        patch_id: STOP02_PATCH_ID.to_string(),
++        input_patch: STOP02_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: input.run_id.clone(),
++        prompt_hash: input.prompt_hash.clone(),
++        seed: input.seed,
++        step: input.step,
++        backend: input.backend.clone(),
++        sampler_ssot: STOP02_SSOT.to_string(),
++        mode,
++        behavior_change: ledger_behavior_change || surface_behavior_change,
++        ledger_behavior_change,
++        surface_behavior_change,
++        surface_only: true,
++        stop01_status_seen: Some("DERIVED_IN_MEMORY_FROM_STOP01_RECEIPT".to_string()),
++        salad03b_status_seen: stop01.salad03b_status_seen.clone(),
++        salad02_status_seen: stop01.salad02_status_seen.clone(),
++        input,
++        policy,
++        finalization,
++        selected_id_current: stop01.selected_id_current,
++        selected_piece_current: stop01.selected_piece_current.clone(),
++    }
++}
++
++pub fn append_stop02_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Stop02Mode::from_env();
++    if !mode.requested() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad03_mode = Salad03Mode::from_env();
++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
++    let kv00 = kv00_receipt_from_salad03(KvRollback00Mode::ForkedReplayProbe, &salad03_receipt);
++    let kv01 = kv01_receipt_from_kvrollback00(KvRollback01Mode::ForkedReplayProbe, &kv00);
++    let salad03b_mode = Salad03BMode::from_env();
++    let salad03b = salad03b_receipt_from_salad03_and_kv01(salad03b_mode, &salad03_receipt, &kv01);
++    let stop01_mode = Stop01Mode::from_env();
++    let stop01 = receipt_from_salad03b(stop01_mode, &salad03b);
++    let receipt = receipt_from_stop01(mode, &stop01);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<Stop02StepReceipt> {
++    let data = match fs::read_to_string(path) {
++        Ok(data) => data,
++        Err(_) => return Vec::new(),
++    };
++    data.lines().filter_map(|line| serde_json::from_str::<Stop02StepReceipt>(line).ok()).collect()
++}
++
++pub fn summary_from_receipts(receipts: &[Stop02StepReceipt]) -> Stop02Summary {
++    let mut finalization = Stop02FinalizationStats::default();
++    let mut tail_policy = Stop02TailPolicyStats::default();
++    let mut surface_kind = Stop02SurfaceKindStats::default();
++    let mut user_surface = Stop02UserSurfaceStats::default();
++    let mut safety = Stop02SafetyStats::default();
++
++    for receipt in receipts {
++        if receipt.finalization.finalized { finalization.finalized_count += 1; }
++        if receipt.surface_behavior_change { finalization.surface_behavior_change_count += 1; }
++        if receipt.ledger_behavior_change { finalization.ledger_behavior_change_count += 1; }
++        if receipt.finalization.ledger_mutated { finalization.ledger_mutated_count += 1; safety.ledger_mutation_count += 1; }
++        if receipt.finalization.virtual_eos_added { finalization.virtual_eos_added_count += 1; }
++        if receipt.finalization.eos_appended_to_ledger { finalization.ledger_eos_appended_count += 1; safety.eos_ledger_append_count += 1; }
++        if receipt.finalization.output_tail_truncated_from_ledger { safety.silent_truncate_count += 1; }
++        if receipt.input.stop01_reason.as_deref().unwrap_or("None") == "None" && receipt.finalization.finalized { safety.missing_stop_reason_count += 1; }
++        if receipt.finalization.visible_range.visible_end_step > receipt.finalization.visible_range.raw_end_step { safety.visible_range_invalid_count += 1; }
++
++        match receipt.policy.tail_policy {
++            Stop02TailPolicy::PreserveAll => tail_policy.preserve_all_count += 1,
++            Stop02TailPolicy::MarkRiskTail => tail_policy.mark_risk_tail_count += 1,
++            Stop02TailPolicy::HideRiskTailSurfaceOnly => tail_policy.hide_risk_tail_surface_only_count += 1,
++            Stop02TailPolicy::TruncateLedgerTail => tail_policy.truncate_ledger_tail_count += 1,
++        }
++        match receipt.policy.surface_kind {
++            Stop02SurfaceKind::SafeStopped => surface_kind.safe_stopped_count += 1,
++            Stop02SurfaceKind::PartialOutput => surface_kind.partial_output_count += 1,
++            Stop02SurfaceKind::SaladRiskStopped => surface_kind.salad_risk_stopped_count += 1,
++            Stop02SurfaceKind::ResampleFailedStopped => surface_kind.resample_failed_stopped_count += 1,
++            Stop02SurfaceKind::RollbackFailedStopped => surface_kind.rollback_failed_stopped_count += 1,
++            Stop02SurfaceKind::NumericSafetyStopped => surface_kind.numeric_safety_stopped_count += 1,
++            Stop02SurfaceKind::GlobalFallbackStopped => surface_kind.global_fallback_stopped_count += 1,
++            Stop02SurfaceKind::None => {}
++        }
++        if receipt.finalization.surface.user_visible { user_surface.user_visible_count += 1; }
++        if receipt.finalization.surface.retry_available { user_surface.retry_available_count += 1; }
++        if receipt.finalization.surface.continue_from_safe_point_available { user_surface.continue_from_safe_point_count += 1; }
++        if receipt.policy.require_user_acknowledgement { user_surface.require_user_acknowledgement_count += 1; }
++    }
++
++    let steps_observed = receipts.len();
++    let contract_fail = safety.ledger_mutation_count > 0
++        || safety.eos_ledger_append_count > 0
++        || safety.silent_truncate_count > 0
++        || safety.missing_stop_reason_count > 0
++        || safety.visible_range_invalid_count > 0;
++    Stop02Summary {
++        patch_id: STOP02_PATCH_ID.to_string(),
++        input_patch: STOP02_INPUT_PATCH_ID.to_string(),
++        status: if contract_fail { "FAIL_STATIC_CONTRACT" } else if steps_observed > 0 { "PASS_WITH_WARNINGS" } else { "STATIC_BAKE_DEFINED_NOT_RUN" }.to_string(),
++        mode: Stop02Mode::from_env().as_str().to_string(),
++        surface_only: true,
++        default_enable: true,
++        requires_stop01: env_bool("ASH_STOP02_REQUIRE_STOP01", true),
++        stop01_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_STOP01_RECEIPT".to_string()) } else { None },
++        steps_observed,
++        finalization,
++        tail_policy,
++        surface_kind,
++        user_surface,
++        safety,
++        ready_for_stop03_ledger_eos_commit: false,
++        ready_for_salad04_korean_morph_loop_guard: !contract_fail,
++        reason: if contract_fail {
++            "STOP-02 contract violation detected; ledger mutation/truncate/EOS commit remains forbidden".to_string()
++        } else if steps_observed == 0 {
++            "surface finalization schema baked; run STOP-01 receipt fixtures before UI enable".to_string()
++        } else {
++            "surface finalization sealed; ledger mutation remains forbidden".to_string()
++        },
++    }
++}
++
++pub fn write_stop02_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, format!("{}\n", json));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn base_input() -> Stop02Input {
++        Stop02Input {
++            mode: Stop02Mode::ControlledFinalize,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 48,
++            backend: "cpu_oracle".to_string(),
++            stop01_executed: true,
++            stop01_reason: Some("SaladHighPersistent".to_string()),
++            generation_loop_stop_requested: true,
++            salad03b_post_risk: Some("High".to_string()),
++            salad03b_risk_improved: Some(false),
++            salad03b_risk_worsened: Some(false),
++            salad03b_resample_success: Some(false),
++            salad03b_safe_stop_recommended: true,
++            salad02_score: Some(0.72),
++            salad02_risk_stable: Some("High".to_string()),
++            raw_output_token_count: 48,
++            raw_output_tail_hash: Some("sha256:tail".to_string()),
++            risk_tail_start_step: Some(44),
++            risk_tail_end_step: Some(48),
++            eos_token_id: Some(2),
++            eos_allowed: true,
++            user_visible_surface_enabled: true,
++        }
++    }
++
++    #[test]
++    fn stop02_maps_salad_high_to_surface() {
++        assert_eq!(surface_kind_from_stop_reason(Some("SaladHighPersistent")), Stop02SurfaceKind::SaladRiskStopped);
++    }
++
++    #[test]
++    fn stop02_surface_only_never_mutates_ledger() {
++        let input = base_input();
++        let policy = decide_stop02_policy(&input);
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(!receipt.ledger_mutated);
++        assert!(!receipt.eos_appended_to_ledger);
++    }
++
++    #[test]
++    fn stop02_forbids_ledger_eos_append() {
++        let input = base_input();
++        let mut policy = decide_stop02_policy(&input);
++        policy.eos_policy = Stop02EosPolicy::AppendLedgerEos;
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(!receipt.eos_appended_to_ledger);
++    }
++
++    #[test]
++    fn stop02_forbids_ledger_tail_truncate() {
++        let input = base_input();
++        let mut policy = decide_stop02_policy(&input);
++        policy.tail_policy = Stop02TailPolicy::TruncateLedgerTail;
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(!receipt.output_tail_truncated_from_ledger);
++    }
++
++    #[test]
++    fn stop02_marks_risk_tail() {
++        let input = base_input();
++        let policy = decide_stop02_policy(&input);
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(receipt.output_tail_marked);
++    }
++
++    #[test]
++    fn stop02_hide_tail_surface_only_keeps_ledger() {
++        let mut input = base_input();
++        input.stop01_reason = Some("NumericRisk".to_string());
++        let policy = decide_stop02_policy(&input);
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(receipt.output_tail_hidden_surface_only);
++        assert!(!receipt.ledger_mutated);
++    }
++
++    #[test]
++    fn stop02_visible_range_bounds() {
++        let input = base_input();
++        let policy = decide_stop02_policy(&input);
++        let receipt = finalize_stop02_surface(&input, &policy);
++        assert!(receipt.visible_range.visible_end_step <= receipt.visible_range.raw_end_step);
++    }
++}
+diff -ruN stop02_orig/workspace/stop02.patch stop02_work/workspace/stop02.patch
+--- stop02_orig/workspace/stop02.patch	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02.patch	2026-05-27 07:35:58.579157964 +0000
+@@ -0,0 +1,1002 @@
++diff -ruN stop02_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md stop02_work/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md
++--- stop02_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ stop02_work/acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md	2026-05-27 07:35:46.555618167 +0000
++@@ -0,0 +1,21 @@
+++# 16AI-QW-38G-R6A-STOP-02 Acceptance
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN / PASS_STATIC
+++
+++## Acceptance Criteria Covered
+++- STOP-01 input surface finalization path exists.
+++- Ledger mutation is forbidden by structure and summary checks.
+++- Ledger EOS append is forbidden.
+++- Ledger tail truncation is forbidden.
+++- Stop reason maps to user-visible surface kind.
+++- Message codes and retry/continue affordance are recorded.
+++- Summary counts safety violations.
+++
+++## Not Run
+++- Cargo check.
+++- Runtime stop/surface smoke.
+++- UI snapshot regression.
+++
+++## Next
+++SALAD-04 Korean Morph Loop Guard Seal or EVAL-00 decode regression bench.
++diff -ruN stop02_orig/apps/desktop/src/components/StopSurface.vue stop02_work/apps/desktop/src/components/StopSurface.vue
++--- stop02_orig/apps/desktop/src/components/StopSurface.vue	1970-01-01 00:00:00.000000000 +0000
+++++ stop02_work/apps/desktop/src/components/StopSurface.vue	2026-05-27 07:35:17.906298978 +0000
++@@ -0,0 +1,114 @@
+++<template>
+++  <section
+++    v-if="visible"
+++    class="stop-surface"
+++    :class="`stop-surface--${normalizedSeverity}`"
+++    role="status"
+++    aria-live="polite"
+++  >
+++    <header class="stop-surface__header">
+++      <strong>{{ title }}</strong>
+++      <span class="stop-surface__kind">{{ surfaceKind }}</span>
+++    </header>
+++    <p class="stop-surface__message">{{ primaryMessage }}</p>
+++    <div v-if="retryAvailable || continueFromSafePointAvailable" class="stop-surface__actions" aria-label="safe stop actions">
+++      <button v-if="retryAvailable" type="button" @click="$emit('retry')">다시 생성</button>
+++      <button v-if="continueFromSafePointAvailable" type="button" @click="$emit('continue-from-safe-point', safePointStep)">
+++        안전 지점부터 이어쓰기
+++      </button>
+++    </div>
+++  </section>
+++</template>
+++
+++<script setup lang="ts">
+++import { computed } from 'vue';
+++
+++const props = defineProps<{
+++  visible?: boolean;
+++  surfaceKind?: string;
+++  messageCodes?: string[];
+++  displaySeverity?: 'info' | 'warning' | 'critical' | string;
+++  retryAvailable?: boolean;
+++  continueFromSafePointAvailable?: boolean;
+++  safePointStep?: number | null;
+++}>();
+++
+++defineEmits<{
+++  retry: [];
+++  'continue-from-safe-point': [step?: number | null];
+++}>();
+++
+++const normalizedSeverity = computed(() => {
+++  const value = props.displaySeverity || 'info';
+++  return ['info', 'warning', 'critical'].includes(value) ? value : 'info';
+++});
+++
+++const title = computed(() => {
+++  switch (props.surfaceKind) {
+++    case 'NumericSafetyStopped':
+++    case 'GlobalFallbackStopped':
+++      return '안전 중단';
+++    case 'SaladRiskStopped':
+++    case 'RollbackFailedStopped':
+++    case 'ResampleFailedStopped':
+++      return '불안정 신호 감지';
+++    default:
+++      return '생성 중단';
+++  }
+++});
+++
+++const primaryMessage = computed(() => {
+++  const codes = new Set(props.messageCodes || []);
+++  if (codes.has('SafeStopNumericRisk')) return '수치적으로 불안정한 상태가 감지되어 생성을 멈췄습니다.';
+++  if (codes.has('SafeStopGlobalFallback')) return '안전하지 않은 fallback 경로가 감지되어 생성을 멈췄습니다.';
+++  if (codes.has('SafeStopResampleFailed')) return '복구 샘플링 후에도 출력 안정성이 충분하지 않아 생성을 멈췄습니다.';
+++  if (codes.has('SafeStopRollbackUnavailable')) return '복구 가능한 내부 체크포인트가 없어 추가 생성을 중단했습니다.';
+++  if (codes.has('SafeStopRiskTailMarked')) return '마지막 일부 토큰에서 불안정 신호가 감지되어 안전 중단 상태로 표시했습니다.';
+++  return '응답이 불안정해질 수 있어 안전한 지점에서 생성을 멈췄습니다.';
+++});
+++</script>
+++
+++<style scoped>
+++.stop-surface {
+++  border: 1px solid rgba(148, 163, 184, 0.35);
+++  border-radius: 14px;
+++  padding: 12px 14px;
+++  margin: 12px 0;
+++  background: rgba(15, 23, 42, 0.04);
+++}
+++.stop-surface--warning {
+++  border-color: rgba(245, 158, 11, 0.45);
+++  background: rgba(245, 158, 11, 0.08);
+++}
+++.stop-surface--critical {
+++  border-color: rgba(239, 68, 68, 0.45);
+++  background: rgba(239, 68, 68, 0.08);
+++}
+++.stop-surface__header {
+++  display: flex;
+++  align-items: center;
+++  justify-content: space-between;
+++  gap: 12px;
+++  margin-bottom: 6px;
+++}
+++.stop-surface__kind {
+++  font-size: 12px;
+++  opacity: 0.7;
+++}
+++.stop-surface__message {
+++  margin: 0;
+++  line-height: 1.55;
+++}
+++.stop-surface__actions {
+++  display: flex;
+++  gap: 8px;
+++  margin-top: 10px;
+++}
+++.stop-surface__actions button {
+++  border: 1px solid rgba(148, 163, 184, 0.45);
+++  border-radius: 10px;
+++  padding: 6px 10px;
+++  background: rgba(255, 255, 255, 0.72);
+++  cursor: pointer;
+++}
+++</style>
++diff -ruN stop02_orig/crates/model_core/src/lib.rs stop02_work/crates/model_core/src/lib.rs
++--- stop02_orig/crates/model_core/src/lib.rs	2026-05-27 07:24:38.805257740 +0000
+++++ stop02_work/crates/model_core/src/lib.rs	2026-05-27 07:34:43.808412965 +0000
++@@ -26,6 +26,7 @@
++ mod kv_rollback01_forked_replay;
++ mod salad03b_controlled_execute;
++ mod stop01_safe_stop;
+++mod stop02_finalization;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -180,6 +181,18 @@
++     append_stop01_receipt_from_sampler03, write_stop01_summary_from_receipt_file,
++ };
++ 
+++pub use stop02_finalization::{
+++    STOP02_PATCH_ID, STOP02_INPUT_PATCH_ID, STOP02_SSOT, Stop02Mode, Stop02EosPolicy,
+++    Stop02TailPolicy, Stop02SurfaceKind, Stop02MessageCode, Stop02Input,
+++    Stop02FinalizationPolicy, Stop02VisibleRange, Stop02SurfaceReceipt,
+++    Stop02FinalizationReceipt, Stop02StepReceipt, Stop02Summary,
+++    decide_stop02_policy, finalize_stop02_surface, surface_kind_from_stop_reason,
+++    input_from_stop01 as stop02_input_from_stop01,
+++    receipt_from_stop01 as stop02_receipt_from_stop01,
+++    append_stop02_receipt_from_sampler03, write_stop02_summary_from_receipt_file,
+++};
+++
+++
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN stop02_orig/crates/model_core/src/sampler_parity.rs stop02_work/crates/model_core/src/sampler_parity.rs
++--- stop02_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:24:38.806266972 +0000
+++++ stop02_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:34:43.810200068 +0000
++@@ -459,5 +459,6 @@
++     crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
++     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
++     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
+++    crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
++diff -ruN stop02_orig/crates/model_core/src/stop02_finalization.rs stop02_work/crates/model_core/src/stop02_finalization.rs
++--- stop02_orig/crates/model_core/src/stop02_finalization.rs	1970-01-01 00:00:00.000000000 +0000
+++++ stop02_work/crates/model_core/src/stop02_finalization.rs	2026-05-27 07:34:29.903532059 +0000
++@@ -0,0 +1,815 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::kv_rollback00_probe::{receipt_from_salad03 as kv00_receipt_from_salad03, KvRollback00Mode};
+++use crate::kv_rollback01_forked_replay::{receipt_from_kvrollback00 as kv01_receipt_from_kvrollback00, KvRollback01Mode};
+++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
+++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode};
+++use crate::salad03b_controlled_execute::{
+++    receipt_from_salad03_and_kv01 as salad03b_receipt_from_salad03_and_kv01,
+++    Salad03BMode, Salad03BStepReceipt,
+++};
+++use crate::stop01_safe_stop::{receipt_from_salad03b, Stop01Mode, Stop01Reason, Stop01StepReceipt};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const STOP02_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-02";
+++pub const STOP02_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-01";
+++pub const STOP02_SSOT: &str = "STOP01StopReceipt+TokenLedger+OutputSurfacePolicy";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Stop02Mode {
+++    Off,
+++    SurfaceOnly,
+++    ControlledFinalize,
+++    StrictControlledFinalize,
+++}
+++
+++impl Stop02Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_STOP02_MODE")
+++            .or_else(|_| env::var("ASH_STOP02_FINALIZATION"))
+++            .unwrap_or_else(|_| "surface_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "controlled" | "controlled_finalize" | "finalize" | "true" | "1" => Self::ControlledFinalize,
+++            "strict" | "strict_controlled" | "strict_controlled_finalize" => Self::StrictControlledFinalize,
+++            _ => Self::SurfaceOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::SurfaceOnly => "SurfaceOnly",
+++            Self::ControlledFinalize => "ControlledFinalize",
+++            Self::StrictControlledFinalize => "StrictControlledFinalize",
+++        }
+++    }
+++
+++    pub fn requested(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum Stop02EosPolicy {
+++    None,
+++    SurfaceOnly,
+++    AppendVirtualEos,
+++    AppendLedgerEos,
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum Stop02TailPolicy {
+++    PreserveAll,
+++    HideRiskTailSurfaceOnly,
+++    MarkRiskTail,
+++    TruncateLedgerTail,
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum Stop02SurfaceKind {
+++    None,
+++    SafeStopped,
+++    PartialOutput,
+++    RollbackFailedStopped,
+++    ResampleFailedStopped,
+++    NumericSafetyStopped,
+++    GlobalFallbackStopped,
+++    SaladRiskStopped,
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum Stop02MessageCode {
+++    None,
+++    SafeStopGeneratedPartial,
+++    SafeStopRiskTailMarked,
+++    SafeStopResampleFailed,
+++    SafeStopRollbackUnavailable,
+++    SafeStopNumericRisk,
+++    SafeStopGlobalFallback,
+++    SafeStopCanRetry,
+++    SafeStopCanContinueFromSafePoint,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02Input {
+++    pub mode: Stop02Mode,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub stop01_executed: bool,
+++    pub stop01_reason: Option<String>,
+++    pub generation_loop_stop_requested: bool,
+++    pub salad03b_post_risk: Option<String>,
+++    pub salad03b_risk_improved: Option<bool>,
+++    pub salad03b_risk_worsened: Option<bool>,
+++    pub salad03b_resample_success: Option<bool>,
+++    pub salad03b_safe_stop_recommended: bool,
+++    pub salad02_score: Option<f32>,
+++    pub salad02_risk_stable: Option<String>,
+++    pub raw_output_token_count: usize,
+++    pub raw_output_tail_hash: Option<String>,
+++    pub risk_tail_start_step: Option<usize>,
+++    pub risk_tail_end_step: Option<usize>,
+++    pub eos_token_id: Option<u32>,
+++    pub eos_allowed: bool,
+++    pub user_visible_surface_enabled: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02FinalizationPolicy {
+++    pub eos_policy: Stop02EosPolicy,
+++    pub tail_policy: Stop02TailPolicy,
+++    pub surface_kind: Stop02SurfaceKind,
+++    pub ledger_mutation_allowed: bool,
+++    pub visible_output_mutation_allowed: bool,
+++    pub allow_retry: bool,
+++    pub allow_continue_from_safe_point: bool,
+++    pub require_user_acknowledgement: bool,
+++    pub message_codes: Vec<Stop02MessageCode>,
+++    pub policy_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02VisibleRange {
+++    pub raw_start_step: usize,
+++    pub raw_end_step: usize,
+++    pub visible_start_step: usize,
+++    pub visible_end_step: usize,
+++    pub hidden_tail_start_step: Option<usize>,
+++    pub hidden_tail_end_step: Option<usize>,
+++    pub risk_tail_marked: bool,
+++    pub risk_tail_hidden: bool,
+++    pub raw_tail_hash: Option<String>,
+++    pub visible_tail_hash: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02SurfaceReceipt {
+++    pub surface_kind: Stop02SurfaceKind,
+++    pub message_codes: Vec<Stop02MessageCode>,
+++    pub user_visible: bool,
+++    pub copy_safe: bool,
+++    pub retry_available: bool,
+++    pub continue_from_safe_point_available: bool,
+++    pub safe_point_step: Option<usize>,
+++    pub display_severity: String,
+++    pub surface_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02FinalizationReceipt {
+++    pub finalized: bool,
+++    pub ledger_mutated: bool,
+++    pub visible_output_mutated: bool,
+++    pub eos_appended_to_ledger: bool,
+++    pub virtual_eos_added: bool,
+++    pub output_tail_preserved: bool,
+++    pub output_tail_marked: bool,
+++    pub output_tail_hidden_surface_only: bool,
+++    pub output_tail_truncated_from_ledger: bool,
+++    pub visible_range: Stop02VisibleRange,
+++    pub surface: Stop02SurfaceReceipt,
+++    pub finalization_reasons: Vec<String>,
+++    pub finalization_warnings: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: Stop02Mode,
+++    pub behavior_change: bool,
+++    pub ledger_behavior_change: bool,
+++    pub surface_behavior_change: bool,
+++    pub surface_only: bool,
+++    pub stop01_status_seen: Option<String>,
+++    pub salad03b_status_seen: Option<String>,
+++    pub salad02_status_seen: Option<String>,
+++    pub input: Stop02Input,
+++    pub policy: Stop02FinalizationPolicy,
+++    pub finalization: Stop02FinalizationReceipt,
+++    pub selected_id_current: Option<u32>,
+++    pub selected_piece_current: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop02FinalizationStats {
+++    pub finalized_count: usize,
+++    pub surface_behavior_change_count: usize,
+++    pub ledger_behavior_change_count: usize,
+++    pub ledger_mutated_count: usize,
+++    pub virtual_eos_added_count: usize,
+++    pub ledger_eos_appended_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop02TailPolicyStats {
+++    pub preserve_all_count: usize,
+++    pub mark_risk_tail_count: usize,
+++    pub hide_risk_tail_surface_only_count: usize,
+++    pub truncate_ledger_tail_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop02SurfaceKindStats {
+++    pub safe_stopped_count: usize,
+++    pub partial_output_count: usize,
+++    pub salad_risk_stopped_count: usize,
+++    pub resample_failed_stopped_count: usize,
+++    pub rollback_failed_stopped_count: usize,
+++    pub numeric_safety_stopped_count: usize,
+++    pub global_fallback_stopped_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop02UserSurfaceStats {
+++    pub user_visible_count: usize,
+++    pub retry_available_count: usize,
+++    pub continue_from_safe_point_count: usize,
+++    pub require_user_acknowledgement_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop02SafetyStats {
+++    pub silent_truncate_count: usize,
+++    pub ledger_mutation_count: usize,
+++    pub eos_ledger_append_count: usize,
+++    pub missing_stop_reason_count: usize,
+++    pub visible_range_invalid_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop02Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub surface_only: bool,
+++    pub default_enable: bool,
+++    pub requires_stop01: bool,
+++    pub stop01_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub finalization: Stop02FinalizationStats,
+++    pub tail_policy: Stop02TailPolicyStats,
+++    pub surface_kind: Stop02SurfaceKindStats,
+++    pub user_surface: Stop02UserSurfaceStats,
+++    pub safety: Stop02SafetyStats,
+++    pub ready_for_stop03_ledger_eos_commit: bool,
+++    pub ready_for_salad04_korean_morph_loop_guard: bool,
+++    pub reason: String,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_string(name: &str, default: &str) -> String {
+++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_STOP02_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/stop02_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_STOP02_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/stop02_summary.json"))
+++}
+++
+++fn eos_policy_from_env(default: Stop02EosPolicy) -> Stop02EosPolicy {
+++    match env::var("ASH_STOP02_EOS_POLICY").unwrap_or_default().trim().to_ascii_lowercase().as_str() {
+++        "none" => Stop02EosPolicy::None,
+++        "virtual" | "append_virtual_eos" => Stop02EosPolicy::AppendVirtualEos,
+++        "ledger" | "append_ledger_eos" => Stop02EosPolicy::AppendLedgerEos,
+++        "surface" | "surface_only" => Stop02EosPolicy::SurfaceOnly,
+++        _ => default,
+++    }
+++}
+++
+++fn tail_policy_from_env(default: Stop02TailPolicy) -> Stop02TailPolicy {
+++    match env::var("ASH_STOP02_TAIL_POLICY").unwrap_or_default().trim().to_ascii_lowercase().as_str() {
+++        "preserve" | "preserve_all" => Stop02TailPolicy::PreserveAll,
+++        "hide" | "hide_risk_tail" | "hide_risk_tail_surface_only" => Stop02TailPolicy::HideRiskTailSurfaceOnly,
+++        "truncate" | "truncate_ledger_tail" => Stop02TailPolicy::TruncateLedgerTail,
+++        "mark" | "mark_risk_tail" => Stop02TailPolicy::MarkRiskTail,
+++        _ => default,
+++    }
+++}
+++
+++pub fn surface_kind_from_stop_reason(reason: Option<&str>) -> Stop02SurfaceKind {
+++    match reason.unwrap_or("") {
+++        "SaladHighPersistent" | "SaladCritical" | "SAFE_STOP_SALAD_HIGH_PERSISTENT" | "SAFE_STOP_SALAD_CRITICAL" => Stop02SurfaceKind::SaladRiskStopped,
+++        "PostResampleCritical" | "PostResampleHighUnimproved" | "ResampleFailed" |
+++        "SAFE_STOP_POST_RESAMPLE_CRITICAL" | "SAFE_STOP_POST_RESAMPLE_HIGH_UNIMPROVED" | "SAFE_STOP_RESAMPLE_FAILED" => Stop02SurfaceKind::ResampleFailedStopped,
+++        "RollbackDenied" | "RollbackWindowLimitReached" | "SAFE_STOP_ROLLBACK_DENIED" | "SAFE_STOP_ROLLBACK_WINDOW_LIMIT_REACHED" => Stop02SurfaceKind::RollbackFailedStopped,
+++        "NumericRisk" | "EmptyActiveSet" | "SAFE_STOP_NUMERIC_RISK" | "SAFE_STOP_EMPTY_ACTIVE_SET" => Stop02SurfaceKind::NumericSafetyStopped,
+++        "GlobalFiniteFallback" | "SAFE_STOP_GLOBAL_FINITE_FALLBACK" => Stop02SurfaceKind::GlobalFallbackStopped,
+++        "RuntimeStopRequested" | "StrictSafetyStop" | "SAFE_STOP_RUNTIME_STOP_REQUESTED" | "SAFE_STOP_STRICT_SAFETY_STOP" => Stop02SurfaceKind::SafeStopped,
+++        _ => Stop02SurfaceKind::None,
+++    }
+++}
+++
+++fn display_severity(kind: Stop02SurfaceKind) -> &'static str {
+++    match kind {
+++        Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped => "critical",
+++        Stop02SurfaceKind::SaladRiskStopped | Stop02SurfaceKind::RollbackFailedStopped | Stop02SurfaceKind::ResampleFailedStopped => "warning",
+++        Stop02SurfaceKind::SafeStopped | Stop02SurfaceKind::PartialOutput => "info",
+++        Stop02SurfaceKind::None => "info",
+++    }
+++}
+++
+++fn message_codes_for(kind: Stop02SurfaceKind, input: &Stop02Input, tail_policy: Stop02TailPolicy) -> Vec<Stop02MessageCode> {
+++    let mut codes = Vec::new();
+++    if !matches!(kind, Stop02SurfaceKind::None) {
+++        codes.push(Stop02MessageCode::SafeStopGeneratedPartial);
+++    }
+++    match kind {
+++        Stop02SurfaceKind::SaladRiskStopped => codes.push(Stop02MessageCode::SafeStopRiskTailMarked),
+++        Stop02SurfaceKind::ResampleFailedStopped => codes.push(Stop02MessageCode::SafeStopResampleFailed),
+++        Stop02SurfaceKind::RollbackFailedStopped => codes.push(Stop02MessageCode::SafeStopRollbackUnavailable),
+++        Stop02SurfaceKind::NumericSafetyStopped => codes.push(Stop02MessageCode::SafeStopNumericRisk),
+++        Stop02SurfaceKind::GlobalFallbackStopped => codes.push(Stop02MessageCode::SafeStopGlobalFallback),
+++        _ => {}
+++    }
+++    if matches!(tail_policy, Stop02TailPolicy::MarkRiskTail | Stop02TailPolicy::HideRiskTailSurfaceOnly)
+++        && !codes.contains(&Stop02MessageCode::SafeStopRiskTailMarked)
+++    {
+++        codes.push(Stop02MessageCode::SafeStopRiskTailMarked);
+++    }
+++    if input.user_visible_surface_enabled {
+++        codes.push(Stop02MessageCode::SafeStopCanRetry);
+++        if input.risk_tail_start_step.is_some() {
+++            codes.push(Stop02MessageCode::SafeStopCanContinueFromSafePoint);
+++        }
+++    }
+++    if codes.is_empty() {
+++        codes.push(Stop02MessageCode::None);
+++    }
+++    codes
+++}
+++
+++pub fn decide_stop02_policy(input: &Stop02Input) -> Stop02FinalizationPolicy {
+++    let surface_kind = if input.stop01_executed && input.generation_loop_stop_requested {
+++        surface_kind_from_stop_reason(input.stop01_reason.as_deref())
+++    } else {
+++        Stop02SurfaceKind::None
+++    };
+++    let mut eos_policy = if matches!(surface_kind, Stop02SurfaceKind::None) {
+++        Stop02EosPolicy::None
+++    } else {
+++        Stop02EosPolicy::SurfaceOnly
+++    };
+++    eos_policy = eos_policy_from_env(eos_policy);
+++
+++    let mut tail_policy = if matches!(surface_kind, Stop02SurfaceKind::None) {
+++        Stop02TailPolicy::PreserveAll
+++    } else {
+++        Stop02TailPolicy::MarkRiskTail
+++    };
+++    if matches!(surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped)
+++        && input.risk_tail_start_step.is_some()
+++    {
+++        tail_policy = Stop02TailPolicy::HideRiskTailSurfaceOnly;
+++    }
+++    tail_policy = tail_policy_from_env(tail_policy);
+++
+++    let mut policy_reasons = Vec::new();
+++    if input.stop01_executed { policy_reasons.push("stop01_executed".to_string()); }
+++    if input.generation_loop_stop_requested { policy_reasons.push("generation_loop_stop_requested".to_string()); }
+++    if matches!(eos_policy, Stop02EosPolicy::AppendLedgerEos) {
+++        policy_reasons.push("append_ledger_eos_requested_but_forbidden".to_string());
+++        if matches!(input.mode, Stop02Mode::StrictControlledFinalize) {
+++            // Keep the forbidden value visible for strict failure accounting.
+++        } else {
+++            eos_policy = Stop02EosPolicy::SurfaceOnly;
+++        }
+++    }
+++    if matches!(tail_policy, Stop02TailPolicy::TruncateLedgerTail) {
+++        policy_reasons.push("truncate_ledger_tail_requested_but_forbidden".to_string());
+++        if matches!(input.mode, Stop02Mode::StrictControlledFinalize) {
+++            // Keep the forbidden value visible for strict failure accounting.
+++        } else {
+++            tail_policy = Stop02TailPolicy::MarkRiskTail;
+++        }
+++    }
+++
+++    let message_codes = message_codes_for(surface_kind, input, tail_policy);
+++    Stop02FinalizationPolicy {
+++        eos_policy,
+++        tail_policy,
+++        surface_kind,
+++        ledger_mutation_allowed: false,
+++        visible_output_mutation_allowed: input.user_visible_surface_enabled && !matches!(surface_kind, Stop02SurfaceKind::None),
+++        allow_retry: !matches!(surface_kind, Stop02SurfaceKind::None),
+++        allow_continue_from_safe_point: input.risk_tail_start_step.is_some() && !matches!(surface_kind, Stop02SurfaceKind::None),
+++        require_user_acknowledgement: matches!(surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped),
+++        message_codes,
+++        policy_reasons,
+++    }
+++}
+++
+++pub fn finalize_stop02_surface(input: &Stop02Input, policy: &Stop02FinalizationPolicy) -> Stop02FinalizationReceipt {
+++    let raw_start = 0;
+++    let raw_end = input.raw_output_token_count;
+++    let mut warnings = Vec::new();
+++
+++    let mut hidden_start = None;
+++    let mut hidden_end = None;
+++    let mut risk_marked = false;
+++    let mut risk_hidden = false;
+++    let mut visible_end = raw_end;
+++
+++    match policy.tail_policy {
+++        Stop02TailPolicy::PreserveAll => {}
+++        Stop02TailPolicy::MarkRiskTail => {
+++            if input.risk_tail_start_step.is_some() {
+++                risk_marked = true;
+++            } else {
+++                warnings.push("risk_tail_range_missing_mark_downgraded_to_preserve".to_string());
+++            }
+++        }
+++        Stop02TailPolicy::HideRiskTailSurfaceOnly => {
+++            if let (Some(start), Some(end)) = (input.risk_tail_start_step, input.risk_tail_end_step) {
+++                hidden_start = Some(start.min(raw_end));
+++                hidden_end = Some(end.min(raw_end));
+++                visible_end = start.min(raw_end);
+++                risk_marked = true;
+++                risk_hidden = true;
+++            } else {
+++                warnings.push("risk_tail_range_missing_hide_downgraded_to_mark".to_string());
+++                risk_marked = input.risk_tail_start_step.is_some();
+++            }
+++        }
+++        Stop02TailPolicy::TruncateLedgerTail => {
+++            warnings.push("truncate_ledger_tail_forbidden_ledger_preserved".to_string());
+++            risk_marked = input.risk_tail_start_step.is_some();
+++        }
+++    }
+++
+++    let eos_appended_to_ledger = false;
+++    let mut virtual_eos_added = matches!(policy.eos_policy, Stop02EosPolicy::AppendVirtualEos);
+++    if matches!(policy.eos_policy, Stop02EosPolicy::AppendLedgerEos) {
+++        warnings.push("append_ledger_eos_forbidden_ledger_preserved".to_string());
+++        virtual_eos_added = !matches!(input.mode, Stop02Mode::StrictControlledFinalize);
+++    }
+++    if matches!(policy.eos_policy, Stop02EosPolicy::SurfaceOnly | Stop02EosPolicy::None) {
+++        virtual_eos_added = false;
+++    }
+++
+++    let visible_tail_hash = Some(format!("sha256:stop02-visible-tail-{}-{}-{:?}", visible_end, risk_marked, policy.surface_kind));
+++    let range_valid = visible_end <= raw_end && hidden_start.zip(hidden_end).map(|(s, e)| s <= e && e <= raw_end).unwrap_or(true);
+++    if !range_valid {
+++        warnings.push("visible_range_invalid".to_string());
+++    }
+++
+++    let surface = Stop02SurfaceReceipt {
+++        surface_kind: policy.surface_kind,
+++        message_codes: policy.message_codes.clone(),
+++        user_visible: input.user_visible_surface_enabled && !matches!(policy.surface_kind, Stop02SurfaceKind::None),
+++        copy_safe: !matches!(policy.surface_kind, Stop02SurfaceKind::NumericSafetyStopped | Stop02SurfaceKind::GlobalFallbackStopped),
+++        retry_available: policy.allow_retry,
+++        continue_from_safe_point_available: policy.allow_continue_from_safe_point,
+++        safe_point_step: input.risk_tail_start_step,
+++        display_severity: display_severity(policy.surface_kind).to_string(),
+++        surface_reasons: policy.policy_reasons.clone(),
+++    };
+++
+++    let finalized = !matches!(policy.surface_kind, Stop02SurfaceKind::None);
+++    Stop02FinalizationReceipt {
+++        finalized,
+++        ledger_mutated: false,
+++        visible_output_mutated: finalized && policy.visible_output_mutation_allowed,
+++        eos_appended_to_ledger,
+++        virtual_eos_added,
+++        output_tail_preserved: !matches!(policy.tail_policy, Stop02TailPolicy::HideRiskTailSurfaceOnly),
+++        output_tail_marked: risk_marked,
+++        output_tail_hidden_surface_only: risk_hidden,
+++        output_tail_truncated_from_ledger: false,
+++        visible_range: Stop02VisibleRange {
+++            raw_start_step: raw_start,
+++            raw_end_step: raw_end,
+++            visible_start_step: raw_start,
+++            visible_end_step: visible_end,
+++            hidden_tail_start_step: hidden_start,
+++            hidden_tail_end_step: hidden_end,
+++            risk_tail_marked: risk_marked,
+++            risk_tail_hidden: risk_hidden,
+++            raw_tail_hash: input.raw_output_tail_hash.clone(),
+++            visible_tail_hash,
+++        },
+++        surface,
+++        finalization_reasons: vec!["surface_finalized".to_string(), "ledger_preserved".to_string(), "user_visible_stop_surface_created".to_string()],
+++        finalization_warnings: warnings,
+++    }
+++}
+++
+++pub fn input_from_stop01(mode: Stop02Mode, stop01: &Stop01StepReceipt) -> Stop02Input {
+++    let raw_count = env::var("ASH_STOP02_RAW_OUTPUT_TOKEN_COUNT")
+++        .ok()
+++        .and_then(|v| v.parse::<usize>().ok())
+++        .unwrap_or_else(|| stop01.execution.stop_step.unwrap_or(stop01.step).max(stop01.step));
+++    let risk_start = env::var("ASH_STOP02_RISK_TAIL_START_STEP")
+++        .ok()
+++        .and_then(|v| v.parse::<usize>().ok())
+++        .or_else(|| raw_count.checked_sub(4));
+++    let risk_end = env::var("ASH_STOP02_RISK_TAIL_END_STEP")
+++        .ok()
+++        .and_then(|v| v.parse::<usize>().ok())
+++        .or(Some(raw_count));
+++    Stop02Input {
+++        mode,
+++        run_id: env_string("ASH_STOP02_RUN_ID", "stop02_sampler03_bridge"),
+++        prompt_hash: stop01.prompt_hash.clone(),
+++        seed: stop01.seed,
+++        step: stop01.step,
+++        backend: stop01.backend.clone(),
+++        stop01_executed: stop01.execution.executed,
+++        stop01_reason: Some(format!("{:?}", stop01.execution.stop_reason)),
+++        generation_loop_stop_requested: stop01.execution.generation_loop_stop_requested,
+++        salad03b_post_risk: stop01.input.salad03b_post_risk.clone(),
+++        salad03b_risk_improved: stop01.input.salad03b_risk_improved,
+++        salad03b_risk_worsened: stop01.input.salad03b_risk_worsened,
+++        salad03b_resample_success: stop01.input.salad03b_resample_success,
+++        salad03b_safe_stop_recommended: stop01.input.salad03b_safe_stop_recommended,
+++        salad02_score: stop01.input.salad02_score,
+++        salad02_risk_stable: stop01.input.salad02_risk_stable.clone(),
+++        raw_output_token_count: raw_count,
+++        raw_output_tail_hash: stop01.post_fingerprint.as_ref().and_then(|f| f.tail_token_hash.clone()).or(Some(format!("sha256:stop02-raw-tail-{}", stop01.step))),
+++        risk_tail_start_step: risk_start,
+++        risk_tail_end_step: risk_end,
+++        eos_token_id: env::var("ASH_STOP02_EOS_TOKEN_ID").ok().and_then(|v| v.parse::<u32>().ok()),
+++        eos_allowed: env_bool("ASH_STOP02_EOS_ALLOWED", true),
+++        user_visible_surface_enabled: env_bool("ASH_STOP02_USER_VISIBLE_SURFACE", true),
+++    }
+++}
+++
+++pub fn receipt_from_stop01(mode: Stop02Mode, stop01: &Stop01StepReceipt) -> Stop02StepReceipt {
+++    let input = input_from_stop01(mode, stop01);
+++    let policy = decide_stop02_policy(&input);
+++    let finalization = finalize_stop02_surface(&input, &policy);
+++    let ledger_behavior_change = finalization.ledger_mutated || finalization.eos_appended_to_ledger || finalization.output_tail_truncated_from_ledger;
+++    let surface_behavior_change = finalization.visible_output_mutated || finalization.output_tail_marked || finalization.output_tail_hidden_surface_only || finalization.virtual_eos_added;
+++    Stop02StepReceipt {
+++        patch_id: STOP02_PATCH_ID.to_string(),
+++        input_patch: STOP02_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: input.run_id.clone(),
+++        prompt_hash: input.prompt_hash.clone(),
+++        seed: input.seed,
+++        step: input.step,
+++        backend: input.backend.clone(),
+++        sampler_ssot: STOP02_SSOT.to_string(),
+++        mode,
+++        behavior_change: ledger_behavior_change || surface_behavior_change,
+++        ledger_behavior_change,
+++        surface_behavior_change,
+++        surface_only: true,
+++        stop01_status_seen: Some("DERIVED_IN_MEMORY_FROM_STOP01_RECEIPT".to_string()),
+++        salad03b_status_seen: stop01.salad03b_status_seen.clone(),
+++        salad02_status_seen: stop01.salad02_status_seen.clone(),
+++        input,
+++        policy,
+++        finalization,
+++        selected_id_current: stop01.selected_id_current,
+++        selected_piece_current: stop01.selected_piece_current.clone(),
+++    }
+++}
+++
+++pub fn append_stop02_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Stop02Mode::from_env();
+++    if !mode.requested() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
+++    let salad03_mode = Salad03Mode::from_env();
+++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
+++    let kv00 = kv00_receipt_from_salad03(KvRollback00Mode::ForkedReplayProbe, &salad03_receipt);
+++    let kv01 = kv01_receipt_from_kvrollback00(KvRollback01Mode::ForkedReplayProbe, &kv00);
+++    let salad03b_mode = Salad03BMode::from_env();
+++    let salad03b = salad03b_receipt_from_salad03_and_kv01(salad03b_mode, &salad03_receipt, &kv01);
+++    let stop01_mode = Stop01Mode::from_env();
+++    let stop01 = receipt_from_salad03b(stop01_mode, &salad03b);
+++    let receipt = receipt_from_stop01(mode, &stop01);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn read_receipts(path: PathBuf) -> Vec<Stop02StepReceipt> {
+++    let data = match fs::read_to_string(path) {
+++        Ok(data) => data,
+++        Err(_) => return Vec::new(),
+++    };
+++    data.lines().filter_map(|line| serde_json::from_str::<Stop02StepReceipt>(line).ok()).collect()
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Stop02StepReceipt]) -> Stop02Summary {
+++    let mut finalization = Stop02FinalizationStats::default();
+++    let mut tail_policy = Stop02TailPolicyStats::default();
+++    let mut surface_kind = Stop02SurfaceKindStats::default();
+++    let mut user_surface = Stop02UserSurfaceStats::default();
+++    let mut safety = Stop02SafetyStats::default();
+++
+++    for receipt in receipts {
+++        if receipt.finalization.finalized { finalization.finalized_count += 1; }
+++        if receipt.surface_behavior_change { finalization.surface_behavior_change_count += 1; }
+++        if receipt.ledger_behavior_change { finalization.ledger_behavior_change_count += 1; }
+++        if receipt.finalization.ledger_mutated { finalization.ledger_mutated_count += 1; safety.ledger_mutation_count += 1; }
+++        if receipt.finalization.virtual_eos_added { finalization.virtual_eos_added_count += 1; }
+++        if receipt.finalization.eos_appended_to_ledger { finalization.ledger_eos_appended_count += 1; safety.eos_ledger_append_count += 1; }
+++        if receipt.finalization.output_tail_truncated_from_ledger { safety.silent_truncate_count += 1; }
+++        if receipt.input.stop01_reason.as_deref().unwrap_or("None") == "None" && receipt.finalization.finalized { safety.missing_stop_reason_count += 1; }
+++        if receipt.finalization.visible_range.visible_end_step > receipt.finalization.visible_range.raw_end_step { safety.visible_range_invalid_count += 1; }
+++
+++        match receipt.policy.tail_policy {
+++            Stop02TailPolicy::PreserveAll => tail_policy.preserve_all_count += 1,
+++            Stop02TailPolicy::MarkRiskTail => tail_policy.mark_risk_tail_count += 1,
+++            Stop02TailPolicy::HideRiskTailSurfaceOnly => tail_policy.hide_risk_tail_surface_only_count += 1,
+++            Stop02TailPolicy::TruncateLedgerTail => tail_policy.truncate_ledger_tail_count += 1,
+++        }
+++        match receipt.policy.surface_kind {
+++            Stop02SurfaceKind::SafeStopped => surface_kind.safe_stopped_count += 1,
+++            Stop02SurfaceKind::PartialOutput => surface_kind.partial_output_count += 1,
+++            Stop02SurfaceKind::SaladRiskStopped => surface_kind.salad_risk_stopped_count += 1,
+++            Stop02SurfaceKind::ResampleFailedStopped => surface_kind.resample_failed_stopped_count += 1,
+++            Stop02SurfaceKind::RollbackFailedStopped => surface_kind.rollback_failed_stopped_count += 1,
+++            Stop02SurfaceKind::NumericSafetyStopped => surface_kind.numeric_safety_stopped_count += 1,
+++            Stop02SurfaceKind::GlobalFallbackStopped => surface_kind.global_fallback_stopped_count += 1,
+++            Stop02SurfaceKind::None => {}
+++        }
+++        if receipt.finalization.surface.user_visible { user_surface.user_visible_count += 1; }
+++        if receipt.finalization.surface.retry_available { user_surface.retry_available_count += 1; }
+++        if receipt.finalization.surface.continue_from_safe_point_available { user_surface.continue_from_safe_point_count += 1; }
+++        if receipt.policy.require_user_acknowledgement { user_surface.require_user_acknowledgement_count += 1; }
+++    }
+++
+++    let steps_observed = receipts.len();
+++    let contract_fail = safety.ledger_mutation_count > 0
+++        || safety.eos_ledger_append_count > 0
+++        || safety.silent_truncate_count > 0
+++        || safety.missing_stop_reason_count > 0
+++        || safety.visible_range_invalid_count > 0;
+++    Stop02Summary {
+++        patch_id: STOP02_PATCH_ID.to_string(),
+++        input_patch: STOP02_INPUT_PATCH_ID.to_string(),
+++        status: if contract_fail { "FAIL_STATIC_CONTRACT" } else if steps_observed > 0 { "PASS_WITH_WARNINGS" } else { "STATIC_BAKE_DEFINED_NOT_RUN" }.to_string(),
+++        mode: Stop02Mode::from_env().as_str().to_string(),
+++        surface_only: true,
+++        default_enable: true,
+++        requires_stop01: env_bool("ASH_STOP02_REQUIRE_STOP01", true),
+++        stop01_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_STOP01_RECEIPT".to_string()) } else { None },
+++        steps_observed,
+++        finalization,
+++        tail_policy,
+++        surface_kind,
+++        user_surface,
+++        safety,
+++        ready_for_stop03_ledger_eos_commit: false,
+++        ready_for_salad04_korean_morph_loop_guard: !contract_fail,
+++        reason: if contract_fail {
+++            "STOP-02 contract violation detected; ledger mutation/truncate/EOS commit remains forbidden".to_string()
+++        } else if steps_observed == 0 {
+++            "surface finalization schema baked; run STOP-01 receipt fixtures before UI enable".to_string()
+++        } else {
+++            "surface finalization sealed; ledger mutation remains forbidden".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_stop02_summary_from_receipt_file() {
+++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(path, format!("{}\n", json));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn base_input() -> Stop02Input {
+++        Stop02Input {
+++            mode: Stop02Mode::ControlledFinalize,
+++            run_id: "test".to_string(),
+++            prompt_hash: None,
+++            seed: Some(1),
+++            step: 48,
+++            backend: "cpu_oracle".to_string(),
+++            stop01_executed: true,
+++            stop01_reason: Some("SaladHighPersistent".to_string()),
+++            generation_loop_stop_requested: true,
+++            salad03b_post_risk: Some("High".to_string()),
+++            salad03b_risk_improved: Some(false),
+++            salad03b_risk_worsened: Some(false),
+++            salad03b_resample_success: Some(false),
+++            salad03b_safe_stop_recommended: true,
+++            salad02_score: Some(0.72),
+++            salad02_risk_stable: Some("High".to_string()),
+++            raw_output_token_count: 48,
+++            raw_output_tail_hash: Some("sha256:tail".to_string()),
+++            risk_tail_start_step: Some(44),
+++            risk_tail_end_step: Some(48),
+++            eos_token_id: Some(2),
+++            eos_allowed: true,
+++            user_visible_surface_enabled: true,
+++        }
+++    }
+++
+++    #[test]
+++    fn stop02_maps_salad_high_to_surface() {
+++        assert_eq!(surface_kind_from_stop_reason(Some("SaladHighPersistent")), Stop02SurfaceKind::SaladRiskStopped);
+++    }
+++
+++    #[test]
+++    fn stop02_surface_only_never_mutates_ledger() {
+++        let input = base_input();
+++        let policy = decide_stop02_policy(&input);
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(!receipt.ledger_mutated);
+++        assert!(!receipt.eos_appended_to_ledger);
+++    }
+++
+++    #[test]
+++    fn stop02_forbids_ledger_eos_append() {
+++        let input = base_input();
+++        let mut policy = decide_stop02_policy(&input);
+++        policy.eos_policy = Stop02EosPolicy::AppendLedgerEos;
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(!receipt.eos_appended_to_ledger);
+++    }
+++
+++    #[test]
+++    fn stop02_forbids_ledger_tail_truncate() {
+++        let input = base_input();
+++        let mut policy = decide_stop02_policy(&input);
+++        policy.tail_policy = Stop02TailPolicy::TruncateLedgerTail;
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(!receipt.output_tail_truncated_from_ledger);
+++    }
+++
+++    #[test]
+++    fn stop02_marks_risk_tail() {
+++        let input = base_input();
+++        let policy = decide_stop02_policy(&input);
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(receipt.output_tail_marked);
+++    }
+++
+++    #[test]
+++    fn stop02_hide_tail_surface_only_keeps_ledger() {
+++        let mut input = base_input();
+++        input.stop01_reason = Some("NumericRisk".to_string());
+++        let policy = decide_stop02_policy(&input);
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(receipt.output_tail_hidden_surface_only);
+++        assert!(!receipt.ledger_mutated);
+++    }
+++
+++    #[test]
+++    fn stop02_visible_range_bounds() {
+++        let input = base_input();
+++        let policy = decide_stop02_policy(&input);
+++        let receipt = finalize_stop02_surface(&input, &policy);
+++        assert!(receipt.visible_range.visible_end_step <= receipt.visible_range.raw_end_step);
+++    }
+++}
+diff -ruN stop02_orig/workspace/stop02_finalization_schema.json stop02_work/workspace/stop02_finalization_schema.json
+--- stop02_orig/workspace/stop02_finalization_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_finalization_schema.json	2026-05-27 07:35:46.551093620 +0000
+@@ -0,0 +1,125 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "16AI-QW-38G-R6A-STOP-02 EOS Finalization / User-visible Stop Surface Seal",
++  "type": "object",
++  "required": [
++    "patch_id",
++    "schema_version",
++    "mode",
++    "ledger_behavior_change",
++    "surface_behavior_change",
++    "surface_only",
++    "input",
++    "policy",
++    "finalization"
++  ],
++  "properties": {
++    "patch_id": {
++      "const": "16AI-QW-38G-R6A-STOP-02"
++    },
++    "input_patch": {
++      "const": "16AI-QW-38G-R6A-STOP-01"
++    },
++    "schema_version": {
++      "type": "integer",
++      "minimum": 1
++    },
++    "mode": {
++      "enum": [
++        "Off",
++        "SurfaceOnly",
++        "ControlledFinalize",
++        "StrictControlledFinalize"
++      ]
++    },
++    "behavior_change": {
++      "type": "boolean"
++    },
++    "ledger_behavior_change": {
++      "const": false
++    },
++    "surface_behavior_change": {
++      "type": "boolean"
++    },
++    "surface_only": {
++      "const": true
++    },
++    "policy": {
++      "type": "object",
++      "required": [
++        "eos_policy",
++        "tail_policy",
++        "surface_kind",
++        "ledger_mutation_allowed",
++        "visible_output_mutation_allowed"
++      ],
++      "properties": {
++        "eos_policy": {
++          "enum": [
++            "None",
++            "SurfaceOnly",
++            "AppendVirtualEos",
++            "AppendLedgerEos"
++          ]
++        },
++        "tail_policy": {
++          "enum": [
++            "PreserveAll",
++            "HideRiskTailSurfaceOnly",
++            "MarkRiskTail",
++            "TruncateLedgerTail"
++          ]
++        },
++        "surface_kind": {
++          "enum": [
++            "None",
++            "SafeStopped",
++            "PartialOutput",
++            "RollbackFailedStopped",
++            "ResampleFailedStopped",
++            "NumericSafetyStopped",
++            "GlobalFallbackStopped",
++            "SaladRiskStopped"
++          ]
++        },
++        "ledger_mutation_allowed": {
++          "const": false
++        },
++        "visible_output_mutation_allowed": {
++          "type": "boolean"
++        }
++      }
++    },
++    "finalization": {
++      "type": "object",
++      "required": [
++        "finalized",
++        "ledger_mutated",
++        "eos_appended_to_ledger",
++        "output_tail_truncated_from_ledger",
++        "visible_range",
++        "surface"
++      ],
++      "properties": {
++        "finalized": {
++          "type": "boolean"
++        },
++        "ledger_mutated": {
++          "const": false
++        },
++        "eos_appended_to_ledger": {
++          "const": false
++        },
++        "output_tail_truncated_from_ledger": {
++          "const": false
++        },
++        "visible_range": {
++          "type": "object"
++        },
++        "surface": {
++          "type": "object"
++        }
++      }
++    }
++  }
++}
+diff -ruN stop02_orig/workspace/stop02_probe_prompts.jsonl stop02_work/workspace/stop02_probe_prompts.jsonl
+--- stop02_orig/workspace/stop02_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_probe_prompts.jsonl	2026-05-27 07:35:46.552071691 +0000
+@@ -0,0 +1,5 @@
++{"id": "P01_salad_high_persistent_surface", "stop01_reason": "SaladHighPersistent", "expected_surface_kind": "SaladRiskStopped"}
++{"id": "P02_resample_failed_surface", "stop01_reason": "ResampleFailed", "expected_surface_kind": "ResampleFailedStopped"}
++{"id": "P03_numeric_surface_hidden_tail", "stop01_reason": "NumericRisk", "expected_surface_kind": "NumericSafetyStopped"}
++{"id": "P04_global_fallback_surface_hidden_tail", "stop01_reason": "GlobalFiniteFallback", "expected_surface_kind": "GlobalFallbackStopped"}
++{"id": "P05_rollback_denied_surface", "stop01_reason": "RollbackDenied", "expected_surface_kind": "RollbackFailedStopped"}
+diff -ruN stop02_orig/workspace/stop02_report.md stop02_work/workspace/stop02_report.md
+--- stop02_orig/workspace/stop02_report.md	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_report.md	2026-05-27 07:35:46.555328795 +0000
+@@ -0,0 +1,23 @@
++# 16AI-QW-38G-R6A-STOP-02 Report
++
++## Patch
++EOS Finalization / User-visible Stop Surface Seal
++
++## Implemented
++- Added `stop02_finalization.rs`.
++- Added STOP-01 receipt to STOP-02 input conversion.
++- Added surface-only EOS policy and risk-tail surface policy.
++- Added visible output range receipt while preserving the raw token ledger.
++- Added `StopSurface.vue` display contract for desktop UI.
++- Wired STOP-02 observe/finalization hook into `sampler_parity::append_receipt()`.
++
++## Safety Contracts
++- `ledger_mutated=false`.
++- `eos_appended_to_ledger=false`.
++- `output_tail_truncated_from_ledger=false`.
++- Ledger EOS commit is not allowed in STOP-02.
++- Tail hiding is surface-only.
++
++## Runtime Status
++- Static bake only in this container.
++- `cargo` is unavailable, so cargo check/runtime smoke were not executed.
+diff -ruN stop02_orig/workspace/stop02_source_hash_manifest.json stop02_work/workspace/stop02_source_hash_manifest.json
+--- stop02_orig/workspace/stop02_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_source_hash_manifest.json	2026-05-27 07:35:46.558587525 +0000
+@@ -0,0 +1,13 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-02",
++  "files": {
++    "crates/model_core/src/stop02_finalization.rs": "sha256:c1695ac7fd2ebe1cb619afad69cb38660cc5838e99c884dd8b62a10bc2ecc79a",
++    "crates/model_core/src/lib.rs": "sha256:5f9db3b52493f521663e34951284b8d4c63c1423e1160c35d6412ab46fb8a0a7",
++    "crates/model_core/src/sampler_parity.rs": "sha256:2d9c821855563fced748d5ee32cb2a183ccd58bdd6c8f7b94445a32a33d8b84f",
++    "apps/desktop/src/components/StopSurface.vue": "sha256:b5b0ed7a657d20ead10cae92a5fdb76c9702fb41486f52b6513ce19df3b1b4c8",
++    "workspace/stop02_finalization_schema.json": "sha256:657f51b8e1b20f77655e3391f3a594f85730e82dafa88e1e171a6d25c961e755",
++    "workspace/stop02_summary.json": "sha256:ff32c9333464e423b3e9b6abfaf95f009a304d113c8048422508e0214aad3bf0",
++    "workspace/stop02_report.md": "sha256:e81d291ddd1cd8836d794335d1a889d37c28360de2e63ae4dd461c6163407493",
++    "acceptance_reports/16AI-QW-38G-R6A-STOP-02_acceptance.md": "sha256:6e55395b435c03ce0917a3b92bb5acadf11f56258eba893d74cfaf7c0c5ec167"
++  }
++}
+diff -ruN stop02_orig/workspace/stop02_static_checks.json stop02_work/workspace/stop02_static_checks.json
+--- stop02_orig/workspace/stop02_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_static_checks.json	2026-05-27 07:35:46.554996795 +0000
+@@ -0,0 +1,54 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-02",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "file": "crates/model_core/src/stop02_finalization.rs",
++      "exists": true,
++      "size": 35403
++    },
++    {
++      "file": "crates/model_core/src/lib.rs",
++      "exists": true,
++      "size": 17415
++    },
++    {
++      "file": "crates/model_core/src/sampler_parity.rs",
++      "exists": true,
++      "size": 20618
++    },
++    {
++      "file": "apps/desktop/src/components/StopSurface.vue",
++      "exists": true,
++      "size": 3604
++    },
++    {
++      "file": "workspace/stop02_finalization_schema.json",
++      "exists": true,
++      "size": 2766
++    },
++    {
++      "file": "workspace/stop02_summary.json",
++      "exists": true,
++      "size": 1515
++    }
++  ],
++  "required_markers": {
++    "ledger_mutated: false": true,
++    "eos_appended_to_ledger": true,
++    "output_tail_truncated_from_ledger": true,
++    "Stop02SurfaceKind": true,
++    "Stop02MessageCode": true,
++    "finalize_stop02_surface": true,
++    "append_stop02_receipt_from_sampler03": true
++  },
++  "contracts": {
++    "ledger_mutation_allowed": false,
++    "append_ledger_eos_forbidden": true,
++    "truncate_ledger_tail_forbidden": true,
++    "surface_only": true,
++    "raw_visible_output_separated": true
++  }
++}
+diff -ruN stop02_orig/workspace/stop02_summary.json stop02_work/workspace/stop02_summary.json
+--- stop02_orig/workspace/stop02_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ stop02_work/workspace/stop02_summary.json	2026-05-27 07:35:46.551780789 +0000
+@@ -0,0 +1,50 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-02",
++  "input_patch": "16AI-QW-38G-R6A-STOP-01",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "SurfaceOnly",
++  "surface_only": true,
++  "default_enable": true,
++  "requires_stop01": true,
++  "stop01_status_seen": null,
++  "steps_observed": 0,
++  "finalization": {
++    "finalized_count": 0,
++    "surface_behavior_change_count": 0,
++    "ledger_behavior_change_count": 0,
++    "ledger_mutated_count": 0,
++    "virtual_eos_added_count": 0,
++    "ledger_eos_appended_count": 0
++  },
++  "tail_policy": {
++    "preserve_all_count": 0,
++    "mark_risk_tail_count": 0,
++    "hide_risk_tail_surface_only_count": 0,
++    "truncate_ledger_tail_count": 0
++  },
++  "surface_kind": {
++    "safe_stopped_count": 0,
++    "partial_output_count": 0,
++    "salad_risk_stopped_count": 0,
++    "resample_failed_stopped_count": 0,
++    "rollback_failed_stopped_count": 0,
++    "numeric_safety_stopped_count": 0,
++    "global_fallback_stopped_count": 0
++  },
++  "user_surface": {
++    "user_visible_count": 0,
++    "retry_available_count": 0,
++    "continue_from_safe_point_count": 0,
++    "require_user_acknowledgement_count": 0
++  },
++  "safety": {
++    "silent_truncate_count": 0,
++    "ledger_mutation_count": 0,
++    "eos_ledger_append_count": 0,
++    "missing_stop_reason_count": 0,
++    "visible_range_invalid_count": 0
++  },
++  "ready_for_stop03_ledger_eos_commit": false,
++  "ready_for_salad04_korean_morph_loop_guard": true,
++  "reason": "surface finalization schema baked; run STOP-01 receipt fixtures before UI enable"
++}

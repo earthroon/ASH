@@ -1,0 +1,25 @@
+SFT-GPU-BUILD-03A static verification
+
+Scope:
+- Remove Rust struct update trailing comma after Default base expression.
+- Complete ModuleLoraBundleManifest compatibility fields in production manifest constructors.
+- Add PartialEq to HardCaseReplayCompact for existing assert_eq! comparison.
+
+Commands represented by static scans:
+- grep -R "..RuntimeHealthCompact::default()," crates/lora_train/src
+- grep -R "..StandardInferResult::default()," crates/lora_train/src
+- grep -R "..ModuleLoraScorecard::default()," crates/lora_train/src
+- grep -R "..HardCaseSurfaceCompact::default()," crates/lora_train/src
+- grep -R "target_outcome_record:" crates/lora_train/src/pipeline.rs crates/lora_train/src/pipeline_artifacts.rs
+- grep -R "PartialEq" crates/lora_train/src/hard_case_replay.rs
+
+Static result:
+- stale struct update trailing comma patterns: none found
+- pipeline.rs manifest compatibility fields: filled
+- pipeline_artifacts.rs manifest compatibility fields: filled
+- HardCaseReplayCompact derives PartialEq: yes
+- delimiter balance: checked with local parser
+
+Runtime result:
+- cargo/rustc/rustfmt unavailable in bake container
+- local verification required

@@ -1,0 +1,47 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02D",
+  "status": "TRANSITION_GUARD_RUNTIME_EVIDENCE_AND_CONTROLLED_ON_CANDIDATE_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-02C",
+  "transition_guard_ssot": "model_core::decode_transition_guard",
+  "probe_integrity_ssot": "model_core::decode_transition_validation::TransitionProbeIntegrityCounters",
+  "default_mode_changed": false,
+  "default_mode": "off",
+  "runtime_evidence": {
+    "receipt": "workspace/decode02d_runtime_evidence_receipt.jsonl",
+    "checked_steps": 0,
+    "pass_steps": 0,
+    "warn_steps": 0,
+    "fail_steps": 0,
+    "partial_steps": 0
+  },
+  "required_conditions": [
+    "candidate_trace_version_4",
+    "probe_integrity_pass",
+    "no_weighted_logit_mutation",
+    "no_mask_mutation",
+    "no_selected_id_mutation",
+    "transition_action_parity",
+    "transition_reason_parity",
+    "hardblock_parity",
+    "normal_korean_not_hardblocked",
+    "emotional_repeat_not_hardblocked"
+  ],
+  "promotion_status": "NOT_RUN",
+  "blocking_reasons": [
+    "RUNTIME_EVIDENCE_NOT_RUN"
+  ],
+  "execution": {
+    "cargo_check": "NOT_RUN",
+    "cargo_test": "NOT_RUN",
+    "rustfmt": "NOT_RUN",
+    "webgpu_runtime": "NOT_RUN"
+  },
+  "non_scope": [
+    "transition_rule_redesign",
+    "transition_default_on",
+    "dynamic_context_qwave",
+    "minp_formula_change",
+    "semantic_prior_default_enable",
+    "lora_training"
+  ]
+}

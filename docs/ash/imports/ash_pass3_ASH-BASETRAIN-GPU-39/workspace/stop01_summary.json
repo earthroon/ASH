@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-STOP-01",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-03B",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "Off",
+  "controlled_execute": false,
+  "default_enable": false,
+  "requires_salad03b": true,
+  "salad03b_status_seen": null,
+  "steps_observed": 0,
+  "gate": {
+    "can_execute_count": 0,
+    "denied_count": 0,
+    "strict_fail_count": 0
+  },
+  "execution": {
+    "executed_count": 0,
+    "runtime_stop_executed_count": 0,
+    "eos_bias_stop_executed_count": 0,
+    "generation_loop_stop_requested_count": 0,
+    "output_tail_truncated_count": 0
+  },
+  "reasons": {
+    "salad_critical_count": 0,
+    "salad_high_persistent_count": 0,
+    "post_resample_critical_count": 0,
+    "post_resample_high_unimproved_count": 0,
+    "resample_failed_count": 0,
+    "rollback_denied_count": 0,
+    "numeric_risk_count": 0,
+    "global_finite_fallback_count": 0,
+    "empty_active_set_count": 0
+  },
+  "safety": {
+    "stop_without_gate_count": 0,
+    "stop_without_receipt_count": 0,
+    "tail_truncate_count": 0,
+    "eos_bias_stop_count": 0,
+    "stop_reason_none_executed_count": 0
+  },
+  "ready_for_stop02_eos_finalization": false,
+  "ready_for_default_safe_stop": false,
+  "reason": "static bake only; run controlled stop fixtures before enabling safe stop"
+}

@@ -1,0 +1,41 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-LORA-FS-01",
+  "export_plan_status": "READY_FOR_LORA_FS_02_AFTER_LOCAL_AUDIT_PASS",
+  "source_feature_store_root": "workspace/lora_runs/tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192/feature_store_work",
+  "source_manifest_path": "workspace/lora_runs/tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192/feature_store_work/feature_store_manifest.json",
+  "adapter_family": "shared_hidden_token_head_lora",
+  "adapter_target_key": "classifier.shared_hidden_token_head",
+  "base_model_id": "model_tinyllama_1p1b_v4",
+  "hidden_size": 2048,
+  "vocab_size": 48259,
+  "dtype": "f16",
+  "recommended_rank": 8,
+  "allowed_ranks": [
+    4,
+    8,
+    16
+  ],
+  "recommended_alpha": 16,
+  "recommended_scale_for_infer": 0.35,
+  "planned_output_safetensors": "workspace/domain_adapters/tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.safetensors",
+  "planned_output_manifest": "workspace/domain_adapters/tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.manifest.json",
+  "planned_tensor_keys": [
+    "adapter.shared_hidden_token_head.lora_A",
+    "adapter.shared_hidden_token_head.lora_B",
+    "adapter.shared_hidden_token_head.alpha"
+  ],
+  "planned_shapes": {
+    "adapter.shared_hidden_token_head.lora_A": [
+      8,
+      2048
+    ],
+    "adapter.shared_hidden_token_head.lora_B": [
+      48259,
+      8
+    ],
+    "adapter.shared_hidden_token_head.alpha": []
+  },
+  "runtime_attach_mode": "domain_adapter_logit_delta",
+  "base_checkpoint_modified": false,
+  "tokenizer_modified": false
+}

@@ -1,0 +1,81 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-CLOSURE-04",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "title": "Fixture JSON Integrity Repair / Static Receipt Parse Closure Seal",
+  "repair_entry_count": 5,
+  "repairs": [
+    {
+      "path": "meta.json",
+      "backup_path": "workspace/closure_04_repair_backup/meta.json.bak",
+      "reason": "empty_json_file",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before_size_bytes": 0,
+      "action": "replace_empty_json_with_explicit_unavailable_metadata",
+      "after_sha256": "7bcf2e3a893b7d77bb11aad892f0269d548a49e1b27c8c6b4a891aeb49020e7a",
+      "after_size_bytes": 604,
+      "notes": [
+        "backup_renamed_to_json_bak_to_keep_full_json_parse_scan_clean"
+      ]
+    },
+    {
+      "path": "infer_debug/probe_17A_native_base_ascii_A.json",
+      "backup_path": "workspace/closure_04_repair_backup/infer_debug/probe_17A_native_base_ascii_A.json.bak",
+      "reason": "utf8_bom_json",
+      "before_sha256": "4bb6923d4826556ee5d8912f2c8e45ad9d85a6fbdfca4d15ea07c980130504cc",
+      "before_size_bytes": 642,
+      "action": "remove_utf8_bom_and_rewrite_canonical_json",
+      "after_sha256": "655caaaec9e4c0ebd42112eb42103a020e081f288b5bed678adc8a3e377658c7",
+      "after_size_bytes": 637,
+      "notes": [
+        "backup_renamed_to_json_bak_to_keep_full_json_parse_scan_clean"
+      ]
+    },
+    {
+      "path": "workspace/qw38g_r6a_r12i_r2_r1_static_validation_result.json",
+      "backup_path": "workspace/closure_04_repair_backup/workspace/qw38g_r6a_r12i_r2_r1_static_validation_result.json.bak",
+      "reason": "invalid_json_backslash_escape",
+      "before_sha256": "0d7699847bd28e5868407e1373e60af13c0390421d061e7c94ad35ec551e9402",
+      "before_size_bytes": 995,
+      "action": "escape_windows_powershell_path_backslashes",
+      "after_sha256": "ee60d5960fcac762aae38be614fe69c3b3581e9e342fa30c424f13ad04bcf3a5",
+      "after_size_bytes": 997,
+      "notes": [
+        "backup_renamed_to_json_bak_to_keep_full_json_parse_scan_clean"
+      ]
+    },
+    {
+      "path": "workspace/qw38g_r6a_r12i_r2_static_validation_result.json",
+      "backup_path": "workspace/closure_04_repair_backup/workspace/qw38g_r6a_r12i_r2_static_validation_result.json.bak",
+      "reason": "invalid_json_backslash_escape",
+      "before_sha256": "42db5f1b7699124309c7f90aa5e4415e29943cc52792ecb3878ce75c265a9abf",
+      "before_size_bytes": 1034,
+      "action": "escape_windows_powershell_path_backslashes",
+      "after_sha256": "fa47d654a8e1e12d0d3f7366bd6cce0e8167052c5edae67880ccf7b00e8eb0bf",
+      "after_size_bytes": 1036,
+      "notes": [
+        "backup_renamed_to_json_bak_to_keep_full_json_parse_scan_clean"
+      ]
+    },
+    {
+      "path": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json",
+      "backup_path": "workspace/closure_04_repair_backup/workspace/qw38g_r6a_decode06_transition_guard_receipt.json.bak",
+      "reason": "aggregate_receipt_list_duplicates_standalone_receipts",
+      "before_sha256": "42a468e1e6e0455393dfddc69497e3b7bea009f2e349d62d6b5ad17fd5e6bca3",
+      "before_size_bytes": 4964,
+      "action": "replace_duplicate_receipt_aggregate_with_canonical_reference_index",
+      "after_sha256": "84bc93b810734f136448f6e42ea4b9593cf232873d3b0a00461c78dfb89c5e2d",
+      "after_size_bytes": 3357,
+      "notes": [
+        "backup_renamed_to_json_bak_to_keep_full_json_parse_scan_clean"
+      ]
+    }
+  ],
+  "unknown_auto_patch_applied": false,
+  "json_autofix_executed_count": 0,
+  "manual_static_repair_executed_count": 5,
+  "runtime_decode_executed": false,
+  "model_forward_executed": false,
+  "sampling_executed": false,
+  "subtitle_export_executed": false,
+  "deterministic_receipt_key": "q4sha256:05d06168ffe3bfdb05b2fccc31e08465f3bbf8439c75cb28abe6f45ac77101af"
+}

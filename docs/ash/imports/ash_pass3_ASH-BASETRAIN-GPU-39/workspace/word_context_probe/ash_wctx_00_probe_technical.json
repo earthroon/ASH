@@ -1,0 +1,108 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-00",
+  "input_text": "WebGPU 렌더 경로에서 폴리라인으로 떨어지는 이유",
+  "input_char_len": 29,
+  "input_byte_len": 65,
+  "hits": [
+    {
+      "surface": "WebGPU",
+      "normalized": null,
+      "span": {
+        "start_char": 0,
+        "end_char": 6,
+        "start_byte": 0,
+        "end_byte": 6
+      },
+      "role": "technical_term",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.7,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "렌더",
+      "normalized": null,
+      "span": {
+        "start_char": 7,
+        "end_char": 9,
+        "start_byte": 7,
+        "end_byte": 13
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "경로에서",
+      "normalized": null,
+      "span": {
+        "start_char": 10,
+        "end_char": 14,
+        "start_byte": 14,
+        "end_byte": 26
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "폴리라인으로",
+      "normalized": null,
+      "span": {
+        "start_char": 15,
+        "end_char": 21,
+        "start_byte": 27,
+        "end_byte": 45
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "떨어지는",
+      "normalized": null,
+      "span": {
+        "start_char": 22,
+        "end_char": 26,
+        "start_byte": 46,
+        "end_byte": 58
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "이유",
+      "normalized": null,
+      "span": {
+        "start_char": 27,
+        "end_char": 29,
+        "start_byte": 59,
+        "end_byte": 65
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    }
+  ],
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true,
+    "unknown_span_count": 5
+  },
+  "deterministic_receipt_key": "sha256:df63b3a8f97b2541c1e6f9442d73a2aa90e12dc08a9233dd57fec81a2e087ebb",
+  "created_by": "ash_core::word_context",
+  "schema_version": 1
+}

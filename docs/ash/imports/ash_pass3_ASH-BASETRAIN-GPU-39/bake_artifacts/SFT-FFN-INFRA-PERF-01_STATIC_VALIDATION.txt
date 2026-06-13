@@ -1,0 +1,19 @@
+SFT-FFN-INFRA-PERF-01 static validation
+
+Checked:
+- added infra_error.rs
+- added infra_string.rs
+- added infra_hash.rs
+- added ffn_infra_perf_hygiene.rs backend shell
+- added sft_ffn_infra_perf_01_hot_path_hygiene.rs tests
+- ash_core lib.rs exports infra modules
+- burn_webgpu_backend lib.rs exports backend hygiene shell
+- event_driven_lora_router uses stable_hash_fmt_v2(format_args!(...)) for event_id hash input
+- event_sft_sample_ledger uses centralized string dedup utilities and legacy stable hash wrapper
+- event_tag_router_calibration includes AshTagRouterCalibrationWeights default config
+- event_tag_router_calibration hot hash call sites patched to stable_hash_fmt_v2 / stable_hash_str_debug_str
+- acceptance report present
+- bake report present
+
+Not checked:
+- cargo test / rustc compile / rustfmt, because Rust toolchain is unavailable in this container.

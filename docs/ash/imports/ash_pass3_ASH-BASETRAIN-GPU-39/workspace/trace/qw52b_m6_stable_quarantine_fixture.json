@@ -1,0 +1,94 @@
+[
+  {
+    "case_id": "stable_phrase_candidate_low_risk",
+    "generated_pieces": [
+      "오늘",
+      "날씨가",
+      "좋네요",
+      "."
+    ],
+    "mirror_resonance_score": 0.72,
+    "self_echo_score": 0.12,
+    "residual_loop_score": 0.18,
+    "phase_escape_score": 0.1,
+    "diversity_risk_score": 0.1,
+    "aggregate_detector_risk": 0.2,
+    "available_detector_count": 8,
+    "final_status_hint": null,
+    "human_review_label": null,
+    "expected": {
+      "memory_candidate_class": "StablePhraseCandidate",
+      "stable_phrase_memory_write": false,
+      "requires_human_review": true
+    }
+  },
+  {
+    "case_id": "quarantine_candidate_self_echo_loop",
+    "generated_pieces": [
+      "있고",
+      "나오죠",
+      "나오죠",
+      "나오죠"
+    ],
+    "mirror_resonance_score": 0.1,
+    "self_echo_score": 0.82,
+    "residual_loop_score": 0.76,
+    "phase_escape_score": 0.2,
+    "diversity_risk_score": 0.71,
+    "aggregate_detector_risk": 0.78,
+    "available_detector_count": 9,
+    "final_status_hint": "salad",
+    "human_review_label": null,
+    "expected": {
+      "memory_candidate_class": "QuarantineCandidate",
+      "quarantine_memory_write": false,
+      "token_ban_allowed": false,
+      "requires_human_review": true
+    }
+  },
+  {
+    "case_id": "review_candidate_ambiguous_medium_risk",
+    "generated_pieces": [
+      "그런데",
+      "이건",
+      "조금",
+      "애매합니다"
+    ],
+    "mirror_resonance_score": 0.43,
+    "self_echo_score": 0.36,
+    "residual_loop_score": 0.41,
+    "phase_escape_score": 0.44,
+    "diversity_risk_score": 0.38,
+    "aggregate_detector_risk": 0.42,
+    "available_detector_count": 7,
+    "final_status_hint": null,
+    "human_review_label": null,
+    "expected": {
+      "memory_candidate_class": "ReviewQueueCandidate",
+      "review_state": "ReviewSuggested",
+      "stable_phrase_memory_write": false,
+      "quarantine_memory_write": false
+    }
+  },
+  {
+    "case_id": "ignore_memory_too_short_or_missing",
+    "generated_pieces": [
+      "네"
+    ],
+    "mirror_resonance_score": null,
+    "self_echo_score": null,
+    "residual_loop_score": null,
+    "phase_escape_score": null,
+    "diversity_risk_score": null,
+    "aggregate_detector_risk": null,
+    "available_detector_count": 1,
+    "final_status_hint": null,
+    "human_review_label": null,
+    "expected": {
+      "memory_candidate_class": "Unavailable",
+      "stable_phrase_memory_write": false,
+      "quarantine_memory_write": false,
+      "token_ban_allowed": false
+    }
+  }
+]

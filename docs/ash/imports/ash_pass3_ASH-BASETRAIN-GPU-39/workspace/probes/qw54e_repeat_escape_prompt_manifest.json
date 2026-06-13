@@ -1,0 +1,18 @@
+{
+  "patch_id": "QW-54E",
+  "prompt_set_id": "repeat_escape_probe_v1",
+  "prompts": [
+    {
+      "prompt_id": "ko_loop_probe_bonikka_001",
+      "text": "Translate this subtitle into Korean without repeating the same phrase: I saw it because it kept coming back.",
+      "expected_domain": "subtitle_translation",
+      "known_loop_piece": "▁보니까"
+    },
+    {
+      "prompt_id": "ko_loop_probe_naojo_001",
+      "text": "Translate this subtitle into Korean: It keeps showing up, and then it shows up again.",
+      "expected_domain": "subtitle_translation",
+      "known_loop_piece": "나오죠"
+    }
+  ]
+}

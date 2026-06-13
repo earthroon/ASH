@@ -1,0 +1,55 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-BUILD-ENV-02",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "contract_type": "external_runner_receipt_contract",
+  "external_runner_required": true,
+  "external_runner_executed": false,
+  "commands": [
+    "rustc --version",
+    "cargo --version",
+    "rustup show",
+    "python3 tools/provision_rust_toolchain.py --verify --emit-receipt",
+    "python3 tools/run_build_00_r1_cargo_environment_rerun.py",
+    "cargo test -p tokenizer_core --test decode_qa_05_control_token_guard",
+    "cargo test -p tokenizer_core --test decode_qa_06_byte_utf8_guard",
+    "cargo test -p tokenizer_core --test decode_qa_07_linebreak_guard",
+    "cargo test -p tokenizer_core --test decode_qa_08_degeneration_guard",
+    "cargo test -p tokenizer_core --test decode_qa_09_termination_guard",
+    "cargo test -p tokenizer_core --test decode_qa_10_subtitle_smoke",
+    "cargo test -p tokenizer_core --test decode_qa_11_regression_matrix",
+    "cargo test -p tokenizer_core --test decode_qa_12_quality_closure",
+    "cargo test -p tokenizer_core --test decode_run_00_runtime_guard_chain",
+    "cargo run -p tokenizer_core --bin decode_run_00_runtime_guard_chain"
+  ],
+  "required_receipts": [
+    "workspace/build_env_02_external_runner_receipt.json",
+    "workspace/build_env_02_external_runner_stdout.log",
+    "workspace/build_env_02_external_runner_stderr.log",
+    "workspace/build_00_r1_static_build_receipt.json",
+    "workspace/build_00_r1_cargo_check_report.json",
+    "workspace/decode_run_00_execution_receipt.json",
+    "workspace/decode_run_00_runtime_guard_chain_result.json",
+    "workspace/decode_run_00_runtime_guard_chain_summary.json"
+  ],
+  "conditional_receipts": [
+    "workspace/build_00_r1_missing_path_dependency_classification.json",
+    "workspace/build_00_r1_tokenizer_core_test_report.json",
+    "workspace/build_00_r1_decode_run_00_execution_report.json"
+  ],
+  "pass_statuses": [
+    "PASS_EXTERNAL_RUNNER_GUARD_CHAIN",
+    "BLOCKED_MISSING_PATH_DEPENDENCY",
+    "BLOCKED_TOKENIZER_CORE_COMPILE_ERROR",
+    "BLOCKED_GUARD_CHAIN_MISMATCH",
+    "EXTERNAL_RUNNER_TEMPLATE_READY_NOT_EXECUTED"
+  ],
+  "runtime_ready_decode_confirmed_requires": [
+    "external_runner_executed = true",
+    "cargo_test_executed = true",
+    "cargo_run_executed = true",
+    "decode_run_00_guard_chain_executed = true",
+    "surface_text_mismatch_count = 0",
+    "guard_signal_mismatch_count = 0",
+    "failure_case_count = 0"
+  ]
+}

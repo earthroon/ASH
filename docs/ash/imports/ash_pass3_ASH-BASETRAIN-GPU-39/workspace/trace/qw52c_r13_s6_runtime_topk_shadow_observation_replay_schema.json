@@ -1,0 +1,40 @@
+{
+  "schema_id": "qw52c_r13_s6_runtime_topk_shadow_observation_replay_schema",
+  "schema_version": "1.0.0",
+  "patch_id": "QW-52C-R13-S6",
+  "base_patch": "QW-52C-R13-S5",
+  "status_target": "PASS_RUNTIME_TOPK_SHADOW_OBSERVATION_REPLAY_NO_TOKEN_MUTATION",
+  "blocked_status": "BLOCKED_MISSING_REAL_RUNTIME_TRACE_INPUT",
+  "input_trace_format": "jsonl",
+  "accepted_evidence_kinds": [
+    "RealRuntimeTopKTrace",
+    "RealRuntimeShadowTrace"
+  ],
+  "rejected_evidence_kinds": [
+    "StaticFixture",
+    "MockReplay",
+    "ParsedReceiptOnly",
+    "Unknown"
+  ],
+  "replay_classes": [
+    "BeneficialDiff",
+    "RiskyDiff",
+    "StableBroken",
+    "NoDiff",
+    "ReviewOnly",
+    "Unavailable"
+  ],
+  "forbidden_true_fields": [
+    "shadow_result_applied",
+    "runtime_apply_allowed",
+    "token_selection_mutated",
+    "token_rank_mutated",
+    "logit_mutated",
+    "sampler_mutated"
+  ],
+  "runtime_apply_allowed": false,
+  "promotion_eligible": false,
+  "weight_commit_allowed": false,
+  "safe_profile_apply_allowed": false,
+  "policy_promotion_allowed": false
+}

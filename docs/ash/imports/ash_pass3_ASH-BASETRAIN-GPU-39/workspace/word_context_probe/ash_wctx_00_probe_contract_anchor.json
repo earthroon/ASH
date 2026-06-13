@@ -1,0 +1,63 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-00",
+  "input_text": "SSOT부터 다시 봐줘",
+  "input_char_len": 12,
+  "input_byte_len": 24,
+  "hits": [
+    {
+      "surface": "SSOT부터",
+      "normalized": null,
+      "span": {
+        "start_char": 0,
+        "end_char": 6,
+        "start_byte": 0,
+        "end_byte": 10
+      },
+      "role": "contract_anchor",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.7,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "다시",
+      "normalized": null,
+      "span": {
+        "start_char": 7,
+        "end_char": 9,
+        "start_byte": 11,
+        "end_byte": 17
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    },
+    {
+      "surface": "봐줘",
+      "normalized": null,
+      "span": {
+        "start_char": 10,
+        "end_char": 12,
+        "start_byte": 18,
+        "end_byte": 24
+      },
+      "role": "unknown",
+      "source": "current_turn_heuristic",
+      "links": [],
+      "confidence": 0.5,
+      "reason": "ASH-WCTX-00 initial whitespace-bounded probe span; no token or generation mutation"
+    }
+  ],
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true,
+    "unknown_span_count": 2
+  },
+  "deterministic_receipt_key": "sha256:e1be29dd69615229d4bb3611c7712717c5bf7cfc9964d21b0bf90e23d8613f03",
+  "created_by": "ash_core::word_context",
+  "schema_version": 1
+}

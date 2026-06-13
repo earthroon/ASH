@@ -1,0 +1,43 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03B",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "behavior_change": false,
+  "shadow_only": true,
+  "requires_decode03b": true,
+  "decode03b_status_seen": null,
+  "decode03a_status_seen": null,
+  "sampler05_status_seen": null,
+  "steps_observed": 0,
+  "policy_buckets": {
+    "confident_path_count": 0,
+    "stable_path_count": 0,
+    "uncertain_path_count": 0,
+    "unstable_path_count": 0,
+    "collapsing_path_count": 0
+  },
+  "policy_actions": {
+    "would_change_behavior_count": 0,
+    "would_tighten_count": 0,
+    "would_relax_count": 0,
+    "would_panic_count": 0,
+    "rollback_candidate_count": 0,
+    "safe_stop_candidate_count": 0,
+    "eos_bias_candidate_count": 0
+  },
+  "shadow_config_stats": {
+    "temperature_shadow_min": null,
+    "temperature_shadow_mean": null,
+    "temperature_shadow_max": null,
+    "min_p_shadow_min": null,
+    "min_p_shadow_mean": null,
+    "min_p_shadow_max": null,
+    "top_p_shadow_min": null,
+    "top_p_shadow_mean": null,
+    "top_p_shadow_max": null
+  },
+  "risk_policy_reasons": {},
+  "ready_for_decode03d_controlled_enable": false,
+  "ready_for_default_enable": false,
+  "reason": "static bake only; run ASH_DECODE03C_SHADOW=receipt after DECODE-03B PCI to produce shadow policy evidence"
+}

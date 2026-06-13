@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SALAD-02 Word Salad Online Detector Receipt",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "schema_version",
+    "behavior_change",
+    "detector_only",
+    "input",
+    "detection",
+    "selected_id"
+  ],
+  "properties": {
+    "patch_id": {
+      "const": "16AI-QW-38G-R6A-SALAD-02"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "behavior_change": {
+      "const": false
+    },
+    "detector_only": {
+      "const": true
+    },
+    "selected_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "detection": {
+      "type": "object",
+      "required": [
+        "behavior_change",
+        "detector_only",
+        "score",
+        "risk_raw",
+        "risk_stable",
+        "action_executed"
+      ],
+      "properties": {
+        "behavior_change": {
+          "const": false
+        },
+        "detector_only": {
+          "const": true
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "risk_raw": {
+          "enum": [
+            "Low",
+            "Medium",
+            "High",
+            "Critical"
+          ]
+        },
+        "risk_stable": {
+          "enum": [
+            "Low",
+            "Medium",
+            "High",
+            "Critical"
+          ]
+        },
+        "action_executed": {
+          "const": false
+        }
+      }
+    }
+  }
+}

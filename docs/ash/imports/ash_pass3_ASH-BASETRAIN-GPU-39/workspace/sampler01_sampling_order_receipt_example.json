@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
+  "runner": "orchestrator_local_infer_entry",
+  "sampler_audit_enabled": true,
+  "sampling_order": [
+    "raw_logits",
+    "repetition_penalty",
+    "ban_mask",
+    "eos_step_guard",
+    "temperature_scale",
+    "top_k_filter",
+    "min_p_filter",
+    "top_p_filter",
+    "final_sample"
+  ],
+  "repetition_penalty_stage": "before_temperature_and_softmax",
+  "min_p_enabled": true,
+  "min_p_value": 0.05,
+  "min_p_threshold_mode": "logit_domain",
+  "top_p_after_min_p": true,
+  "status": "PASS_MIN_P_FILTER_AND_SAMPLING_ORDER_SEALED"
+}

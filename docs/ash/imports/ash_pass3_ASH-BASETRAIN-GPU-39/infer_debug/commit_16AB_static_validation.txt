@@ -1,0 +1,41 @@
+# Commit 16AB Static Validation
+
+## Policy fields
+crates/runtime/src/infer.rs:612:    pub disable_native_headwise_atlas: bool,
+crates/runtime/src/infer.rs:1007:    pub disable_native_headwise_atlas: bool,
+crates/runtime/src/infer.rs:2147:        disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+crates/runtime/src/infer.rs:2339:                req.disable_native_headwise_atlas,
+crates/runtime/src/infer.rs:2351:                req.disable_native_headwise_atlas,
+crates/runtime/src/infer/request_resolution.rs:54:    pub disable_native_headwise_atlas: bool,
+crates/runtime/src/infer/request_resolution.rs:122:            disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+crates/orchestrator_local/src/infer_entry.rs:301:    let disable_native_headwise_atlas = payload_bool(
+crates/orchestrator_local/src/infer_entry.rs:303:        "disableNativeHeadwiseAtlas",
+crates/orchestrator_local/src/infer_entry.rs:304:        "disable_native_headwise_atlas",
+crates/orchestrator_local/src/infer_entry.rs:326:        disable_native_headwise_atlas,
+crates/orchestrator_local/src/infer_entry.rs:360:        disable_native_headwise_atlas,
+crates/model_core/src/native_wgpu.rs:487:    disable_native_headwise_atlas: bool,
+crates/model_core/src/native_wgpu.rs:1366:        if self.disable_native_raw_bridge || self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
+crates/model_core/src/native_wgpu.rs:1404:        disable_native_headwise_atlas: bool,
+crates/model_core/src/native_wgpu.rs:1423:            disable_native_headwise_atlas,
+crates/model_core/src/native_wgpu.rs:1427:        let atlas_dispatcher = if disable_native_headwise_atlas || disable_native_qkv_bridge {
+crates/model_core/src/native_wgpu.rs:1487:            disable_native_headwise_atlas,
+crates/model_core/src/native_wgpu.rs:1521:        disable_native_headwise_atlas: bool,
+crates/model_core/src/native_wgpu.rs:1536:            disable_native_headwise_atlas,
+crates/model_core/src/native_wgpu.rs:2492:        if self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
+
+## Gate logs
+crates/orchestrator_local/src/infer_entry.rs:325:        "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+crates/runtime/src/infer.rs:2338:                "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+crates/model_core/src/native_wgpu.rs:1314:                "[16AB][raw-bridge] skipped reason=disabled_by_policy stage=same_device_raw_bridge"
+crates/model_core/src/native_wgpu.rs:1368:                "[16AB][raw-bridge] skipped reason=disabled_by_policy label={}",
+crates/model_core/src/native_wgpu.rs:1422:            "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+crates/model_core/src/native_wgpu.rs:1429:                "[16AB][headwise-atlas] disabled_by_policy=true stage=init"
+crates/model_core/src/native_wgpu.rs:2494:                "[16AB][headwise-atlas] skipped reason=disabled_by_policy stage=try_grouped_query_attention_via_atlas"
+
+## Constructor signatures
+crates/model_core/src/native_wgpu.rs:1394:        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false, false, false, false)
+crates/model_core/src/native_wgpu.rs:1397:    pub fn from_full_checkpoints_with_vocab_atlas(
+crates/model_core/src/native_wgpu.rs:1510:        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false, false, false, false)
+crates/model_core/src/native_wgpu.rs:1513:    pub fn load_toml_with_loras_and_vocab_atlas(
+crates/model_core/src/native_wgpu.rs:1529:        let mut model = Self::from_full_checkpoints_with_vocab_atlas(
+crates/runtime/src/infer.rs:2343:            match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(

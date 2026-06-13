@@ -1,0 +1,23 @@
+{
+  "candidate_id": "candidate-polarity-fail",
+  "candidate_ko": "난 그를 믿어.",
+  "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+  "cue_id": "mock-cue-0004",
+  "decode_session_id": "mock-decode-session-polarity-fail",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "expected_decision": "RejectCandidateRecommended",
+  "expected_reason": "PolarityInversion",
+  "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+  "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+  "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+  "source_en": "I don't trust him.",
+  "span_error_receipt_hash": "mock-span-receipt-hash",
+  "span_errors": [
+    {
+      "candidate_span": "믿어",
+      "error_type": "PolarityMismatch",
+      "severity": "Major",
+      "source_span": "don't trust"
+    }
+  ]
+}

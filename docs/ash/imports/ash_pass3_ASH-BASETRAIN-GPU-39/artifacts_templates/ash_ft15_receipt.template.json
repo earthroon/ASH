@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-FT-15",
+  "title": "Shadow Candidate Token Selection Gate Preflight / No Decode No Generation Seal",
+  "status": "PASS",
+  "guards": {
+    "selection_mode": "preflight_only",
+    "token_selection_executed": false,
+    "token_id_committed": false,
+    "argmax_executed": false,
+    "top_k_executed": false,
+    "top_p_executed": false,
+    "temperature_sampling_executed": false,
+    "sampling_executed": false,
+    "token_decode_executed": false,
+    "decoded_text_created": false,
+    "generation_executed": false,
+    "user_prompt_evaluated": false,
+    "real_corpus_eval_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "promotion_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "optimizer_step_executed": false,
+    "train_executed": false
+  },
+  "verdict": "PASS_ASH_FT15_SHADOW_CANDIDATE_TOKEN_SELECTION_GATE_PREFLIGHT_NO_DECODE_NO_GENERATION"
+}

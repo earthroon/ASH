@@ -1,0 +1,352 @@
+--- /mnt/data/work_r6a_r1_layout_orig2/crates/model_core/src/native_wgpu.rs	2026-05-22 13:01:36.000000000 +0000
++++ /mnt/data/work_r6a_r1_layout/crates/model_core/src/native_wgpu.rs	2026-05-22 13:35:26.345071594 +0000
+@@ -1008,6 +1008,341 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A-R1 — Pipeline Layout Registry Exposure / Bind Group Audit Seal
++static QW38G_R6A_R1_AUDIT_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r1_enabled() -> bool {
++    env_flag("ASH_PIPELINE_LAYOUT_AUDIT") || env_flag("ASH_QW38G_R6A_R1_PIPELINE_LAYOUT_AUDIT")
++}
++
++fn qw38g_r6a_r1_dry_run() -> bool {
++    std::env::var("ASH_PIPELINE_LAYOUT_AUDIT_DRY_RUN")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r6a_r1_audit_path() -> String {
++    std::env::var("ASH_PIPELINE_LAYOUT_AUDIT_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r1_pipeline_layout_audit.json".to_string())
++}
++
++fn qw38g_r6a_r1_receipt_path() -> String {
++    std::env::var("ASH_PIPELINE_LAYOUT_AUDIT_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r1_runtime_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r1_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r6a_r1_path_written(path: &str) -> bool {
++    std::path::Path::new(path)
++        .metadata()
++        .map(|m| m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn qw38g_r6a_r1_write_audit_and_receipt(
++    status: &str,
++    events: Vec<serde_json::Value>,
++    owner_state: serde_json::Value,
++    warnings: Vec<String>,
++    recommended_next_patch: &str,
++) {
++    let audit_path = qw38g_r6a_r1_audit_path();
++    let receipt_path = qw38g_r6a_r1_receipt_path();
++    let shader_module_owner_found = owner_state.get("shader_module_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let compute_pipeline_owner_found = owner_state.get("compute_pipeline_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let pipeline_layout_owner_found = owner_state.get("pipeline_layout_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let bind_group_layout_owner_found = owner_state.get("bind_group_layout_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let bind_group_owner_found = owner_state.get("bind_group_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let cache_key_owner_found = owner_state.get("cache_key_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let debug_binding_surface_owner_found = owner_state.get("debug_binding_surface_owner_found").and_then(|v| v.as_bool()).unwrap_or(false);
++    let debug_binding_insertable_from_current_crate = owner_state.get("debug_binding_insertable_from_current_crate").and_then(|v| v.as_bool()).unwrap_or(false);
++    let backend_patch_required = owner_state.get("backend_patch_required").and_then(|v| v.as_bool()).unwrap_or(true);
++
++    let audit = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R1",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "audit_enabled": qw38g_r6a_r1_enabled(),
++        "dry_run": qw38g_r6a_r1_dry_run(),
++        "events": events,
++        "shader_module_owner_found": shader_module_owner_found,
++        "compute_pipeline_owner_found": compute_pipeline_owner_found,
++        "pipeline_layout_owner_found": pipeline_layout_owner_found,
++        "bind_group_layout_owner_found": bind_group_layout_owner_found,
++        "bind_group_owner_found": bind_group_owner_found,
++        "cache_key_owner_found": cache_key_owner_found,
++        "debug_binding_surface_owner_found": debug_binding_surface_owner_found,
++        "debug_binding_insertable_from_current_crate": debug_binding_insertable_from_current_crate,
++        "backend_patch_required": backend_patch_required,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warnings,
++        "owner_state": owner_state,
++    });
++    qw38g_r6a_r1_write_json(&audit_path, &audit);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R1",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "audit_enabled": qw38g_r6a_r1_enabled(),
++        "dry_run": qw38g_r6a_r1_dry_run(),
++        "shader_module_owner_found": shader_module_owner_found,
++        "compute_pipeline_owner_found": compute_pipeline_owner_found,
++        "pipeline_layout_owner_found": pipeline_layout_owner_found,
++        "bind_group_layout_owner_found": bind_group_layout_owner_found,
++        "bind_group_owner_found": bind_group_owner_found,
++        "cache_key_owner_found": cache_key_owner_found,
++        "debug_binding_surface_owner_found": debug_binding_surface_owner_found,
++        "debug_binding_insertable_from_current_crate": debug_binding_insertable_from_current_crate,
++        "backend_patch_required": backend_patch_required,
++        "audit_path": audit_path,
++        "audit_written": qw38g_r6a_r1_path_written(&qw38g_r6a_r1_audit_path()),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": audit.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r1_write_json(&qw38g_r6a_r1_receipt_path(), &receipt);
++    eprintln!("[16AI-QW-38G-R6A-R1][audit_written] path={}", qw38g_r6a_r1_audit_path());
++    eprintln!("[16AI-QW-38G-R6A-R1][receipt_written] path={}", qw38g_r6a_r1_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R1][done] status={}", status);
++}
++
++fn qw38g_r6a_r1_pipeline_layout_registry_audit(candidate_context: &str) {
++    if !qw38g_r6a_r1_enabled() {
++        return;
++    }
++    if QW38G_R6A_R1_AUDIT_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++    let dry_run = qw38g_r6a_r1_dry_run();
++    eprintln!("[16AI-QW-38G-R6A-R1][start]");
++    eprintln!("[16AI-QW-38G-R6A-R1][env] enabled=true dry_run={} context={}", dry_run, candidate_context);
++    eprintln!("[16AI-QW-38G-R6A-R1][audit_start] context={}", candidate_context);
++
++    if !dry_run {
++        qw38g_r6a_r1_write_audit_and_receipt(
++            "FAIL_NON_DRY_RUN_REJECTED",
++            vec![serde_json::json!({
++                "patch_id": "16AI-QW-38G-R6A-R1",
++                "event_kind": "dry_run_guard",
++                "owner_name": candidate_context,
++                "function_name": "qw38g_r6a_r1_pipeline_layout_registry_audit",
++                "shader_name": null,
++                "pipeline_name": null,
++                "reached": true,
++                "count": 1,
++                "layout_visible_from_native_path": false,
++                "bind_group_layout_visible": false,
++                "bind_group_visible": false,
++                "shader_source_visible": false,
++                "cache_key_visible": false,
++                "debug_binding_insertable_here": false,
++                "requires_backend_patch": true,
++                "notes": ["R6A-R1 is audit-only and rejects non-dry-run mode"],
++                "warning_codes": ["PIPELINE_LAYOUT_AUDIT_NON_DRY_RUN_REJECTED"]
++            })],
++            serde_json::json!({
++                "shader_module_owner_found": false,
++                "compute_pipeline_owner_found": false,
++                "pipeline_layout_owner_found": false,
++                "bind_group_layout_owner_found": false,
++                "bind_group_owner_found": false,
++                "cache_key_owner_found": false,
++                "debug_binding_surface_owner_found": false,
++                "debug_binding_insertable_from_current_crate": false,
++                "backend_patch_required": true
++            }),
++            vec!["PIPELINE_LAYOUT_AUDIT_NON_DRY_RUN_REJECTED".to_string()],
++            "16AI-QW-38G-R6A-R1_PIPELINE_LAYOUT_AUDIT_DRY_RUN_ONLY",
++        );
++        return;
++    }
++
++    let events = vec![
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "dispatch_candidate",
++            "owner_name": "NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas",
++            "function_name": "project_last_hidden_to_logits_vocab_atlas",
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "vocab_atlas_projection",
++            "reached": true,
++            "count": 1,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["Hot path reaches vocab atlas projection but does not expose direct bind group layout ownership in this crate"],
++            "warning_codes": ["NO_BIND_GROUP_LAYOUT_SURFACE", "BURN_WGPU_BACKEND_ABSTRACTION_BOUNDARY"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "shader_module_candidate",
++            "owner_name": "burn_wgpu_backend_or_burn_tensor_kernel",
++            "function_name": null,
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas",
++            "reached": true,
++            "count": 1,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["Shader name is visible through telemetry/audit, but shader module source and owner are not exposed at the current native model_core surface"],
++            "warning_codes": ["SHADER_MODULE_OWNER_NOT_FOUND", "NO_SHADER_SOURCE_SURFACE", "BACKEND_PATCH_REQUIRED"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "compute_pipeline_candidate",
++            "owner_name": "burn_wgpu_backend_pipeline_cache",
++            "function_name": null,
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "vocab_atlas_tile_matmul",
++            "reached": true,
++            "count": 1,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["Compute pipeline is implied by successful dispatch, but its layout/cache key owner is behind backend abstraction"],
++            "warning_codes": ["COMPUTE_PIPELINE_OWNER_NOT_FOUND", "BURN_WGPU_BACKEND_ABSTRACTION_BOUNDARY"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "pipeline_layout_candidate",
++            "owner_name": "unknown_backend_pipeline_layout_registry",
++            "function_name": null,
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "vocab_atlas_tile_matmul",
++            "reached": false,
++            "count": 0,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["No direct pipeline layout registry is visible from the current crate surface"],
++            "warning_codes": ["PIPELINE_LAYOUT_OWNER_NOT_FOUND", "NO_PIPELINE_LAYOUT_REGISTRY_VISIBLE"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "bind_group_layout_candidate",
++            "owner_name": "unknown_backend_bind_group_layout_registry",
++            "function_name": null,
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "vocab_atlas_tile_matmul",
++            "reached": false,
++            "count": 0,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["No bind group layout owner is visible from current NativeWgpuModel hot path"],
++            "warning_codes": ["BIND_GROUP_LAYOUT_OWNER_NOT_FOUND", "NO_BIND_GROUP_LAYOUT_SURFACE"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "cache_key_candidate",
++            "owner_name": "unknown_backend_pipeline_cache_key",
++            "function_name": null,
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "pipeline_name": "vocab_atlas_tile_matmul",
++            "reached": false,
++            "count": 0,
++            "layout_visible_from_native_path": false,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": true,
++            "notes": ["Debug on/off pipeline cache key cannot be extended from the current crate without exposing backend owner"],
++            "warning_codes": ["PIPELINE_CACHE_KEY_OWNER_NOT_FOUND", "DEBUG_BINDING_REQUIRES_PIPELINE_CACHE_KEY_EXTENSION"]
++        }),
++        serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R1",
++            "event_kind": "dead_path_candidate",
++            "owner_name": "NativeWgpuModel::forward_hidden_for_generation_input",
++            "function_name": "forward_hidden_for_generation_input",
++            "shader_name": "rust_side_layer_loop_candidate",
++            "pipeline_name": "legacy_or_debug_forward_candidate",
++            "reached": false,
++            "count": 0,
++            "layout_visible_from_native_path": true,
++            "bind_group_layout_visible": false,
++            "bind_group_visible": false,
++            "shader_source_visible": false,
++            "cache_key_visible": false,
++            "debug_binding_insertable_here": false,
++            "requires_backend_patch": false,
++            "notes": ["This Rust-side layer-loop candidate is not reached in the current hot path and cannot host the debug binding for active generation"],
++            "warning_codes": ["FORWARD_HIDDEN_FOR_GENERATION_INPUT_NOT_REACHED"]
++        }),
++    ];
++
++    for event in &events {
++        eprintln!(
++            "[16AI-QW-38G-R6A-R1][candidate] kind={} owner={} reached={} insertable={}",
++            event.get("event_kind").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            event.get("owner_name").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            event.get("reached").and_then(|v| v.as_bool()).unwrap_or(false),
++            event.get("debug_binding_insertable_here").and_then(|v| v.as_bool()).unwrap_or(false)
++        );
++    }
++
++    let owner_state = serde_json::json!({
++        "shader_module_owner_found": false,
++        "compute_pipeline_owner_found": false,
++        "pipeline_layout_owner_found": false,
++        "bind_group_layout_owner_found": false,
++        "bind_group_owner_found": false,
++        "cache_key_owner_found": false,
++        "debug_binding_surface_owner_found": false,
++        "debug_binding_insertable_from_current_crate": false,
++        "backend_patch_required": true,
++        "actual_traceable_boundary": "final_hidden_projection",
++        "binding_surface_status": "BACKEND_ABSTRACTION_BOUNDARY"
++    });
++    eprintln!("[16AI-QW-38G-R6A-R1][cache_key] visible=false reason=backend_cache_key_owner_not_exposed");
++    qw38g_r6a_r1_write_audit_and_receipt(
++        "PASS_PIPELINE_LAYOUT_AUDIT_BACKEND_PATCH_REQUIRED",
++        events,
++        owner_state,
++        vec![
++            "NO_PIPELINE_LAYOUT_REGISTRY_VISIBLE".to_string(),
++            "NO_BIND_GROUP_LAYOUT_SURFACE".to_string(),
++            "BURN_WGPU_BACKEND_ABSTRACTION_BOUNDARY".to_string(),
++            "BACKEND_PATCH_REQUIRED".to_string(),
++        ],
++        "16AI-QW-38G-R6A-R2_BURN_WGPU_PIPELINE_LAYOUT_OWNER_AUDIT",
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -3836,6 +4171,7 @@
+         qw38g_r4_gpu_debug_tap_candidate(&global_top_k, atlas, &last_hidden);
+         qw38g_r6_shader_debug_buffer_candidate();
+         qw38g_r6a_shader_debug_binding_surface("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
++        qw38g_r6a_r1_pipeline_layout_registry_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

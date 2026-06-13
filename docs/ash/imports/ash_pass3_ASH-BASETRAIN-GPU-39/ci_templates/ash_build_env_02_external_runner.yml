@@ -1,0 +1,74 @@
+name: ASH External Rust Runner Receipt
+
+on:
+  workflow_dispatch:
+
+jobs:
+  external-rust-runner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Probe Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+          rustup show
+          python3 tools/provision_rust_toolchain.py --verify --emit-receipt
+
+      - name: Run BUILD-00-R1 classification
+        run: |
+          python3 tools/run_build_00_r1_cargo_environment_rerun.py
+
+      - name: Run tokenizer_core decode QA tests
+        run: |
+          cargo test -p tokenizer_core --test decode_qa_05_control_token_guard
+          cargo test -p tokenizer_core --test decode_qa_06_byte_utf8_guard
+          cargo test -p tokenizer_core --test decode_qa_07_linebreak_guard
+          cargo test -p tokenizer_core --test decode_qa_08_degeneration_guard
+          cargo test -p tokenizer_core --test decode_qa_09_termination_guard
+          cargo test -p tokenizer_core --test decode_qa_10_subtitle_smoke
+          cargo test -p tokenizer_core --test decode_qa_11_regression_matrix
+          cargo test -p tokenizer_core --test decode_qa_12_quality_closure
+          cargo test -p tokenizer_core --test decode_run_00_runtime_guard_chain
+
+      - name: Run DECODE-RUN-00 guard chain
+        run: |
+          cargo run -p tokenizer_core --bin decode_run_00_runtime_guard_chain
+
+      - name: Write external runner receipt
+        if: always()
+        run: |
+          mkdir -p workspace
+          cat > workspace/build_env_02_external_runner_receipt.json <<'JSON'
+          {
+            "patch_id": "16AI-QW-38G-R6A-BUILD-ENV-02",
+            "domain_ssot": "en_to_ko_translation_subtitle_machine",
+            "runner": "github_actions_ubuntu_latest",
+            "receipt_kind": "external_runner_receipt",
+            "ci_executed": true,
+            "cargo_probe_attempted": true,
+            "build_00_r1_attempted": true,
+            "decode_guard_tests_attempted": true,
+            "decode_run_00_attempted": true,
+            "runtime_ready_decode_confirmed": false,
+            "note": "Update this receipt with pass/block classification after CI command results are available. Do not mark runtime_ready_decode_confirmed true unless guard chain execution passes."
+          }
+          JSON
+
+      - name: Upload receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ash-build-env-02-external-runner-receipts
+          path: |
+            workspace/*.json
+            workspace/*.log
+            acceptance_reports/*.md
+            patch_reports/*.md

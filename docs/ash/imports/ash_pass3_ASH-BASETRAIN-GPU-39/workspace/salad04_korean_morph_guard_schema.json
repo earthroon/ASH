@@ -1,0 +1,74 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
+  "title": "Korean Morph Loop Guard Seal",
+  "schema_version": 1,
+  "ssot": "generated_token_stream+piece_preview+salad02_detection_state",
+  "contracts": {
+    "behavior_change": false,
+    "guard_overlay_only": true,
+    "no_morph_autocorrect": true,
+    "no_direct_rollback": true,
+    "no_direct_stop": true
+  },
+  "step_receipt": {
+    "required_fields": [
+      "patch_id",
+      "input_patch",
+      "schema_version",
+      "run_id",
+      "step",
+      "backend",
+      "mode",
+      "behavior_change",
+      "guard_overlay_only",
+      "input",
+      "detection",
+      "selected_id"
+    ],
+    "input": [
+      "current",
+      "recent",
+      "salad02_score",
+      "salad02_risk_stable",
+      "pci_raw",
+      "pci_bucket",
+      "entropy_spike",
+      "fallback_risk",
+      "numeric_risk",
+      "global_finite_fallback_seen",
+      "decode03d_guard_strength",
+      "stop01_executed"
+    ],
+    "detection": [
+      "morph_score",
+      "morph_risk_raw",
+      "morph_risk_stable",
+      "dominant_loop_kind",
+      "window_metrics",
+      "components",
+      "overlay_recommendation",
+      "morph_reasons"
+    ]
+  },
+  "risk_levels": {
+    "low": "0.00-0.30",
+    "medium": "0.30-0.55",
+    "high": "0.55-0.80",
+    "critical": "0.80-1.00"
+  },
+  "loop_kinds": [
+    "JosaRepeat",
+    "JosaChain",
+    "EomiRepeat",
+    "EomiPunctuationLoop",
+    "JamoLeak",
+    "ByteJamoMixedLeak",
+    "SyllableFragmentLoop",
+    "EojeolBoundaryCollapse",
+    "PunctuationGlueLoop",
+    "MixedMorphLoop"
+  ],
+  "ready_next": [
+    "16AI-QW-38G-R6A-EVAL-00 Fixed Prompt Suite / Decode Regression Bench Seal"
+  ]
+}

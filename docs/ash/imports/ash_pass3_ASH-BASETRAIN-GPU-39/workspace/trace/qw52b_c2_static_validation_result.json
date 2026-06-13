@@ -1,0 +1,26 @@
+{
+  "patch_id": "QW-52B-C2",
+  "status": "PASS_STATIC_CJI_CAIRO_COUNTEREXAMPLE_STRESS_TRACE",
+  "json_static_validation": "PASS",
+  "zip_integrity": "PASS",
+  "crate_js_ts_added_by_patch": false,
+  "added_crate_files": [
+    "crates/model_core/src/cji_cairo_counterexample_trace.rs",
+    "crates/model_core/src/bin/qw52b_c2_cji_cairo_validate.rs"
+  ],
+  "forbidden_mutations": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "memory_mutation": false,
+    "cairo_gate_apply": false,
+    "force_class_apply": false
+  },
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE",
+  "runtime_probe": "NOT_RUN_RUNTIME_UNAVAILABLE"
+}

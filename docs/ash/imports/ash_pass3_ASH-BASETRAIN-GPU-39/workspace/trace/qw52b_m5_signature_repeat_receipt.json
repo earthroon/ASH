@@ -1,0 +1,452 @@
+{
+  "patch_id": "QW-52B-M5",
+  "title": "QWave Signature Repeat Guard / Diversity Hash Trace Seal",
+  "base_patch": "QW-52B-M4",
+  "status": "PASS_STATIC_QWAVE_SIGNATURE_REPEAT_GUARD",
+  "detector_added": {
+    "detector_id": "qwave_signature_repeat_guard",
+    "detector_family": "structural_diversity_hash_guard",
+    "registry_detector_count_before": 13,
+    "registry_detector_count_after": 14
+  },
+  "config": {
+    "recent_window_size": 12,
+    "token_ngram_min": 2,
+    "token_ngram_max": 4,
+    "piece_ngram_min": 2,
+    "piece_ngram_max": 4,
+    "qwave_signature_weight": 0.3,
+    "cji_xyz_weight": 0.15,
+    "transition_hash_weight": 0.2,
+    "token_ngram_weight": 0.15,
+    "piece_ngram_weight": 0.2,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85,
+    "min_available_signals": 2
+  },
+  "hash_policy": {
+    "hash_policy_version": "fnv1a64_v1",
+    "normalization_policy_version": "piece_norm_v1",
+    "cryptographic": false,
+    "deterministic": true,
+    "external_dependency_added": false
+  },
+  "fixture_results": [
+    {
+      "case_id": "normal_diverse_signature_window",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M5",
+        "detector_id": "qwave_signature_repeat_guard",
+        "decode_step": 0,
+        "recent_window_size": 12,
+        "token_ngram_repeat_count": 0,
+        "piece_ngram_repeat_count": 0,
+        "qwave_signature_repeat_count": 0,
+        "cji_xyz_repeat_count": null,
+        "transition_hash_repeat_count": 0,
+        "token_hash_risk": 0.0,
+        "piece_hash_risk": 0.0,
+        "qwave_signature_hash_risk": 0.0,
+        "cji_xyz_hash_risk": null,
+        "transition_hash_risk": 0.0,
+        "diversity_risk_score": 0,
+        "risk_score": 0,
+        "risk_level": "None",
+        "evidence": {
+          "token_ngram_hashes": [
+            "737c0fe6bd29a2a2",
+            "cdf94b30ca21f2e8",
+            "50f4ff4e85175054",
+            "cbe08bfafcf2f0ea",
+            "ab0388505a89bbab",
+            "5ecd7bafca031fd9",
+            "c627344780349e8b",
+            "ea88428f2bb49764",
+            "33d5ac8a2b793e94"
+          ],
+          "piece_ngram_hashes": [
+            "7a880ebbb08b6f07",
+            "3213593c25b7be4c",
+            "3908a1e52353fac3",
+            "5935aca32284c349",
+            "18cc9bc04811810c",
+            "95d157477da500bd",
+            "0d01b4f25ba0d484",
+            "f05e44ad484a0cbd",
+            "4aa03ab120e3e5d4"
+          ],
+          "qwave_signature_hashes": [
+            "a1",
+            "b2",
+            "c3",
+            "d4",
+            "e5"
+          ],
+          "cji_xyz_hashes": [],
+          "transition_hashes": [
+            "a1>b2",
+            "b2>c3",
+            "c3>d4",
+            "d4>e5"
+          ],
+          "repeated_token_ngram_hashes": [],
+          "repeated_piece_ngram_hashes": [],
+          "repeated_qwave_signature_hashes": [],
+          "repeated_cji_xyz_hashes": [],
+          "repeated_transition_hashes": [],
+          "hash_policy_version": "fnv1a64_v1",
+          "normalization_policy_version": "piece_norm_v1",
+          "available_signal_count": 4,
+          "missing_signals": [
+            "cji_xyz_hashes"
+          ],
+          "note": [
+            "signature repeat guard is trace-only; no token ban or memory mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "surface_piece_repeat_guard",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M5",
+        "detector_id": "qwave_signature_repeat_guard",
+        "decode_step": 0,
+        "recent_window_size": 12,
+        "token_ngram_repeat_count": 1,
+        "piece_ngram_repeat_count": 1,
+        "qwave_signature_repeat_count": 1,
+        "cji_xyz_repeat_count": null,
+        "transition_hash_repeat_count": 1,
+        "token_hash_risk": 0.3333333333333333,
+        "piece_hash_risk": 0.3333333333333333,
+        "qwave_signature_hash_risk": 0.75,
+        "cji_xyz_hash_risk": null,
+        "transition_hash_risk": 0.6666666666666666,
+        "diversity_risk_score": 0.75,
+        "risk_score": 0.75,
+        "risk_level": "High",
+        "evidence": {
+          "token_ngram_hashes": [
+            "520f8d4febd5adbb",
+            "e432e8efe4e3b1d8",
+            "e432e8efe4e3b1d8",
+            "818c0b53c39467f8",
+            "b90af3a53c3a032b",
+            "cd3a27d7239a3e1d"
+          ],
+          "piece_ngram_hashes": [
+            "24d5fe9c47735fd2",
+            "6bb6b43dfe532293",
+            "6bb6b43dfe532293",
+            "221b9f27b6f20bdb",
+            "6909aa8f3865c944",
+            "6781d8748d6d5cc0"
+          ],
+          "qwave_signature_hashes": [
+            "x0",
+            "x1",
+            "x1",
+            "x1"
+          ],
+          "cji_xyz_hashes": [],
+          "transition_hashes": [
+            "x0>x1",
+            "x1>x1",
+            "x1>x1"
+          ],
+          "repeated_token_ngram_hashes": [
+            "e432e8efe4e3b1d8"
+          ],
+          "repeated_piece_ngram_hashes": [
+            "6bb6b43dfe532293"
+          ],
+          "repeated_qwave_signature_hashes": [
+            "x1"
+          ],
+          "repeated_cji_xyz_hashes": [],
+          "repeated_transition_hashes": [
+            "x1>x1"
+          ],
+          "hash_policy_version": "fnv1a64_v1",
+          "normalization_policy_version": "piece_norm_v1",
+          "available_signal_count": 4,
+          "missing_signals": [
+            "cji_xyz_hashes"
+          ],
+          "note": [
+            "signature repeat guard is trace-only; no token ban or memory mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "qwave_signature_repeat_without_piece_repeat",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M5",
+        "detector_id": "qwave_signature_repeat_guard",
+        "decode_step": 0,
+        "recent_window_size": 12,
+        "token_ngram_repeat_count": 0,
+        "piece_ngram_repeat_count": 0,
+        "qwave_signature_repeat_count": 1,
+        "cji_xyz_repeat_count": null,
+        "transition_hash_repeat_count": 1,
+        "token_hash_risk": 0.0,
+        "piece_hash_risk": 0.0,
+        "qwave_signature_hash_risk": 1.0,
+        "cji_xyz_hash_risk": null,
+        "transition_hash_risk": 1.0,
+        "diversity_risk_score": 1.0,
+        "risk_score": 1.0,
+        "risk_level": "Critical",
+        "evidence": {
+          "token_ngram_hashes": [
+            "35c8d11322602287",
+            "0b3f7f13c20fe085",
+            "f9b042027efc3c83",
+            "dea8351e90ac0813",
+            "26423ebfb86a259a",
+            "f7e1c1f1ff966736"
+          ],
+          "piece_ngram_hashes": [
+            "a2d928c9c76b8510",
+            "555faa3b0705cd95",
+            "67618d8dc991125e",
+            "43512014701039dd",
+            "417684d861c1d781",
+            "926d47ff8c98b47d"
+          ],
+          "qwave_signature_hashes": [
+            "loopA",
+            "loopA",
+            "loopA",
+            "loopA"
+          ],
+          "cji_xyz_hashes": [],
+          "transition_hashes": [
+            "loopA>loopA",
+            "loopA>loopA",
+            "loopA>loopA"
+          ],
+          "repeated_token_ngram_hashes": [],
+          "repeated_piece_ngram_hashes": [],
+          "repeated_qwave_signature_hashes": [
+            "loopA"
+          ],
+          "repeated_cji_xyz_hashes": [],
+          "repeated_transition_hashes": [
+            "loopA>loopA"
+          ],
+          "hash_policy_version": "fnv1a64_v1",
+          "normalization_policy_version": "piece_norm_v1",
+          "available_signal_count": 4,
+          "missing_signals": [
+            "cji_xyz_hashes"
+          ],
+          "note": [
+            "signature repeat guard is trace-only; no token ban or memory mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "transition_ping_pong_repeat",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M5",
+        "detector_id": "qwave_signature_repeat_guard",
+        "decode_step": 0,
+        "recent_window_size": 12,
+        "token_ngram_repeat_count": 5,
+        "piece_ngram_repeat_count": 5,
+        "qwave_signature_repeat_count": 2,
+        "cji_xyz_repeat_count": null,
+        "transition_hash_repeat_count": 2,
+        "token_hash_risk": 0.9166666666666666,
+        "piece_hash_risk": 0.9166666666666666,
+        "qwave_signature_hash_risk": 1.0,
+        "cji_xyz_hash_risk": null,
+        "transition_hash_risk": 1.0,
+        "diversity_risk_score": 1.0,
+        "risk_score": 1.0,
+        "risk_level": "Critical",
+        "evidence": {
+          "token_ngram_hashes": [
+            "eb50f0bc95180bb1",
+            "6da156f18b60913f",
+            "eb50f0bc95180bb1",
+            "6da156f18b60913f",
+            "eb50f0bc95180bb1",
+            "7b3a0939968b28d7",
+            "ecb8b897f64209ca",
+            "7b3a0939968b28d7",
+            "ecb8b897f64209ca",
+            "16d8491f4ac50f96",
+            "4a0591947fcaf7c6",
+            "16d8491f4ac50f96"
+          ],
+          "piece_ngram_hashes": [
+            "4dc97ffe04f988c6",
+            "67230dfe132754be",
+            "4dc97ffe04f988c6",
+            "67230dfe132754be",
+            "4dc97ffe04f988c6",
+            "48aa2236fadf7ae6",
+            "501fe5fe6e877963",
+            "48aa2236fadf7ae6",
+            "501fe5fe6e877963",
+            "c92bce24ef883fe5",
+            "e03ceae3b25bff25",
+            "c92bce24ef883fe5"
+          ],
+          "qwave_signature_hashes": [
+            "qa",
+            "qb",
+            "qa",
+            "qb",
+            "qa",
+            "qb"
+          ],
+          "cji_xyz_hashes": [],
+          "transition_hashes": [
+            "qa>qb",
+            "qb>qa",
+            "qa>qb",
+            "qb>qa",
+            "qa>qb"
+          ],
+          "repeated_token_ngram_hashes": [
+            "16d8491f4ac50f96",
+            "6da156f18b60913f",
+            "7b3a0939968b28d7",
+            "eb50f0bc95180bb1",
+            "ecb8b897f64209ca"
+          ],
+          "repeated_piece_ngram_hashes": [
+            "48aa2236fadf7ae6",
+            "4dc97ffe04f988c6",
+            "501fe5fe6e877963",
+            "67230dfe132754be",
+            "c92bce24ef883fe5"
+          ],
+          "repeated_qwave_signature_hashes": [
+            "qa",
+            "qb"
+          ],
+          "repeated_cji_xyz_hashes": [],
+          "repeated_transition_hashes": [
+            "qa>qb",
+            "qb>qa"
+          ],
+          "hash_policy_version": "fnv1a64_v1",
+          "normalization_policy_version": "piece_norm_v1",
+          "available_signal_count": 4,
+          "missing_signals": [
+            "cji_xyz_hashes"
+          ],
+          "note": [
+            "signature repeat guard is trace-only; no token ban or memory mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    },
+    {
+      "case_id": "missing_all_hash_inputs",
+      "status": "PASS",
+      "trace": {
+        "patch_id": "QW-52B-M5",
+        "detector_id": "qwave_signature_repeat_guard",
+        "decode_step": 0,
+        "recent_window_size": 12,
+        "token_ngram_repeat_count": 0,
+        "piece_ngram_repeat_count": 0,
+        "qwave_signature_repeat_count": null,
+        "cji_xyz_repeat_count": null,
+        "transition_hash_repeat_count": null,
+        "token_hash_risk": 0.0,
+        "piece_hash_risk": 0.0,
+        "qwave_signature_hash_risk": null,
+        "cji_xyz_hash_risk": null,
+        "transition_hash_risk": null,
+        "diversity_risk_score": null,
+        "risk_score": null,
+        "risk_level": "Unavailable",
+        "evidence": {
+          "token_ngram_hashes": [],
+          "piece_ngram_hashes": [],
+          "qwave_signature_hashes": [],
+          "cji_xyz_hashes": [],
+          "transition_hashes": [],
+          "repeated_token_ngram_hashes": [],
+          "repeated_piece_ngram_hashes": [],
+          "repeated_qwave_signature_hashes": [],
+          "repeated_cji_xyz_hashes": [],
+          "repeated_transition_hashes": [],
+          "hash_policy_version": "fnv1a64_v1",
+          "normalization_policy_version": "piece_norm_v1",
+          "available_signal_count": 0,
+          "missing_signals": [
+            "generated_tokens",
+            "generated_pieces",
+            "qwave_signature_hashes",
+            "cji_xyz_hashes",
+            "transition_hashes"
+          ],
+          "note": [
+            "signature repeat guard is trace-only; no token ban or memory mutation is allowed"
+          ]
+        },
+        "action_allowed": false,
+        "mutation_allowed": false
+      }
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "memory_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false,
+    "patch_added_crate_js_ts_files": []
+  },
+  "next_candidates": [
+    "QW-52B-M6",
+    "QW-52B-C1",
+    "QW-53A"
+  ],
+  "notes": [
+    "Signature repeat guard is trace-only.",
+    "No token ban is allowed.",
+    "Normal words are not blacklisted.",
+    "Structural repetition is recorded as evidence only.",
+    "Crate/core detector and validator implementation is Rust-only; no JS/TS files are added under crates."
+  ]
+}

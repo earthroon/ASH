@@ -1,0 +1,20 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EOS-03",
+  "request_id": "eos03_greeting_01",
+  "guard_strategy": "rerun_with_eos_token_banned_after_illegal_eos_detection",
+  "min_new_tokens_effective": 8,
+  "suppression_used": true,
+  "steps": [
+    {
+      "step_index": 1,
+      "generated_tail_len_at_step": 2,
+      "selected_token_id_before_eos_guard": 2,
+      "selected_token_is_eos_before_guard": true,
+      "eos_allowed_at_step": false,
+      "eos_guard_applied": true,
+      "eos_suppressed_by_min_new_tokens": true,
+      "eos_guard_replacement_source": "rerun_with_eos_token_banned",
+      "continue_generation": true
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "all_rejected": [
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-empty",
+      "candidate_index": 0,
+      "candidate_snapshot_hash": "1b840b135013afee12354a535092543fcd7d3396c9694b9a96c962fbc55ee7ab",
+      "final_surface_score": 0.81,
+      "metric_snapshot_hash": "5dcd572e1d5ff070e890be0af5689cca81402d90fb2303ced20121c8ac365c14",
+      "penalty_overlay_hash": "5e7ed0014f900bb8f50153d481425a722b4a74b50d01581d8f1b0963a165b84b",
+      "profile_id": "profile-greedy-stable",
+      "quality_receipt_hash": "3d102ebc770fe611f438df5677f7a617bd96119da7360465668b60460a8d493d",
+      "rejected_by_surface_gate": true,
+      "rejection_reasons": [
+        "empty_candidate",
+        "over_compressed",
+        "under_translated"
+      ]
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-malformed",
+      "candidate_index": 1,
+      "candidate_snapshot_hash": "5a9b2b85f7cc8a8b9b11b9855b3ac981da27059dbaf905dea3c01f80d2509ffe",
+      "final_surface_score": 0.73,
+      "metric_snapshot_hash": "d2c677ec4a0c2b86e4627e374c6026195d2c82140614efcbf37b58a906a80a58",
+      "penalty_overlay_hash": "c7f59b21f47a48219e80090af3950aeea5ba4abad6a977527bc4b508cc5b3d54",
+      "profile_id": "profile-low-temp-default",
+      "quality_receipt_hash": "d131bdd1d3517515b36366c28005d54cacf423f0cb03f0e68321fab97fce8816",
+      "rejected_by_surface_gate": true,
+      "rejection_reasons": [
+        "malformed_candidate",
+        "trailing_noise"
+      ]
+    }
+  ],
+  "cps_overflow": [
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-too-long",
+      "candidate_index": 0,
+      "candidate_snapshot_hash": "b48d5af74d1c19c8b90b885a4d941dba99c9b46bfa13426f5615b9d141a87d1a",
+      "final_surface_score": 0.6,
+      "metric_snapshot_hash": "0c7393cfe2f4cc9eecdb90bebe911bcda3424fbeddc493b2865250de76daf4f7",
+      "penalty_overlay_hash": "c7109fc55bc25f644c3e2d58e20123c3324847611cf98659e32bafb3ae5957fe",
+      "profile_id": "profile-low-temp-default",
+      "quality_receipt_hash": "736e1682671251081c1c6a8a2dbb5772dee02dce8ce6c59068b8ffe7569fd5d7",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": [
+        "cps_overflow",
+        "line_too_long"
+      ]
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-readable",
+      "candidate_index": 1,
+      "candidate_snapshot_hash": "e7d6d5fa2078b4723cb92c4828cb244530a26a9c01eac72881f40bb2becf3e3a",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "de16eab628910ef496c21b3cc92f9ce951b0a5ef10662e82c0e1026639579719",
+      "penalty_overlay_hash": "c6d98d09fdcf226dd2e4cd38cc01059ca4a3d5c1cef30009bec8950ce37df571",
+      "profile_id": "profile-loop-risk-strict",
+      "quality_receipt_hash": "dbb4df5d25a01d7f59f9105c6ac657bcca5662224025f73792bfde52daa44170",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    }
+  ],
+  "orphan_particle": [
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-orphan",
+      "candidate_index": 0,
+      "candidate_snapshot_hash": "8e52f7b022bb6a6bdc52992cbcd78e0800f5b39d2fb762d3a062408693fca6ad",
+      "final_surface_score": 0.58,
+      "metric_snapshot_hash": "10936c096d2261d0f56a7a283cce8d4abd02b2aa4dca865b81b5a1f87146ec67",
+      "penalty_overlay_hash": "21f3e2d626f6418d5d473b0162166fcbe4835638db20b5625de093f6d51a03f5",
+      "profile_id": "profile-low-temp-default",
+      "quality_receipt_hash": "3538d686ccdbdb6ab5ca984459adb3784728212ec0c68e035ee034baabb7da61",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": [
+        "line_imbalance",
+        "orphan_particle"
+      ]
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-clean",
+      "candidate_index": 1,
+      "candidate_snapshot_hash": "9d62867cf1f0b82a49283559cda127483d62bc911b24434031f42dfb60556a7d",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "27c4ceabee009d578ae260d1976e40b9d018e6fdbd0d73bf2034ab0d29360713",
+      "penalty_overlay_hash": "1b32f70e004d2c050c7d754bff32e6a918aab8a865ed320a5a145ae7b7fb2728",
+      "profile_id": "profile-loop-risk-strict",
+      "quality_receipt_hash": "87d872c2c14989b86be5aa17124112f702dfa7fe2096e92fe78ecf69831a32b4",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    }
+  ],
+  "pool_not_ready": [],
+  "valid_surface": [
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-0001-greedy",
+      "candidate_index": 0,
+      "candidate_snapshot_hash": "da6642fac9716b75322a745be4b9a9b45739b911c1e7a6d48fe78754aabadeb8",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "3cee2c6e59633dda717f3a715487354fe6d6ac11d177485a40cb303b0b4d6441",
+      "penalty_overlay_hash": "58160c5ed1a643ecf4ec71c29b44957b301cf50d3c7c87221f29c95ba4d299b8",
+      "profile_id": "profile-greedy-stable",
+      "quality_receipt_hash": "a9f16edfed6123ed479fb326c5d290f1983584903a76b4417e16ade2051e824e",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-0002-lowtemp",
+      "candidate_index": 1,
+      "candidate_snapshot_hash": "0ddd3fef6fe14741a57b16f946e99649d71e8a87efef7d1c6365ab8bbc19e4a6",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "cbc23c60dfdd32de350e5a48ced07e0c215f19701e2963bb1f83617a6398fbf8",
+      "penalty_overlay_hash": "3f2de109ece6d4ff85cf63062cec0439fde8c62df699d9f00c4c7c3243cae3cf",
+      "profile_id": "profile-low-temp-default",
+      "quality_receipt_hash": "7929915e6dccd7f4196b7ccdc91bc12485af513a5388f7ce5934609e07505310",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-0003-minp",
+      "candidate_index": 2,
+      "candidate_snapshot_hash": "958efd92a73c87841f4a6e486978fae65f2c0a375657bd20a82ae4c705867f2b",
+      "final_surface_score": 0.85,
+      "metric_snapshot_hash": "3af39723a9d51bc8919215d73ad8ffd7032b3f44d080a3e259aaec972a6f54ab",
+      "penalty_overlay_hash": "39abdf2231a8468d9081a5474bfe7fa402dc48ab3115dbc34aab07105cbddc57",
+      "profile_id": "profile-minp-strict",
+      "quality_receipt_hash": "eb6e0dc0709c85c92ae50391b24704efe34f8f3afd6dfafe418828f13ab04022",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": [
+        "line_too_long"
+      ]
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-0004-loopstrict",
+      "candidate_index": 3,
+      "candidate_snapshot_hash": "121137b30bba7a7ef48b4e6c80e08030552b999a8f56e8379898a2d97d0cbc9b",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "9d01e49967b8cefa5e4a9279a8a7c5ece68d8e3d54d3612d461fb26a8df25d41",
+      "penalty_overlay_hash": "b17d1c32dde1da9317f69fffbdf741a7324b0dbe0fc1fa274fa89b509007ed2b",
+      "profile_id": "profile-loop-risk-strict",
+      "quality_receipt_hash": "203b2546576916d3cc734f7ad3b94a351e3c516f83999d134f57fc314cbb645e",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    },
+    {
+      "base_score": 1.0,
+      "candidate_id": "candidate-0005-register",
+      "candidate_index": 4,
+      "candidate_snapshot_hash": "875f7371bb326796591884ecf798835f2c86b0275385715dacc6402582f099d5",
+      "final_surface_score": 1.0,
+      "metric_snapshot_hash": "833dbe6aca6882d529cbbe7485484b5c61669c39ca22fddcbf372d1037b6bd0c",
+      "penalty_overlay_hash": "ba306d5d22157ea8521cf939076753cdc6f247577bb35682e4e9dab736983d50",
+      "profile_id": "profile-register-preserving",
+      "quality_receipt_hash": "b4c6c05209c9758c83186e9b5fb541dfbbbf1adf9503eada33239973c2c9ac97",
+      "rejected_by_surface_gate": false,
+      "rejection_reasons": []
+    }
+  ]
+}

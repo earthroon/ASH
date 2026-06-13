@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "16AI-QW-38G-R6A-STOP-02 EOS Finalization / User-visible Stop Surface Seal",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "schema_version",
+    "mode",
+    "ledger_behavior_change",
+    "surface_behavior_change",
+    "surface_only",
+    "input",
+    "policy",
+    "finalization"
+  ],
+  "properties": {
+    "patch_id": {
+      "const": "16AI-QW-38G-R6A-STOP-02"
+    },
+    "input_patch": {
+      "const": "16AI-QW-38G-R6A-STOP-01"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mode": {
+      "enum": [
+        "Off",
+        "SurfaceOnly",
+        "ControlledFinalize",
+        "StrictControlledFinalize"
+      ]
+    },
+    "behavior_change": {
+      "type": "boolean"
+    },
+    "ledger_behavior_change": {
+      "const": false
+    },
+    "surface_behavior_change": {
+      "type": "boolean"
+    },
+    "surface_only": {
+      "const": true
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "eos_policy",
+        "tail_policy",
+        "surface_kind",
+        "ledger_mutation_allowed",
+        "visible_output_mutation_allowed"
+      ],
+      "properties": {
+        "eos_policy": {
+          "enum": [
+            "None",
+            "SurfaceOnly",
+            "AppendVirtualEos",
+            "AppendLedgerEos"
+          ]
+        },
+        "tail_policy": {
+          "enum": [
+            "PreserveAll",
+            "HideRiskTailSurfaceOnly",
+            "MarkRiskTail",
+            "TruncateLedgerTail"
+          ]
+        },
+        "surface_kind": {
+          "enum": [
+            "None",
+            "SafeStopped",
+            "PartialOutput",
+            "RollbackFailedStopped",
+            "ResampleFailedStopped",
+            "NumericSafetyStopped",
+            "GlobalFallbackStopped",
+            "SaladRiskStopped"
+          ]
+        },
+        "ledger_mutation_allowed": {
+          "const": false
+        },
+        "visible_output_mutation_allowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "finalization": {
+      "type": "object",
+      "required": [
+        "finalized",
+        "ledger_mutated",
+        "eos_appended_to_ledger",
+        "output_tail_truncated_from_ledger",
+        "visible_range",
+        "surface"
+      ],
+      "properties": {
+        "finalized": {
+          "type": "boolean"
+        },
+        "ledger_mutated": {
+          "const": false
+        },
+        "eos_appended_to_ledger": {
+          "const": false
+        },
+        "output_tail_truncated_from_ledger": {
+          "const": false
+        },
+        "visible_range": {
+          "type": "object"
+        },
+        "surface": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

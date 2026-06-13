@@ -1,0 +1,35 @@
+{
+  "patch_id": "QW-52C-R6",
+  "title": "Operator Approval Receipt / No Apply Decision Seal",
+  "base_patch": "QW-52C-R5",
+  "schema": "OperatorApprovalReceiptTrace",
+  "receipt_schema": "OperatorDecisionReceipt",
+  "allowed_decisions": [
+    "Pending",
+    "Approved",
+    "Rejected",
+    "NeedsMoreEvidence"
+  ],
+  "approved_status": "ApprovedButNotApplied",
+  "mutation_policy_required_false": [
+    "runtime_apply",
+    "hidden_state_mutation",
+    "logit_mutation",
+    "sampler_mutation",
+    "token_rank_mutation",
+    "token_selection_mutation",
+    "token_ban",
+    "hard_ban",
+    "blacklist_mutation",
+    "rerank_execution",
+    "retry_execution",
+    "policy_promotion",
+    "threshold_autotune",
+    "weight_commit",
+    "safe_profile_apply",
+    "approval_granted_as_apply",
+    "memory_mutation",
+    "training_mutation",
+    "lora_mutation"
+  ]
+}

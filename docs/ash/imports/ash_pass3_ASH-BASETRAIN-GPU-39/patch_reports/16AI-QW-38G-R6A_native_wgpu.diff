@@ -1,0 +1,259 @@
+--- /mnt/data/work_38g_r6a_orig/crates/model_core/src/native_wgpu.rs	2026-05-22 12:46:28.000000000 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 13:01:36.883041146 +0000
+@@ -766,6 +766,248 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A — Shader Dispatch Hook Exposure / Debug Buffer Binding Surface Seal
++static QW38G_R6A_DRY_RUN_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_enabled() -> bool {
++    env_flag("ASH_SHADER_DEBUG_BINDING") || env_flag("ASH_QW38G_R6A_SHADER_DEBUG_BINDING")
++}
++
++fn qw38g_r6a_dry_run() -> bool {
++    std::env::var("ASH_SHADER_DEBUG_BINDING_DRY_RUN")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r6a_map_path() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BINDING_MAP")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_debug_binding_map.json".to_string())
++}
++
++fn qw38g_r6a_receipt_path() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BINDING_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_debug_binding_receipt.json".to_string())
++}
++
++fn qw38g_r6a_group_request() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BINDING_GROUP")
++        .unwrap_or_else(|_| "auto".to_string())
++}
++
++fn qw38g_r6a_slot_request() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BINDING_SLOT")
++        .unwrap_or_else(|_| "auto".to_string())
++}
++
++fn qw38g_r6a_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r6a_path_written(path: &str) -> bool {
++    std::path::Path::new(path)
++        .metadata()
++        .map(|m| m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn qw38g_r6a_write_map_and_receipt(status: &str, candidates: Vec<serde_json::Value>, surface_available: bool, warnings: Vec<String>, extra: serde_json::Value) {
++    let map_path = qw38g_r6a_map_path();
++    let receipt_path = qw38g_r6a_receipt_path();
++    let selected_candidate = if surface_available {
++        candidates.iter().find(|c| c.get("candidate_status").and_then(|v| v.as_str()) == Some("AVAILABLE_DRY_RUN")).cloned()
++    } else {
++        None
++    };
++    let pipeline_cache_key_extended = surface_available;
++    let shader_variant_required = surface_available;
++    let map = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "enabled": qw38g_r6a_enabled(),
++        "dry_run": qw38g_r6a_dry_run(),
++        "max_bytes": qw38g_r6_max_bytes(),
++        "requested_group": qw38g_r6a_group_request(),
++        "requested_binding": qw38g_r6a_slot_request(),
++        "candidates": candidates,
++        "debug_binding_surface_available": surface_available,
++        "selected_candidate": selected_candidate.clone(),
++        "pipeline_cache_key_extended": pipeline_cache_key_extended,
++        "shader_variant_required": shader_variant_required,
++        "debug_write_performed": false,
++        "warning_codes": warnings,
++        "extra": extra,
++    });
++    qw38g_r6a_write_json(&map_path, &map);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "enabled": qw38g_r6a_enabled(),
++        "dry_run": qw38g_r6a_dry_run(),
++        "debug_binding_surface_available": surface_available,
++        "selected_group": selected_candidate.as_ref().and_then(|c| c.get("bind_group_index")).cloned(),
++        "selected_binding": selected_candidate.as_ref().and_then(|c| c.get("binding_index")).cloned(),
++        "pipeline_cache_key_extended": pipeline_cache_key_extended,
++        "shader_variant_required": shader_variant_required,
++        "debug_write_performed": false,
++        "map_path": map_path,
++        "map_written": qw38g_r6a_path_written(&qw38g_r6a_map_path()),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": if surface_available {
++            "16AI-QW-38G-R6B_SHADER_DEBUG_BUFFER_BIND_DRY_RUN"
++        } else {
++            "16AI-QW-38G-R6A-R1_PIPELINE_LAYOUT_REGISTRY_EXPOSURE"
++        },
++        "warning_codes": map.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_write_json(&qw38g_r6a_receipt_path(), &receipt);
++    eprintln!("[16AI-QW-38G-R6A][map_written] path={}", qw38g_r6a_map_path());
++    eprintln!("[16AI-QW-38G-R6A][receipt_written] path={}", qw38g_r6a_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A][done] status={}", status);
++}
++
++fn qw38g_r6a_shader_debug_binding_surface(candidate_context: &str) {
++    if !qw38g_r6a_enabled() {
++        return;
++    }
++    if QW38G_R6A_DRY_RUN_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++    let dry_run = qw38g_r6a_dry_run();
++    let max_bytes = qw38g_r6_max_bytes();
++    eprintln!(
++        "[16AI-QW-38G-R6A][start] context={} dry_run={} max_bytes={}",
++        candidate_context, dry_run, max_bytes
++    );
++    eprintln!(
++        "[16AI-QW-38G-R6A][env] enabled=true dry_run={} group={} slot={} max_bytes={}",
++        dry_run,
++        qw38g_r6a_group_request(),
++        qw38g_r6a_slot_request(),
++        max_bytes
++    );
++    eprintln!("[16AI-QW-38G-R6A][layout_scan_start] context={}", candidate_context);
++
++    if !dry_run {
++        qw38g_r6a_write_map_and_receipt(
++            "FAIL_DEBUG_BINDING_NON_DRY_RUN_REJECTED",
++            vec![serde_json::json!({
++                "pipeline_name": candidate_context,
++                "shader_name": "unknown",
++                "bind_group_index": null,
++                "binding_index": null,
++                "storage_buffer_allowed": false,
++                "read_only": false,
++                "write_only_candidate": false,
++                "layout_extendable": false,
++                "cache_key_requires_debug_variant": true,
++                "collision_detected": false,
++                "collision_with": null,
++                "candidate_status": "REJECTED_NON_DRY_RUN",
++                "warning_codes": ["DEBUG_DRY_RUN_ONLY"]
++            })],
++            false,
++            vec!["DEBUG_DRY_RUN_ONLY".to_string()],
++            serde_json::json!({"note": "R6A only exposes dry-run binding surface; shader write is intentionally not performed"}),
++        );
++        return;
++    }
++
++    let planned_records = 1usize
++        .saturating_mul(qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_LAYERS", "mid,last").len().max(1))
++        .saturating_mul(qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_STAGES", "post_mlp,post_block").len().max(1))
++        .saturating_mul(qw38g_r6_target_ids().len().max(1));
++    let planned_bytes = planned_records.saturating_mul(qw38g_r6_record_size_bytes());
++    if planned_bytes > max_bytes {
++        qw38g_r6a_write_map_and_receipt(
++            "FAIL_DEBUG_BUFFER_BYTE_BUDGET_EXCEEDED",
++            Vec::new(),
++            false,
++            vec!["DEBUG_BUFFER_BYTE_BUDGET_EXCEEDED".to_string()],
++            serde_json::json!({
++                "planned_records": planned_records,
++                "planned_bytes": planned_bytes,
++                "max_bytes": max_bytes
++            }),
++        );
++        return;
++    }
++
++    // Current native generation hot path reaches Burn tensor matmul/vocab-atlas projection,
++    // not a directly-owned WebGPU compute pipeline layout in this module.
++    // R6A therefore records the binding surface as unavailable instead of faking a slot.
++    let candidates = vec![
++        serde_json::json!({
++            "pipeline_name": "NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas",
++            "shader_name": "burn_tensor_matmul_vocab_atlas_tile",
++            "bind_group_index": null,
++            "binding_index": null,
++            "storage_buffer_allowed": true,
++            "read_only": false,
++            "write_only_candidate": true,
++            "layout_extendable": false,
++            "cache_key_requires_debug_variant": true,
++            "collision_detected": false,
++            "collision_with": null,
++            "candidate_status": "UNAVAILABLE_NO_DIRECT_BIND_GROUP_LAYOUT_SURFACE",
++            "warning_codes": ["NO_BIND_GROUP_LAYOUT_SURFACE", "DEBUG_SHADER_VARIANT_REQUIRED"]
++        }),
++        serde_json::json!({
++            "pipeline_name": "NativeWgpuModel::forward_hidden_for_generation_input",
++            "shader_name": "rust_side_layer_loop_candidate",
++            "bind_group_index": null,
++            "binding_index": null,
++            "storage_buffer_allowed": false,
++            "read_only": false,
++            "write_only_candidate": false,
++            "layout_extendable": false,
++            "cache_key_requires_debug_variant": true,
++            "collision_detected": false,
++            "collision_with": null,
++            "candidate_status": "UNAVAILABLE_NOT_REACHED_IN_CURRENT_HOT_PATH",
++            "warning_codes": ["FORWARD_HIDDEN_FOR_GENERATION_INPUT_NOT_REACHED"]
++        })
++    ];
++    for c in &candidates {
++        eprintln!(
++            "[16AI-QW-38G-R6A][candidate] pipeline={} shader={} group={:?} binding={:?} status={}",
++            c.get("pipeline_name").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            c.get("shader_name").and_then(|v| v.as_str()).unwrap_or("unknown"),
++            c.get("bind_group_index"),
++            c.get("binding_index"),
++            c.get("candidate_status").and_then(|v| v.as_str()).unwrap_or("unknown")
++        );
++    }
++    eprintln!("[16AI-QW-38G-R6A][cache_key] extended=false reason=no_available_debug_binding_surface");
++    qw38g_r6a_write_map_and_receipt(
++        "FAIL_DEBUG_BINDING_SURFACE_UNAVAILABLE",
++        candidates,
++        false,
++        vec![
++            "NO_BIND_GROUP_LAYOUT_SURFACE".to_string(),
++            "DEBUG_SHADER_VARIANT_REQUIRED".to_string(),
++            "DEBUG_BINDING_SURFACE_UNAVAILABLE".to_string(),
++        ],
++        serde_json::json!({
++            "context": candidate_context,
++            "planned_records": planned_records,
++            "planned_bytes": planned_bytes,
++            "max_bytes": max_bytes,
++            "actual_traceable_boundary": "final_hidden_projection",
++            "note": "current native hot path does not expose a direct WebGPU bind group layout surface for intermediate debug buffer insertion"
++        }),
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -3593,6 +3835,7 @@
+         qw38g_r3_stage_enter("hidden_projection_trace_hook", format!("best_token_id={} best_logit={}", best_token_id, best_logit));
+         qw38g_r4_gpu_debug_tap_candidate(&global_top_k, atlas, &last_hidden);
+         qw38g_r6_shader_debug_buffer_candidate();
++        qw38g_r6a_shader_debug_binding_surface("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

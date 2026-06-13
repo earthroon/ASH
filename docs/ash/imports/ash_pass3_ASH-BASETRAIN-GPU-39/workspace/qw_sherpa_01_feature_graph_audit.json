@@ -1,0 +1,16 @@
+{
+  "package": "asr_sidecar",
+  "feature": "speech_sherpa",
+  "default_features": [],
+  "optional_dependencies": [
+    "sherpa-rs",
+    "sherpa-rs-sys"
+  ],
+  "cfg_gated_modules": {
+    "adapter": "adapter.rs / adapter_stub.rs",
+    "online": "online.rs / online_stub.rs",
+    "transcribe": "transcribe.rs / transcribe_stub.rs"
+  },
+  "vendor_payload_present_in_bake": false,
+  "vendor_path_references_preserved": true
+}

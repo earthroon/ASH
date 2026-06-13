@@ -1,0 +1,5 @@
+cargo_execution=not_available_in_container
+command_attempted=command -v cargo && cargo test -p model_core qw_tok_map10 -- --nocapture
+result=not_run
+reason=cargo binary is not available in this execution container
+seal=No claim is made that Rust tests were executed here. Local cargo test remains required.

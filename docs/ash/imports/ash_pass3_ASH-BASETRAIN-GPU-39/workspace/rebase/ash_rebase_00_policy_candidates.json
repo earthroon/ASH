@@ -1,0 +1,68 @@
+{
+  "patch_id": "ASH-REBASE-00",
+  "candidates": [
+    {
+      "candidate_id": "LEGACY_DECODE_TRANSITION_GUARD",
+      "source_family": "QW-38G-R6A-DECODE",
+      "target_future_patch": "QW-50-R0X",
+      "status": "candidate",
+      "default_apply": false,
+      "requires": [
+        "QW-50-R0W generatedTokenIds",
+        "QW-50-R0W topKCandidatesByStep",
+        "QW-50-R0W repeatLoopReason"
+      ],
+      "forbidden_before_requirements": [
+        "runtime_default_enable",
+        "hard_token_ban",
+        "lora_scale_change",
+        "guard_threshold_change"
+      ]
+    },
+    {
+      "candidate_id": "LEGACY_CANDIDATE_CALIBRATION_REPLAY",
+      "source_family": "QW-38G-R6A-EVAL",
+      "target_future_patch": "QW-53B",
+      "status": "candidate",
+      "default_apply": false,
+      "requires": [
+        "R0W trace fixture",
+        "controlled rerank candidate output"
+      ]
+    },
+    {
+      "candidate_id": "LEGACY_WCTX_AUDIT_PACKET_REFERENCE",
+      "source_family": "QW-38G-R6A-WCTX-MOCK",
+      "target_future_patch": "ASH-PRO-20",
+      "status": "reference_only",
+      "default_apply": false
+    },
+    {
+      "candidate_id": "LEGACY_LORA_RT_ATTACH_LEDGER",
+      "source_family": "QW-38G-R6A-LORA-RT",
+      "target_future_patch": "QW-50-R0Y",
+      "status": "candidate",
+      "default_apply": false,
+      "runtime_mutation": false
+    },
+    {
+      "candidate_id": "LEGACY_R12_HEAD_DIRECTION_ORTHOGONAL",
+      "source_family": "QW-38G-R6A-R12",
+      "target_future_patch": "none",
+      "status": "quarantined_low_confidence",
+      "default_apply": false,
+      "runtime_default_apply": false,
+      "production_safe_confirmed": false,
+      "root_cause_confirmed": false,
+      "no_model_write": true
+    },
+    {
+      "candidate_id": "TCU_HEALTH_RECOMMENDATION_GATE",
+      "source_family": "TCU",
+      "target_future_patch": "TCU-21",
+      "status": "candidate",
+      "default_apply": false,
+      "requires_operator_approval": true
+    }
+  ]
+}

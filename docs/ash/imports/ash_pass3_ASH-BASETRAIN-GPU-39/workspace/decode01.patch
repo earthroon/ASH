@@ -1,0 +1,1185 @@
+diff -ruN decode01_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md decode01_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md
+--- decode01_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md	2026-05-26 15:35:19.139629868 +0000
+@@ -0,0 +1,18 @@
++# 16AI-QW-38G-R6A-DECODE-01 Acceptance
++
++## Static acceptance
++- [x] CPU oracle sampler module exists.
++- [x] `SamplingApplyMode::CpuOracleSampler` exists.
++- [x] `sample_with_cpu_oracle` exists.
++- [x] sampled decode fallback no longer calls `select_next_token(&logits_for_fallback)` directly.
++- [x] reference checkpoint streaming path calls CPU oracle when sampled decode is requested.
++- [x] DECODE-00 probe schema extended with CPU oracle fields.
++- [x] summary, fixture, schema, report generated.
++
++## Execution acceptance
++- [ ] `cargo check` — NOT_RUN, cargo unavailable.
++- [ ] `cargo test` — NOT_RUN, cargo unavailable.
++- [ ] `rustfmt` — NOT_RUN, rustfmt unavailable.
++
++## Seal
++Static bake accepted with execution validation pending in Rust toolchain environment.
+diff -ruN decode01_orig/crates/model_core/src/cpu_oracle_sampler.rs decode01_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- decode01_orig/crates/model_core/src/cpu_oracle_sampler.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:34:59.427813296 +0000
+@@ -0,0 +1,314 @@
++use serde::{Deserialize, Serialize};
++
++use crate::generation_sampling::GenerationSamplingConfig;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum SamplingApplyMode {
++    Greedy,
++    GpuSampler,
++    CpuOracleSampler,
++    GreedyFallbackDisabled,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct CpuOracleContext {
++    pub step: usize,
++    pub seed: u64,
++    pub eos_token_id: Option<u32>,
++    pub pad_token_id: Option<u32>,
++    pub banned_token_ids: Vec<u32>,
++    pub recent_token_ids: Vec<u32>,
++    pub min_new_tokens: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct CpuOracleSampleResult {
++    pub selected_id: u32,
++    pub selected_logit: f32,
++    pub selected_logprob: f32,
++    pub active_count_before_min_p: usize,
++    pub active_count_after_min_p: usize,
++    pub active_count_after_top_p: usize,
++    pub min_p_threshold: Option<f32>,
++    pub sampler_applied: bool,
++    pub apply_mode: SamplingApplyMode,
++    pub active_softmax_renormalized: bool,
++    pub candidate_empty_recovered: bool,
++    pub recovery_mode: Option<String>,
++}
++
++#[derive(Debug, Clone)]
++struct Candidate {
++    id: u32,
++    logit: f32,
++    scaled: f32,
++    prob: f32,
++}
++
++pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
++    config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
++}
++
++pub fn sample_with_cpu_oracle(
++    logits: &[f32],
++    config: &GenerationSamplingConfig,
++    ctx: &CpuOracleContext,
++) -> CpuOracleSampleResult {
++    if logits.is_empty() {
++        return CpuOracleSampleResult {
++            selected_id: ctx.eos_token_id.unwrap_or(0),
++            selected_logit: f32::NEG_INFINITY,
++            selected_logprob: f32::NEG_INFINITY,
++            active_count_before_min_p: 0,
++            active_count_after_min_p: 0,
++            active_count_after_top_p: 0,
++            min_p_threshold: None,
++            sampler_applied: false,
++            apply_mode: SamplingApplyMode::GreedyFallbackDisabled,
++            active_softmax_renormalized: false,
++            candidate_empty_recovered: true,
++            recovery_mode: Some("empty_logits".to_string()),
++        };
++    }
++
++    let requested = sampler_requested(config);
++    if !requested {
++        return greedy_result(logits, ctx, SamplingApplyMode::Greedy);
++    }
++
++    let temp = if config.temperature.is_finite() && config.temperature > 0.0 {
++        config.temperature
++    } else {
++        1.0
++    };
++
++    let banned = |id: u32| -> bool { ctx.banned_token_ids.binary_search(&id).is_ok() || ctx.banned_token_ids.contains(&id) };
++    let eos_blocked = |id: u32| -> bool {
++        ctx.eos_token_id == Some(id) && ctx.min_new_tokens > 0 && ctx.step < ctx.min_new_tokens
++    };
++
++    let mut candidates = logits
++        .iter()
++        .copied()
++        .enumerate()
++        .filter_map(|(idx, logit)| {
++            let id = idx as u32;
++            if !logit.is_finite() || banned(id) || eos_blocked(id) {
++                return None;
++            }
++            Some(Candidate {
++                id,
++                logit,
++                scaled: logit / temp,
++                prob: 0.0,
++            })
++        })
++        .collect::<Vec<_>>();
++
++    if candidates.is_empty() {
++        return recover_valid_top1(logits, ctx, "no_candidate_after_ban_eos_guard");
++    }
++
++    candidates.sort_by(|a, b| b.scaled.total_cmp(&a.scaled));
++    if config.top_k > 0 {
++        let k = (config.top_k as usize).min(candidates.len()).max(1);
++        candidates.truncate(k);
++    }
++
++    let active_count_before_min_p = candidates.len();
++    let mut min_p_threshold = None;
++    if config.min_p.is_finite() && config.min_p > 0.0 {
++        let min_p = config.min_p.clamp(0.0, 0.95);
++        if let Some(max_scaled) = candidates.iter().map(|c| c.scaled).max_by(|a, b| a.total_cmp(b)) {
++            let threshold = max_scaled + min_p.ln();
++            min_p_threshold = Some(threshold);
++            candidates.retain(|c| c.scaled >= threshold);
++        }
++    }
++
++    if candidates.is_empty() {
++        return recover_valid_top1(logits, ctx, "no_candidate_after_min_p");
++    }
++    let active_count_after_min_p = candidates.len();
++
++    renormalize_active_set(&mut candidates);
++
++    candidates.sort_by(|a, b| b.prob.total_cmp(&a.prob));
++    let mut top_p_cut = candidates.len();
++    if config.top_p.is_finite() && config.top_p > 0.0 && config.top_p < 1.0 {
++        let mut acc = 0.0f32;
++        top_p_cut = 0;
++        for cand in &candidates {
++            acc += cand.prob;
++            top_p_cut += 1;
++            if acc >= config.top_p {
++                break;
++            }
++        }
++        top_p_cut = top_p_cut.max(1).min(candidates.len());
++        candidates.truncate(top_p_cut);
++        renormalize_active_set(&mut candidates);
++    }
++
++    if candidates.is_empty() {
++        return recover_valid_top1(logits, ctx, "no_candidate_after_top_p");
++    }
++
++    let r = deterministic_unit(ctx.seed, ctx.step, config.min_p, config.top_p, config.top_k, config.temperature);
++    let mut acc = 0.0f32;
++    let mut selected = candidates.last().cloned().unwrap();
++    for cand in &candidates {
++        acc += cand.prob;
++        if r <= acc {
++            selected = cand.clone();
++            break;
++        }
++    }
++
++    CpuOracleSampleResult {
++        selected_id: selected.id,
++        selected_logit: selected.logit,
++        selected_logprob: selected.prob.max(1e-20).ln(),
++        active_count_before_min_p,
++        active_count_after_min_p,
++        active_count_after_top_p: candidates.len(),
++        min_p_threshold,
++        sampler_applied: true,
++        apply_mode: SamplingApplyMode::CpuOracleSampler,
++        active_softmax_renormalized: true,
++        candidate_empty_recovered: false,
++        recovery_mode: None,
++    }
++}
++
++fn renormalize_active_set(candidates: &mut [Candidate]) {
++    if candidates.is_empty() {
++        return;
++    }
++    let max_scaled = candidates
++        .iter()
++        .map(|c| c.scaled)
++        .max_by(|a, b| a.total_cmp(b))
++        .unwrap_or(0.0);
++    let mut sum = 0.0f32;
++    for cand in candidates.iter_mut() {
++        cand.prob = (cand.scaled - max_scaled).exp();
++        sum += cand.prob;
++    }
++    if sum.is_finite() && sum > 0.0 {
++        for cand in candidates.iter_mut() {
++            cand.prob /= sum;
++        }
++    } else {
++        let uniform = 1.0 / candidates.len() as f32;
++        for cand in candidates.iter_mut() {
++            cand.prob = uniform;
++        }
++    }
++}
++
++fn greedy_result(logits: &[f32], ctx: &CpuOracleContext, mode: SamplingApplyMode) -> CpuOracleSampleResult {
++    let mut best_id = ctx.eos_token_id.unwrap_or(0);
++    let mut best_logit = f32::NEG_INFINITY;
++    for (idx, &logit) in logits.iter().enumerate() {
++        if !logit.is_finite() {
++            continue;
++        }
++        let id = idx as u32;
++        if ctx.banned_token_ids.contains(&id) || ctx.pad_token_id == Some(id) {
++            continue;
++        }
++        if logit > best_logit {
++            best_id = id;
++            best_logit = logit;
++        }
++    }
++    CpuOracleSampleResult {
++        selected_id: best_id,
++        selected_logit: best_logit,
++        selected_logprob: f32::NEG_INFINITY,
++        active_count_before_min_p: 1,
++        active_count_after_min_p: 1,
++        active_count_after_top_p: 1,
++        min_p_threshold: None,
++        sampler_applied: false,
++        apply_mode: mode,
++        active_softmax_renormalized: false,
++        candidate_empty_recovered: false,
++        recovery_mode: None,
++    }
++}
++
++fn recover_valid_top1(logits: &[f32], ctx: &CpuOracleContext, reason: &str) -> CpuOracleSampleResult {
++    let mut result = greedy_result(logits, ctx, SamplingApplyMode::GreedyFallbackDisabled);
++    result.candidate_empty_recovered = true;
++    result.recovery_mode = Some(reason.to_string());
++    result.sampler_applied = true;
++    result.apply_mode = SamplingApplyMode::CpuOracleSampler;
++    result
++}
++
++fn deterministic_unit(seed: u64, step: usize, min_p: f32, top_p: f32, top_k: u32, temperature: f32) -> f32 {
++    let mut x = seed
++        ^ ((step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
++        ^ ((top_k as u64) << 32)
++        ^ ((min_p.to_bits() as u64) << 1)
++        ^ ((top_p.to_bits() as u64) << 7)
++        ^ ((temperature.to_bits() as u64) << 13);
++    x ^= x >> 30;
++    x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
++    x ^= x >> 27;
++    x = x.wrapping_mul(0x94D0_49BB_1331_11EB);
++    x ^= x >> 31;
++    let mantissa = (x >> 40) as u32;
++    (mantissa as f32) / ((1u32 << 24) as f32)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn cfg() -> GenerationSamplingConfig {
++        GenerationSamplingConfig {
++            temperature: 1.0,
++            top_k: 0,
++            top_p: 1.0,
++            min_p: 0.1,
++            ..Default::default()
++        }
++    }
++
++    #[test]
++    fn decode01_min_p_fixture_keeps_expected_candidates() {
++        let logits = [10.0, 9.0, 8.0, 2.0, -1.0];
++        let ctx = CpuOracleContext {
++            step: 0,
++            seed: 1,
++            eos_token_id: None,
++            pad_token_id: None,
++            banned_token_ids: Vec::new(),
++            recent_token_ids: Vec::new(),
++            min_new_tokens: 0,
++        };
++        let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
++        assert_eq!(result.active_count_before_min_p, 5);
++        assert_eq!(result.active_count_after_min_p, 3);
++        assert!(result.active_softmax_renormalized);
++    }
++
++    #[test]
++    fn decode01_banned_token_never_selected() {
++        let logits = [10.0, 9.0, 8.0];
++        let ctx = CpuOracleContext {
++            step: 0,
++            seed: 1,
++            eos_token_id: None,
++            pad_token_id: None,
++            banned_token_ids: vec![0],
++            recent_token_ids: Vec::new(),
++            min_new_tokens: 0,
++        };
++        let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
++        assert_ne!(result.selected_id, 0);
++    }
++}
+diff -ruN decode01_orig/crates/model_core/src/generation_sampling.rs decode01_work/crates/model_core/src/generation_sampling.rs
+--- decode01_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 08:00:51.000000000 +0000
++++ decode01_work/crates/model_core/src/generation_sampling.rs	2026-05-26 15:33:25.904452596 +0000
+@@ -1,5 +1,6 @@
+ use super::*;
+ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
++use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
+ use std::collections::BTreeMap;
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+@@ -2286,6 +2287,54 @@
+ 
+         Ok(ids)
+     }
++
++    fn select_next_token_with_cpu_oracle(
++        &self,
++        cpu_row: &[f32],
++        sampling: &GenerationSamplingConfig,
++        step: usize,
++        fallback_reason: &'static str,
++    ) -> NextTokenChoice {
++        let ctx = CpuOracleContext {
++            step,
++            seed: sampling.seed.unwrap_or(0),
++            eos_token_id: Some(self.spec.token_ids.eos_id),
++            pad_token_id: Some(self.spec.token_ids.pad_id),
++            banned_token_ids: Vec::new(),
++            recent_token_ids: Vec::new(),
++            min_new_tokens: sampling.min_new_tokens,
++        };
++        let result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
++        NextTokenChoice {
++            token_id: result.selected_id,
++            logit: result.selected_logit,
++            logprob: Some(result.selected_logprob),
++            sampled: result.sampler_applied,
++            rerank_delta: None,
++            adapter_gate_scale: self.current_adapter_gate_telemetry().as_ref().map(|gate| gate.max_effective_scale),
++            effective_loop_index: None,
++            routing_pressure: None,
++            top_n_cutoff: Some(result.active_count_after_top_p),
++            candidate_pool: Vec::new(),
++            gpu_sampling: Some(GpuSamplingStepTelemetry {
++                path: Some("cpu_oracle_sampler".to_string()),
++                selected_token_source: Some("cpu_oracle_sampler".to_string()),
++                fallback_reason: Some(fallback_reason.to_string()),
++                compare_status: Some("cpu_oracle_not_compared".to_string()),
++                legacy_token_id: None,
++                multistage_token_id: None,
++                score_abs_delta: None,
++                logprob_abs_delta: None,
++                compared: false,
++                fell_back_to_legacy: false,
++                topk_overflow_fallback: false,
++                perf: None,
++            }),
++            gpu_raw_bridge: None,
++            tensorcube_runtime_splice: None,
++        }
++    }
++
+     pub(crate) fn select_next_token_with_sampling(
+         &self,
+         logits: &LastLogitsGpu,
+@@ -2444,10 +2493,15 @@
+                     });
+                 }
+             }
+-            return with_runtime_splice_telemetry_label(
+-                "model_core.select.sampled.greedy_fallback".to_string(),
+-                || self.select_next_token(&logits_for_fallback),
+-            );
++            return Ok(with_runtime_splice_telemetry_label(
++                "model_core.select.sampled.cpu_oracle_fallback".to_string(),
++                || self.select_next_token_with_cpu_oracle(
++                    &logits_for_fallback.cpu_row,
++                    &routed_sampling,
++                    0,
++                    "gpu_sampler_unavailable_cpu_oracle",
++                ),
++            ));
+         }
+ 
+         if let Some(runtime) = self.gpu_sampling_runtime_ref() {
+@@ -2524,7 +2578,12 @@
+             }
+         }
+ 
+-        self.select_next_token(&logits_for_fallback)
++        Ok(self.select_next_token_with_cpu_oracle(
++            &logits_for_fallback.cpu_row,
++            &routed_sampling,
++            0,
++            "gpu_sampler_unavailable_cpu_oracle",
++        ))
+     }
+ 
+     pub fn generate_with_sampling_cached_with_telemetry(
+diff -ruN decode01_orig/crates/model_core/src/lib.rs decode01_work/crates/model_core/src/lib.rs
+--- decode01_orig/crates/model_core/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
++++ decode01_work/crates/model_core/src/lib.rs	2026-05-26 15:32:49.326111711 +0000
+@@ -9,6 +9,7 @@
+ mod decode_state;
+ mod generation_sampling;
+ mod sampling_helpers;
++mod cpu_oracle_sampler;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -55,6 +56,7 @@
+     tensorcube_health_snapshot_from_telemetry_summaries,
+ };
+ 
++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, SamplingApplyMode, sample_with_cpu_oracle};
+ pub use generation_telemetry::{
+     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
+     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
+diff -ruN decode01_orig/crates/model_core/src/reference_checkpoint.rs decode01_work/crates/model_core/src/reference_checkpoint.rs
+--- decode01_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-26 07:18:41.000000000 +0000
++++ decode01_work/crates/model_core/src/reference_checkpoint.rs	2026-05-26 15:34:10.585904211 +0000
+@@ -1,4 +1,5 @@
+ use super::*;
++use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+     check_generation_cancel, detect_stop_hit, has_repeating_ngram, has_repeating_suffix,
+@@ -759,18 +760,31 @@
+             let mut logits = self.forward_logits_ids(&ids, vocab_limit);
+             apply_banned_token_mask(&mut logits, banned_token_ids);
+             apply_repetition_penalty(&mut logits, &ids, 256, 1.10);
+-            let mut best = 0usize;
+-            let mut best_logit = f32::MIN;
+-            for (idx, logit) in logits.iter().enumerate() {
+-                if *logit > best_logit {
+-                    best_logit = *logit;
+-                    best = idx;
+-                }
+-            }
+-            let next = if !best_logit.is_finite() {
+-                self.spec.token_ids.eos_id
++            let next = if sampling.requests_sampled_decode() {
++                let ctx = CpuOracleContext {
++                    step: generated_idx,
++                    seed: sampling.seed.unwrap_or(0),
++                    eos_token_id: Some(self.spec.token_ids.eos_id),
++                    pad_token_id: Some(self.spec.token_ids.pad_id),
++                    banned_token_ids: banned_token_ids.to_vec(),
++                    recent_token_ids: ids.clone(),
++                    min_new_tokens: sampling.min_new_tokens,
++                };
++                sample_with_cpu_oracle(&logits, &sampling, &ctx).selected_id
+             } else {
+-                best as u32
++                let mut best = 0usize;
++                let mut best_logit = f32::MIN;
++                for (idx, logit) in logits.iter().enumerate() {
++                    if *logit > best_logit {
++                        best_logit = *logit;
++                        best = idx;
++                    }
++                }
++                if !best_logit.is_finite() {
++                    self.spec.token_ids.eos_id
++                } else {
++                    best as u32
++                }
+             };
+             ids.push(next);
+             if let Some(fragment) = append_token_piece_to_text(manifest, &mut emitted_text, next) {
+diff -ruN decode01_orig/crates/model_core/src/sampling_helpers.rs decode01_work/crates/model_core/src/sampling_helpers.rs
+--- decode01_orig/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:22:57.000000000 +0000
++++ decode01_work/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:33:01.738605872 +0000
+@@ -103,6 +103,14 @@
+     pub sampler_applied: bool,
+     pub fallback_applied: bool,
+     pub fallback_reason: Option<String>,
++    pub sampling_apply_mode: Option<String>,
++    pub cpu_oracle_applied: bool,
++    pub gpu_sampler_unavailable: bool,
++    pub candidate_count_before_min_p: Option<usize>,
++    pub candidate_count_after_min_p: Option<usize>,
++    pub candidate_count_after_top_p: Option<usize>,
++    pub min_p_threshold: Option<f32>,
++    pub active_softmax_renormalized: bool,
+     pub finite_logits: bool,
+     pub nan_count: usize,
+     pub inf_count: usize,
+diff -ruN decode01_orig/workspace/decode01.patch decode01_work/workspace/decode01.patch
+--- decode01_orig/workspace/decode01.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/workspace/decode01.patch	2026-05-26 15:35:33.133763991 +0000
+@@ -0,0 +1,528 @@
++diff -ruN decode01_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md decode01_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md
++--- decode01_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ decode01_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-01_acceptance.md	2026-05-26 15:35:19.139629868 +0000
++@@ -0,0 +1,18 @@
+++# 16AI-QW-38G-R6A-DECODE-01 Acceptance
+++
+++## Static acceptance
+++- [x] CPU oracle sampler module exists.
+++- [x] `SamplingApplyMode::CpuOracleSampler` exists.
+++- [x] `sample_with_cpu_oracle` exists.
+++- [x] sampled decode fallback no longer calls `select_next_token(&logits_for_fallback)` directly.
+++- [x] reference checkpoint streaming path calls CPU oracle when sampled decode is requested.
+++- [x] DECODE-00 probe schema extended with CPU oracle fields.
+++- [x] summary, fixture, schema, report generated.
+++
+++## Execution acceptance
+++- [ ] `cargo check` — NOT_RUN, cargo unavailable.
+++- [ ] `cargo test` — NOT_RUN, cargo unavailable.
+++- [ ] `rustfmt` — NOT_RUN, rustfmt unavailable.
+++
+++## Seal
+++Static bake accepted with execution validation pending in Rust toolchain environment.
++diff -ruN decode01_orig/crates/model_core/src/cpu_oracle_sampler.rs decode01_work/crates/model_core/src/cpu_oracle_sampler.rs
++--- decode01_orig/crates/model_core/src/cpu_oracle_sampler.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode01_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:34:59.427813296 +0000
++@@ -0,0 +1,314 @@
+++use serde::{Deserialize, Serialize};
+++
+++use crate::generation_sampling::GenerationSamplingConfig;
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum SamplingApplyMode {
+++    Greedy,
+++    GpuSampler,
+++    CpuOracleSampler,
+++    GreedyFallbackDisabled,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct CpuOracleContext {
+++    pub step: usize,
+++    pub seed: u64,
+++    pub eos_token_id: Option<u32>,
+++    pub pad_token_id: Option<u32>,
+++    pub banned_token_ids: Vec<u32>,
+++    pub recent_token_ids: Vec<u32>,
+++    pub min_new_tokens: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct CpuOracleSampleResult {
+++    pub selected_id: u32,
+++    pub selected_logit: f32,
+++    pub selected_logprob: f32,
+++    pub active_count_before_min_p: usize,
+++    pub active_count_after_min_p: usize,
+++    pub active_count_after_top_p: usize,
+++    pub min_p_threshold: Option<f32>,
+++    pub sampler_applied: bool,
+++    pub apply_mode: SamplingApplyMode,
+++    pub active_softmax_renormalized: bool,
+++    pub candidate_empty_recovered: bool,
+++    pub recovery_mode: Option<String>,
+++}
+++
+++#[derive(Debug, Clone)]
+++struct Candidate {
+++    id: u32,
+++    logit: f32,
+++    scaled: f32,
+++    prob: f32,
+++}
+++
+++pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
+++    config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
+++}
+++
+++pub fn sample_with_cpu_oracle(
+++    logits: &[f32],
+++    config: &GenerationSamplingConfig,
+++    ctx: &CpuOracleContext,
+++) -> CpuOracleSampleResult {
+++    if logits.is_empty() {
+++        return CpuOracleSampleResult {
+++            selected_id: ctx.eos_token_id.unwrap_or(0),
+++            selected_logit: f32::NEG_INFINITY,
+++            selected_logprob: f32::NEG_INFINITY,
+++            active_count_before_min_p: 0,
+++            active_count_after_min_p: 0,
+++            active_count_after_top_p: 0,
+++            min_p_threshold: None,
+++            sampler_applied: false,
+++            apply_mode: SamplingApplyMode::GreedyFallbackDisabled,
+++            active_softmax_renormalized: false,
+++            candidate_empty_recovered: true,
+++            recovery_mode: Some("empty_logits".to_string()),
+++        };
+++    }
+++
+++    let requested = sampler_requested(config);
+++    if !requested {
+++        return greedy_result(logits, ctx, SamplingApplyMode::Greedy);
+++    }
+++
+++    let temp = if config.temperature.is_finite() && config.temperature > 0.0 {
+++        config.temperature
+++    } else {
+++        1.0
+++    };
+++
+++    let banned = |id: u32| -> bool { ctx.banned_token_ids.binary_search(&id).is_ok() || ctx.banned_token_ids.contains(&id) };
+++    let eos_blocked = |id: u32| -> bool {
+++        ctx.eos_token_id == Some(id) && ctx.min_new_tokens > 0 && ctx.step < ctx.min_new_tokens
+++    };
+++
+++    let mut candidates = logits
+++        .iter()
+++        .copied()
+++        .enumerate()
+++        .filter_map(|(idx, logit)| {
+++            let id = idx as u32;
+++            if !logit.is_finite() || banned(id) || eos_blocked(id) {
+++                return None;
+++            }
+++            Some(Candidate {
+++                id,
+++                logit,
+++                scaled: logit / temp,
+++                prob: 0.0,
+++            })
+++        })
+++        .collect::<Vec<_>>();
+++
+++    if candidates.is_empty() {
+++        return recover_valid_top1(logits, ctx, "no_candidate_after_ban_eos_guard");
+++    }
+++
+++    candidates.sort_by(|a, b| b.scaled.total_cmp(&a.scaled));
+++    if config.top_k > 0 {
+++        let k = (config.top_k as usize).min(candidates.len()).max(1);
+++        candidates.truncate(k);
+++    }
+++
+++    let active_count_before_min_p = candidates.len();
+++    let mut min_p_threshold = None;
+++    if config.min_p.is_finite() && config.min_p > 0.0 {
+++        let min_p = config.min_p.clamp(0.0, 0.95);
+++        if let Some(max_scaled) = candidates.iter().map(|c| c.scaled).max_by(|a, b| a.total_cmp(b)) {
+++            let threshold = max_scaled + min_p.ln();
+++            min_p_threshold = Some(threshold);
+++            candidates.retain(|c| c.scaled >= threshold);
+++        }
+++    }
+++
+++    if candidates.is_empty() {
+++        return recover_valid_top1(logits, ctx, "no_candidate_after_min_p");
+++    }
+++    let active_count_after_min_p = candidates.len();
+++
+++    renormalize_active_set(&mut candidates);
+++
+++    candidates.sort_by(|a, b| b.prob.total_cmp(&a.prob));
+++    let mut top_p_cut = candidates.len();
+++    if config.top_p.is_finite() && config.top_p > 0.0 && config.top_p < 1.0 {
+++        let mut acc = 0.0f32;
+++        top_p_cut = 0;
+++        for cand in &candidates {
+++            acc += cand.prob;
+++            top_p_cut += 1;
+++            if acc >= config.top_p {
+++                break;
+++            }
+++        }
+++        top_p_cut = top_p_cut.max(1).min(candidates.len());
+++        candidates.truncate(top_p_cut);
+++        renormalize_active_set(&mut candidates);
+++    }
+++
+++    if candidates.is_empty() {
+++        return recover_valid_top1(logits, ctx, "no_candidate_after_top_p");
+++    }
+++
+++    let r = deterministic_unit(ctx.seed, ctx.step, config.min_p, config.top_p, config.top_k, config.temperature);
+++    let mut acc = 0.0f32;
+++    let mut selected = candidates.last().cloned().unwrap();
+++    for cand in &candidates {
+++        acc += cand.prob;
+++        if r <= acc {
+++            selected = cand.clone();
+++            break;
+++        }
+++    }
+++
+++    CpuOracleSampleResult {
+++        selected_id: selected.id,
+++        selected_logit: selected.logit,
+++        selected_logprob: selected.prob.max(1e-20).ln(),
+++        active_count_before_min_p,
+++        active_count_after_min_p,
+++        active_count_after_top_p: candidates.len(),
+++        min_p_threshold,
+++        sampler_applied: true,
+++        apply_mode: SamplingApplyMode::CpuOracleSampler,
+++        active_softmax_renormalized: true,
+++        candidate_empty_recovered: false,
+++        recovery_mode: None,
+++    }
+++}
+++
+++fn renormalize_active_set(candidates: &mut [Candidate]) {
+++    if candidates.is_empty() {
+++        return;
+++    }
+++    let max_scaled = candidates
+++        .iter()
+++        .map(|c| c.scaled)
+++        .max_by(|a, b| a.total_cmp(b))
+++        .unwrap_or(0.0);
+++    let mut sum = 0.0f32;
+++    for cand in candidates.iter_mut() {
+++        cand.prob = (cand.scaled - max_scaled).exp();
+++        sum += cand.prob;
+++    }
+++    if sum.is_finite() && sum > 0.0 {
+++        for cand in candidates.iter_mut() {
+++            cand.prob /= sum;
+++        }
+++    } else {
+++        let uniform = 1.0 / candidates.len() as f32;
+++        for cand in candidates.iter_mut() {
+++            cand.prob = uniform;
+++        }
+++    }
+++}
+++
+++fn greedy_result(logits: &[f32], ctx: &CpuOracleContext, mode: SamplingApplyMode) -> CpuOracleSampleResult {
+++    let mut best_id = ctx.eos_token_id.unwrap_or(0);
+++    let mut best_logit = f32::NEG_INFINITY;
+++    for (idx, &logit) in logits.iter().enumerate() {
+++        if !logit.is_finite() {
+++            continue;
+++        }
+++        let id = idx as u32;
+++        if ctx.banned_token_ids.contains(&id) || ctx.pad_token_id == Some(id) {
+++            continue;
+++        }
+++        if logit > best_logit {
+++            best_id = id;
+++            best_logit = logit;
+++        }
+++    }
+++    CpuOracleSampleResult {
+++        selected_id: best_id,
+++        selected_logit: best_logit,
+++        selected_logprob: f32::NEG_INFINITY,
+++        active_count_before_min_p: 1,
+++        active_count_after_min_p: 1,
+++        active_count_after_top_p: 1,
+++        min_p_threshold: None,
+++        sampler_applied: false,
+++        apply_mode: mode,
+++        active_softmax_renormalized: false,
+++        candidate_empty_recovered: false,
+++        recovery_mode: None,
+++    }
+++}
+++
+++fn recover_valid_top1(logits: &[f32], ctx: &CpuOracleContext, reason: &str) -> CpuOracleSampleResult {
+++    let mut result = greedy_result(logits, ctx, SamplingApplyMode::GreedyFallbackDisabled);
+++    result.candidate_empty_recovered = true;
+++    result.recovery_mode = Some(reason.to_string());
+++    result.sampler_applied = true;
+++    result.apply_mode = SamplingApplyMode::CpuOracleSampler;
+++    result
+++}
+++
+++fn deterministic_unit(seed: u64, step: usize, min_p: f32, top_p: f32, top_k: u32, temperature: f32) -> f32 {
+++    let mut x = seed
+++        ^ ((step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
+++        ^ ((top_k as u64) << 32)
+++        ^ ((min_p.to_bits() as u64) << 1)
+++        ^ ((top_p.to_bits() as u64) << 7)
+++        ^ ((temperature.to_bits() as u64) << 13);
+++    x ^= x >> 30;
+++    x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+++    x ^= x >> 27;
+++    x = x.wrapping_mul(0x94D0_49BB_1331_11EB);
+++    x ^= x >> 31;
+++    let mantissa = (x >> 40) as u32;
+++    (mantissa as f32) / ((1u32 << 24) as f32)
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn cfg() -> GenerationSamplingConfig {
+++        GenerationSamplingConfig {
+++            temperature: 1.0,
+++            top_k: 0,
+++            top_p: 1.0,
+++            min_p: 0.1,
+++            ..Default::default()
+++        }
+++    }
+++
+++    #[test]
+++    fn decode01_min_p_fixture_keeps_expected_candidates() {
+++        let logits = [10.0, 9.0, 8.0, 2.0, -1.0];
+++        let ctx = CpuOracleContext {
+++            step: 0,
+++            seed: 1,
+++            eos_token_id: None,
+++            pad_token_id: None,
+++            banned_token_ids: Vec::new(),
+++            recent_token_ids: Vec::new(),
+++            min_new_tokens: 0,
+++        };
+++        let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
+++        assert_eq!(result.active_count_before_min_p, 5);
+++        assert_eq!(result.active_count_after_min_p, 3);
+++        assert!(result.active_softmax_renormalized);
+++    }
+++
+++    #[test]
+++    fn decode01_banned_token_never_selected() {
+++        let logits = [10.0, 9.0, 8.0];
+++        let ctx = CpuOracleContext {
+++            step: 0,
+++            seed: 1,
+++            eos_token_id: None,
+++            pad_token_id: None,
+++            banned_token_ids: vec![0],
+++            recent_token_ids: Vec::new(),
+++            min_new_tokens: 0,
+++        };
+++        let result = sample_with_cpu_oracle(&logits, &cfg(), &ctx);
+++        assert_ne!(result.selected_id, 0);
+++    }
+++}
++diff -ruN decode01_orig/crates/model_core/src/generation_sampling.rs decode01_work/crates/model_core/src/generation_sampling.rs
++--- decode01_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 08:00:51.000000000 +0000
+++++ decode01_work/crates/model_core/src/generation_sampling.rs	2026-05-26 15:33:25.904452596 +0000
++@@ -1,5 +1,6 @@
++ use super::*;
++ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+++use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
++ use std::collections::BTreeMap;
++ use crate::sampling_helpers::{
++     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
++@@ -2286,6 +2287,54 @@
++ 
++         Ok(ids)
++     }
+++
+++    fn select_next_token_with_cpu_oracle(
+++        &self,
+++        cpu_row: &[f32],
+++        sampling: &GenerationSamplingConfig,
+++        step: usize,
+++        fallback_reason: &'static str,
+++    ) -> NextTokenChoice {
+++        let ctx = CpuOracleContext {
+++            step,
+++            seed: sampling.seed.unwrap_or(0),
+++            eos_token_id: Some(self.spec.token_ids.eos_id),
+++            pad_token_id: Some(self.spec.token_ids.pad_id),
+++            banned_token_ids: Vec::new(),
+++            recent_token_ids: Vec::new(),
+++            min_new_tokens: sampling.min_new_tokens,
+++        };
+++        let result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
+++        NextTokenChoice {
+++            token_id: result.selected_id,
+++            logit: result.selected_logit,
+++            logprob: Some(result.selected_logprob),
+++            sampled: result.sampler_applied,
+++            rerank_delta: None,
+++            adapter_gate_scale: self.current_adapter_gate_telemetry().as_ref().map(|gate| gate.max_effective_scale),
+++            effective_loop_index: None,
+++            routing_pressure: None,
+++            top_n_cutoff: Some(result.active_count_after_top_p),
+++            candidate_pool: Vec::new(),
+++            gpu_sampling: Some(GpuSamplingStepTelemetry {
+++                path: Some("cpu_oracle_sampler".to_string()),
+++                selected_token_source: Some("cpu_oracle_sampler".to_string()),
+++                fallback_reason: Some(fallback_reason.to_string()),
+++                compare_status: Some("cpu_oracle_not_compared".to_string()),
+++                legacy_token_id: None,
+++                multistage_token_id: None,
+++                score_abs_delta: None,
+++                logprob_abs_delta: None,
+++                compared: false,
+++                fell_back_to_legacy: false,
+++                topk_overflow_fallback: false,
+++                perf: None,
+++            }),
+++            gpu_raw_bridge: None,
+++            tensorcube_runtime_splice: None,
+++        }
+++    }
+++
++     pub(crate) fn select_next_token_with_sampling(
++         &self,
++         logits: &LastLogitsGpu,
++@@ -2444,10 +2493,15 @@
++                     });
++                 }
++             }
++-            return with_runtime_splice_telemetry_label(
++-                "model_core.select.sampled.greedy_fallback".to_string(),
++-                || self.select_next_token(&logits_for_fallback),
++-            );
+++            return Ok(with_runtime_splice_telemetry_label(
+++                "model_core.select.sampled.cpu_oracle_fallback".to_string(),
+++                || self.select_next_token_with_cpu_oracle(
+++                    &logits_for_fallback.cpu_row,
+++                    &routed_sampling,
+++                    0,
+++                    "gpu_sampler_unavailable_cpu_oracle",
+++                ),
+++            ));
++         }
++ 
++         if let Some(runtime) = self.gpu_sampling_runtime_ref() {
++@@ -2524,7 +2578,12 @@
++             }
++         }
++ 
++-        self.select_next_token(&logits_for_fallback)
+++        Ok(self.select_next_token_with_cpu_oracle(
+++            &logits_for_fallback.cpu_row,
+++            &routed_sampling,
+++            0,
+++            "gpu_sampler_unavailable_cpu_oracle",
+++        ))
++     }
++ 
++     pub fn generate_with_sampling_cached_with_telemetry(
++diff -ruN decode01_orig/crates/model_core/src/lib.rs decode01_work/crates/model_core/src/lib.rs
++--- decode01_orig/crates/model_core/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
+++++ decode01_work/crates/model_core/src/lib.rs	2026-05-26 15:32:49.326111711 +0000
++@@ -9,6 +9,7 @@
++ mod decode_state;
++ mod generation_sampling;
++ mod sampling_helpers;
+++mod cpu_oracle_sampler;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -55,6 +56,7 @@
++     tensorcube_health_snapshot_from_telemetry_summaries,
++ };
++ 
+++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, SamplingApplyMode, sample_with_cpu_oracle};
++ pub use generation_telemetry::{
++     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
++     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
++diff -ruN decode01_orig/crates/model_core/src/reference_checkpoint.rs decode01_work/crates/model_core/src/reference_checkpoint.rs
++--- decode01_orig/crates/model_core/src/reference_checkpoint.rs	2026-05-26 07:18:41.000000000 +0000
+++++ decode01_work/crates/model_core/src/reference_checkpoint.rs	2026-05-26 15:34:10.585904211 +0000
++@@ -1,4 +1,5 @@
++ use super::*;
+++use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
++ use crate::sampling_helpers::{
++     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
++     check_generation_cancel, detect_stop_hit, has_repeating_ngram, has_repeating_suffix,
++@@ -759,18 +760,31 @@
++             let mut logits = self.forward_logits_ids(&ids, vocab_limit);
++             apply_banned_token_mask(&mut logits, banned_token_ids);
++             apply_repetition_penalty(&mut logits, &ids, 256, 1.10);
++-            let mut best = 0usize;
++-            let mut best_logit = f32::MIN;
++-            for (idx, logit) in logits.iter().enumerate() {
++-                if *logit > best_logit {
++-                    best_logit = *logit;
++-                    best = idx;
++-                }
++-            }
++-            let next = if !best_logit.is_finite() {
++-                self.spec.token_ids.eos_id
+++            let next = if sampling.requests_sampled_decode() {
+++                let ctx = CpuOracleContext {
+++                    step: generated_idx,
+++                    seed: sampling.seed.unwrap_or(0),
+++                    eos_token_id: Some(self.spec.token_ids.eos_id),
+++                    pad_token_id: Some(self.spec.token_ids.pad_id),
+++                    banned_token_ids: banned_token_ids.to_vec(),
+++                    recent_token_ids: ids.clone(),
+++                    min_new_tokens: sampling.min_new_tokens,
+++                };
+++                sample_with_cpu_oracle(&logits, &sampling, &ctx).selected_id
++             } else {
++-                best as u32
+++                let mut best = 0usize;
+++                let mut best_logit = f32::MIN;
+++                for (idx, logit) in logits.iter().enumerate() {
+++                    if *logit > best_logit {
+++                        best_logit = *logit;
+++                        best = idx;
+++                    }
+++                }
+++                if !best_logit.is_finite() {
+++                    self.spec.token_ids.eos_id
+++                } else {
+++                    best as u32
+++                }
++             };
++             ids.push(next);
++             if let Some(fragment) = append_token_piece_to_text(manifest, &mut emitted_text, next) {
++diff -ruN decode01_orig/crates/model_core/src/sampling_helpers.rs decode01_work/crates/model_core/src/sampling_helpers.rs
++--- decode01_orig/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:22:57.000000000 +0000
+++++ decode01_work/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:33:01.738605872 +0000
++@@ -103,6 +103,14 @@
++     pub sampler_applied: bool,
++     pub fallback_applied: bool,
++     pub fallback_reason: Option<String>,
+++    pub sampling_apply_mode: Option<String>,
+++    pub cpu_oracle_applied: bool,
+++    pub gpu_sampler_unavailable: bool,
+++    pub candidate_count_before_min_p: Option<usize>,
+++    pub candidate_count_after_min_p: Option<usize>,
+++    pub candidate_count_after_top_p: Option<usize>,
+++    pub min_p_threshold: Option<f32>,
+++    pub active_softmax_renormalized: bool,
++     pub finite_logits: bool,
++     pub nan_count: usize,
++     pub inf_count: usize,
+diff -ruN decode01_orig/workspace/decode01_cpu_oracle_fixture.json decode01_work/workspace/decode01_cpu_oracle_fixture.json
+--- decode01_orig/workspace/decode01_cpu_oracle_fixture.json	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/workspace/decode01_cpu_oracle_fixture.json	2026-05-26 15:35:19.106798355 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-01",
++  "fixture": "min_p_active_set",
++  "logits": [10.0, 9.0, 8.0, 2.0, -1.0],
++  "config": {
++    "temperature": 1.0,
++    "top_k": 0,
++    "top_p": 1.0,
++    "min_p": 0.1
++  },
++  "expected": {
++    "threshold": 7.6974149,
++    "candidate_count_before_min_p": 5,
++    "candidate_count_after_min_p": 3,
++    "kept_token_indices": [0, 1, 2],
++    "removed_token_indices": [3, 4],
++    "active_softmax_renormalized": true
++  }
++}
+diff -ruN decode01_orig/workspace/decode01_cpu_oracle_probe_schema.json decode01_work/workspace/decode01_cpu_oracle_probe_schema.json
+--- decode01_orig/workspace/decode01_cpu_oracle_probe_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/workspace/decode01_cpu_oracle_probe_schema.json	2026-05-26 15:35:19.090318093 +0000
+@@ -0,0 +1,27 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-01",
++  "decode_step_probe_extensions": {
++    "sampling_apply_mode": "Option<String>",
++    "cpu_oracle_applied": "bool",
++    "gpu_sampler_unavailable": "bool",
++    "candidate_count_before_min_p": "Option<usize>",
++    "candidate_count_after_min_p": "Option<usize>",
++    "candidate_count_after_top_p": "Option<usize>",
++    "min_p_threshold": "Option<f32>",
++    "active_softmax_renormalized": "bool"
++  },
++  "cpu_oracle_result_fields": [
++    "selected_id",
++    "selected_logit",
++    "selected_logprob",
++    "active_count_before_min_p",
++    "active_count_after_min_p",
++    "active_count_after_top_p",
++    "min_p_threshold",
++    "sampler_applied",
++    "apply_mode",
++    "active_softmax_renormalized",
++    "candidate_empty_recovered",
++    "recovery_mode"
++  ]
++}
+diff -ruN decode01_orig/workspace/decode01_cpu_oracle_sampler_summary.json decode01_work/workspace/decode01_cpu_oracle_sampler_summary.json
+--- decode01_orig/workspace/decode01_cpu_oracle_sampler_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/workspace/decode01_cpu_oracle_sampler_summary.json	2026-05-26 15:35:19.074219664 +0000
+@@ -0,0 +1,43 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-01",
++  "status": "CPU_ORACLE_SAMPLER_AND_GREEDY_FALLBACK_ELIMINATION_BAKED_STATIC",
++  "sampling_fallback_ssot": "GenerationSamplingConfig",
++  "cpu_oracle_module": "model_core::cpu_oracle_sampler",
++  "sampling_order": [
++    "raw_logits",
++    "finite_check",
++    "ban_mask",
++    "eos_guard",
++    "repetition_penalty_already_applied_by_caller_when_present",
++    "temperature_scale",
++    "top_k",
++    "min_p",
++    "active_set_softmax_renormalization",
++    "top_p",
++    "seeded_sample"
++  ],
++  "greedy_fallback_policy": {
++    "allowed_when_sampler_requested": false,
++    "allowed_when_sampler_not_requested": true
++  },
++  "wired_paths": [
++    "model_core::NativeWgpuModel::select_next_token_with_sampling sampled fallback",
++    "model_core::ReferenceCheckpoint::greedy_generate_streaming when sampling config requests sampled decode"
++  ],
++  "probe_fields_added": [
++    "sampling_apply_mode",
++    "cpu_oracle_applied",
++    "gpu_sampler_unavailable",
++    "candidate_count_before_min_p",
++    "candidate_count_after_min_p",
++    "candidate_count_after_top_p",
++    "min_p_threshold",
++    "active_softmax_renormalized"
++  ],
++  "non_scope": [
++    "webgpu_shader_active_set_renormalization",
++    "deltak_qwave_weighted_minp",
++    "context_router_training"
++  ],
++  "execution_validation": "NOT_RUN_NO_CARGO_IN_CONTAINER"
++}
+diff -ruN decode01_orig/workspace/decode01_report.md decode01_work/workspace/decode01_report.md
+--- decode01_orig/workspace/decode01_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode01_work/workspace/decode01_report.md	2026-05-26 15:35:19.122665596 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-DECODE-01 Report
++
++## Scope
++CPU Oracle Sampler / Greedy Fallback Elimination Seal.
++
++## Implemented
++- Added `crates/model_core/src/cpu_oracle_sampler.rs`.
++- Added `SamplingApplyMode`, `CpuOracleContext`, `CpuOracleSampleResult`.
++- Added deterministic CPU oracle sampling for `temperature`, `top_k`, `min_p`, active-set softmax renormalization, `top_p`, and seeded sampling.
++- Replaced sampled decode greedy fallback in `NativeWgpuModel::select_next_token_with_sampling` with CPU oracle fallback.
++- Routed `ReferenceCheckpoint::greedy_generate_streaming` through CPU oracle when `GenerationSamplingConfig::requests_sampled_decode()` is true.
++- Extended DECODE-00 `DecodeStepProbe` with CPU oracle / candidate count fields.
++
++## Non-scope
++- WebGPU shader active-set renormalization.
++- ΔK/QWave weighted Min-P.
++- Context router training.
++
++## Validation
++Static validation only. `cargo`, `rustc`, and `rustfmt` are unavailable in this container.

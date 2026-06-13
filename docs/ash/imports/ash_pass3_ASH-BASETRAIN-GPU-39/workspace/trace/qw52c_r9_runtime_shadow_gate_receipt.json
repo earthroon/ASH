@@ -1,0 +1,104 @@
+{
+  "patch_id": "QW-52C-R9",
+  "title": "Approved Profile Runtime Shadow Gate / Explicit Enable Only Seal",
+  "base_patch": "QW-52C-R8",
+  "status": "PASS_STATIC_RUNTIME_SHADOW_GATE_EXPLICIT_ENABLE_ONLY",
+  "runtime_shadow_gate_policy": {
+    "runtime_shadow_gate_policy_version": "runtime_shadow_gate_v1",
+    "explicit_enable_policy_version": "explicit_enable_only_v1",
+    "no_default_apply_policy_version": "runtime_shadow_no_default_apply_v1",
+    "require_commit_candidate_sealed": true,
+    "require_explicit_enable_receipt": true,
+    "allow_gate_creation_without_enable": true,
+    "allow_gate_open_without_enable": false,
+    "allow_shadow_apply_execution": false,
+    "allow_runtime_default_apply": false,
+    "allow_runtime_apply": false
+  },
+  "summary": {
+    "candidate_count": 1,
+    "bound_candidate_count": 1,
+    "gate_created_count": 1,
+    "gate_open_count": 0,
+    "gate_closed_count": 1,
+    "explicit_enable_required_count": 1,
+    "explicit_enable_missing_count": 1,
+    "shadow_apply_execution_count": 0,
+    "runtime_apply_count": 0,
+    "runtime_default_apply_count": 0,
+    "proceed_to_explicit_enable_receipt": true
+  },
+  "fixture_results": [
+    {
+      "case_id": "runtime_shadow_gate_created_but_closed",
+      "status": "PASS",
+      "runtime_shadow_gate_open": false
+    },
+    {
+      "case_id": "explicit_enable_missing_blocks_shadow_apply",
+      "status": "PASS",
+      "shadow_apply_execution_allowed": false
+    },
+    {
+      "case_id": "runtime_default_apply_forbidden",
+      "status": "PASS",
+      "runtime_default_apply": false
+    },
+    {
+      "case_id": "missing_commit_candidate_unavailable",
+      "status": "PASS",
+      "runtime_shadow_gate_status": "Unavailable"
+    },
+    {
+      "case_id": "applied_commit_candidate_invalid",
+      "status": "PASS",
+      "binding_status": "CandidateInvalid"
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "runtime_default_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "runtime_shadow_gate_created": true,
+    "runtime_shadow_gate_open": false,
+    "shadow_apply_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_gate_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R10",
+    "QW-52C-R9-R1",
+    "QW-52D"
+  ],
+  "notes": [
+    "R9 creates the runtime shadow gate but keeps it closed.",
+    "Explicit enable receipt is required before any shadow apply dry-run.",
+    "Runtime default apply remains false.",
+    "No shadow apply execution occurs in this patch.",
+    "No runtime behavior changes."
+  ]
+}

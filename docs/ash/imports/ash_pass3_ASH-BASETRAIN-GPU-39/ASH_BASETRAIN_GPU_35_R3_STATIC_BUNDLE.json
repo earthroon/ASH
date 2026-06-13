@@ -1,0 +1,128 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-35-R3",
+  "pass": false,
+  "title": "Selected Group Manifest From Atlas Plan Receipt / Derived Manifest Candidate No Invent No Weight Load Seal",
+  "patch_kind": "read_only_selected_group_manifest_derivation",
+  "source_ssot": "existing_atlas_group_plan_receipt_only",
+  "selected_group_manifest_candidate_count": 0,
+  "raw_manifest_candidate_count": 0,
+  "atlas_group_plan_receipt_candidate_count": 10,
+  "selected_group_id_requested": "SELECTED_ATLAS_GROUP_SLOT_0_CONTRACT_ONLY",
+  "selected_group_index_requested": 0,
+  "atlas_group_plan_search_roots": [
+    "target",
+    "artifacts",
+    "acceptance_reports",
+    "patch_reports",
+    "receipts",
+    "crates/base_train",
+    "crates/base_train/artifacts",
+    "crates/base_train/receipts"
+  ],
+  "atlas_group_plan_receipt_candidates": [
+    {
+      "path": "acceptance_reports/16AF_native_atlas_ffn_acceptance.json",
+      "digest_hex": "67e8399f6a090a41440fe227854c1a40db750c0cd6763dd9d89e4aad43091caa",
+      "parse_kind": "json",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-06_enko_subtitle_contextplan_shadow_builder_cuewindow_budget_gate_seal.md",
+      "digest_hex": "fe80b95815409d394ac4139e6bf9451e80e9187f80461c89af8393d222556117",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-07_enko_subtitle_contextplan_shadow_replay_no_prompt_mutation_receipt_seal.md",
+      "digest_hex": "b9678ff5c75f5e9bcc34b422804f6dae502ab18e5350a8b54d2039a5bd4b5c4a",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-09_enko_subtitle_contextplan_injection_approval_receipt_manual_apply_gate_seal.md",
+      "digest_hex": "0812f325156c05dd1f10868ba59830718e233e456c14ddea5cb3d79e54f07511",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-06_enko_subtitle_mock_approved_single_cue_commit_replay_target_apply_receipt_seal.md",
+      "digest_hex": "24a25fd7593b38f30d682614f7cc7bcc87a9653f4b3cd5d5f7a37e5432fe754a",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-07_enko_subtitle_mock_single_cue_commit_rollback_replay_revert_receipt_seal.md",
+      "digest_hex": "08e1b419a6323c646e02ca9b35af4031e08f99f4d250c121721dcfddad32fa2b",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-38G-R6A-WCTX-MOCK-14_enko_subtitle_mock_wctx_e2e_receipt_chain_index_path_closure_seal.md",
+      "digest_hex": "dc9ec6ca1471b4a950d5ef611f4e3f45e45d24ac6aa7dbe22a842f84cea84997",
+      "parse_kind": "md",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "patch_reports/16AF_native_atlas_ffn_bake_report.json",
+      "digest_hex": "03199bad6b5bf828534b7376f645290cbe2751c6ad1b848b73697444e5445560",
+      "parse_kind": "json",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "target/selected_atlas_group_slot_0_manifest.operator.skeleton.json",
+      "digest_hex": "489781df357a7b540c413b528ba1288f964c459ee39f6c0f104c350dd2165757",
+      "parse_kind": "json",
+      "parsed_value_count": 1
+    },
+    {
+      "path": "target/selected_atlas_group_slot_0_manifest.template.json",
+      "digest_hex": "a60c915fed0757dfbcdb16c72df525e8273e3e7bfd192a736b5c48f5ed0991e4",
+      "parse_kind": "json",
+      "parsed_value_count": 1
+    }
+  ],
+  "status": "BLOCKED_NO_SELECTED_GROUP_ENTRY_FOUND",
+  "verdict": "BLOCKED",
+  "selected_group_manifest_candidate": null,
+  "blocked_reason": "parseable atlas group plan candidates exist, but no selected group entry with complete direct metadata was found",
+  "guards": {
+    "invented_shape": false,
+    "invented_dtype": false,
+    "invented_byte_range": false,
+    "selected_group_weights_loaded": false,
+    "runtime_gpu_buffer_created": false,
+    "selected_group_gradient_buffer_allocated": false,
+    "selected_group_backward_executed": false,
+    "optimizer_step_executed": false,
+    "safetensors_mutation_present": false,
+    "runtime_1p1b_training_claimed": false
+  },
+  "no_invent_guard": {
+    "missing_field_policy": "block_do_not_fill",
+    "shape_default_allowed": false,
+    "dtype_default_allowed": false,
+    "byte_range_default_allowed": false
+  },
+  "no_weight_load_guard": {
+    "selected_group_weight_bytes_read": false,
+    "full_tensor_load_executed": false,
+    "weight_loaded": false
+  },
+  "no_gpu_runtime_guard": {
+    "wgpu_device_requested": false,
+    "runtime_gpu_buffer_created": false,
+    "gpu_upload_executed": false
+  },
+  "no_backward_no_optimizer_guard": {
+    "selected_group_backward_executed": false,
+    "optimizer_step_executed": false,
+    "safetensors_mutation_present": false
+  },
+  "acceptance_criteria": {
+    "pass_status_expected": "PASS_ASH_BASETRAIN_GPU_35_R3_SELECTED_GROUP_MANIFEST_FROM_ATLAS_PLAN_RECEIPT_DERIVED_MANIFEST_CANDIDATE_NO_INVENT_NO_WEIGHT_LOAD",
+    "actual_status": "BLOCKED_NO_SELECTED_GROUP_ENTRY_FOUND",
+    "blocked_is_valid_sealed_result": true,
+    "next_patch_if_pass": "ASH-BASETRAIN-GPU-36",
+    "next_patch_if_blocked": "ASH-BASETRAIN-GPU-35-R3A"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-03B",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-03+KV-ROLLBACK-01",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "Off",
+  "controlled_execute": false,
+  "default_enable": false,
+  "requires_salad03": true,
+  "requires_kv_rollback01": true,
+  "steps_observed": 0,
+  "gate": {
+    "can_execute_count": 0,
+    "denied_count": 0,
+    "strict_fail_count": 0
+  },
+  "execution": {
+    "executed_count": 0,
+    "rollback_executed_count": 0,
+    "kv_restore_executed_count": 0,
+    "token_ledger_truncate_executed_count": 0,
+    "position_restore_executed_count": 0,
+    "resample_executed_count": 0,
+    "safe_stop_executed_count": 0
+  },
+  "resample": {
+    "success_count": 0,
+    "failure_count": 0,
+    "mean_replacement_logprob": null
+  },
+  "post_check": {
+    "risk_improved_count": 0,
+    "risk_worsened_count": 0,
+    "safe_stop_recommended_count": 0,
+    "replacement_rejected_count": 0
+  },
+  "safety": {
+    "string_only_rollback_count": 0,
+    "execute_without_verified_snapshot_count": 0,
+    "execute_without_gate_count": 0,
+    "partial_failure_count": 0
+  },
+  "acceptance": {
+    "ready_for_salad03c_span_resample": false,
+    "ready_for_stop01_safe_stop_execute": false,
+    "ready_for_default_enable": false,
+    "reason": "static bake only; run controlled fixtures before enabling rollback execute"
+  }
+}

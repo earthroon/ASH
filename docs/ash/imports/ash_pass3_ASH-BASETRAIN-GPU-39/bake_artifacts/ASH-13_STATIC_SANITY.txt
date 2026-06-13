@@ -1,0 +1,18 @@
+ASH-13 STATIC SANITY
+PASS file crates/runtime/src/ash_inference_attachment.rs
+PASS file crates/runtime/tests/ash_inference_attachment.rs
+PASS file crates/orchestrator_local/src/ash_inference_attachment_integration.rs
+PASS file crates/orchestrator_local/src/bin/ash_13_inference_attachment_audit.rs
+PASS file crates/orchestrator_local/tests/ash_inference_attachment_integration.rs
+PASS file acceptance_reports/ASH-13_runtime_current_attachment_into_inference_request.md
+PASS grep pub mod ash_inference_attachment in crates/runtime/src/lib.rs
+PASS grep RuntimeAshInferenceAttachmentMetadata in crates/runtime/src/ash_inference_attachment.rs
+PASS grep RuntimeAshInferenceRequestEnvelope in crates/runtime/src/ash_inference_attachment.rs
+PASS grep attach_lora_telemetry_to_inference_request in crates/runtime/src/ash_inference_attachment.rs
+PASS grep attached_lora_ids in crates/runtime/src/ash_inference_attachment.rs
+PASS grep silent_fallback_detected in crates/runtime/src/ash_inference_attachment.rs
+PASS grep target_auto_remap_detected in crates/runtime/src/ash_inference_attachment.rs
+PASS grep ash_inference_attachment_integration in crates/orchestrator_local/src/lib.rs
+PASS grep build_orchestrator_inference_attachment_report in crates/orchestrator_local/src/ash_inference_attachment_integration.rs
+PASS absent tools/validate_ash_13_static.py
+PASS_STATIC_SANITY ASH-13 checks=16 fail=0

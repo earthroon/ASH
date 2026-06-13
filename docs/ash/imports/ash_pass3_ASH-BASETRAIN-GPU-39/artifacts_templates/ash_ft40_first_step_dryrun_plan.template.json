@@ -1,0 +1,32 @@
+{
+  "patch_id": "ASH-FT-40",
+  "title": "First Group Training Step Dry-run / No Commit Seal",
+  "mode": "first_group_training_step_dryrun",
+  "base_required": [
+    "ASH-FT-36",
+    "ASH-FT-37",
+    "ASH-FT-38",
+    "ASH-FT-39"
+  ],
+  "train_step_mode": "first_selected_group_dryrun",
+  "selected_group_policy": "from_ft37_train_run_manifest",
+  "allow_model_forward": true,
+  "allow_loss_computation": true,
+  "allow_backward": true,
+  "allow_optimizer_candidate_update": true,
+  "allow_weight_commit": false,
+  "allow_checkpoint_mutation": false,
+  "allow_safetensors_mutation": false,
+  "allow_persistent_optimizer_state_commit": false,
+  "allow_delta_packet_creation": false,
+  "allow_delta_stack_append": false,
+  "allow_shadow_route": false,
+  "allow_generation": false,
+  "allow_runtime_default_apply": false,
+  "allow_checkpoint_alias_rebind": false,
+  "allow_promotion": false,
+  "gradient_check": "finite_and_scope",
+  "optimizer_update_mode": "candidate_only",
+  "commit_mode": "no_commit",
+  "next_patch": "ASH-FT-41"
+}

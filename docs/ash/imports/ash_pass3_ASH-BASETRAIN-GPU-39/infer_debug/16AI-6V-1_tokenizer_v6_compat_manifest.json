@@ -1,0 +1,35 @@
+{
+  "run": {
+    "id": "16AI-6V-1",
+    "kind": "tokenizer_v6_compat_manifest",
+    "generation": false,
+    "checkpoint_required": false,
+    "manifest_created": true,
+    "runtime_changed": false,
+    "token_ids_mutated": false,
+    "vocab_augmented": false,
+    "new_token_ids_created": false,
+    "embedding_resize_required": false,
+    "checkpoint_rewrite_required": false
+  },
+  "outputs": {
+    "manifest": "artifacts/tokenizer_manifest_v6_compat.json",
+    "doc": "docs/16AI-6V-1_tokenizer_v6_compat_manifest.md",
+    "acceptance": "acceptance_reports/16AI-6V-1_acceptance_PENDING_OR_PASS_MANIFEST.md"
+  },
+  "manifest_summary": {
+    "tokenizer_version": "v6-compat",
+    "base_tokenizer_version": "v5",
+    "base_manifest": "artifacts/tokenizer_manifest_v5_final.json",
+    "vocab_size": 48259,
+    "checkpoint_compatible": true,
+    "default_mode": "v5-baseline",
+    "fallback_to_v5": true,
+    "gpu_shadow_replay8_verified": true,
+    "gpu_default": false,
+    "cpu_fallback": true
+  },
+  "acceptance": {
+    "status": "PASS_TOKENIZER_V6_COMPAT_MANIFEST"
+  }
+}

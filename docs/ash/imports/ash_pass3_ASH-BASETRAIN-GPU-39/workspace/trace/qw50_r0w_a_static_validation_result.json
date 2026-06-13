@@ -1,0 +1,75 @@
+{
+  "patch_id": "QW-50-R0W-A",
+  "title": "Generated Prefix / DecodeState Duplication Inspector Seal / Rust-Owned Prefix Trace / Python Injector Only Contract",
+  "status": "PASS_STATIC",
+  "rust_owned": true,
+  "python_injector_only": true,
+  "runtime_probe": "NOT_RUN_CARGO_UNAVAILABLE",
+  "checks": [
+    {
+      "name": "model_core owns decode_prefix_inspector.rs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "model_core lib exports inspector APIs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "decode_state records prefix snapshots in Rust",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "runtime has R0W-A trace module",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "runtime infer wires R0W-A trace",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "infer_only exposes nativeDecodeR0wAPrefixTrace",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Rust prefix probe binary exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Rust validator binary exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "No new QW-50-R0W-A Python analyzer tools",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "R0W-A schema exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cargo unavailable in bake environment",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "prefix_fix_applied": false,
+    "python_trace_mutation": false,
+    "python_receipt_mutation": false
+  }
+}

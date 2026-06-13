@@ -1,0 +1,50 @@
+{
+  "patch_id": "QW-52C-R2",
+  "base_patch": "QW-52C-R1",
+  "entry_added": {
+    "entry_id": "shadow_rerank_riskydiff_guard",
+    "entry_family": "promotion_guard_no_runtime_apply"
+  },
+  "registry_entry_count_before": 20,
+  "registry_entry_count_after": 21,
+  "summary": {
+    "patch_id": "QW-52C-R2",
+    "title": "Shadow Rerank RiskyDiff Guard / No Promotion Seal",
+    "base_patch": "QW-52C-R1",
+    "promotion_eligible": false,
+    "promotion_status": "PromotionBlocked",
+    "risky_diff_count": 1,
+    "beneficial_diff_count": 1,
+    "hard_ban_count": 0,
+    "token_selection_change_count": 0,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "required_next_patch": "QW-52C-R3",
+    "blocked_promotion_targets": [
+      "RuntimeSoftRerank",
+      "WeakLogitCorrection",
+      "EmergencyLoopBrakeDependency",
+      "ThresholdAutoTune",
+      "StablePolicyPromotion",
+      "MemoryWritePolicy"
+    ]
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

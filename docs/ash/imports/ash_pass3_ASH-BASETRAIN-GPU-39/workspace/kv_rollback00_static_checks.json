@@ -1,0 +1,68 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "check": "exists:crates/model_core/src/kv_rollback00_probe.rs",
+      "pass": true
+    },
+    {
+      "check": "exists:crates/model_core/src/lib.rs",
+      "pass": true
+    },
+    {
+      "check": "exists:crates/model_core/src/sampler_parity.rs",
+      "pass": true
+    },
+    {
+      "check": "exists:workspace/kv_rollback00_probe_schema.json",
+      "pass": true
+    },
+    {
+      "check": "exists:workspace/kv_rollback00_steps.jsonl",
+      "pass": true
+    },
+    {
+      "check": "exists:workspace/kv_rollback00_summary.json",
+      "pass": true
+    },
+    {
+      "check": "token:KvRollback00Mode",
+      "pass": true
+    },
+    {
+      "check": "token:KVSnapshotLedger+TokenLedger+PositionState",
+      "pass": true
+    },
+    {
+      "check": "token:main_state_unchanged: true",
+      "pass": true
+    },
+    {
+      "check": "token:probe_only: true",
+      "pass": true
+    },
+    {
+      "check": "token:restore_verified",
+      "pass": true
+    },
+    {
+      "check": "token:ForkedReplayProbe",
+      "pass": true
+    },
+    {
+      "check": "token:KvRollbackProbeRuntime",
+      "pass": true
+    },
+    {
+      "check": "lib module exported",
+      "pass": true
+    },
+    {
+      "check": "sampler hook connected",
+      "pass": true
+    }
+  ]
+}

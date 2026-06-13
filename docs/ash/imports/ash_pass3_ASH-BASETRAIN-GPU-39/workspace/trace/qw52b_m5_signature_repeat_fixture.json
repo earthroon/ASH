@@ -1,0 +1,154 @@
+[
+  {
+    "case_id": "normal_diverse_signature_window",
+    "generated_tokens": [
+      101,
+      204,
+      305,
+      406,
+      512
+    ],
+    "generated_pieces": [
+      "오늘",
+      "날씨가",
+      "좋네요",
+      ".",
+      "그래서"
+    ],
+    "qwave_signature_hashes": [
+      "a1",
+      "b2",
+      "c3",
+      "d4",
+      "e5"
+    ],
+    "cji_xyz_hashes": null,
+    "transition_hashes": [
+      "a1>b2",
+      "b2>c3",
+      "c3>d4",
+      "d4>e5"
+    ],
+    "expected": {
+      "risk_level_max": "Low",
+      "diversity_risk_score_max": 0.3
+    }
+  },
+  {
+    "case_id": "surface_piece_repeat_guard",
+    "generated_tokens": [
+      900,
+      901,
+      901,
+      901
+    ],
+    "generated_pieces": [
+      "있고",
+      "나오죠",
+      "나오죠",
+      "나오죠"
+    ],
+    "qwave_signature_hashes": [
+      "x0",
+      "x1",
+      "x1",
+      "x1"
+    ],
+    "cji_xyz_hashes": null,
+    "transition_hashes": [
+      "x0>x1",
+      "x1>x1",
+      "x1>x1"
+    ],
+    "expected": {
+      "piece_hash_risk_min": 0.6,
+      "qwave_signature_hash_risk_min": 0.6,
+      "risk_level_min": "High"
+    }
+  },
+  {
+    "case_id": "qwave_signature_repeat_without_piece_repeat",
+    "generated_tokens": [
+      111,
+      222,
+      333,
+      444
+    ],
+    "generated_pieces": [
+      "있고",
+      "그러고",
+      "해서",
+      "그리고"
+    ],
+    "qwave_signature_hashes": [
+      "loopA",
+      "loopA",
+      "loopA",
+      "loopA"
+    ],
+    "cji_xyz_hashes": null,
+    "transition_hashes": [
+      "loopA>loopA",
+      "loopA>loopA",
+      "loopA>loopA"
+    ],
+    "expected": {
+      "piece_hash_risk_max": 0.4,
+      "qwave_signature_hash_risk_min": 0.75,
+      "transition_hash_risk_min": 0.75,
+      "risk_level_min": "Medium"
+    }
+  },
+  {
+    "case_id": "transition_ping_pong_repeat",
+    "generated_tokens": [
+      10,
+      20,
+      10,
+      20,
+      10,
+      20
+    ],
+    "generated_pieces": [
+      "A",
+      "B",
+      "A",
+      "B",
+      "A",
+      "B"
+    ],
+    "qwave_signature_hashes": [
+      "qa",
+      "qb",
+      "qa",
+      "qb",
+      "qa",
+      "qb"
+    ],
+    "cji_xyz_hashes": null,
+    "transition_hashes": [
+      "qa>qb",
+      "qb>qa",
+      "qa>qb",
+      "qb>qa",
+      "qa>qb"
+    ],
+    "expected": {
+      "transition_hash_risk_min": 0.7,
+      "risk_level_min": "High"
+    }
+  },
+  {
+    "case_id": "missing_all_hash_inputs",
+    "generated_tokens": [],
+    "generated_pieces": [],
+    "qwave_signature_hashes": null,
+    "cji_xyz_hashes": null,
+    "transition_hashes": null,
+    "expected": {
+      "risk_level": "Unavailable",
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  }
+]

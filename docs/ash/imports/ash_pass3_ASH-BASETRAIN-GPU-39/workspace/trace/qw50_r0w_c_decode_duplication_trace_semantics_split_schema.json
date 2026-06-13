@@ -1,0 +1,12 @@
+{
+  "patch_id": "QW-50-R0W-C",
+  "title": "Decode Duplication Trace Semantics Split / Generated Repeat Attribution Seal",
+  "schema_version": 1,
+  "fields": {
+    "prefix_push_duplication_detected": "bool: true only when last_token push really occurred and prefix_len_delta > 0",
+    "prefix_push_duplication_count": "usize: count of push-caused duplicate tail observations",
+    "generated_history_repeat_detected": "bool: true when generated sequence itself already contains consecutive last-token repeats",
+    "generated_history_repeat_count": "usize: count of generated-history repeat observations",
+    "recommended_next_patch": "QW-50-R0W-B only for push duplication; QW-50-R0X-A for generated repeat observation"
+  }
+}

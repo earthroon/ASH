@@ -1,0 +1,397 @@
+--- /mnt/data/r6a_r11_orig/crates/model_core/src/native_wgpu.rs	2026-05-23 05:43:03.000000000 +0000
++++ /mnt/data/r6a_r11_r1_work/crates/model_core/src/native_wgpu.rs	2026-05-23 06:16:25.081721476 +0000
+@@ -5112,6 +5112,7 @@
+ 
+ // 16AI-QW-38G-R6A-R11 — Projection Boundary Margin Audit / Masked Top1 Compare Seal
+ static QW38G_R6A_R11_MARGIN_DONE: AtomicUsize = AtomicUsize::new(0);
++static QW38G_R6A_R11_R1_ENTRY_DONE: AtomicUsize = AtomicUsize::new(0);
+ 
+ fn qw38g_r6a_r11_enabled() -> bool {
+     env_flag("ASH_PROJECTION_MARGIN_AUDIT") || env_flag("ASH_QW38G_R6A_R11_PROJECTION_MARGIN_AUDIT")
+@@ -5179,6 +5180,254 @@
+         .unwrap_or_else(|_| "workspace/qw38g_r6a_r11_projection_margin_rollback_receipt.json".to_string())
+ }
+ 
++// 16AI-QW-38G-R6A-R11-R1 — Projection Margin Hook Reachability / Receipt Fallback Seal
++fn qw38g_r6a_r11_r1_enabled() -> bool {
++    qw38g_r6a_r11_enabled()
++        && (env_flag("ASH_PROJECTION_MARGIN_HOOK_TRACE")
++            || env_flag("ASH_PROJECTION_MARGIN_RECEIPT_FALLBACK")
++            || env_flag("ASH_QW38G_R6A_R11_R1_HOOK_TRACE"))
++}
++
++fn qw38g_r6a_r11_r1_receipt_fallback_enabled() -> bool {
++    env_flag("ASH_PROJECTION_MARGIN_RECEIPT_FALLBACK")
++        || env_flag("ASH_QW38G_R6A_R11_R1_RECEIPT_FALLBACK")
++}
++
++fn qw38g_r6a_r11_r1_reachability_path() -> String {
++    std::env::var("ASH_PROJECTION_MARGIN_REACHABILITY")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r11_r1_projection_margin_reachability.json".to_string())
++}
++
++fn qw38g_r6a_r11_r1_vec_from_json_array(value: Option<&serde_json::Value>) -> Vec<String> {
++    value
++        .and_then(|v| v.as_array())
++        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
++        .unwrap_or_default()
++}
++
++fn qw38g_r6a_r11_r1_write_reachability(
++    status: &str,
++    last_stage: &str,
++    projection_boundary_entered: bool,
++    hook_attempted: bool,
++    source_load_attempted: bool,
++    source_loaded: bool,
++    margin_plan_created: bool,
++    event_written: bool,
++    summary_written: bool,
++    receipt_written: bool,
++    rollback_written: bool,
++    warning_codes: Vec<String>,
++) {
++    if !qw38g_r6a_r11_r1_enabled() {
++        return;
++    }
++    let path = qw38g_r6a_r11_r1_reachability_path();
++    let reachability = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R11-R1",
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "runtime_entered": true,
++        "env_checked": true,
++        "audit_enabled": qw38g_r6a_r11_enabled(),
++        "hook_registered": true,
++        "projection_boundary_entered": projection_boundary_entered,
++        "hook_attempted": hook_attempted,
++        "source_load_attempted": source_load_attempted,
++        "source_loaded": source_loaded,
++        "margin_plan_created": margin_plan_created,
++        "event_written": event_written,
++        "summary_written": summary_written,
++        "receipt_written": receipt_written,
++        "rollback_written": rollback_written,
++        "last_stage": last_stage,
++        "status": status,
++        "receipt_path": qw38g_r6a_r11_receipt_path(),
++        "summary_path": qw38g_r6a_r11_summary_path(),
++        "trace_path": qw38g_r6a_r11_trace_path(),
++        "rollback_path": qw38g_r6a_r11_rollback_path(),
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&path, &reachability);
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][reachability_written] path={}", path);
++}
++
++fn qw38g_r6a_r11_r1_write_fallback_rollback(status: &str, warning_codes: Vec<String>) -> bool {
++    let rollback_path = qw38g_r6a_r11_rollback_path();
++    let rollback = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R11-R1",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "rollback_required": true,
++        "rollback_available": true,
++        "rollback_executed": true,
++        "margin_buffers_discarded": true,
++        "staging_buffers_discarded": true,
++        "sandbox_bindings_discarded": true,
++        "sandbox_cache_keys_discarded": true,
++        "rollback_receipt_written": true,
++        "fallback_rollback": true,
++        "rollback_status": "NO_RUNTIME_RESOURCES_TO_DISCARD",
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&rollback_path, &rollback);
++    qw38g_r6a_r2_path_written(&rollback_path)
++}
++
++fn qw38g_r6a_r11_r1_write_fallback_receipt(
++    status: &str,
++    failure_stage: &str,
++    failure_reason: &str,
++    projection_boundary_entered: bool,
++    hook_attempted: bool,
++    source_load_attempted: bool,
++    source_loaded: bool,
++    margin_plan_created: bool,
++    event_written: bool,
++    recommended_next_patch: &str,
++    warning_codes: Vec<String>,
++) {
++    if !qw38g_r6a_r11_r1_receipt_fallback_enabled() {
++        return;
++    }
++    let trace_path = qw38g_r6a_r11_trace_path();
++    let summary_path = qw38g_r6a_r11_summary_path();
++    let receipt_path = qw38g_r6a_r11_receipt_path();
++    qw38g_r6a_r8_write_jsonl(&trace_path, &[]);
++    let rollback_written = qw38g_r6a_r11_r1_write_fallback_rollback(
++        "ROLLBACK_RECEIPT_R11_R1_FALLBACK_NO_RUNTIME_RESOURCES",
++        warning_codes.clone(),
++    );
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R11-R1",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "margin_audit_enabled": qw38g_r6a_r11_enabled(),
++        "audit_mode": qw38g_r6a_r11_mode(),
++        "fallback_receipt": true,
++        "failure_stage": failure_stage,
++        "failure_reason": failure_reason,
++        "source_valid_for_r11": false,
++        "target_ids": qw38g_r6a_r11_target_ids(),
++        "top_n": qw38a_env_usize("ASH_PROJECTION_MARGIN_TOP_N", 8).max(1),
++        "min_margin_threshold": qw38g_r6a_r11_min_margin(),
++        "total_events": 0,
++        "ok_event_count": 0,
++        "failed_event_count": 0,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "total_readback_bytes": 0,
++        "raw_top1_target_count": 0,
++        "raw_top1_target_rate": 0.0,
++        "ban_mask_displacement_count": 0,
++        "ban_mask_displacement_rate": 0.0,
++        "projection_margin_confirmed": false,
++        "projection_margin_strength": "none",
++        "confirmed_candidate": serde_json::Value::Null,
++        "candidate_confidence_after_margin": "none",
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++    let summary_written = qw38g_r6a_r2_path_written(&summary_path);
++    let trace_written = qw38g_r6a_r2_path_written(&trace_path);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R11-R1",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "audit_enabled": qw38g_r6a_r11_enabled(),
++        "hook_attempted": hook_attempted,
++        "projection_boundary_entered": projection_boundary_entered,
++        "source_load_attempted": source_load_attempted,
++        "source_loaded": source_loaded,
++        "margin_plan_created": margin_plan_created,
++        "event_written": event_written,
++        "fallback_receipt": true,
++        "failure_stage": failure_stage,
++        "failure_reason": failure_reason,
++        "source_valid_for_r11": false,
++        "projection_margin_confirmed": false,
++        "projection_margin_strength": "none",
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "trace_path": trace_path,
++        "trace_jsonl_written": trace_written,
++        "summary_path": summary_path,
++        "summary_json_written": summary_written,
++        "rollback_receipt_path": qw38g_r6a_r11_rollback_path(),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++    let warnings = qw38g_r6a_r11_r1_vec_from_json_array(summary.get("warning_codes"));
++    qw38g_r6a_r11_r1_write_reachability(
++        status,
++        failure_stage,
++        projection_boundary_entered,
++        hook_attempted,
++        source_load_attempted,
++        source_loaded,
++        margin_plan_created,
++        event_written,
++        summary_written,
++        true,
++        rollback_written,
++        warnings,
++    );
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][receipt_written] path={}", qw38g_r6a_r11_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][rollback_written] path={}", qw38g_r6a_r11_rollback_path());
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][done] status={}", status);
++}
++
++fn qw38g_r6a_r11_r1_runtime_entry_probe(context: &str) {
++    if !qw38g_r6a_r11_r1_enabled() {
++        return;
++    }
++    if QW38G_R6A_R11_R1_ENTRY_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][start]");
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][env] enabled={} mode={} context={}", qw38g_r6a_r11_enabled(), qw38g_r6a_r11_mode(), context);
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][receipt_fallback] enabled={}", qw38g_r6a_r11_r1_receipt_fallback_enabled());
++    qw38g_r6a_r11_r1_write_fallback_receipt(
++        "FAIL_PROJECTION_MARGIN_HOOK_NOT_REACHED",
++        "hook_reachability",
++        "projection_margin_hook_not_reached",
++        false,
++        false,
++        false,
++        false,
++        false,
++        false,
++        "16AI-QW-38G-R6A-R11-R2_HOT_PATH_HOOK_RELOCATION",
++        vec!["PROJECTION_MARGIN_HOOK_NOT_REACHED".to_string(), "RECEIPT_FALLBACK_USED".to_string()],
++    );
++}
++
++fn qw38g_r6a_r11_r1_projection_hook_attempt(context: &str) {
++    if !qw38g_r6a_r11_r1_enabled() {
++        return;
++    }
++    eprintln!("[16AI-QW-38G-R6A-R11-R1][hook_attempt] projection_boundary={}", context);
++    qw38g_r6a_r11_r1_write_reachability(
++        "RUNNING_PROJECTION_MARGIN_HOOK_REACHED",
++        "hook_attempt",
++        true,
++        true,
++        false,
++        false,
++        false,
++        false,
++        false,
++        qw38g_r6a_r2_path_written(&qw38g_r6a_r11_receipt_path()),
++        qw38g_r6a_r2_path_written(&qw38g_r6a_r11_rollback_path()),
++        vec![],
++    );
++}
++
+ fn qw38g_r6a_r11_target_ids() -> Vec<u32> {
+     std::env::var("ASH_PROJECTION_MARGIN_TARGET_IDS")
+         .unwrap_or_else(|_| "13".to_string())
+@@ -5312,6 +5561,23 @@
+ 
+     eprintln!("[16AI-QW-38G-R6A-R11][start]");
+     eprintln!("[16AI-QW-38G-R6A-R11][env] mode={} scalar_only={} top_n={} min_margin={} targets={:?} max_bytes={}", qw38g_r6a_r11_mode(), scalar_only, top_n, min_margin_threshold, target_ids, max_bytes);
++    if qw38g_r6a_r11_r1_enabled() {
++        eprintln!("[16AI-QW-38G-R6A-R11-R1][source_load_attempt]");
++        qw38g_r6a_r11_r1_write_reachability(
++            "RUNNING_SOURCE_LOAD_ATTEMPT",
++            "source_load_attempt",
++            true,
++            true,
++            true,
++            false,
++            false,
++            false,
++            false,
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_receipt_path()),
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_rollback_path()),
++            vec![],
++        );
++    }
+ 
+     if production_apply_requested {
+         qw38g_r6a_r11_write_failure(
+@@ -5391,6 +5657,40 @@
+         && r10_confirmed
+         && r10_candidate.as_deref() == Some("final_norm_or_projection_boundary");
+     eprintln!("[16AI-QW-38G-R6A-R11][source_loaded] r8={} r10={} raw_topk={} candidate={:?} valid={}", r8_loaded, r10_loaded, raw_topk_loaded, r10_candidate, source_valid_for_r11);
++    if qw38g_r6a_r11_r1_enabled() {
++        qw38g_r6a_r11_r1_write_reachability(
++            if source_valid_for_r11 { "RUNNING_SOURCE_LOADED" } else { "FAIL_PROJECTION_MARGIN_SOURCE_LOAD" },
++            "source_loaded",
++            true,
++            true,
++            true,
++            source_valid_for_r11,
++            false,
++            false,
++            false,
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_receipt_path()),
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_rollback_path()),
++            if source_valid_for_r11 { vec![] } else { vec!["PROJECTION_MARGIN_SOURCE_LOAD_FAILED".to_string(), "RECEIPT_FALLBACK_USED".to_string()] },
++        );
++        if !source_valid_for_r11 {
++            qw38g_r6a_r11_r1_write_fallback_receipt(
++                "FAIL_PROJECTION_MARGIN_SOURCE_LOAD",
++                "source_load",
++                "r8_or_r10_source_missing_or_invalid",
++                true,
++                true,
++                true,
++                false,
++                false,
++                false,
++                "16AI-QW-38G-R6A-R11-R1_SOURCE_PATH_RECHECK",
++                vec!["PROJECTION_MARGIN_SOURCE_LOAD_FAILED".to_string(), "RECEIPT_FALLBACK_USED".to_string()],
++            );
++        }
++    }
++    if !source_valid_for_r11 && qw38g_r6a_r11_r1_enabled() && qw38g_r6a_r11_r1_receipt_fallback_enabled() {
++        return;
++    }
+ 
+     if !source_valid_for_r11 {
+         let mut warnings = Vec::new();
+@@ -5425,6 +5725,24 @@
+         .filter(|c| meta.banned_reasons.contains_key(&c.token_id))
+         .count();
+ 
++    if qw38g_r6a_r11_r1_enabled() {
++        eprintln!("[16AI-QW-38G-R6A-R11-R1][margin_plan] target_ids={:?} top_n={} min_margin={}", target_ids, top_n, min_margin_threshold);
++        qw38g_r6a_r11_r1_write_reachability(
++            "RUNNING_MARGIN_PLAN_CREATED",
++            "margin_plan",
++            true,
++            true,
++            true,
++            true,
++            true,
++            false,
++            false,
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_receipt_path()),
++            qw38g_r6a_r2_path_written(&qw38g_r6a_r11_rollback_path()),
++            vec![],
++        );
++    }
++
+     let mut events = Vec::new();
+     let mut margins_vs_masked = Vec::new();
+     let mut margins_vs_raw_top2 = Vec::new();
+@@ -5667,6 +5985,24 @@
+         "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
+     });
+     qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++    if qw38g_r6a_r11_r1_enabled() {
++        let r1_warnings = qw38g_r6a_r11_r1_vec_from_json_array(summary.get("warning_codes"));
++        qw38g_r6a_r11_r1_write_reachability(
++            status,
++            "done",
++            true,
++            true,
++            true,
++            true,
++            true,
++            ok_event_count > 0,
++            summary_written,
++            qw38g_r6a_r2_path_written(&receipt_path),
++            rollback_written,
++            r1_warnings,
++        );
++        eprintln!("[16AI-QW-38G-R6A-R11-R1][done] status={}", status);
++    }
+ 
+     eprintln!("[16AI-QW-38G-R6A-R11][margin_summary] raw_top1_rate={} displacement_rate={} strength={}", raw_top1_target_rate, displacement_rate, margin_strength);
+     eprintln!("[16AI-QW-38G-R6A-R11][normal_path_guard] passed=true");
+@@ -8456,6 +8792,7 @@
+         &self,
+         last_hidden: Tensor<NativeInferenceBackend, 2>,
+     ) -> Tensor<NativeInferenceBackend, 2> {
++        qw38g_r6a_r11_r1_runtime_entry_probe("NativeWgpuModel::project_last_hidden_to_logits");
+         if let Some(atlas) = self.vocab_atlas.as_ref() {
+             return self.project_last_hidden_to_logits_vocab_atlas(last_hidden, atlas);
+         }
+@@ -8467,6 +8804,8 @@
+         last_hidden: Tensor<NativeInferenceBackend, 2>,
+         atlas: &NativeVocabAtlas,
+     ) -> Tensor<NativeInferenceBackend, 2> {
++        qw38g_r6a_r11_r1_runtime_entry_probe("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
++        qw38g_r6a_r11_r1_projection_hook_attempt("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r3_stage_enter("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas", format!("vocab_size={}", atlas.vocab_size));
+         qw38g_r3_stage_enter("vocab_atlas_projection", format!("tile_count={}", atlas.tiles.len()));
+         let mut merged_logits = Vec::with_capacity(atlas.vocab_size);

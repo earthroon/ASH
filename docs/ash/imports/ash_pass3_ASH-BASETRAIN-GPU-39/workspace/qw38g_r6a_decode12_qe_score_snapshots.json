@@ -1,0 +1,121 @@
+[
+  {
+    "candidate_id": "candidate-qe-low-risk",
+    "qe_quality_score": 0.8,
+    "adequacy_risk_score": 0.0,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 0.0,
+    "hallucination_risk_score": 0.0,
+    "polarity_risk_score": 0.0,
+    "entity_number_risk_score": 0.0,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": false,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "DeterministicStubOnly",
+      "ExternalModelDisabled"
+    ]
+  },
+  {
+    "candidate_id": "candidate-qe-omission",
+    "qe_quality_score": 0.35,
+    "adequacy_risk_score": 0.7,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 0.7,
+    "hallucination_risk_score": 0.0,
+    "polarity_risk_score": 0.0,
+    "entity_number_risk_score": 0.7,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": true,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "DeterministicStubOnly",
+      "ExternalModelDisabled",
+      "NumberMismatchRisk",
+      "OmissionRisk",
+      "OmissionRisk",
+      "LowQeQualityScore"
+    ]
+  },
+  {
+    "candidate_id": "candidate-qe-hallucination",
+    "qe_quality_score": 0.35,
+    "adequacy_risk_score": 0.7,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 0.6,
+    "hallucination_risk_score": 0.7,
+    "polarity_risk_score": 0.0,
+    "entity_number_risk_score": 0.65,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": true,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "DeterministicStubOnly",
+      "ExternalModelDisabled",
+      "NamedEntityMismatchRisk",
+      "HallucinationRisk",
+      "LowQeQualityScore"
+    ]
+  },
+  {
+    "candidate_id": "candidate-qe-polarity",
+    "qe_quality_score": 0.5,
+    "adequacy_risk_score": 0.75,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 0.0,
+    "hallucination_risk_score": 0.0,
+    "polarity_risk_score": 0.75,
+    "entity_number_risk_score": 0.0,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": true,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "DeterministicStubOnly",
+      "ExternalModelDisabled",
+      "PolarityMismatchRisk",
+      "LowQeQualityScore"
+    ]
+  },
+  {
+    "candidate_id": "candidate-qe-missing-source",
+    "qe_quality_score": 0.0,
+    "adequacy_risk_score": 1.0,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 1.0,
+    "hallucination_risk_score": 0.0,
+    "polarity_risk_score": 0.0,
+    "entity_number_risk_score": 0.0,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": true,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "SourceMissing",
+      "DeterministicStubOnly",
+      "ExternalModelDisabled"
+    ]
+  },
+  {
+    "candidate_id": "candidate-qe-missing-final-gate",
+    "qe_quality_score": 0.0,
+    "adequacy_risk_score": 1.0,
+    "fluency_risk_score": 0.0,
+    "omission_risk_score": 1.0,
+    "hallucination_risk_score": 0.0,
+    "polarity_risk_score": 0.0,
+    "entity_number_risk_score": 0.0,
+    "deterministic_stub_score": true,
+    "external_model_score": false,
+    "review_recommended": true,
+    "hard_fail_recommended": false,
+    "reasons": [
+      "FinalGateReceiptMissing",
+      "DeterministicStubOnly",
+      "ExternalModelDisabled"
+    ]
+  }
+]

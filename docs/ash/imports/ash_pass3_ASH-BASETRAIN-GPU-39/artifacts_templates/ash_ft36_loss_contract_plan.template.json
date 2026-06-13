@@ -1,0 +1,13 @@
+{
+  "patch_id": "ASH-FT-36",
+  "title": "Loss Objective Contract / Subtitle Causal LM Target Seal",
+  "mode": "loss_objective_contract",
+  "base_required": "ASH-FT-35",
+  "objective_kind": "subtitle_causal_lm",
+  "label_policy": "shifted_next_token",
+  "ignore_index": -100,
+  "pair_loss": "target_only",
+  "allow_model_forward": false,
+  "allow_training": false,
+  "next_patch": "ASH-FT-37"
+}

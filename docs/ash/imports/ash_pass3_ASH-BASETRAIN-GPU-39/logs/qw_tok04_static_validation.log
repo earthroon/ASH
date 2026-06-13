@@ -1,0 +1,41 @@
+QW-TOK-04 static validation
+QW-TOK-04 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok04FirstControlledInferSmokeConfig: PASS
+QwTok04InferSmokeCandidateProbe: PASS
+QwTok04RuntimeRunnerAvailabilityProbe: PASS
+QwTok04ControlledInferSmokeInput: PASS
+QwTok04StaticSamplerReceipt: PASS
+QwTok04ControlledInferSmokeOutput: PASS
+QwTok04OutputIdRangeReceipt: PASS
+QwTok04NoQualityClaimSeal: PASS
+QwTok04NoSamplerMutationSeal: PASS
+QwTok04FirstControlledInferSmokeReport: PASS
+build_qw_tok04_first_controlled_infer_smoke_report: PASS
+build_qw_tok04_controlled_infer_smoke_output: PASS
+build_qw_tok04_output_id_range_receipt: PASS
+build_qw_tok04_no_quality_claim_seal: PASS
+build_qw_tok04_no_sampler_mutation_seal: PASS
+build_qw_tok04_default_first_controlled_infer_smoke_report: PASS
+expected vocab const 48259: PASS
+max new tokens limit 8: PASS
+default blocks sampler mutation: PASS
+default blocks QW selector execution: PASS
+default blocks MCTS execution: PASS
+default blocks quality evaluation: PASS
+default blocks training mutation: PASS
+default blocks checkpoint write: PASS
+default blocks runtime spec write: PASS
+test qw_tok04_first_controlled_infer_smoke.rs present: PASS
+test qw_tok04_output_id_range_guard.rs present: PASS
+test qw_tok04_no_sampler_mutation.rs present: PASS
+test qw_tok04_no_quality_claim_no_training.rs present: PASS
+artifacts/qw_tok04_first_controlled_infer_smoke_report.json exists: PASS
+artifacts/qw_tok04_infer_smoke_output_ids.json exists: PASS
+artifacts/qw_tok04_output_id_range_receipt.json exists: PASS
+artifacts/qw_tok04_sampler_static_receipt.json exists: PASS
+workspace/runtime_traces/qw_tok04_first_controlled_infer_smoke_trace.jsonl exists: PASS
+workspace/trace/qw_tok04_first_controlled_infer_smoke_receipt.json exists: PASS
+no checkpoint/model/tokenizer weight files packaged: PASS
+overall: PASS

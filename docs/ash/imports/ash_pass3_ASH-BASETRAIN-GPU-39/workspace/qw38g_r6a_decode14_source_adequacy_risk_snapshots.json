@@ -1,0 +1,219 @@
+[
+  {
+    "fixture": "adequacy_pass",
+    "snapshot": {
+      "action_hints": [
+        "NoAction"
+      ],
+      "adequacy_risk_score": 0.0,
+      "adequacy_score": 1.0,
+      "candidate_id": "candidate-adequacy-pass",
+      "candidate_ko_hash": "sha256:28f3c3fd1037778e817801a549615961911969afd53fba03dee639dca97e6965",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": true,
+      "number_mismatch_count": 0,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "DeterministicStubOnly"
+      ],
+      "reject_recommended": false,
+      "review_required": false,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:eedee88485b4931a98f4b759257aef83db4edc87d1e02b56fa66b92072d644ec",
+      "span_error_count": 0,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:4d713457d1cff50c5e2fe49ade12d468dd2d2db2d5881251138e886fd45deda0"
+  },
+  {
+    "fixture": "omission_fail",
+    "snapshot": {
+      "action_hints": [
+        "RewriteCandidate"
+      ],
+      "adequacy_risk_score": 0.24,
+      "adequacy_score": 0.76,
+      "candidate_id": "candidate-omission-fail",
+      "candidate_ko_hash": "sha256:63a5e65696c8ebb17c0bd308f2d3bdf6edcbadf475962d0ad75760cb92e9563a",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": false,
+      "number_mismatch_count": 0,
+      "omission_count": 1,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "OmissionMeaningLoss"
+      ],
+      "reject_recommended": false,
+      "review_required": false,
+      "rewrite_recommended": true,
+      "source_en_hash": "sha256:75514e8940f227ab70401cf467b092c0ad3d43759e8bb1418fda74b803988ed0",
+      "span_error_count": 1,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:2de83b153df0b19ca3fdb41c4838700ce38f1055fa46c483d545df71c53d2569"
+  },
+  {
+    "fixture": "hallucination_fail",
+    "snapshot": {
+      "action_hints": [
+        "RejectCandidate"
+      ],
+      "adequacy_risk_score": 0.24,
+      "adequacy_score": 0.76,
+      "candidate_id": "candidate-hallucination-fail",
+      "candidate_ko_hash": "sha256:b3a2aeedfcbba3fe86074883253f29dff5651ea94b6b9db4d26e934f3eb8f04d",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 1,
+      "meaning_preserved": false,
+      "number_mismatch_count": 0,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "HallucinationMeaningDrift"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:9c06e90c362f7d60e3e00dc88feb420d098caa3992d6e7f0c70ea0aa5c27aef4",
+      "span_error_count": 1,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:5b8ecd4e3446eab39ab0f34773c1d115763bc97fe96fc080c0b3d5ddd09169e4"
+  },
+  {
+    "fixture": "polarity_fail",
+    "snapshot": {
+      "action_hints": [
+        "RejectCandidate"
+      ],
+      "adequacy_risk_score": 0.22,
+      "adequacy_score": 0.78,
+      "candidate_id": "candidate-polarity-fail",
+      "candidate_ko_hash": "sha256:2d96c7512688c87bdc3c3486d5b9aa264080bab3c7ec50eafa7cdb8bd003966b",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": false,
+      "number_mismatch_count": 0,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 1,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "PolarityInversion"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:a30e4b10fbdd2e87d50820aa1cdc651921be320fa8b7a814dd9b382e319af3eb",
+      "span_error_count": 1,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:8cdf762d229e8c173189e2d1887ec4a5de1a003cc81c76846ba54c852e22bc27"
+  },
+  {
+    "fixture": "number_review",
+    "snapshot": {
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "adequacy_risk_score": 0.12,
+      "adequacy_score": 0.88,
+      "candidate_id": "candidate-number-review",
+      "candidate_ko_hash": "sha256:f2d41f7d5e256e6ad5776a8f5ea895a20f1654aed85e4d6c70841b5bee678510",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": false,
+      "number_mismatch_count": 1,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "NumberTimeMismatch"
+      ],
+      "reject_recommended": false,
+      "review_required": true,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:ee94d6b2d253927cc4fe051948ae47f3e2c85a27e09f9945f67b3a7b0e865a1e",
+      "span_error_count": 1,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:996c5a897d20fb94f781472fe2a69b5dc308d28871321494104f8e8f55c6f7e6"
+  },
+  {
+    "fixture": "entity_fail",
+    "snapshot": {
+      "action_hints": [
+        "RequireGlossaryGate"
+      ],
+      "adequacy_risk_score": 0.14,
+      "adequacy_score": 0.86,
+      "candidate_id": "candidate-entity-fail",
+      "candidate_ko_hash": "sha256:c5ac7dbfc2fd65e6552c90d81563a57de65e245a431cde503e7b8282522de2dc",
+      "entity_mismatch_count": 1,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": false,
+      "number_mismatch_count": 0,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "NamedEntityMismatch"
+      ],
+      "reject_recommended": true,
+      "review_required": false,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:3ccff2d80e6af9e38caf5e4a76f40162c6cfaf885c271a73cb1d4103d549028f",
+      "span_error_count": 1,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:185c2cf5d4736766a559697b4abccee6e759f93b9c5e8f02b4bd5b704ac0e2af"
+  },
+  {
+    "fixture": "missing_span_receipt",
+    "snapshot": {
+      "action_hints": [
+        "ReviewRequired"
+      ],
+      "adequacy_risk_score": 1.0,
+      "adequacy_score": 0.0,
+      "candidate_id": "candidate-missing-span",
+      "candidate_ko_hash": "sha256:28f3c3fd1037778e817801a549615961911969afd53fba03dee639dca97e6965",
+      "entity_mismatch_count": 0,
+      "fallback_recommended": false,
+      "hallucination_count": 0,
+      "meaning_preserved": false,
+      "number_mismatch_count": 0,
+      "omission_count": 0,
+      "over_expansion_count": 0,
+      "polarity_mismatch_count": 0,
+      "question_intent_mismatch_count": 0,
+      "reasons": [
+        "SpanErrorReceiptMissing"
+      ],
+      "reject_recommended": false,
+      "review_required": true,
+      "rewrite_recommended": false,
+      "source_en_hash": "sha256:eedee88485b4931a98f4b759257aef83db4edc87d1e02b56fa66b92072d644ec",
+      "span_error_count": 0,
+      "under_translation_count": 0
+    },
+    "snapshot_hash": "sha256:84f10d971c7d3f6b324f48355478be4452b01e7ec2cc041385ab731b743e120f"
+  }
+]

@@ -1,0 +1,84 @@
+{
+  "patch_id": "QW-52A",
+  "title": "Hangul QWave Candidate Awareness Trace / Cheonjiin Side-channel Seal / Existing Rust-WebGPU Asset Binding / No New Math Rewrite Contract",
+  "base_patch": "QW-50-R0W-A",
+  "candidateAwarenessTrace": {
+    "enabled": true,
+    "rust_owned": true,
+    "side_channel_only": true,
+    "steps": [
+      {
+        "step": 0,
+        "selected_token_id": 0,
+        "selected_piece": "",
+        "top_k": 8,
+        "candidates": [
+          {
+            "rank": 1,
+            "token_id": 0,
+            "piece": "",
+            "logit": 0.0,
+            "is_selected": true,
+            "existing_asset_binding": {
+              "hangul_feature_source": "tokenizer_core::hangul_tensor::HangulFeatureRow",
+              "qwave_cell_source": "tokenizer_core::hangul_qwave_cell",
+              "qwave_pulse_source": "tokenizer_core::hangul_qwave_pulse",
+              "qwave_transition_source": "tokenizer_core::hangul_qwave_transition",
+              "cheonjiin_probe_reference": "model_core::bin::af16ai6b_cheonjiin_structural_probe",
+              "webgpu_qwave_reference": "burn_webgpu_backend::qwave_*",
+              "new_math_rewrite_performed": false
+            },
+            "surface": {"utf8": "", "decode_ok": true, "is_special": false, "is_byte_fallback": false},
+            "hangul_feature_summary": {},
+            "cheonjiin_from_existing_rows": {},
+            "qwave_from_existing_modules": {},
+            "repeat_observation": {},
+            "side_channel_policy": {
+              "observe_only": true,
+              "logit_mutation": false,
+              "sampler_mutation": false,
+              "token_ban_added": false,
+              "hidden_state_fusion": false,
+              "adapter_projection_applied": false
+            }
+          }
+        ]
+      }
+    ],
+    "summary": {}
+  },
+  "existingImplementationAudit": {
+    "hangul_tensor_found": true,
+    "hangul_feature_row_has_cheonjiin": true,
+    "qwave_cell_found": true,
+    "qwave_pulse_found": true,
+    "qwave_transition_found": true,
+    "qwave_eojeol_found": true,
+    "qwave_morph_overlay_found": true,
+    "qwave_sentence_graph_found": true,
+    "af16ai6b_cheonjiin_probe_found": true,
+    "webgpu_qwave_dispatch_found": true,
+    "webgpu_qwave_shaders_found": true,
+    "qwave_mega_atlas_found": true,
+    "qwave_tile_atlas_found": true,
+    "qwave_vec4_tile_atlas_found": true,
+    "new_hangul_decomposition_math_added": false,
+    "new_cheonjiin_lut_added": false,
+    "new_qwave_phase_math_added": false,
+    "new_webgpu_shader_added": false,
+    "backend_qwave_switch_performed": false,
+    "text_qwave_backend_boundary_preserved": true
+  },
+  "mutationPolicy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "hidden_state_fusion": false,
+    "adapter_projection_applied": false,
+    "python_trace_mutation": false
+  }
+}

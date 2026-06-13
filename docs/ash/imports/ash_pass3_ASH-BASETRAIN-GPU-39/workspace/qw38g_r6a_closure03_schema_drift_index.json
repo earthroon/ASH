@@ -1,0 +1,70 @@
+{
+  "blocking_drift_count": 2,
+  "drift_entry_count": 6,
+  "entries": [
+    {
+      "actual_shape_hash": "sha256:8c87fb3cba09cf0f0acb87275d9ec1e11d89757b620dc21c7561650f8f52fd0c",
+      "drift_blocking": true,
+      "drift_kind": "JsonParseFailed",
+      "expected_shape_hash": null,
+      "field_path": null,
+      "fixture_path": "workspace/qw38g_r6a_r12i_r2_r1_static_validation_result.json",
+      "patch_id": null,
+      "remediation_hint": "RepairJsonParseError"
+    },
+    {
+      "actual_shape_hash": "sha256:039fe540adf1169d53296a8705d055c32a5b9cad6dd56e37b378f09883ba19b7",
+      "drift_blocking": true,
+      "drift_kind": "JsonParseFailed",
+      "expected_shape_hash": null,
+      "field_path": null,
+      "fixture_path": "workspace/qw38g_r6a_r12i_r2_static_validation_result.json",
+      "patch_id": null,
+      "remediation_hint": "RepairJsonParseError"
+    },
+    {
+      "actual_shape_hash": "q4sha256:34cb9627385ef45ba0734ff3785f2f5ab4bad70e1bd37659c5d5da087af8c4c6",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[0]",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:b99f5ea97af70d07471515fc48ed335f69fed95db28c1210976ace44961a6756",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_receipt.json[1]",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:4ed10c88c3292936969bae0a3272c3ea259c37372c3d9dbb284c3c3328df8a59",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_soft_penalty_repeated_punctuation_receipt.json",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    },
+    {
+      "actual_shape_hash": "q4sha256:1c8bb719e91cb87f17927754e5668fd8357c38f5569cd45550b378cba7cdddca",
+      "drift_blocking": false,
+      "drift_kind": "ReceiptKeyDuplicate",
+      "expected_shape_hash": null,
+      "field_path": "deterministic_receipt_key",
+      "fixture_path": "workspace/qw38g_r6a_decode06_transition_guard_step_integrity_fail_receipt.json",
+      "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+      "remediation_hint": "RepairDuplicateReceiptKey"
+    }
+  ],
+  "non_blocking_drift_count": 4,
+  "schema_drift_clean": false,
+  "schema_drift_index_hash": "sha256:d6c1caa9c8cf38b05f24fd264526d03b52a026b1ab575eaccde17276a82bc0b0",
+  "schema_drift_index_id": "qw38g-r6a-closure03-schema-drift-index"
+}

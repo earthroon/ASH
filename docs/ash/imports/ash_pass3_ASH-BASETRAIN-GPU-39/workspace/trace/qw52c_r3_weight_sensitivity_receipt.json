@@ -1,0 +1,122 @@
+{
+  "patch_id": "QW-52C-R3",
+  "title": "Shadow Rerank Weight Sensitivity Sweep / No Apply Seal",
+  "base_patch": "QW-52C-R2",
+  "status": "PASS_STATIC_SHADOW_RERANK_WEIGHT_SENSITIVITY_SWEEP",
+  "sweep_policy": {
+    "sweep_policy_version": "shadow_rerank_weight_sensitivity_sweep_v1",
+    "attribution_policy_version": "riskydiff_feature_attribution_v1",
+    "no_apply_policy_version": "no_apply_no_weight_commit_v1",
+    "max_profiles": 8,
+    "require_risky_diff_zero_for_safe_profile": true,
+    "require_beneficial_diff_preserved": true,
+    "require_stable_preserved": true,
+    "min_supervised_audit_eligible": 3,
+    "allow_policy_promotion": false,
+    "allow_weight_commit": false,
+    "allow_threshold_autotune": false
+  },
+  "summary": {
+    "profile_count": 7,
+    "base_risky_diff_count": 1,
+    "min_risky_diff_count": 0,
+    "max_beneficial_diff_count": 1,
+    "safe_profile_candidate_count": 3,
+    "best_candidate_profile_id": "reduced_dream_weight_v1",
+    "risky_diff_cleared_profile_ids": [
+      "reduced_dream_weight_v1",
+      "reduced_cji_cairo_weight_v1",
+      "low_penalty_audit_v1",
+      "balanced_risk_support_v1"
+    ],
+    "beneficial_preserved_profile_ids": [
+      "base_qw52c_v1",
+      "reduced_dream_weight_v1",
+      "reduced_cji_cairo_weight_v1",
+      "increased_mirror_support_v1",
+      "increased_stable_support_v1",
+      "balanced_risk_support_v1"
+    ],
+    "stable_broken_profile_ids": [
+      "base_qw52c_v1"
+    ],
+    "promotion_allowed": false,
+    "weight_commit_allowed": false,
+    "threshold_autotune_allowed": false
+  },
+  "fixture_results": [
+    {
+      "case_id": "riskydiff_attribution_detects_dream_weight",
+      "status": "PASS",
+      "attribution_status": "Attributed",
+      "suspected_cause": [
+        "DreamCollapseWeightTooHigh"
+      ]
+    },
+    {
+      "case_id": "reduced_dream_weight_clears_risky_diff",
+      "status": "PASS",
+      "safe_profile_candidate": true,
+      "promotion_allowed": false
+    },
+    {
+      "case_id": "reduced_cji_cairo_preserves_beneficial",
+      "status": "PASS",
+      "safe_profile_candidate": true,
+      "policy_promotion": false
+    },
+    {
+      "case_id": "low_penalty_loses_beneficial",
+      "status": "PASS",
+      "safe_profile_candidate": false
+    },
+    {
+      "case_id": "missing_r1_audit_unavailable",
+      "status": "PASS",
+      "sweep_status": "Unavailable",
+      "policy_promotion": false,
+      "weight_commit": false
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_sweep_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R4",
+    "QW-52D",
+    "QW-55"
+  ],
+  "notes": [
+    "R3 performs shadow-only weight sensitivity sweep.",
+    "Safe profile candidates are analysis artifacts only.",
+    "No weight profile is committed.",
+    "No threshold autotune is performed.",
+    "No runtime apply or promotion is allowed."
+  ]
+}

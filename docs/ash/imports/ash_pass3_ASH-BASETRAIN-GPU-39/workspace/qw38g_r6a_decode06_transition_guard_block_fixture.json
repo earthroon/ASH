@@ -1,0 +1,34 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-06",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "decode_session_id": "mock-decode-session-0001",
+  "cue_id": "mock-cue-0001",
+  "candidate_id": "candidate-byte-token",
+  "generation_step": 4,
+  "step_integrity": {
+    "all_steps_aligned": true,
+    "step_integrity_hash": "mock-step-integrity-hash"
+  },
+  "candidate": {
+    "generation_step": 4,
+    "token_id": 99999,
+    "token_piece_hash": "sha256:5a0bb8d497dfa92bdb98cca9405ff07a7ddc677f51c369adef7fe6c59b34286c",
+    "raw_logit": 9.0,
+    "raw_probability": 0.31,
+    "is_eos": false,
+    "is_byte_token": true,
+    "is_control_token": false,
+    "is_pad_token": false,
+    "is_unknown_token": false,
+    "has_mojibake_risk": false,
+    "recent_repeat_count": 0,
+    "punctuation_repeat_count": 0,
+    "josa_repeat_hint": false,
+    "eomi_repeat_hint": false,
+    "fixture_token_piece": "<0xEA>"
+  },
+  "expected_decision": "HardBlock",
+  "expected_reason": "ByteToken",
+  "expected_token_scores_mutated": true,
+  "fixture_name": "hard_block_byte_token"
+}

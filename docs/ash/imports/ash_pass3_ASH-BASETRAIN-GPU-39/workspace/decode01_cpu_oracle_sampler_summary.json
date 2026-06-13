@@ -1,0 +1,43 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-01",
+  "status": "CPU_ORACLE_SAMPLER_AND_GREEDY_FALLBACK_ELIMINATION_BAKED_STATIC",
+  "sampling_fallback_ssot": "GenerationSamplingConfig",
+  "cpu_oracle_module": "model_core::cpu_oracle_sampler",
+  "sampling_order": [
+    "raw_logits",
+    "finite_check",
+    "ban_mask",
+    "eos_guard",
+    "repetition_penalty_already_applied_by_caller_when_present",
+    "temperature_scale",
+    "top_k",
+    "min_p",
+    "active_set_softmax_renormalization",
+    "top_p",
+    "seeded_sample"
+  ],
+  "greedy_fallback_policy": {
+    "allowed_when_sampler_requested": false,
+    "allowed_when_sampler_not_requested": true
+  },
+  "wired_paths": [
+    "model_core::NativeWgpuModel::select_next_token_with_sampling sampled fallback",
+    "model_core::ReferenceCheckpoint::greedy_generate_streaming when sampling config requests sampled decode"
+  ],
+  "probe_fields_added": [
+    "sampling_apply_mode",
+    "cpu_oracle_applied",
+    "gpu_sampler_unavailable",
+    "candidate_count_before_min_p",
+    "candidate_count_after_min_p",
+    "candidate_count_after_top_p",
+    "min_p_threshold",
+    "active_softmax_renormalized"
+  ],
+  "non_scope": [
+    "webgpu_shader_active_set_renormalization",
+    "deltak_qwave_weighted_minp",
+    "context_router_training"
+  ],
+  "execution_validation": "NOT_RUN_NO_CARGO_IN_CONTAINER"
+}

@@ -1,0 +1,132 @@
+{
+  "pairs": [
+    {
+      "case_id": "ko_descriptive_sentence",
+      "expansion_eligible": true,
+      "pair_decision": "ShadowExpansionPairEligible",
+      "policy": {
+        "candidate_piece": "▁양념치킨",
+        "candidate_token_id": 31123,
+        "case_id": "ko_descriptive_sentence",
+        "default_runtime_enabled": false,
+        "default_sampler_mutated": false,
+        "diagnostics": [
+          "shadow policy expansion probe only; default runtime remains disabled"
+        ],
+        "expansion_eligible": true,
+        "expansion_horizons": [
+          8,
+          16
+        ],
+        "expansion_mode": "shadow-expansion-only",
+        "expansion_route": "medium_risk_shadow_expansion_with_tracking",
+        "horizon_16_required": true,
+        "horizon_8_required": true,
+        "output_mutated": false,
+        "raw_byte_piece": "<0x63>",
+        "raw_byte_token_id": 171,
+        "recommended_next_action": "expand_medium_risk_shadow_policy_case_limited_with_tracking",
+        "risk_level": "Medium",
+        "risk_tracking_required": true,
+        "runtime_default_committed": false,
+        "shadow_policy_hit": true,
+        "shadow_policy_registered": true,
+        "wrapper": "dialogue-ko"
+      },
+      "recommended_policy": "expand_shadow_policy_with_risk_tracking_horizon16_case_limited",
+      "risk_tracking_required": true,
+      "same_candidate_as_shadow_commit": true,
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "case_id": "ko_particle_short",
+      "expansion_eligible": true,
+      "pair_decision": "ShadowExpansionPairEligible",
+      "policy": {
+        "candidate_piece": "라도",
+        "candidate_token_id": 1301,
+        "case_id": "ko_particle_short",
+        "default_runtime_enabled": false,
+        "default_sampler_mutated": false,
+        "diagnostics": [
+          "shadow policy expansion probe only; default runtime remains disabled"
+        ],
+        "expansion_eligible": true,
+        "expansion_horizons": [
+          8,
+          16
+        ],
+        "expansion_mode": "shadow-expansion-only",
+        "expansion_route": "low_risk_shadow_expansion",
+        "horizon_16_required": true,
+        "horizon_8_required": true,
+        "output_mutated": false,
+        "raw_byte_piece": "<0x63>",
+        "raw_byte_token_id": 171,
+        "recommended_next_action": "expand_low_risk_shadow_policy_to_horizon16_then_more_cases",
+        "risk_level": "Low",
+        "risk_tracking_required": false,
+        "runtime_default_committed": false,
+        "shadow_policy_hit": true,
+        "shadow_policy_registered": true,
+        "wrapper": "dialogue-ko"
+      },
+      "recommended_policy": "expand_shadow_policy_low_risk_horizon16_then_more_cases",
+      "risk_tracking_required": false,
+      "same_candidate_as_shadow_commit": true,
+      "wrapper": "dialogue-ko"
+    }
+  ],
+  "run": {
+    "acceptance_status": "PASS_SHADOW_POLICY_EXPANSION_PROBE",
+    "byte_token_id": 171,
+    "checkpoint_required": false,
+    "default_runtime_enabled": false,
+    "default_sampler_mutated": false,
+    "embedding_resize_required": false,
+    "expansion_horizons": [
+      8,
+      16
+    ],
+    "expansion_mode": "shadow-expansion-only",
+    "generation": false,
+    "global_default_commit": false,
+    "gpu_default": false,
+    "gpu_execution": false,
+    "id": "16AI-6W-7",
+    "kind": "shadow_policy_expansion_probe",
+    "new_token_ids_created": false,
+    "output_mutated": false,
+    "runtime_default_committed": false,
+    "shadow_policy_expansion_probe": true,
+    "target_text": "<0x63>",
+    "token_ids_mutated": false,
+    "vocab_augmented": false
+  },
+  "summary": {
+    "acceptance_status": "PASS_SHADOW_POLICY_EXPANSION_PROBE",
+    "byte_token_id": 171,
+    "case_count": 2,
+    "default_runtime_enabled_count": 0,
+    "default_sampler_mutated_count": 0,
+    "embedding_resize_required": false,
+    "expansion_candidate_count": 2,
+    "global_default_commit": false,
+    "gpu_default": false,
+    "high_risk_count": 0,
+    "horizon_16_required_count": 2,
+    "horizon_8_required_count": 2,
+    "low_risk_expansion_count": 1,
+    "medium_risk_expansion_count": 1,
+    "new_token_ids_created": false,
+    "output_mutated_count": 0,
+    "policy_count": 2,
+    "rejected_count": 0,
+    "risk_tracking_required_count": 1,
+    "runtime_default_committed_count": 0,
+    "shadow_expansion_only": true,
+    "shadow_policy_hit_count": 2,
+    "token_ids_mutated": false,
+    "vocab_augmented": false
+  }
+}

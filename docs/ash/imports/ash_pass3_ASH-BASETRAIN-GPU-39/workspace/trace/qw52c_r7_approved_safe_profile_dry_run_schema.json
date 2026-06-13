@@ -1,0 +1,18 @@
+{
+  "patch_id": "QW-52C-R7",
+  "title": "Approved Safe Profile Dry-run Replay / No Runtime Apply Seal",
+  "base_patch": "QW-52C-R6",
+  "schema": "ApprovedSafeProfileDryRunTrace",
+  "required_outputs": [
+    "artifacts/qw52c_r7_approved_safe_profile_dry_run_replay.jsonl",
+    "artifacts/qw52c_r7_approved_safe_profile_dry_run_report.json",
+    "artifacts/qw52c_r7_approved_safe_profile_dry_run_manifest.json",
+    "workspace/trace/qw52c_r7_approved_safe_profile_dry_run_receipt.json"
+  ],
+  "mutation_invariants": {
+    "runtime_apply": false,
+    "safe_profile_apply": false,
+    "weight_commit": false,
+    "dry_run_result_applied": false
+  }
+}

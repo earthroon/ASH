@@ -1,0 +1,76 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-11",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX03-C001",
+  "source_prompt_dryrun_receipt_key": "sha256:4019b9e2a0820cd5539686546d0bdb174fa7f8b7465c3e95d91a6bf6dfa2b4fa",
+  "input": {
+    "center_cue_id": "WCTX03-C001",
+    "source_prompt_dryrun_receipt_key": "sha256:4019b9e2a0820cd5539686546d0bdb174fa7f8b7465c3e95d91a6bf6dfa2b4fa",
+    "dry_run_status": "ready",
+    "candidate_prompt_preview": "[ASH_WCTX_CONTEXT_PLAN_BEGIN]\ndomain: en_to_ko_translation_subtitle_machine\nmode: candidate_only\napply: false\n[ASH_WCTX_CONTEXT_PLAN_END]",
+    "injected_block_text": "[ASH_WCTX_CONTEXT_PLAN_BEGIN]\ndomain: en_to_ko_translation_subtitle_machine\nmode: candidate_only\napply: false\n[ASH_WCTX_CONTEXT_PLAN_END]",
+    "active_prompt_snapshot_hash": null,
+    "candidate_prompt_preview_hash": "sha256:59125da19d4b945870f4aed3f6f8d2dd39fcd8b6a18e6a8f82acecfb3c032dfc",
+    "injected_block_hash": "sha256:007dd9a9172f7c98a40703b82733bc010a46d35e29d7f5510b2f894888dd5583",
+    "runtime_default_apply_before": false
+  },
+  "budget": {
+    "max_prompt_chars": 6000,
+    "max_estimated_tokens": 1800,
+    "max_context_block_chars": 1200,
+    "max_context_block_estimated_tokens": 384,
+    "used_prompt_chars": 139,
+    "used_estimated_tokens": 47,
+    "used_context_block_chars": 139,
+    "used_context_block_estimated_tokens": 47
+  },
+  "checks": [
+    {
+      "check_id": "wctx11_check:0:dry_run_ready",
+      "kind": "dry_run_ready",
+      "pass": true,
+      "severity": "critical",
+      "detail": "dry_run_status=Ready"
+    },
+    {
+      "check_id": "wctx11_check:13:no_decode_execution",
+      "kind": "no_decode_execution",
+      "pass": true,
+      "severity": "critical",
+      "detail": "WCTX-11 never executes decode"
+    }
+  ],
+  "decision": {
+    "status": "pass",
+    "block_reasons": [],
+    "can_proceed_to_decode_candidate": true,
+    "can_apply_to_runtime": false,
+    "decision_reason": "runtime preflight passed; decode candidate may be staged by next seal, but no decode executed in WCTX-11"
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "decode_executed": false,
+    "generation_mutated": false,
+    "generation_executed": false,
+    "model_forward_executed": false,
+    "sampling_executed": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "candidate_prompt_applied": false,
+    "runtime_default_apply": false,
+    "runtime_apply_gate_open": false,
+    "rerank_applied": false,
+    "dry_run_ready": true,
+    "preflight_passed": true,
+    "marker_missing": false,
+    "budget_exceeded": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:562d18af60144aecd7ad08fe1c15af83251b753f46e5d7a9dac6ecf15b1ae262",
+  "created_by": "ash_core::word_context_runtime_preflight",
+  "schema_version": 1
+}

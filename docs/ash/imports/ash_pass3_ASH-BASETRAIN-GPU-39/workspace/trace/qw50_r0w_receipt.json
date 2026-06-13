@@ -1,0 +1,37 @@
+{
+  "patch_id": "QW-50-R0W",
+  "base_patch": "QW-50-R0V",
+  "previous_patch": "ASH-REBASE-00",
+  "status": "PASS_STATIC_BAKE",
+  "trace_outputs": {
+    "runtime_json_field": "nativeDecodeR0wTrace",
+    "schema": "workspace/trace/qw50_r0w_native_decode_trace_schema.json",
+    "no_guard_trace": "workspace/trace/qw50_r0w_no_guard_trace.json",
+    "guarded_trace": "workspace/trace/qw50_r0w_guarded_trace.json",
+    "repeat_summary": "workspace/trace/qw50_r0w_repeat_attractor_summary.json"
+  },
+  "observed": {
+    "generated_token_ids_present": true,
+    "generated_pieces_present": true,
+    "topk_candidates_present": true,
+    "raw_final_output_split_present": true,
+    "repeat_analysis_present": true
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "webgpu_policy_mutation": false,
+    "qwave_detector_enabled": false,
+    "cheonjiin_detector_enabled": false
+  },
+  "validation_note": "cargo was not available in the sandbox; static validation checked patch hooks and trace schema only.",
+  "next_candidates": [
+    "QW-50-R0W-A",
+    "QW-50-R0X",
+    "QW-50-R0Y",
+    "QW-50-R0Z"
+  ]
+}

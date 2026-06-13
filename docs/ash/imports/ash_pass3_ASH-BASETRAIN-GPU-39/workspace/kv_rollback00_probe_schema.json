@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KV Rollback 00 Step Receipt",
+  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
+  "type": "object",
+  "required": [
+    "patch_id",
+    "schema_version",
+    "run_id",
+    "step",
+    "backend",
+    "mode",
+    "behavior_change",
+    "probe_only",
+    "input",
+    "ring_state",
+    "result"
+  ],
+  "properties": {
+    "patch_id": {
+      "const": "16AI-QW-38G-R6A-KV-ROLLBACK-00"
+    },
+    "input_patch": {
+      "const": "16AI-QW-38G-R6A-SALAD-03"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "backend": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "Off",
+        "SnapshotOnly",
+        "DryRunRestoreProbe",
+        "ForkedReplayProbe",
+        "StrictProbe"
+      ]
+    },
+    "behavior_change": {
+      "const": false
+    },
+    "probe_only": {
+      "const": true
+    },
+    "input": {
+      "type": "object"
+    },
+    "snapshot": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "ring_state": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object",
+      "required": [
+        "main_state_unchanged",
+        "restore_verified",
+        "shape_probe_passed"
+      ]
+    },
+    "forked_replay": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

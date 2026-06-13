@@ -1,0 +1,60 @@
+[
+  {
+    "generation_step": 3,
+    "token_id": 303,
+    "decision": "Allow",
+    "reasons": [],
+    "blocked": false,
+    "penalty_delta": 0.0,
+    "adjusted_logit": 8.0,
+    "adjusted_probability": 0.2,
+    "requires_resample": false,
+    "contributes_to_salad_risk": false,
+    "contributes_to_decode_quality_risk": false
+  },
+  {
+    "generation_step": 4,
+    "token_id": 99999,
+    "decision": "HardBlock",
+    "reasons": [
+      "ByteToken"
+    ],
+    "blocked": true,
+    "penalty_delta": -1000000000.0,
+    "adjusted_logit": -999999991.0,
+    "adjusted_probability": 0.31,
+    "requires_resample": true,
+    "contributes_to_salad_risk": true,
+    "contributes_to_decode_quality_risk": true
+  },
+  {
+    "generation_step": 5,
+    "token_id": 777,
+    "decision": "SoftPenalty",
+    "reasons": [
+      "RepeatedPunctuation"
+    ],
+    "blocked": false,
+    "penalty_delta": -3.0,
+    "adjusted_logit": 1.0,
+    "adjusted_probability": 0.08,
+    "requires_resample": false,
+    "contributes_to_salad_risk": true,
+    "contributes_to_decode_quality_risk": true
+  },
+  {
+    "generation_step": 6,
+    "token_id": 99999,
+    "decision": "SkippedStepIntegrityFailed",
+    "reasons": [
+      "StepIntegrityMismatch"
+    ],
+    "blocked": false,
+    "penalty_delta": 0.0,
+    "adjusted_logit": 9.0,
+    "adjusted_probability": 0.31,
+    "requires_resample": false,
+    "contributes_to_salad_risk": false,
+    "contributes_to_decode_quality_risk": false
+  }
+]

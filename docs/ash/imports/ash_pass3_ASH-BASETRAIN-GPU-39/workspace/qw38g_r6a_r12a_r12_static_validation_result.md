@@ -1,0 +1,15 @@
+# 16AI-QW-38G-R6A-R12A-R12 Static Validation
+
+- runner_exists: true
+- runner_loads_r11a: true
+- runner_requires_ready: true
+- runner_writes_prompt_variant_matrix: true
+- runner_writes_negative_control_matrix: true
+- runner_writes_overeffect_matrix: true
+- runtime_default_apply_false: true
+- explicit_enable_env_used: true
+- module_r12_env_gate: true
+- module_r12_decision_helper: true
+- patch_report_exists: true
+- acceptance_report_exists: true
+- static_validation_pass: true

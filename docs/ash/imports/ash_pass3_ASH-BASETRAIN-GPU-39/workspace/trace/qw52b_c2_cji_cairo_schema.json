@@ -1,0 +1,23 @@
+{
+  "patch_id": "QW-52B-C2",
+  "detector_id": "cji_cairo_counterexample_stress_trace",
+  "detector_family": "cji_cairo_tube_concentration_trace",
+  "trace_type": "CjiCairoCounterexampleTrace",
+  "status_enum": [
+    "Unavailable",
+    "Partial",
+    "Available"
+  ],
+  "formula": "log(1 + gamma_c * curvature_component * concentration_component)",
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "cairo_gate_apply": false,
+    "force_class_apply": false
+  }
+}

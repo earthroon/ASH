@@ -1,0 +1,139 @@
+{
+    "run_name":  "tl02_qwave_measure01_feature_dump_tiny16",
+    "family":  "sft_lora",
+    "mode":  "train",
+    "model_id":  "model_tinyllama_1p1b_v4",
+    "model_path":  "specs/model_spec_v5_48259.toml",
+    "dataset":  {
+                    "train_jsonl":  "datasets/tl02_qwave_measure01_smoke/data/train.jsonl",
+                    "train_jsonl_paths":  [
+
+                                          ],
+                    "eval_jsonl":  "datasets/tl02_qwave_measure01_smoke/data/eval.jsonl",
+                    "system_field":  null,
+                    "prompt_field":  "prompt",
+                    "response_field":  "response",
+                    "format":  "prompt_response",
+                    "template":  "????? {prompt}\n?醫롫룴: {response}",
+                    "loss_on":  "response_only",
+                    "max_samples":  16,
+                    "max_seq_len":  96,
+                    "prompt_max_tokens":  48,
+                    "response_max_tokens":  48,
+                    "pack_turns":  false,
+                    "append_eos":  true,
+                    "feature_jsonl":  null,
+                    "feature_store_manifest":  "workspace/lora_runs/tl02_qwave_measure01_sft_smoke_tiny16/feature_store_work/feature_store_manifest.json",
+                    "max_feature_batches":  null
+                },
+    "optimizer":  {
+                      "optimizer":  "adamw",
+                      "learning_rate":  0.0001,
+                      "weight_decay":  0,
+                      "warmup_steps":  0,
+                      "gradient_accumulation":  1,
+                      "max_steps":  20,
+                      "grad_clip":  1
+                  },
+    "hyper":  {
+                  "rank":  8,
+                  "alpha":  16,
+                  "dropout":  0,
+                  "preset":  "custom",
+                  "target_modules":  [
+                                         "lm_head"
+                                     ],
+                  "bias_mode":  "none",
+                  "hidden_size":  2048,
+                  "vocab_size":  48259,
+                  "init_std":  0.02
+              },
+    "lora":  {
+                 "rank":  8,
+                 "alpha":  16,
+                 "dropout":  0,
+                 "targets":  [
+                                 "lm_head"
+                             ],
+                 "merge_mode":  "runtime_attach",
+                 "artifact_family":  "module_lora"
+             },
+    "checkpoints":  {
+                        "output_dir":  "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1_smoke/artifacts/lm_head_lora",
+                        "save_every_steps":  5,
+                        "keep_last":  3,
+                        "manifest_name":  "adapter_manifest.json",
+                        "adapter_name":  "ash_ko_short_sft_lm_head_lora_v1_smoke.adapter.safetensors"
+                    },
+    "logging":  {
+                    "log_every_steps":  1,
+                    "report_loss":  true,
+                    "report_tokens_per_sec":  true
+                },
+    "training":  {
+                     "planned_layers":  1,
+                     "pad_token_id":  0,
+                     "label_smoothing":  null,
+                     "save_adapter_checkpoint":  true,
+                     "plan_kind":  "module_lora"
+                 },
+    "bridge":  {
+                   "enabled":  true,
+                   "model_kind":  "ash_native",
+                   "tokenizer_path":  "artifacts/tokenizer_manifest_v5_final.json",
+                   "teacher_full_model_path":  "tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors",
+                   "max_bridge_samples":  16,
+                   "bos":  true,
+                   "eos":  true,
+                   "include_system_prompt":  false,
+                   "output_feature_jsonl":  null,
+                   "feature_store_work_dir":  "workspace/lora_runs/tl02_qwave_measure01_sft_smoke_tiny16/feature_store_work",
+                   "feature_store_archive_dir":  null,
+                   "feature_store_rows_per_shard":  1,
+                   "teacher":  {
+                                   "mode":  "token_aligned",
+                                   "span":  "response_only",
+                                   "center_per_sequence":  false,
+                                   "l2_normalize":  false,
+                                   "subtract_prompt_mean":  false,
+                                   "prompt_mean_scale":  1,
+                                   "keep_last_k_tokens":  null,
+                                   "min_span_tokens":  1,
+                                   "layer_blend":  {
+                                                       "enabled":  false
+                                                   }
+                               }
+               },
+    "guards":  {
+                   "intent":  "A-SFT response-token LM-head LoRA smoke",
+                   "do_not_reuse_module_local_q_proj_reconstruction":  true,
+                   "expect_lora_b_nonzero_after_train":  true,
+                   "expect_target_key":  "lm_head",
+                   "forbid_byte_markers":  true,
+                   "forbid_replacement_char":  true,
+                   "forbid_prompt_loss":  true,
+                   "require_response_loss_tokens":  true
+               },
+    "a_sft_native_contract":  {
+                                  "phase":  "native_dump",
+                                  "backend":  "native_wgpu",
+                                  "vocab_projection":  "lm_head",
+                                  "embedding":  "checkpoint",
+                                  "forbid_direct_jsonl_train":  false,
+                                  "allow_teacher_full_model_only_in_dump":  true,
+                                  "forbid_teacher_full_model_in_train":  true,
+                                  "require_feature_store_manifest":  false,
+                                  "expected_target_key":  "lm_head"
+                              },
+    "hidden_source":  {
+                          "mode":  "direct_checkpoint_teacher",
+                          "feature_store_manifest_path":  null,
+                          "atlas_grouped_hidden_provider_manifest_path":  null,
+                          "expected_dataset_digest":  null,
+                          "expected_hidden_source_digest":  null,
+                          "require_manifest_exists":  false,
+                          "require_dataset_digest_match":  false,
+                          "require_hidden_source_digest":  false,
+                          "allow_direct_checkpoint_teacher_in_train":  false
+                      }
+}

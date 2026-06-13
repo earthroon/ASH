@@ -1,0 +1,43 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
+  "title": "Dynamic Sampler Shadow Policy Seal",
+  "schema_version": 1,
+  "behavior_change": false,
+  "shadow_only": true,
+  "required_input_patch": "16AI-QW-38G-R6A-DECODE-03B",
+  "ssot": "model_core::decode03b_pci",
+  "receipt_path": "workspace/decode03c_shadow_steps.jsonl",
+  "summary_path": "workspace/decode03c_summary.json",
+  "required_step_fields": [
+    "patch_id",
+    "input_patch",
+    "schema_version",
+    "run_id",
+    "seed",
+    "step",
+    "behavior_change",
+    "shadow_only",
+    "decode03b_status_seen",
+    "input",
+    "shadow_policy",
+    "would_change_behavior",
+    "would_tighten",
+    "would_relax",
+    "would_panic"
+  ],
+  "shadow_policy_contract": {
+    "temperature_range": [0.03, 1.2],
+    "min_p_range": [0.0, 0.25],
+    "top_p_range": [0.5, 1.0],
+    "guard_strength_values": ["Relaxed", "Normal", "Strict", "Panic"],
+    "bucket_values": ["ConfidentPath", "StablePath", "UncertainPath", "UnstablePath", "CollapsingPath"]
+  },
+  "promotion": {
+    "ready_for_decode03d_controlled_enable_requires": [
+      "steps_observed > 0",
+      "behavior_change == false",
+      "shadow_only == true"
+    ],
+    "default_enable_allowed": false
+  }
+}

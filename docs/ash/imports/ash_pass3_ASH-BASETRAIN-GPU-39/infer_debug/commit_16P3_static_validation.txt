@@ -1,0 +1,60 @@
+== 16P-3 static validation ==
+-- NativeWgpuModel telemetry getter/store --
+490:    last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
+1490:            last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
+1699:        if let Ok(mut slot) = self.last_embedding_row_gather_bytes.lock() {
+1702:                "[16P-3][telemetry] stored_embedding_row_gather_bytes={} source=NativeWgpuModel",
+1707:                "[16P-3][telemetry][warn] failed_to_store_embedding_row_gather_bytes source=NativeWgpuModel"
+2399:pub fn last_embedding_row_gather_bytes(&self) -> Option<usize> {
+2400:    self.last_embedding_row_gather_bytes
+-- Runtime propagation --
+2464:                            "[16P-3][telemetry] embedding_row_gather_bytes={:?} source=16AC_safe_generation",
+2536:                        "[16P-3][telemetry] embedding_row_gather_bytes={:?} source=native_generation",
+2625:    let mut native_embedding_row_gather_bytes: Option<usize>;
+2628:    let (generated_ids, first_backend, first_telemetry, first_embedding_row_gather_bytes) = generate_ids(&banned_token_ids)?;
+2631:    native_embedding_row_gather_bytes = first_embedding_row_gather_bytes;
+2686:            let (retry_generated_ids, retry_backend, retry_telemetry, retry_embedding_row_gather_bytes) = generate_ids(&retry_banned_token_ids)?;
+2710:                native_embedding_row_gather_bytes = retry_embedding_row_gather_bytes;
+2717:                native_embedding_row_gather_bytes = retry_embedding_row_gather_bytes;
+2785:    let mut native_vocab_allocation_probe = NativeVocabAllocationProbe::new(
+2801:    if let Some(bytes) = native_embedding_row_gather_bytes {
+2804:            "[16P-3][telemetry] embedding_row_gather_bytes={} source=NativeVocabAllocationProbe",
+-- Orchestrator copies probe values --
+438:    output_json.insert("native_vocab_allocation_probe".to_string(), json!(&result.native_vocab_allocation_probe));
+439:    output_json.insert("native_vocab_projection".to_string(), json!(&result.native_vocab_allocation_probe.effective_vocab_projection));
+440:    output_json.insert("native_vocab_tile_size".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
+441:    output_json.insert("native_full_vocab_bytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
+442:    output_json.insert("native_gpu_full_vocab_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
+443:    output_json.insert("native_vocab_atlas_tile_count".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_tile_count));
+444:    output_json.insert("native_generated_by_tile_argmax".to_string(), json!(result.native_vocab_allocation_probe.generated_by_tile_argmax));
+445:    output_json.insert("native_embedding_mode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+446:    output_json.insert("native_embedding_mode_requested".to_string(), json!(&result.native_vocab_allocation_probe.requested_embedding_mode));
+447:    output_json.insert("native_embedding_mode_effective".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+448:    output_json.insert("native_embedding_full_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
+449:    output_json.insert("native_embedding_full_upload_skipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
+450:    output_json.insert("native_embedding_row_gather_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+451:    output_json.insert("native_projection_cache_action".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+452:    output_json.insert("native_sampling_mode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+453:    output_json.insert("native_tile_top_k".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
+454:    output_json.insert("native_global_top_k".to_string(), json!(result.native_vocab_allocation_probe.global_top_k));
+807:    response_json.insert("nativeVocabAllocationProbe".to_string(), json!(&result.native_vocab_allocation_probe));
+808:    response_json.insert("nativeVocabProjection".to_string(), json!(&result.native_vocab_allocation_probe.effective_vocab_projection));
+809:    response_json.insert("nativeVocabTileSize".to_string(), json!(result.native_vocab_allocation_probe.vocab_tile_size));
+810:    response_json.insert("nativeVocabAtlasTileCount".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_tile_count));
+811:    response_json.insert("nativeGeneratedByTileArgmax".to_string(), json!(result.native_vocab_allocation_probe.generated_by_tile_argmax));
+812:    response_json.insert("nativeFullVocabBytes".to_string(), json!(result.native_vocab_allocation_probe.full_vocab_bytes));
+813:    response_json.insert("nativeGpuFullVocabUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.gpu_full_vocab_upload_skipped));
+814:    response_json.insert("nativeEmbeddingMode".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+815:    response_json.insert("nativeEmbeddingModeRequested".to_string(), json!(&result.native_vocab_allocation_probe.requested_embedding_mode));
+816:    response_json.insert("nativeEmbeddingModeEffective".to_string(), json!(&result.native_vocab_allocation_probe.effective_embedding_mode));
+817:    response_json.insert("nativeEmbeddingFullBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_bytes));
+818:    response_json.insert("nativeEmbeddingFullUploadSkipped".to_string(), json!(result.native_vocab_allocation_probe.embedding_full_upload_skipped));
+819:    response_json.insert("nativeEmbeddingRowGatherBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+820:    response_json.insert("nativeProjectionCacheAction".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+821:    response_json.insert("nativeSamplingMode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+822:    response_json.insert("nativeTileTopK".to_string(), json!(result.native_vocab_allocation_probe.tile_top_k));
+823:    response_json.insert("nativeGlobalTopK".to_string(), json!(result.native_vocab_allocation_probe.global_top_k));
+-- tuple return signature --
+2304:    let mut generate_ids = |effective_banned_token_ids: &[u32]| -> Result<(Vec<u32>, String, Option<GenerationTelemetry>, Option<usize>)> {
+-- Cargo availability --
+cargo not available in bake container

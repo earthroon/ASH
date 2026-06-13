@@ -1,0 +1,18 @@
+ASH-BASETRAIN-GPU-22-R1 STATIC CHECKS
+
+source_file = crates/base_train/src/ash_basetrain_gpu_22_loss_scalar_audit.rs
+bin_file = crates/base_train/src/bin/ash_basetrain_gpu_22_loss_scalar_audit.rs
+
+giant_top_level_json_macro_removed = true
+segmented_receipt_builders_present = true
+top_level_map_assembly_present = true
+recursion_limit_attribute_present = false
+
+logic_change_present = false
+loss_audit_values_changed = false
+new_loss_computed = false
+backward_executed = false
+optimizer_step_executed = false
+safetensors_mutation_present = false
+
+static_result = PASS_STATIC_PATCH_SHAPE_ONLY_RUNTIME_BUILD_REQUIRED

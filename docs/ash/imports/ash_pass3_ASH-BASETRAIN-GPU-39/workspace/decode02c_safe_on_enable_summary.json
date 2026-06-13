@@ -1,0 +1,29 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+  "status": "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-02B",
+  "transition_guard_ssot": "model_core::decode_transition_guard",
+  "validation_ssot": "model_core::decode_transition_validation",
+  "candidate_trace_version": 4,
+  "default_mode": "off",
+  "probe_mode_mutation_allowed": false,
+  "safe_on_gate": {
+    "requires_probe_integrity_pass": true,
+    "requires_transition_parity_pass": true,
+    "requires_candidate_trace_v4": true,
+    "default_promotion_status": "NOT_RUN"
+  },
+  "execution": {
+    "cargo_check": "NOT_RUN",
+    "cargo_test": "NOT_RUN",
+    "rustfmt": "NOT_RUN",
+    "webgpu_runtime": "NOT_RUN"
+  },
+  "non_scope": [
+    "transition_rule_redesign",
+    "dynamic_context_qwave",
+    "minp_formula_change",
+    "semantic_prior_default_enable",
+    "lora_training"
+  ]
+}

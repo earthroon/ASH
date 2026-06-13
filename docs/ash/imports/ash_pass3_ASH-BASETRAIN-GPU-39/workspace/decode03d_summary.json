@@ -1,0 +1,52 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03D",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03C",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "controlled_enable": false,
+  "mode": "Off",
+  "default_enable": false,
+  "requires_decode03c": true,
+  "decode03c_status_seen": null,
+  "decode03b_status_seen": null,
+  "decode03a_status_seen": null,
+  "sampler05_status_seen": null,
+  "steps_observed": 0,
+  "gate": {
+    "can_apply_count": 0,
+    "denied_count": 0,
+    "strict_fail_count": 0,
+    "missing_shadow_policy_count": 0
+  },
+  "applied": {
+    "behavior_change_count": 0,
+    "temperature_changed_count": 0,
+    "min_p_changed_count": 0,
+    "top_p_changed_count": 0,
+    "top_k_changed_count": 0,
+    "guard_strength_changed_count": 0
+  },
+  "shadow_candidate_not_executed": {
+    "rollback_candidate_seen_count": 0,
+    "rollback_candidate_applied_count": 0,
+    "safe_stop_candidate_seen_count": 0,
+    "safe_stop_candidate_applied_count": 0,
+    "eos_bias_candidate_seen_count": 0,
+    "eos_bias_candidate_applied_count": 0
+  },
+  "backend_support": {
+    "min_p_unsupported_count": 0,
+    "min_p_unsupported_but_applied_count": 0
+  },
+  "risk": {
+    "applied_without_gate_count": 0,
+    "panic_candidate_seen_count": 0,
+    "panic_candidate_executed_count": 0,
+    "numeric_risk_seen_count": 0,
+    "fallback_risk_seen_count": 0,
+    "behavior_change_without_controlled_mode_count": 0
+  },
+  "ready_for_salad02_online_detector": false,
+  "ready_for_decode03d_default_enable": false,
+  "ready_for_salad03_rollback": false,
+  "reason": "static bake only; run ASH_DECODE03D_CONTROLLED_ENABLE=true with ASH_DECODE03D_MODE=controlled after DECODE-03C shadow evidence"
+}

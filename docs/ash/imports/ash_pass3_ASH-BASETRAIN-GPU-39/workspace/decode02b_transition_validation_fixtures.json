@@ -1,0 +1,58 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
+  "fixtures": [
+    {
+      "name": "generic_continuation_eos",
+      "prev": "▁이어가고",
+      "candidate": "<eos>",
+      "expected": "Penalize + GenericContinuationImmediateEos"
+    },
+    {
+      "name": "eos_before_min_new_tokens",
+      "step": 2,
+      "min_new_tokens": 8,
+      "candidate": "<eos>",
+      "expected": "HardBlock + EosBeforeMinNewTokens"
+    },
+    {
+      "name": "pad_token",
+      "candidate": "<pad>",
+      "expected": "HardBlock + PadToken"
+    },
+    {
+      "name": "control_token",
+      "candidate": "<glossary:on>",
+      "expected": "HardBlock + ControlToken"
+    },
+    {
+      "name": "mojibake_token",
+      "candidate": "?댁뼱媛怨?",
+      "expected": "HardBlock + MojibakeSuspected"
+    },
+    {
+      "name": "normal_korean_transition",
+      "prev": "사람",
+      "candidate": "은",
+      "expected": "Allow"
+    },
+    {
+      "name": "emotional_repeat_safe",
+      "recent": [
+        "ㅠ",
+        "ㅠ"
+      ],
+      "candidate": "ㅠ",
+      "expected": "not HardBlock"
+    },
+    {
+      "name": "repeated_punctuation",
+      "recent": [
+        "!",
+        "!",
+        "!"
+      ],
+      "candidate": "!",
+      "expected": "Penalize + RepeatedPunctuation"
+    }
+  ]
+}

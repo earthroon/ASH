@@ -1,0 +1,1754 @@
+diff -ruN decode03c_orig/crates/model_core/src/decode03c_shadow_policy.rs decode03c_work/crates/model_core/src/decode03c_shadow_policy.rs
+--- decode03c_orig/crates/model_core/src/decode03c_shadow_policy.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/crates/model_core/src/decode03c_shadow_policy.rs	2026-05-27 06:29:49.386693368 +0000
+@@ -0,0 +1,735 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AEntropyStepReceipt, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode, Decode03BPciStepReceipt, PciBucket};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const DECODE03C_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03C";
++pub const DECODE03C_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03B";
++pub const DECODE03C_SAMPLER_SSOT: &str = "model_core::decode03b_pci";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum Decode03CMode {
++    Off,
++    Receipt,
++    Strict,
++}
++
++impl Decode03CMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_DECODE03C_SHADOW")
++            .or_else(|_| env::var("ASH_DECODE03C_RECEIPT_MODE"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "observe" | "shadow" => Self::Receipt,
++            "strict" => Self::Strict,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn enabled(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::Receipt => "Receipt",
++            Self::Strict => "Strict",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum DynamicSamplerBucket {
++    ConfidentPath,
++    StablePath,
++    UncertainPath,
++    UnstablePath,
++    CollapsingPath,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum ShadowGuardStrength {
++    Relaxed,
++    Normal,
++    Strict,
++    Panic,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CShadowInput {
++    pub pci_raw: f32,
++    pub pci_smoothed: Option<f32>,
++    pub bucket_raw: PciBucket,
++    pub bucket_stable: PciBucket,
++    pub h_raw_norm: Option<f32>,
++    pub h_final_norm: Option<f32>,
++    pub top1_top2_margin: Option<f32>,
++    pub selected_rank: Option<usize>,
++    pub selected_logprob: Option<f32>,
++    pub active_count_final: usize,
++    pub compression_ratio_total: Option<f32>,
++    pub low_confidence: bool,
++    pub collapsing: bool,
++    pub entropy_conflict: bool,
++    pub margin_collapse: bool,
++    pub selected_rank_risk: bool,
++    pub fallback_risk: bool,
++    pub overcompression_risk: bool,
++    pub numeric_risk: bool,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub static_prior_enabled: bool,
++    pub transition_guard_enabled: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CShadowPolicy {
++    pub shadow_only: bool,
++    pub behavior_change: bool,
++    pub bucket: DynamicSamplerBucket,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub shadow_temperature: f32,
++    pub shadow_top_p: f32,
++    pub shadow_top_k: usize,
++    pub shadow_min_p: f32,
++    pub temperature_delta: f32,
++    pub top_p_delta: f32,
++    pub min_p_delta: f32,
++    pub guard_strength: ShadowGuardStrength,
++    pub rollback_candidate: bool,
++    pub safe_stop_candidate: bool,
++    pub eos_bias_candidate: bool,
++    pub no_repeat_ngram_shadow: Option<usize>,
++    pub repeat_penalty_shadow: Option<f32>,
++    pub policy_reason: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CShadowEffect {
++    pub would_change_behavior: bool,
++    pub would_tighten: bool,
++    pub would_relax: bool,
++    pub would_panic: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CStepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub behavior_change: bool,
++    pub shadow_only: bool,
++    pub mode: String,
++    pub decode03a_status_seen: Option<String>,
++    pub decode03b_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub input: Decode03CShadowInput,
++    pub shadow_policy: Decode03CShadowPolicy,
++    pub would_change_behavior: bool,
++    pub would_tighten: bool,
++    pub would_relax: bool,
++    pub would_panic: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CPolicyBucketCounts {
++    pub confident_path_count: usize,
++    pub stable_path_count: usize,
++    pub uncertain_path_count: usize,
++    pub unstable_path_count: usize,
++    pub collapsing_path_count: usize,
++}
++
++impl Default for Decode03CPolicyBucketCounts {
++    fn default() -> Self {
++        Self {
++            confident_path_count: 0,
++            stable_path_count: 0,
++            uncertain_path_count: 0,
++            unstable_path_count: 0,
++            collapsing_path_count: 0,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03CPolicyActionCounts {
++    pub would_change_behavior_count: usize,
++    pub would_tighten_count: usize,
++    pub would_relax_count: usize,
++    pub would_panic_count: usize,
++    pub rollback_candidate_count: usize,
++    pub safe_stop_candidate_count: usize,
++    pub eos_bias_candidate_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03CShadowConfigStats {
++    pub temperature_shadow_min: Option<f32>,
++    pub temperature_shadow_mean: Option<f32>,
++    pub temperature_shadow_max: Option<f32>,
++    pub min_p_shadow_min: Option<f32>,
++    pub min_p_shadow_mean: Option<f32>,
++    pub min_p_shadow_max: Option<f32>,
++    pub top_p_shadow_min: Option<f32>,
++    pub top_p_shadow_mean: Option<f32>,
++    pub top_p_shadow_max: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03CShadowSummary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub behavior_change: bool,
++    pub shadow_only: bool,
++    pub requires_decode03b: bool,
++    pub decode03b_status_seen: Option<String>,
++    pub decode03a_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub policy_buckets: Decode03CPolicyBucketCounts,
++    pub policy_actions: Decode03CPolicyActionCounts,
++    pub shadow_config_stats: Decode03CShadowConfigStats,
++    pub risk_policy_reasons: BTreeMap<String, usize>,
++    pub ready_for_decode03d_controlled_enable: bool,
++    pub ready_for_default_enable: bool,
++    pub reason: String,
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_DECODE03C_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03c_shadow_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_DECODE03C_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03c_summary.json"))
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_DECODE03C_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "decode03c_sampler03_bridge".to_string())
++}
++
++fn require_decode03b() -> bool {
++    env_bool("ASH_DECODE03C_REQUIRE_DECODE03B", true)
++}
++
++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
++    if value.is_finite() { value.clamp(lo, hi) } else { lo }
++}
++
++fn env_f32(name: &str, default: f32) -> f32 {
++    env::var(name)
++        .ok()
++        .and_then(|v| v.trim().parse::<f32>().ok())
++        .filter(|v| v.is_finite())
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name)
++        .ok()
++        .and_then(|v| v.trim().parse::<usize>().ok())
++        .unwrap_or(default)
++}
++
++pub fn bucket_to_dynamic_bucket(bucket: PciBucket) -> DynamicSamplerBucket {
++    match bucket {
++        PciBucket::Confident => DynamicSamplerBucket::ConfidentPath,
++        PciBucket::Stable => DynamicSamplerBucket::StablePath,
++        PciBucket::Uncertain => DynamicSamplerBucket::UncertainPath,
++        PciBucket::Unstable => DynamicSamplerBucket::UnstablePath,
++        PciBucket::Collapsing => DynamicSamplerBucket::CollapsingPath,
++    }
++}
++
++fn stronger_guard(a: ShadowGuardStrength, b: ShadowGuardStrength) -> ShadowGuardStrength {
++    use ShadowGuardStrength::*;
++    let rank = |g| match g { Relaxed => 0, Normal => 1, Strict => 2, Panic => 3 };
++    if rank(a) >= rank(b) { a } else { b }
++}
++
++fn weaker_guard(a: ShadowGuardStrength) -> ShadowGuardStrength {
++    use ShadowGuardStrength::*;
++    match a {
++        Panic => Strict,
++        Strict => Normal,
++        Normal => Relaxed,
++        Relaxed => Relaxed,
++    }
++}
++
++pub fn base_policy_for_bucket(
++    bucket: DynamicSamplerBucket,
++    input: &Decode03CShadowInput,
++) -> Decode03CShadowPolicy {
++    let (shadow_temperature, shadow_min_p, shadow_top_p, guard_strength, rollback_candidate, safe_stop_candidate, eos_bias_candidate, reason) = match bucket {
++        DynamicSamplerBucket::ConfidentPath => (0.10, 0.01, 0.98, ShadowGuardStrength::Relaxed, false, false, false, "bucket_confident_path"),
++        DynamicSamplerBucket::StablePath => (0.25, 0.05, 0.90, ShadowGuardStrength::Normal, false, false, false, "bucket_stable_path"),
++        DynamicSamplerBucket::UncertainPath => (0.18, 0.08, 0.86, ShadowGuardStrength::Strict, false, false, false, "bucket_uncertain_path"),
++        DynamicSamplerBucket::UnstablePath => (0.14, 0.12, 0.82, ShadowGuardStrength::Panic, true, false, false, "bucket_unstable_path"),
++        DynamicSamplerBucket::CollapsingPath => (0.08, 0.16, 0.76, ShadowGuardStrength::Panic, true, true, true, "bucket_collapsing_path"),
++    };
++    Decode03CShadowPolicy {
++        shadow_only: true,
++        behavior_change: false,
++        bucket,
++        current_temperature: input.current_temperature,
++        current_top_p: input.current_top_p,
++        current_top_k: input.current_top_k,
++        current_min_p: input.current_min_p,
++        shadow_temperature,
++        shadow_top_p,
++        shadow_top_k: input.current_top_k,
++        shadow_min_p,
++        temperature_delta: 0.0,
++        top_p_delta: 0.0,
++        min_p_delta: 0.0,
++        guard_strength,
++        rollback_candidate,
++        safe_stop_candidate,
++        eos_bias_candidate,
++        no_repeat_ngram_shadow: if matches!(bucket, DynamicSamplerBucket::UnstablePath | DynamicSamplerBucket::CollapsingPath) { Some(3) } else { None },
++        repeat_penalty_shadow: if matches!(bucket, DynamicSamplerBucket::UnstablePath | DynamicSamplerBucket::CollapsingPath) { Some(1.10) } else { None },
++        policy_reason: vec![reason.to_string()],
++    }
++}
++
++pub fn apply_risk_adjustments(
++    mut policy: Decode03CShadowPolicy,
++    input: &Decode03CShadowInput,
++) -> Decode03CShadowPolicy {
++    if input.numeric_risk {
++        policy.guard_strength = ShadowGuardStrength::Panic;
++        policy.rollback_candidate = true;
++        policy.safe_stop_candidate = true;
++        policy.eos_bias_candidate = true;
++        policy.shadow_temperature = 0.05;
++        policy.shadow_min_p = 0.18;
++        policy.shadow_top_p = 0.70;
++        policy.no_repeat_ngram_shadow = Some(3);
++        policy.repeat_penalty_shadow = Some(1.12);
++        policy.policy_reason.push("numeric_risk_safe_stop".to_string());
++        return policy;
++    }
++    if input.fallback_risk {
++        policy.guard_strength = ShadowGuardStrength::Panic;
++        policy.rollback_candidate = true;
++        policy.safe_stop_candidate = true;
++        policy.no_repeat_ngram_shadow = Some(3);
++        policy.repeat_penalty_shadow = Some(1.12);
++        policy.policy_reason.push("fallback_risk_panic".to_string());
++        return policy;
++    }
++    if input.collapsing {
++        policy.guard_strength = ShadowGuardStrength::Panic;
++        policy.rollback_candidate = true;
++        policy.safe_stop_candidate = true;
++        policy.eos_bias_candidate = true;
++        policy.shadow_temperature = policy.shadow_temperature.min(0.08);
++        policy.shadow_min_p = policy.shadow_min_p.max(0.16);
++        policy.shadow_top_p = policy.shadow_top_p.min(0.76);
++        policy.policy_reason.push("collapsing_safe_stop".to_string());
++    }
++    if input.entropy_conflict {
++        policy.shadow_min_p -= 0.02;
++        policy.shadow_top_p += 0.03;
++        policy.guard_strength = weaker_guard(policy.guard_strength);
++        policy.policy_reason.push("entropy_conflict_relax_guard".to_string());
++    }
++    if input.margin_collapse {
++        policy.shadow_temperature -= 0.03;
++        policy.shadow_min_p += 0.02;
++        policy.guard_strength = stronger_guard(policy.guard_strength, ShadowGuardStrength::Strict);
++        policy.policy_reason.push("margin_collapse_tighten".to_string());
++    }
++    if input.selected_rank_risk {
++        policy.shadow_temperature -= 0.04;
++        policy.shadow_top_p -= 0.04;
++        policy.shadow_min_p += 0.02;
++        policy.guard_strength = stronger_guard(policy.guard_strength, ShadowGuardStrength::Strict);
++        policy.policy_reason.push("selected_rank_risk_tighten".to_string());
++    }
++    if input.overcompression_risk {
++        policy.shadow_min_p -= 0.02;
++        policy.shadow_top_p += 0.04;
++        policy.policy_reason.push("overcompression_relax".to_string());
++    }
++    policy
++}
++
++pub fn clamp_shadow_policy(mut policy: Decode03CShadowPolicy) -> Decode03CShadowPolicy {
++    policy.shadow_temperature = clamp_f32(policy.shadow_temperature, 0.03, 1.20);
++    policy.shadow_min_p = clamp_f32(policy.shadow_min_p, 0.00, 0.25);
++    policy.shadow_top_p = clamp_f32(policy.shadow_top_p, 0.50, 1.00);
++    policy.temperature_delta = policy.shadow_temperature - policy.current_temperature;
++    policy.top_p_delta = policy.shadow_top_p - policy.current_top_p;
++    policy.min_p_delta = policy.shadow_min_p - policy.current_min_p;
++    policy.shadow_only = true;
++    policy.behavior_change = false;
++    policy
++}
++
++pub fn compute_shadow_policy(input: &Decode03CShadowInput) -> Decode03CShadowPolicy {
++    let mut bucket = bucket_to_dynamic_bucket(input.bucket_stable);
++    if input.numeric_risk || input.fallback_risk || input.collapsing {
++        bucket = DynamicSamplerBucket::CollapsingPath;
++    }
++    let mut policy = base_policy_for_bucket(bucket, input);
++    if input.transition_guard_enabled && env_bool("ASH_SAMPLER05_TOPK_BYPASS_APPLIED", false) {
++        policy.shadow_top_k = 0;
++        policy.policy_reason.push("sampler05_topk_bypass_shadow".to_string());
++    }
++    policy = apply_risk_adjustments(policy, input);
++    clamp_shadow_policy(policy)
++}
++
++pub fn classify_shadow_effect(
++    input: &Decode03CShadowInput,
++    policy: &Decode03CShadowPolicy,
++) -> Decode03CShadowEffect {
++    let would_change_behavior = (policy.shadow_temperature - input.current_temperature).abs() > 0.001
++        || (policy.shadow_top_p - input.current_top_p).abs() > 0.001
++        || (policy.shadow_min_p - input.current_min_p).abs() > 0.001
++        || policy.shadow_top_k != input.current_top_k
++        || policy.rollback_candidate
++        || policy.safe_stop_candidate
++        || policy.eos_bias_candidate;
++    let would_tighten = policy.shadow_temperature < input.current_temperature
++        || policy.shadow_min_p > input.current_min_p
++        || policy.shadow_top_p < input.current_top_p
++        || matches!(policy.guard_strength, ShadowGuardStrength::Strict | ShadowGuardStrength::Panic);
++    let would_relax = policy.shadow_min_p < input.current_min_p
++        || policy.shadow_top_p > input.current_top_p
++        || matches!(policy.guard_strength, ShadowGuardStrength::Relaxed);
++    let would_panic = matches!(policy.guard_strength, ShadowGuardStrength::Panic)
++        || policy.rollback_candidate
++        || policy.safe_stop_candidate
++        || policy.eos_bias_candidate;
++    Decode03CShadowEffect { would_change_behavior, would_tighten, would_relax, would_panic }
++}
++
++fn current_temperature_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
++    entropy.map(|r| r.temperature).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_TEMPERATURE", 0.25))
++}
++
++fn current_top_p_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
++    entropy.map(|r| r.top_p).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_TOP_P", 0.88))
++}
++
++fn current_top_k_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> usize {
++    entropy.map(|r| r.top_k_effective).unwrap_or_else(|| env_usize("ASH_DECODE03C_CURRENT_TOP_K", 0))
++}
++
++fn current_min_p_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
++    entropy.map(|r| r.min_p).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_MIN_P", 0.05))
++}
++
++pub fn input_from_decode03b(
++    receipt: &Decode03BPciStepReceipt,
++    entropy_receipt: Option<&Decode03AEntropyStepReceipt>,
++) -> Decode03CShadowInput {
++    Decode03CShadowInput {
++        pci_raw: receipt.pci_raw,
++        pci_smoothed: receipt.pci_smoothed,
++        bucket_raw: receipt.bucket_raw,
++        bucket_stable: receipt.bucket_stable,
++        h_raw_norm: receipt.input.h_raw_norm,
++        h_final_norm: receipt.input.h_final_norm,
++        top1_top2_margin: receipt.input.top1_top2_margin,
++        selected_rank: receipt.input.selected_rank,
++        selected_logprob: receipt.input.selected_logprob,
++        active_count_final: receipt.input.active_count_final,
++        compression_ratio_total: receipt.input.compression_ratio_total,
++        low_confidence: receipt.risk_flags.low_confidence,
++        collapsing: receipt.risk_flags.collapsing,
++        entropy_conflict: receipt.risk_flags.entropy_conflict,
++        margin_collapse: receipt.risk_flags.margin_collapse,
++        selected_rank_risk: receipt.risk_flags.selected_rank_risk,
++        fallback_risk: receipt.risk_flags.fallback_risk,
++        overcompression_risk: receipt.risk_flags.overcompression_risk,
++        numeric_risk: receipt.risk_flags.numeric_risk,
++        current_temperature: current_temperature_from_entropy(entropy_receipt),
++        current_top_p: current_top_p_from_entropy(entropy_receipt),
++        current_top_k: current_top_k_from_entropy(entropy_receipt),
++        current_min_p: current_min_p_from_entropy(entropy_receipt),
++        static_prior_enabled: entropy_receipt.map(|r| r.static_prior_enabled).unwrap_or_else(|| env_bool("ASH_DECODE03C_STATIC_PRIOR_ENABLED", true)),
++        transition_guard_enabled: entropy_receipt.map(|r| r.transition_guard_enabled).unwrap_or_else(|| env_bool("ASH_DECODE03C_TRANSITION_GUARD_ENABLED", true)),
++    }
++}
++
++pub fn receipt_from_decode03b(
++    mode: Decode03CMode,
++    pci_receipt: &Decode03BPciStepReceipt,
++    entropy_receipt: Option<&Decode03AEntropyStepReceipt>,
++) -> Decode03CStepReceipt {
++    let input = input_from_decode03b(pci_receipt, entropy_receipt);
++    let shadow_policy = compute_shadow_policy(&input);
++    let effect = classify_shadow_effect(&input, &shadow_policy);
++    Decode03CStepReceipt {
++        patch_id: DECODE03C_PATCH_ID.to_string(),
++        input_patch: DECODE03C_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: pci_receipt.prompt_hash.clone(),
++        seed: pci_receipt.seed,
++        step: pci_receipt.step,
++        backend: "decode03b_pci_bridge".to_string(),
++        sampler_ssot: DECODE03C_SAMPLER_SSOT.to_string(),
++        behavior_change: false,
++        shadow_only: true,
++        mode: mode.as_str().to_string(),
++        decode03a_status_seen: pci_receipt.decode03a_status_seen.clone(),
++        decode03b_status_seen: Some("DERIVED_IN_MEMORY_FROM_DECODE03B_RECEIPT".to_string()),
++        sampler05_status_seen: pci_receipt.sampler05_status_seen.clone(),
++        input,
++        shadow_policy,
++        would_change_behavior: effect.would_change_behavior,
++        would_tighten: effect.would_tighten,
++        would_relax: effect.would_relax,
++        would_panic: effect.would_panic,
++    }
++}
++
++pub fn append_decode03c_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Decode03CMode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let receipt = receipt_from_decode03b(mode, &pci_receipt, Some(&entropy_receipt));
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn stats(values: &[f32]) -> (Option<f32>, Option<f32>, Option<f32>) {
++    let values = values.iter().copied().filter(|v| v.is_finite()).collect::<Vec<_>>();
++    if values.is_empty() {
++        return (None, None, None);
++    }
++    let min = values.iter().copied().fold(f32::INFINITY, f32::min);
++    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
++    let mean = values.iter().sum::<f32>() / values.len() as f32;
++    (Some(min), Some(mean), Some(max))
++}
++
++pub fn summary_from_receipts(receipts: &[Decode03CStepReceipt]) -> Decode03CShadowSummary {
++    let mut policy_buckets = Decode03CPolicyBucketCounts::default();
++    let mut policy_actions = Decode03CPolicyActionCounts::default();
++    let mut reasons: BTreeMap<String, usize> = BTreeMap::new();
++    let mut temp = Vec::new();
++    let mut minp = Vec::new();
++    let mut topp = Vec::new();
++    for receipt in receipts {
++        match receipt.shadow_policy.bucket {
++            DynamicSamplerBucket::ConfidentPath => policy_buckets.confident_path_count += 1,
++            DynamicSamplerBucket::StablePath => policy_buckets.stable_path_count += 1,
++            DynamicSamplerBucket::UncertainPath => policy_buckets.uncertain_path_count += 1,
++            DynamicSamplerBucket::UnstablePath => policy_buckets.unstable_path_count += 1,
++            DynamicSamplerBucket::CollapsingPath => policy_buckets.collapsing_path_count += 1,
++        }
++        if receipt.would_change_behavior { policy_actions.would_change_behavior_count += 1; }
++        if receipt.would_tighten { policy_actions.would_tighten_count += 1; }
++        if receipt.would_relax { policy_actions.would_relax_count += 1; }
++        if receipt.would_panic { policy_actions.would_panic_count += 1; }
++        if receipt.shadow_policy.rollback_candidate { policy_actions.rollback_candidate_count += 1; }
++        if receipt.shadow_policy.safe_stop_candidate { policy_actions.safe_stop_candidate_count += 1; }
++        if receipt.shadow_policy.eos_bias_candidate { policy_actions.eos_bias_candidate_count += 1; }
++        for reason in &receipt.shadow_policy.policy_reason {
++            *reasons.entry(reason.clone()).or_insert(0) += 1;
++        }
++        temp.push(receipt.shadow_policy.shadow_temperature);
++        minp.push(receipt.shadow_policy.shadow_min_p);
++        topp.push(receipt.shadow_policy.shadow_top_p);
++    }
++    let (temperature_shadow_min, temperature_shadow_mean, temperature_shadow_max) = stats(&temp);
++    let (min_p_shadow_min, min_p_shadow_mean, min_p_shadow_max) = stats(&minp);
++    let (top_p_shadow_min, top_p_shadow_mean, top_p_shadow_max) = stats(&topp);
++    let steps_observed = receipts.len();
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if receipts.iter().any(|r| r.behavior_change || !r.shadow_only) {
++        "FAIL_BEHAVIOR_CHANGE"
++    } else if policy_actions.would_panic_count > 0 || policy_actions.rollback_candidate_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }
++    .to_string();
++    let ready_for_decode03d_controlled_enable = steps_observed > 0
++        && !receipts.iter().any(|r| r.behavior_change || !r.shadow_only);
++    Decode03CShadowSummary {
++        patch_id: DECODE03C_PATCH_ID.to_string(),
++        input_patch: DECODE03C_INPUT_PATCH_ID.to_string(),
++        status,
++        behavior_change: false,
++        shadow_only: true,
++        requires_decode03b: require_decode03b(),
++        decode03b_status_seen: if steps_observed > 0 { Some("OBSERVED_OR_DERIVED".to_string()) } else { None },
++        decode03a_status_seen: receipts.iter().find_map(|r| r.decode03a_status_seen.clone()),
++        sampler05_status_seen: receipts.iter().find_map(|r| r.sampler05_status_seen.clone()),
++        steps_observed,
++        policy_buckets,
++        policy_actions,
++        shadow_config_stats: Decode03CShadowConfigStats {
++            temperature_shadow_min,
++            temperature_shadow_mean,
++            temperature_shadow_max,
++            min_p_shadow_min,
++            min_p_shadow_mean,
++            min_p_shadow_max,
++            top_p_shadow_min,
++            top_p_shadow_mean,
++            top_p_shadow_max,
++        },
++        risk_policy_reasons: reasons,
++        ready_for_decode03d_controlled_enable,
++        ready_for_default_enable: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run ASH_DECODE03C_SHADOW=receipt after DECODE-03B PCI to produce shadow policy evidence".to_string()
++        } else if ready_for_decode03d_controlled_enable {
++            "shadow policy sealed; DECODE-03D may consume shadow values only under controlled enable, not default-on".to_string()
++        } else {
++            "shadow policy failed observe-only contract; controlled enable is blocked".to_string()
++        },
++    }
++}
++
++pub fn write_decode03c_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() {
++                continue;
++            }
++            if let Ok(receipt) = serde_json::from_str::<Decode03CStepReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn input_for(bucket: PciBucket) -> Decode03CShadowInput {
++        Decode03CShadowInput {
++            pci_raw: 0.75,
++            pci_smoothed: None,
++            bucket_raw: bucket,
++            bucket_stable: bucket,
++            h_raw_norm: Some(0.4),
++            h_final_norm: Some(0.35),
++            top1_top2_margin: Some(0.8),
++            selected_rank: Some(1),
++            selected_logprob: Some(-1.0),
++            active_count_final: 32,
++            compression_ratio_total: Some(0.01),
++            low_confidence: false,
++            collapsing: false,
++            entropy_conflict: false,
++            margin_collapse: false,
++            selected_rank_risk: false,
++            fallback_risk: false,
++            overcompression_risk: false,
++            numeric_risk: false,
++            current_temperature: 0.25,
++            current_top_p: 0.88,
++            current_top_k: 0,
++            current_min_p: 0.05,
++            static_prior_enabled: true,
++            transition_guard_enabled: true,
++        }
++    }
++
++    #[test]
++    fn decode03c_bucket_mapping() {
++        assert_eq!(bucket_to_dynamic_bucket(PciBucket::Confident), DynamicSamplerBucket::ConfidentPath);
++        assert_eq!(bucket_to_dynamic_bucket(PciBucket::Collapsing), DynamicSamplerBucket::CollapsingPath);
++    }
++
++    #[test]
++    fn decode03c_shadow_never_changes_behavior() {
++        let policy = compute_shadow_policy(&input_for(PciBucket::Stable));
++        assert!(policy.shadow_only);
++        assert!(!policy.behavior_change);
++    }
++
++    #[test]
++    fn decode03c_uncertain_tightens() {
++        let input = input_for(PciBucket::Uncertain);
++        let policy = compute_shadow_policy(&input);
++        assert!(policy.shadow_min_p >= input.current_min_p);
++        assert!(matches!(policy.guard_strength, ShadowGuardStrength::Strict | ShadowGuardStrength::Panic));
++    }
++
++    #[test]
++    fn decode03c_numeric_risk_forces_panic() {
++        let mut input = input_for(PciBucket::Stable);
++        input.numeric_risk = true;
++        let policy = compute_shadow_policy(&input);
++        assert!(matches!(policy.guard_strength, ShadowGuardStrength::Panic));
++        assert!(policy.safe_stop_candidate);
++        assert!(policy.eos_bias_candidate);
++    }
++
++    #[test]
++    fn decode03c_clamps_policy_values() {
++        let mut policy = base_policy_for_bucket(DynamicSamplerBucket::StablePath, &input_for(PciBucket::Stable));
++        policy.shadow_temperature = -100.0;
++        policy.shadow_min_p = 999.0;
++        policy.shadow_top_p = 999.0;
++        let policy = clamp_shadow_policy(policy);
++        assert!(policy.shadow_temperature >= 0.03 && policy.shadow_temperature <= 1.20);
++        assert!(policy.shadow_min_p >= 0.0 && policy.shadow_min_p <= 0.25);
++        assert!(policy.shadow_top_p >= 0.50 && policy.shadow_top_p <= 1.0);
++    }
++}
+diff -ruN decode03c_orig/crates/model_core/src/lib.rs decode03c_work/crates/model_core/src/lib.rs
+--- decode03c_orig/crates/model_core/src/lib.rs	2026-05-27 06:07:54.127774789 +0000
++++ decode03c_work/crates/model_core/src/lib.rs	2026-05-27 06:30:02.454812884 +0000
+@@ -18,6 +18,7 @@
+ mod sampler05_parity;
+ mod decode03a_entropy;
+ mod decode03b_pci;
++mod decode03c_shadow_policy;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -99,6 +100,15 @@
+     apply_pci_hysteresis, append_decode03b_receipt_from_sampler03,
+     write_decode03b_summary_from_receipt_file,
+ };
++
++pub use decode03c_shadow_policy::{
++    DECODE03C_PATCH_ID, DECODE03C_INPUT_PATCH_ID, Decode03CMode, DynamicSamplerBucket,
++    ShadowGuardStrength, Decode03CShadowInput, Decode03CShadowPolicy, Decode03CShadowEffect,
++    Decode03CStepReceipt, Decode03CShadowSummary, bucket_to_dynamic_bucket,
++    base_policy_for_bucket, apply_risk_adjustments, clamp_shadow_policy, compute_shadow_policy,
++    classify_shadow_effect, append_decode03c_receipt_from_sampler03,
++    write_decode03c_summary_from_receipt_file,
++};
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN decode03c_orig/crates/model_core/src/sampler_parity.rs decode03c_work/crates/model_core/src/sampler_parity.rs
+--- decode03c_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:07:54.128460580 +0000
++++ decode03c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:30:03.641828256 +0000
+@@ -451,5 +451,6 @@
+     crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
+     crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
+     crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
++    crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN decode03c_orig/workspace/decode03c.patch decode03c_work/workspace/decode03c.patch
+--- decode03c_orig/workspace/decode03c.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/workspace/decode03c.patch	2026-05-27 06:30:57.097767212 +0000
+@@ -0,0 +1,776 @@
++diff -ruN decode03c_orig/crates/model_core/src/decode03c_shadow_policy.rs decode03c_work/crates/model_core/src/decode03c_shadow_policy.rs
++--- decode03c_orig/crates/model_core/src/decode03c_shadow_policy.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode03c_work/crates/model_core/src/decode03c_shadow_policy.rs	2026-05-27 06:29:49.386693368 +0000
++@@ -0,0 +1,735 @@
+++use serde::{Deserialize, Serialize};
+++use std::{collections::BTreeMap, env, fs, path::PathBuf};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AEntropyStepReceipt, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode, Decode03BPciStepReceipt, PciBucket};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const DECODE03C_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03C";
+++pub const DECODE03C_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03B";
+++pub const DECODE03C_SAMPLER_SSOT: &str = "model_core::decode03b_pci";
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum Decode03CMode {
+++    Off,
+++    Receipt,
+++    Strict,
+++}
+++
+++impl Decode03CMode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_DECODE03C_SHADOW")
+++            .or_else(|_| env::var("ASH_DECODE03C_RECEIPT_MODE"))
+++            .unwrap_or_else(|_| "off".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "1" | "true" | "yes" | "on" | "receipt" | "probe" | "observe" | "shadow" => Self::Receipt,
+++            "strict" => Self::Strict,
+++            _ => Self::Off,
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::Receipt => "Receipt",
+++            Self::Strict => "Strict",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum DynamicSamplerBucket {
+++    ConfidentPath,
+++    StablePath,
+++    UncertainPath,
+++    UnstablePath,
+++    CollapsingPath,
+++}
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum ShadowGuardStrength {
+++    Relaxed,
+++    Normal,
+++    Strict,
+++    Panic,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CShadowInput {
+++    pub pci_raw: f32,
+++    pub pci_smoothed: Option<f32>,
+++    pub bucket_raw: PciBucket,
+++    pub bucket_stable: PciBucket,
+++    pub h_raw_norm: Option<f32>,
+++    pub h_final_norm: Option<f32>,
+++    pub top1_top2_margin: Option<f32>,
+++    pub selected_rank: Option<usize>,
+++    pub selected_logprob: Option<f32>,
+++    pub active_count_final: usize,
+++    pub compression_ratio_total: Option<f32>,
+++    pub low_confidence: bool,
+++    pub collapsing: bool,
+++    pub entropy_conflict: bool,
+++    pub margin_collapse: bool,
+++    pub selected_rank_risk: bool,
+++    pub fallback_risk: bool,
+++    pub overcompression_risk: bool,
+++    pub numeric_risk: bool,
+++    pub current_temperature: f32,
+++    pub current_top_p: f32,
+++    pub current_top_k: usize,
+++    pub current_min_p: f32,
+++    pub static_prior_enabled: bool,
+++    pub transition_guard_enabled: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CShadowPolicy {
+++    pub shadow_only: bool,
+++    pub behavior_change: bool,
+++    pub bucket: DynamicSamplerBucket,
+++    pub current_temperature: f32,
+++    pub current_top_p: f32,
+++    pub current_top_k: usize,
+++    pub current_min_p: f32,
+++    pub shadow_temperature: f32,
+++    pub shadow_top_p: f32,
+++    pub shadow_top_k: usize,
+++    pub shadow_min_p: f32,
+++    pub temperature_delta: f32,
+++    pub top_p_delta: f32,
+++    pub min_p_delta: f32,
+++    pub guard_strength: ShadowGuardStrength,
+++    pub rollback_candidate: bool,
+++    pub safe_stop_candidate: bool,
+++    pub eos_bias_candidate: bool,
+++    pub no_repeat_ngram_shadow: Option<usize>,
+++    pub repeat_penalty_shadow: Option<f32>,
+++    pub policy_reason: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CShadowEffect {
+++    pub would_change_behavior: bool,
+++    pub would_tighten: bool,
+++    pub would_relax: bool,
+++    pub would_panic: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CStepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub behavior_change: bool,
+++    pub shadow_only: bool,
+++    pub mode: String,
+++    pub decode03a_status_seen: Option<String>,
+++    pub decode03b_status_seen: Option<String>,
+++    pub sampler05_status_seen: Option<String>,
+++    pub input: Decode03CShadowInput,
+++    pub shadow_policy: Decode03CShadowPolicy,
+++    pub would_change_behavior: bool,
+++    pub would_tighten: bool,
+++    pub would_relax: bool,
+++    pub would_panic: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CPolicyBucketCounts {
+++    pub confident_path_count: usize,
+++    pub stable_path_count: usize,
+++    pub uncertain_path_count: usize,
+++    pub unstable_path_count: usize,
+++    pub collapsing_path_count: usize,
+++}
+++
+++impl Default for Decode03CPolicyBucketCounts {
+++    fn default() -> Self {
+++        Self {
+++            confident_path_count: 0,
+++            stable_path_count: 0,
+++            uncertain_path_count: 0,
+++            unstable_path_count: 0,
+++            collapsing_path_count: 0,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03CPolicyActionCounts {
+++    pub would_change_behavior_count: usize,
+++    pub would_tighten_count: usize,
+++    pub would_relax_count: usize,
+++    pub would_panic_count: usize,
+++    pub rollback_candidate_count: usize,
+++    pub safe_stop_candidate_count: usize,
+++    pub eos_bias_candidate_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03CShadowConfigStats {
+++    pub temperature_shadow_min: Option<f32>,
+++    pub temperature_shadow_mean: Option<f32>,
+++    pub temperature_shadow_max: Option<f32>,
+++    pub min_p_shadow_min: Option<f32>,
+++    pub min_p_shadow_mean: Option<f32>,
+++    pub min_p_shadow_max: Option<f32>,
+++    pub top_p_shadow_min: Option<f32>,
+++    pub top_p_shadow_mean: Option<f32>,
+++    pub top_p_shadow_max: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03CShadowSummary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub behavior_change: bool,
+++    pub shadow_only: bool,
+++    pub requires_decode03b: bool,
+++    pub decode03b_status_seen: Option<String>,
+++    pub decode03a_status_seen: Option<String>,
+++    pub sampler05_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub policy_buckets: Decode03CPolicyBucketCounts,
+++    pub policy_actions: Decode03CPolicyActionCounts,
+++    pub shadow_config_stats: Decode03CShadowConfigStats,
+++    pub risk_policy_reasons: BTreeMap<String, usize>,
+++    pub ready_for_decode03d_controlled_enable: bool,
+++    pub ready_for_default_enable: bool,
+++    pub reason: String,
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_DECODE03C_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03c_shadow_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_DECODE03C_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode03c_summary.json"))
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn run_id_from_env() -> String {
+++    env::var("ASH_DECODE03C_RUN_ID")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "decode03c_sampler03_bridge".to_string())
+++}
+++
+++fn require_decode03b() -> bool {
+++    env_bool("ASH_DECODE03C_REQUIRE_DECODE03B", true)
+++}
+++
+++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
+++    if value.is_finite() { value.clamp(lo, hi) } else { lo }
+++}
+++
+++fn env_f32(name: &str, default: f32) -> f32 {
+++    env::var(name)
+++        .ok()
+++        .and_then(|v| v.trim().parse::<f32>().ok())
+++        .filter(|v| v.is_finite())
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name)
+++        .ok()
+++        .and_then(|v| v.trim().parse::<usize>().ok())
+++        .unwrap_or(default)
+++}
+++
+++pub fn bucket_to_dynamic_bucket(bucket: PciBucket) -> DynamicSamplerBucket {
+++    match bucket {
+++        PciBucket::Confident => DynamicSamplerBucket::ConfidentPath,
+++        PciBucket::Stable => DynamicSamplerBucket::StablePath,
+++        PciBucket::Uncertain => DynamicSamplerBucket::UncertainPath,
+++        PciBucket::Unstable => DynamicSamplerBucket::UnstablePath,
+++        PciBucket::Collapsing => DynamicSamplerBucket::CollapsingPath,
+++    }
+++}
+++
+++fn stronger_guard(a: ShadowGuardStrength, b: ShadowGuardStrength) -> ShadowGuardStrength {
+++    use ShadowGuardStrength::*;
+++    let rank = |g| match g { Relaxed => 0, Normal => 1, Strict => 2, Panic => 3 };
+++    if rank(a) >= rank(b) { a } else { b }
+++}
+++
+++fn weaker_guard(a: ShadowGuardStrength) -> ShadowGuardStrength {
+++    use ShadowGuardStrength::*;
+++    match a {
+++        Panic => Strict,
+++        Strict => Normal,
+++        Normal => Relaxed,
+++        Relaxed => Relaxed,
+++    }
+++}
+++
+++pub fn base_policy_for_bucket(
+++    bucket: DynamicSamplerBucket,
+++    input: &Decode03CShadowInput,
+++) -> Decode03CShadowPolicy {
+++    let (shadow_temperature, shadow_min_p, shadow_top_p, guard_strength, rollback_candidate, safe_stop_candidate, eos_bias_candidate, reason) = match bucket {
+++        DynamicSamplerBucket::ConfidentPath => (0.10, 0.01, 0.98, ShadowGuardStrength::Relaxed, false, false, false, "bucket_confident_path"),
+++        DynamicSamplerBucket::StablePath => (0.25, 0.05, 0.90, ShadowGuardStrength::Normal, false, false, false, "bucket_stable_path"),
+++        DynamicSamplerBucket::UncertainPath => (0.18, 0.08, 0.86, ShadowGuardStrength::Strict, false, false, false, "bucket_uncertain_path"),
+++        DynamicSamplerBucket::UnstablePath => (0.14, 0.12, 0.82, ShadowGuardStrength::Panic, true, false, false, "bucket_unstable_path"),
+++        DynamicSamplerBucket::CollapsingPath => (0.08, 0.16, 0.76, ShadowGuardStrength::Panic, true, true, true, "bucket_collapsing_path"),
+++    };
+++    Decode03CShadowPolicy {
+++        shadow_only: true,
+++        behavior_change: false,
+++        bucket,
+++        current_temperature: input.current_temperature,
+++        current_top_p: input.current_top_p,
+++        current_top_k: input.current_top_k,
+++        current_min_p: input.current_min_p,
+++        shadow_temperature,
+++        shadow_top_p,
+++        shadow_top_k: input.current_top_k,
+++        shadow_min_p,
+++        temperature_delta: 0.0,
+++        top_p_delta: 0.0,
+++        min_p_delta: 0.0,
+++        guard_strength,
+++        rollback_candidate,
+++        safe_stop_candidate,
+++        eos_bias_candidate,
+++        no_repeat_ngram_shadow: if matches!(bucket, DynamicSamplerBucket::UnstablePath | DynamicSamplerBucket::CollapsingPath) { Some(3) } else { None },
+++        repeat_penalty_shadow: if matches!(bucket, DynamicSamplerBucket::UnstablePath | DynamicSamplerBucket::CollapsingPath) { Some(1.10) } else { None },
+++        policy_reason: vec![reason.to_string()],
+++    }
+++}
+++
+++pub fn apply_risk_adjustments(
+++    mut policy: Decode03CShadowPolicy,
+++    input: &Decode03CShadowInput,
+++) -> Decode03CShadowPolicy {
+++    if input.numeric_risk {
+++        policy.guard_strength = ShadowGuardStrength::Panic;
+++        policy.rollback_candidate = true;
+++        policy.safe_stop_candidate = true;
+++        policy.eos_bias_candidate = true;
+++        policy.shadow_temperature = 0.05;
+++        policy.shadow_min_p = 0.18;
+++        policy.shadow_top_p = 0.70;
+++        policy.no_repeat_ngram_shadow = Some(3);
+++        policy.repeat_penalty_shadow = Some(1.12);
+++        policy.policy_reason.push("numeric_risk_safe_stop".to_string());
+++        return policy;
+++    }
+++    if input.fallback_risk {
+++        policy.guard_strength = ShadowGuardStrength::Panic;
+++        policy.rollback_candidate = true;
+++        policy.safe_stop_candidate = true;
+++        policy.no_repeat_ngram_shadow = Some(3);
+++        policy.repeat_penalty_shadow = Some(1.12);
+++        policy.policy_reason.push("fallback_risk_panic".to_string());
+++        return policy;
+++    }
+++    if input.collapsing {
+++        policy.guard_strength = ShadowGuardStrength::Panic;
+++        policy.rollback_candidate = true;
+++        policy.safe_stop_candidate = true;
+++        policy.eos_bias_candidate = true;
+++        policy.shadow_temperature = policy.shadow_temperature.min(0.08);
+++        policy.shadow_min_p = policy.shadow_min_p.max(0.16);
+++        policy.shadow_top_p = policy.shadow_top_p.min(0.76);
+++        policy.policy_reason.push("collapsing_safe_stop".to_string());
+++    }
+++    if input.entropy_conflict {
+++        policy.shadow_min_p -= 0.02;
+++        policy.shadow_top_p += 0.03;
+++        policy.guard_strength = weaker_guard(policy.guard_strength);
+++        policy.policy_reason.push("entropy_conflict_relax_guard".to_string());
+++    }
+++    if input.margin_collapse {
+++        policy.shadow_temperature -= 0.03;
+++        policy.shadow_min_p += 0.02;
+++        policy.guard_strength = stronger_guard(policy.guard_strength, ShadowGuardStrength::Strict);
+++        policy.policy_reason.push("margin_collapse_tighten".to_string());
+++    }
+++    if input.selected_rank_risk {
+++        policy.shadow_temperature -= 0.04;
+++        policy.shadow_top_p -= 0.04;
+++        policy.shadow_min_p += 0.02;
+++        policy.guard_strength = stronger_guard(policy.guard_strength, ShadowGuardStrength::Strict);
+++        policy.policy_reason.push("selected_rank_risk_tighten".to_string());
+++    }
+++    if input.overcompression_risk {
+++        policy.shadow_min_p -= 0.02;
+++        policy.shadow_top_p += 0.04;
+++        policy.policy_reason.push("overcompression_relax".to_string());
+++    }
+++    policy
+++}
+++
+++pub fn clamp_shadow_policy(mut policy: Decode03CShadowPolicy) -> Decode03CShadowPolicy {
+++    policy.shadow_temperature = clamp_f32(policy.shadow_temperature, 0.03, 1.20);
+++    policy.shadow_min_p = clamp_f32(policy.shadow_min_p, 0.00, 0.25);
+++    policy.shadow_top_p = clamp_f32(policy.shadow_top_p, 0.50, 1.00);
+++    policy.temperature_delta = policy.shadow_temperature - policy.current_temperature;
+++    policy.top_p_delta = policy.shadow_top_p - policy.current_top_p;
+++    policy.min_p_delta = policy.shadow_min_p - policy.current_min_p;
+++    policy.shadow_only = true;
+++    policy.behavior_change = false;
+++    policy
+++}
+++
+++pub fn compute_shadow_policy(input: &Decode03CShadowInput) -> Decode03CShadowPolicy {
+++    let mut bucket = bucket_to_dynamic_bucket(input.bucket_stable);
+++    if input.numeric_risk || input.fallback_risk || input.collapsing {
+++        bucket = DynamicSamplerBucket::CollapsingPath;
+++    }
+++    let mut policy = base_policy_for_bucket(bucket, input);
+++    if input.transition_guard_enabled && env_bool("ASH_SAMPLER05_TOPK_BYPASS_APPLIED", false) {
+++        policy.shadow_top_k = 0;
+++        policy.policy_reason.push("sampler05_topk_bypass_shadow".to_string());
+++    }
+++    policy = apply_risk_adjustments(policy, input);
+++    clamp_shadow_policy(policy)
+++}
+++
+++pub fn classify_shadow_effect(
+++    input: &Decode03CShadowInput,
+++    policy: &Decode03CShadowPolicy,
+++) -> Decode03CShadowEffect {
+++    let would_change_behavior = (policy.shadow_temperature - input.current_temperature).abs() > 0.001
+++        || (policy.shadow_top_p - input.current_top_p).abs() > 0.001
+++        || (policy.shadow_min_p - input.current_min_p).abs() > 0.001
+++        || policy.shadow_top_k != input.current_top_k
+++        || policy.rollback_candidate
+++        || policy.safe_stop_candidate
+++        || policy.eos_bias_candidate;
+++    let would_tighten = policy.shadow_temperature < input.current_temperature
+++        || policy.shadow_min_p > input.current_min_p
+++        || policy.shadow_top_p < input.current_top_p
+++        || matches!(policy.guard_strength, ShadowGuardStrength::Strict | ShadowGuardStrength::Panic);
+++    let would_relax = policy.shadow_min_p < input.current_min_p
+++        || policy.shadow_top_p > input.current_top_p
+++        || matches!(policy.guard_strength, ShadowGuardStrength::Relaxed);
+++    let would_panic = matches!(policy.guard_strength, ShadowGuardStrength::Panic)
+++        || policy.rollback_candidate
+++        || policy.safe_stop_candidate
+++        || policy.eos_bias_candidate;
+++    Decode03CShadowEffect { would_change_behavior, would_tighten, would_relax, would_panic }
+++}
+++
+++fn current_temperature_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
+++    entropy.map(|r| r.temperature).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_TEMPERATURE", 0.25))
+++}
+++
+++fn current_top_p_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
+++    entropy.map(|r| r.top_p).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_TOP_P", 0.88))
+++}
+++
+++fn current_top_k_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> usize {
+++    entropy.map(|r| r.top_k_effective).unwrap_or_else(|| env_usize("ASH_DECODE03C_CURRENT_TOP_K", 0))
+++}
+++
+++fn current_min_p_from_entropy(entropy: Option<&Decode03AEntropyStepReceipt>) -> f32 {
+++    entropy.map(|r| r.min_p).unwrap_or_else(|| env_f32("ASH_DECODE03C_CURRENT_MIN_P", 0.05))
+++}
+++
+++pub fn input_from_decode03b(
+++    receipt: &Decode03BPciStepReceipt,
+++    entropy_receipt: Option<&Decode03AEntropyStepReceipt>,
+++) -> Decode03CShadowInput {
+++    Decode03CShadowInput {
+++        pci_raw: receipt.pci_raw,
+++        pci_smoothed: receipt.pci_smoothed,
+++        bucket_raw: receipt.bucket_raw,
+++        bucket_stable: receipt.bucket_stable,
+++        h_raw_norm: receipt.input.h_raw_norm,
+++        h_final_norm: receipt.input.h_final_norm,
+++        top1_top2_margin: receipt.input.top1_top2_margin,
+++        selected_rank: receipt.input.selected_rank,
+++        selected_logprob: receipt.input.selected_logprob,
+++        active_count_final: receipt.input.active_count_final,
+++        compression_ratio_total: receipt.input.compression_ratio_total,
+++        low_confidence: receipt.risk_flags.low_confidence,
+++        collapsing: receipt.risk_flags.collapsing,
+++        entropy_conflict: receipt.risk_flags.entropy_conflict,
+++        margin_collapse: receipt.risk_flags.margin_collapse,
+++        selected_rank_risk: receipt.risk_flags.selected_rank_risk,
+++        fallback_risk: receipt.risk_flags.fallback_risk,
+++        overcompression_risk: receipt.risk_flags.overcompression_risk,
+++        numeric_risk: receipt.risk_flags.numeric_risk,
+++        current_temperature: current_temperature_from_entropy(entropy_receipt),
+++        current_top_p: current_top_p_from_entropy(entropy_receipt),
+++        current_top_k: current_top_k_from_entropy(entropy_receipt),
+++        current_min_p: current_min_p_from_entropy(entropy_receipt),
+++        static_prior_enabled: entropy_receipt.map(|r| r.static_prior_enabled).unwrap_or_else(|| env_bool("ASH_DECODE03C_STATIC_PRIOR_ENABLED", true)),
+++        transition_guard_enabled: entropy_receipt.map(|r| r.transition_guard_enabled).unwrap_or_else(|| env_bool("ASH_DECODE03C_TRANSITION_GUARD_ENABLED", true)),
+++    }
+++}
+++
+++pub fn receipt_from_decode03b(
+++    mode: Decode03CMode,
+++    pci_receipt: &Decode03BPciStepReceipt,
+++    entropy_receipt: Option<&Decode03AEntropyStepReceipt>,
+++) -> Decode03CStepReceipt {
+++    let input = input_from_decode03b(pci_receipt, entropy_receipt);
+++    let shadow_policy = compute_shadow_policy(&input);
+++    let effect = classify_shadow_effect(&input, &shadow_policy);
+++    Decode03CStepReceipt {
+++        patch_id: DECODE03C_PATCH_ID.to_string(),
+++        input_patch: DECODE03C_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_hash: pci_receipt.prompt_hash.clone(),
+++        seed: pci_receipt.seed,
+++        step: pci_receipt.step,
+++        backend: "decode03b_pci_bridge".to_string(),
+++        sampler_ssot: DECODE03C_SAMPLER_SSOT.to_string(),
+++        behavior_change: false,
+++        shadow_only: true,
+++        mode: mode.as_str().to_string(),
+++        decode03a_status_seen: pci_receipt.decode03a_status_seen.clone(),
+++        decode03b_status_seen: Some("DERIVED_IN_MEMORY_FROM_DECODE03B_RECEIPT".to_string()),
+++        sampler05_status_seen: pci_receipt.sampler05_status_seen.clone(),
+++        input,
+++        shadow_policy,
+++        would_change_behavior: effect.would_change_behavior,
+++        would_tighten: effect.would_tighten,
+++        would_relax: effect.would_relax,
+++        would_panic: effect.would_panic,
+++    }
+++}
+++
+++pub fn append_decode03c_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Decode03CMode::from_env();
+++    if !mode.enabled() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let receipt = receipt_from_decode03b(mode, &pci_receipt, Some(&entropy_receipt));
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn stats(values: &[f32]) -> (Option<f32>, Option<f32>, Option<f32>) {
+++    let values = values.iter().copied().filter(|v| v.is_finite()).collect::<Vec<_>>();
+++    if values.is_empty() {
+++        return (None, None, None);
+++    }
+++    let min = values.iter().copied().fold(f32::INFINITY, f32::min);
+++    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+++    let mean = values.iter().sum::<f32>() / values.len() as f32;
+++    (Some(min), Some(mean), Some(max))
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Decode03CStepReceipt]) -> Decode03CShadowSummary {
+++    let mut policy_buckets = Decode03CPolicyBucketCounts::default();
+++    let mut policy_actions = Decode03CPolicyActionCounts::default();
+++    let mut reasons: BTreeMap<String, usize> = BTreeMap::new();
+++    let mut temp = Vec::new();
+++    let mut minp = Vec::new();
+++    let mut topp = Vec::new();
+++    for receipt in receipts {
+++        match receipt.shadow_policy.bucket {
+++            DynamicSamplerBucket::ConfidentPath => policy_buckets.confident_path_count += 1,
+++            DynamicSamplerBucket::StablePath => policy_buckets.stable_path_count += 1,
+++            DynamicSamplerBucket::UncertainPath => policy_buckets.uncertain_path_count += 1,
+++            DynamicSamplerBucket::UnstablePath => policy_buckets.unstable_path_count += 1,
+++            DynamicSamplerBucket::CollapsingPath => policy_buckets.collapsing_path_count += 1,
+++        }
+++        if receipt.would_change_behavior { policy_actions.would_change_behavior_count += 1; }
+++        if receipt.would_tighten { policy_actions.would_tighten_count += 1; }
+++        if receipt.would_relax { policy_actions.would_relax_count += 1; }
+++        if receipt.would_panic { policy_actions.would_panic_count += 1; }
+++        if receipt.shadow_policy.rollback_candidate { policy_actions.rollback_candidate_count += 1; }
+++        if receipt.shadow_policy.safe_stop_candidate { policy_actions.safe_stop_candidate_count += 1; }
+++        if receipt.shadow_policy.eos_bias_candidate { policy_actions.eos_bias_candidate_count += 1; }
+++        for reason in &receipt.shadow_policy.policy_reason {
+++            *reasons.entry(reason.clone()).or_insert(0) += 1;
+++        }
+++        temp.push(receipt.shadow_policy.shadow_temperature);
+++        minp.push(receipt.shadow_policy.shadow_min_p);
+++        topp.push(receipt.shadow_policy.shadow_top_p);
+++    }
+++    let (temperature_shadow_min, temperature_shadow_mean, temperature_shadow_max) = stats(&temp);
+++    let (min_p_shadow_min, min_p_shadow_mean, min_p_shadow_max) = stats(&minp);
+++    let (top_p_shadow_min, top_p_shadow_mean, top_p_shadow_max) = stats(&topp);
+++    let steps_observed = receipts.len();
+++    let status = if steps_observed == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if receipts.iter().any(|r| r.behavior_change || !r.shadow_only) {
+++        "FAIL_BEHAVIOR_CHANGE"
+++    } else if policy_actions.would_panic_count > 0 || policy_actions.rollback_candidate_count > 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }
+++    .to_string();
+++    let ready_for_decode03d_controlled_enable = steps_observed > 0
+++        && !receipts.iter().any(|r| r.behavior_change || !r.shadow_only);
+++    Decode03CShadowSummary {
+++        patch_id: DECODE03C_PATCH_ID.to_string(),
+++        input_patch: DECODE03C_INPUT_PATCH_ID.to_string(),
+++        status,
+++        behavior_change: false,
+++        shadow_only: true,
+++        requires_decode03b: require_decode03b(),
+++        decode03b_status_seen: if steps_observed > 0 { Some("OBSERVED_OR_DERIVED".to_string()) } else { None },
+++        decode03a_status_seen: receipts.iter().find_map(|r| r.decode03a_status_seen.clone()),
+++        sampler05_status_seen: receipts.iter().find_map(|r| r.sampler05_status_seen.clone()),
+++        steps_observed,
+++        policy_buckets,
+++        policy_actions,
+++        shadow_config_stats: Decode03CShadowConfigStats {
+++            temperature_shadow_min,
+++            temperature_shadow_mean,
+++            temperature_shadow_max,
+++            min_p_shadow_min,
+++            min_p_shadow_mean,
+++            min_p_shadow_max,
+++            top_p_shadow_min,
+++            top_p_shadow_mean,
+++            top_p_shadow_max,
+++        },
+++        risk_policy_reasons: reasons,
+++        ready_for_decode03d_controlled_enable,
+++        ready_for_default_enable: false,
+++        reason: if steps_observed == 0 {
+++            "static bake only; run ASH_DECODE03C_SHADOW=receipt after DECODE-03B PCI to produce shadow policy evidence".to_string()
+++        } else if ready_for_decode03d_controlled_enable {
+++            "shadow policy sealed; DECODE-03D may consume shadow values only under controlled enable, not default-on".to_string()
+++        } else {
+++            "shadow policy failed observe-only contract; controlled enable is blocked".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_decode03c_summary_from_receipt_file() {
+++    let path = receipt_path();
+++    let mut receipts = Vec::new();
+++    if let Ok(text) = fs::read_to_string(&path) {
+++        for line in text.lines() {
+++            if line.trim().is_empty() {
+++                continue;
+++            }
+++            if let Ok(receipt) = serde_json::from_str::<Decode03CStepReceipt>(line) {
+++                receipts.push(receipt);
+++            }
+++        }
+++    }
+++    let summary = summary_from_receipts(&receipts);
+++    let out = summary_path();
+++    if let Some(parent) = out.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(out, format!("{}\n", text));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn input_for(bucket: PciBucket) -> Decode03CShadowInput {
+++        Decode03CShadowInput {
+++            pci_raw: 0.75,
+++            pci_smoothed: None,
+++            bucket_raw: bucket,
+++            bucket_stable: bucket,
+++            h_raw_norm: Some(0.4),
+++            h_final_norm: Some(0.35),
+++            top1_top2_margin: Some(0.8),
+++            selected_rank: Some(1),
+++            selected_logprob: Some(-1.0),
+++            active_count_final: 32,
+++            compression_ratio_total: Some(0.01),
+++            low_confidence: false,
+++            collapsing: false,
+++            entropy_conflict: false,
+++            margin_collapse: false,
+++            selected_rank_risk: false,
+++            fallback_risk: false,
+++            overcompression_risk: false,
+++            numeric_risk: false,
+++            current_temperature: 0.25,
+++            current_top_p: 0.88,
+++            current_top_k: 0,
+++            current_min_p: 0.05,
+++            static_prior_enabled: true,
+++            transition_guard_enabled: true,
+++        }
+++    }
+++
+++    #[test]
+++    fn decode03c_bucket_mapping() {
+++        assert_eq!(bucket_to_dynamic_bucket(PciBucket::Confident), DynamicSamplerBucket::ConfidentPath);
+++        assert_eq!(bucket_to_dynamic_bucket(PciBucket::Collapsing), DynamicSamplerBucket::CollapsingPath);
+++    }
+++
+++    #[test]
+++    fn decode03c_shadow_never_changes_behavior() {
+++        let policy = compute_shadow_policy(&input_for(PciBucket::Stable));
+++        assert!(policy.shadow_only);
+++        assert!(!policy.behavior_change);
+++    }
+++
+++    #[test]
+++    fn decode03c_uncertain_tightens() {
+++        let input = input_for(PciBucket::Uncertain);
+++        let policy = compute_shadow_policy(&input);
+++        assert!(policy.shadow_min_p >= input.current_min_p);
+++        assert!(matches!(policy.guard_strength, ShadowGuardStrength::Strict | ShadowGuardStrength::Panic));
+++    }
+++
+++    #[test]
+++    fn decode03c_numeric_risk_forces_panic() {
+++        let mut input = input_for(PciBucket::Stable);
+++        input.numeric_risk = true;
+++        let policy = compute_shadow_policy(&input);
+++        assert!(matches!(policy.guard_strength, ShadowGuardStrength::Panic));
+++        assert!(policy.safe_stop_candidate);
+++        assert!(policy.eos_bias_candidate);
+++    }
+++
+++    #[test]
+++    fn decode03c_clamps_policy_values() {
+++        let mut policy = base_policy_for_bucket(DynamicSamplerBucket::StablePath, &input_for(PciBucket::Stable));
+++        policy.shadow_temperature = -100.0;
+++        policy.shadow_min_p = 999.0;
+++        policy.shadow_top_p = 999.0;
+++        let policy = clamp_shadow_policy(policy);
+++        assert!(policy.shadow_temperature >= 0.03 && policy.shadow_temperature <= 1.20);
+++        assert!(policy.shadow_min_p >= 0.0 && policy.shadow_min_p <= 0.25);
+++        assert!(policy.shadow_top_p >= 0.50 && policy.shadow_top_p <= 1.0);
+++    }
+++}
++diff -ruN decode03c_orig/crates/model_core/src/lib.rs decode03c_work/crates/model_core/src/lib.rs
++--- decode03c_orig/crates/model_core/src/lib.rs	2026-05-27 06:07:54.127774789 +0000
+++++ decode03c_work/crates/model_core/src/lib.rs	2026-05-27 06:30:02.454812884 +0000
++@@ -18,6 +18,7 @@
++ mod sampler05_parity;
++ mod decode03a_entropy;
++ mod decode03b_pci;
+++mod decode03c_shadow_policy;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -99,6 +100,15 @@
++     apply_pci_hysteresis, append_decode03b_receipt_from_sampler03,
++     write_decode03b_summary_from_receipt_file,
++ };
+++
+++pub use decode03c_shadow_policy::{
+++    DECODE03C_PATCH_ID, DECODE03C_INPUT_PATCH_ID, Decode03CMode, DynamicSamplerBucket,
+++    ShadowGuardStrength, Decode03CShadowInput, Decode03CShadowPolicy, Decode03CShadowEffect,
+++    Decode03CStepReceipt, Decode03CShadowSummary, bucket_to_dynamic_bucket,
+++    base_policy_for_bucket, apply_risk_adjustments, clamp_shadow_policy, compute_shadow_policy,
+++    classify_shadow_effect, append_decode03c_receipt_from_sampler03,
+++    write_decode03c_summary_from_receipt_file,
+++};
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN decode03c_orig/crates/model_core/src/sampler_parity.rs decode03c_work/crates/model_core/src/sampler_parity.rs
++--- decode03c_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:07:54.128460580 +0000
+++++ decode03c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:30:03.641828256 +0000
++@@ -451,5 +451,6 @@
++     crate::sampler05_parity::append_sampler05_receipt_from_sampler03(receipt);
++     crate::decode03a_entropy::append_decode03a_receipt_from_sampler03(receipt);
++     crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
+++    crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN decode03c_orig/workspace/decode03c_probe_prompts.jsonl decode03c_work/workspace/decode03c_probe_prompts.jsonl
+--- decode03c_orig/workspace/decode03c_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/workspace/decode03c_probe_prompts.jsonl	2026-05-27 06:30:27.996727129 +0000
+@@ -0,0 +1,8 @@
++{"id":"P01_short_korean_qa","text":"장수풍뎅이는 무엇인가요? 한 문단으로 답하세요."}
++{"id":"P02_hangul_completion","text":"장수풍뎅"}
++{"id":"P03_repetition_trap","text":"다음 문장을 반복하지 말고 자연스럽게 이어 쓰세요: 합니다 합니다 합니다"}
++{"id":"P04_josa_eomi_loop_probe","text":"은 는 이 가 을 를 의 에 에서 으로 라는 조사만 반복하지 말고 설명문으로 바꾸세요."}
++{"id":"P05_structured_markdown","text":"애쉬 디코더 안정화 계획을 마크다운 체크리스트로 요약하세요."}
++{"id":"P06_emotional_prose_short","text":"비가 오는 밤, 고장난 기계가 다시 말을 배우는 장면을 짧게 쓰세요."}
++{"id":"P07_noisy_user_input","text":"ㅈㅅ한데 이거 왜자꾸 말 샐러드됨?? minp top-p 뭐가 문제"}
++{"id":"P08_transition_guard_sensitive","text":"앞 문맥과 이어지는 자연스러운 다음 문장을 하나만 생성하세요: 나는 오늘도 모델의 출력을 확인했고,"}
+diff -ruN decode03c_orig/workspace/decode03c_shadow_policy_schema.json decode03c_work/workspace/decode03c_shadow_policy_schema.json
+--- decode03c_orig/workspace/decode03c_shadow_policy_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/workspace/decode03c_shadow_policy_schema.json	2026-05-27 06:30:27.972873176 +0000
+@@ -0,0 +1,43 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
++  "title": "Dynamic Sampler Shadow Policy Seal",
++  "schema_version": 1,
++  "behavior_change": false,
++  "shadow_only": true,
++  "required_input_patch": "16AI-QW-38G-R6A-DECODE-03B",
++  "ssot": "model_core::decode03b_pci",
++  "receipt_path": "workspace/decode03c_shadow_steps.jsonl",
++  "summary_path": "workspace/decode03c_summary.json",
++  "required_step_fields": [
++    "patch_id",
++    "input_patch",
++    "schema_version",
++    "run_id",
++    "seed",
++    "step",
++    "behavior_change",
++    "shadow_only",
++    "decode03b_status_seen",
++    "input",
++    "shadow_policy",
++    "would_change_behavior",
++    "would_tighten",
++    "would_relax",
++    "would_panic"
++  ],
++  "shadow_policy_contract": {
++    "temperature_range": [0.03, 1.2],
++    "min_p_range": [0.0, 0.25],
++    "top_p_range": [0.5, 1.0],
++    "guard_strength_values": ["Relaxed", "Normal", "Strict", "Panic"],
++    "bucket_values": ["ConfidentPath", "StablePath", "UncertainPath", "UnstablePath", "CollapsingPath"]
++  },
++  "promotion": {
++    "ready_for_decode03d_controlled_enable_requires": [
++      "steps_observed > 0",
++      "behavior_change == false",
++      "shadow_only == true"
++    ],
++    "default_enable_allowed": false
++  }
++}
+diff -ruN decode03c_orig/workspace/decode03c_static_checks.json decode03c_work/workspace/decode03c_static_checks.json
+--- decode03c_orig/workspace/decode03c_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/workspace/decode03c_static_checks.json	2026-05-27 06:30:40.554984573 +0000
+@@ -0,0 +1,88 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "check": "decode03c_module_exists",
++      "status": "PASS",
++      "path": "crates/model_core/src/decode03c_shadow_policy.rs"
++    },
++    {
++      "check": "lib_exists",
++      "status": "PASS",
++      "path": "crates/model_core/src/lib.rs"
++    },
++    {
++      "check": "sampler_parity_exists",
++      "status": "PASS",
++      "path": "crates/model_core/src/sampler_parity.rs"
++    },
++    {
++      "check": "schema_exists",
++      "status": "PASS",
++      "path": "workspace/decode03c_shadow_policy_schema.json"
++    },
++    {
++      "check": "summary_exists",
++      "status": "PASS",
++      "path": "workspace/decode03c_summary.json"
++    },
++    {
++      "check": "steps_exists",
++      "status": "PASS",
++      "path": "workspace/decode03c_shadow_steps.jsonl"
++    },
++    {
++      "check": "module_contains_DECODE03C_PATCH_ID",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_Decode03CShadowPolicy",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_compute_shadow_policy",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_classify_shadow_effect",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_append_decode03c_receipt_from_sampler03",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_behavior_change: false",
++      "status": "PASS"
++    },
++    {
++      "check": "module_contains_shadow_only: true",
++      "status": "PASS"
++    },
++    {
++      "check": "lib_declares_decode03c_module",
++      "status": "PASS"
++    },
++    {
++      "check": "lib_exports_decode03c_symbols",
++      "status": "PASS"
++    },
++    {
++      "check": "sampler_parity_appends_decode03c",
++      "status": "PASS"
++    },
++    {
++      "check": "no_runtime_behavior_change_path_static",
++      "status": "PASS"
++    },
++    {
++      "check": "rough_brace_balance",
++      "status": "PASS",
++      "open": 117,
++      "close": 117
++    }
++  ]
++}
+diff -ruN decode03c_orig/workspace/decode03c_summary.json decode03c_work/workspace/decode03c_summary.json
+--- decode03c_orig/workspace/decode03c_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03c_work/workspace/decode03c_summary.json	2026-05-27 06:30:27.987253813 +0000
+@@ -0,0 +1,43 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03C",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03B",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "behavior_change": false,
++  "shadow_only": true,
++  "requires_decode03b": true,
++  "decode03b_status_seen": null,
++  "decode03a_status_seen": null,
++  "sampler05_status_seen": null,
++  "steps_observed": 0,
++  "policy_buckets": {
++    "confident_path_count": 0,
++    "stable_path_count": 0,
++    "uncertain_path_count": 0,
++    "unstable_path_count": 0,
++    "collapsing_path_count": 0
++  },
++  "policy_actions": {
++    "would_change_behavior_count": 0,
++    "would_tighten_count": 0,
++    "would_relax_count": 0,
++    "would_panic_count": 0,
++    "rollback_candidate_count": 0,
++    "safe_stop_candidate_count": 0,
++    "eos_bias_candidate_count": 0
++  },
++  "shadow_config_stats": {
++    "temperature_shadow_min": null,
++    "temperature_shadow_mean": null,
++    "temperature_shadow_max": null,
++    "min_p_shadow_min": null,
++    "min_p_shadow_mean": null,
++    "min_p_shadow_max": null,
++    "top_p_shadow_min": null,
++    "top_p_shadow_mean": null,
++    "top_p_shadow_max": null
++  },
++  "risk_policy_reasons": {},
++  "ready_for_decode03d_controlled_enable": false,
++  "ready_for_default_enable": false,
++  "reason": "static bake only; run ASH_DECODE03C_SHADOW=receipt after DECODE-03B PCI to produce shadow policy evidence"
++}

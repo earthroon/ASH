@@ -1,0 +1,149 @@
+--- 16P3_orig/crates/model_core/src/native_wgpu.rs	2026-05-06 02:36:30.000000000 +0000
++++ 16P3_work/crates/model_core/src/native_wgpu.rs	2026-05-06 03:39:49.591797547 +0000
+@@ -1698,6 +1698,14 @@
+         let bytes = rows.len().saturating_mul(std::mem::size_of::<f32>());
+         if let Ok(mut slot) = self.last_embedding_row_gather_bytes.lock() {
+             *slot = Some(bytes);
++            eprintln!(
++                "[16P-3][telemetry] stored_embedding_row_gather_bytes={} source=NativeWgpuModel",
++                bytes,
++            );
++        } else {
++            eprintln!(
++                "[16P-3][telemetry][warn] failed_to_store_embedding_row_gather_bytes source=NativeWgpuModel"
++            );
+         }
+         eprintln!(
+             "[native-embedding-row-gather] mode=row_gather prompt_len={} hidden={} bytes={} unique_tokens={} full_embedding_upload_skipped=true full_bytes={}",
+@@ -2387,6 +2395,14 @@
+     });
+ }
+ 
++
++pub fn last_embedding_row_gather_bytes(&self) -> Option<usize> {
++    self.last_embedding_row_gather_bytes
++        .lock()
++        .ok()
++        .and_then(|slot| *slot)
++}
++
+ pub fn text_density_state(&self) -> &NativeTextDensityState {
+     &self.text_density_state
+ }
+--- 16P3_orig/crates/runtime/src/infer.rs	2026-05-06 02:57:25.000000000 +0000
++++ 16P3_work/crates/runtime/src/infer.rs	2026-05-06 03:39:49.593603664 +0000
+@@ -2301,7 +2301,7 @@
+ let requested_sampled_decode = decode_requests_sampled_decode(decode);
+ let mut fallback_decode_mode: Option<String> = None;
+ check_cancel(cancel_flag)?;
+-    let mut generate_ids = |effective_banned_token_ids: &[u32]| -> Result<(Vec<u32>, String, Option<GenerationTelemetry>)> {
++    let mut generate_ids = |effective_banned_token_ids: &[u32]| -> Result<(Vec<u32>, String, Option<GenerationTelemetry>, Option<usize>)> {
+         let streaming_this_call = streaming_sink.take();
+         check_cancel(cancel_flag)?;
+         if wants_native_wgpu(&spec, &req.checkpoint_paths) {
+@@ -2459,7 +2459,12 @@
+                         let mut telemetry = GenerationTelemetry::default();
+                         telemetry.sampled_decode_applied = requested_sampled_decode;
+                         telemetry.finish_reason = GenerationFinishReason::MaxNewTokens;
+-                        return Ok((ids, backend_label, Some(telemetry)));
++                        let embedding_row_gather_bytes = native_model.last_embedding_row_gather_bytes();
++                        eprintln!(
++                            "[16P-3][telemetry] embedding_row_gather_bytes={:?} source=16AC_safe_generation",
++                            embedding_row_gather_bytes,
++                        );
++                        return Ok((ids, backend_label, Some(telemetry), embedding_row_gather_bytes));
+                     }
+                     let backend_label = native_model
+                         .text_density_state()
+@@ -2526,7 +2531,12 @@
+                     if let Some(gpu_penalty) = gpu_penalty_telemetry.clone() {
+                         telemetry.gpu_penalty = Some(gpu_penalty);
+                     }
+-                    Ok((ids, backend_label, Some(telemetry)))
++                    let embedding_row_gather_bytes = native_model.last_embedding_row_gather_bytes();
++                    eprintln!(
++                        "[16P-3][telemetry] embedding_row_gather_bytes={:?} source=native_generation",
++                        embedding_row_gather_bytes,
++                    );
++                    Ok((ids, backend_label, Some(telemetry), embedding_row_gather_bytes))
+                 }
+                 Err(err) if spec.backend.allow_cpu_fallback => {
+                     eprintln!("[warn] native_wgpu_failed_falling_back_to_cpu = {err:#}");
+@@ -2562,6 +2572,7 @@
+                         },
+                         cpu_reference_backend_label(&req.checkpoint_paths),
+                         None,
++                        None,
+                     ))
+                 }
+                 Err(err) => Err(err),
+@@ -2599,6 +2610,7 @@
+                 },
+                 cpu_reference_backend_label(&req.checkpoint_paths),
+                 None,
++                None,
+             ))
+         }
+     };
+@@ -2610,11 +2622,13 @@
+     let mut resolved_backend = String::new();
+     let mut output_text = String::new();
+     let mut generation_telemetry: Option<GenerationTelemetry> = None;
++    let mut native_embedding_row_gather_bytes: Option<usize>;
+ 
+ 
+-    let (generated_ids, first_backend, first_telemetry) = generate_ids(&banned_token_ids)?;
++    let (generated_ids, first_backend, first_telemetry, first_embedding_row_gather_bytes) = generate_ids(&banned_token_ids)?;
+     check_cancel(cancel_flag)?;
+     generation_telemetry = first_telemetry;
++    native_embedding_row_gather_bytes = first_embedding_row_gather_bytes;
+     resolved_backend = annotate_backend_with_text_density(first_backend, req.text_routing_prior.as_ref());
+     eprintln!("[debug] resolved_backend = {}", resolved_backend);
+     eprintln!("[debug] generated_ids_len = {}", generated_ids.len());
+@@ -2669,7 +2683,7 @@
+                 "[debug] output_guard_retry_banned_token_ids = {}",
+                 retry_banned_token_ids.len()
+             );
+-            let (retry_generated_ids, retry_backend, retry_telemetry) = generate_ids(&retry_banned_token_ids)?;
++            let (retry_generated_ids, retry_backend, retry_telemetry, retry_embedding_row_gather_bytes) = generate_ids(&retry_banned_token_ids)?;
+             let retry_tail_ids: Vec<u32> = if retry_generated_ids.len() > prompt_len {
+                 retry_generated_ids[prompt_len..].to_vec()
+             } else {
+@@ -2693,12 +2707,14 @@
+                 final_tail_ids = retry_tail_ids;
+                 resolved_backend = annotate_backend_with_text_density(retry_backend, req.text_routing_prior.as_ref());
+                 generation_telemetry = retry_telemetry;
++                native_embedding_row_gather_bytes = retry_embedding_row_gather_bytes;
+                 output_text = retry_eval.normalized_text;
+             } else {
+                 final_generated_ids = retry_generated_ids;
+                 final_tail_ids = retry_tail_ids;
+                 resolved_backend = annotate_backend_with_text_density(retry_backend, req.text_routing_prior.as_ref());
+                 generation_telemetry = retry_telemetry;
++                native_embedding_row_gather_bytes = retry_embedding_row_gather_bytes;
+                 output_text = fallback_output_text(spec);
+             }
+         } else {
+@@ -2766,7 +2782,7 @@
+         &final_generated_ids,
+         &banned_token_ids,
+     );
+-    let native_vocab_allocation_probe = NativeVocabAllocationProbe::new(
++    let mut native_vocab_allocation_probe = NativeVocabAllocationProbe::new(
+         &req,
+         tokenizer_checkpoint_probe
+             .checkpoint_lm_head_vocab_size
+@@ -2782,6 +2798,13 @@
+                 .and_then(|shape| shape.get(1).copied()))
+             .unwrap_or(spec.dimensions.hidden_size),
+     );
++    if let Some(bytes) = native_embedding_row_gather_bytes {
++        native_vocab_allocation_probe.embedding_row_gather_bytes = Some(bytes);
++        eprintln!(
++            "[16P-3][telemetry] embedding_row_gather_bytes={} source=NativeVocabAllocationProbe",
++            bytes,
++        );
++    }
+     eprintln!(
+         "[native-vocab-projection] requested={} effective={} embedding_requested={} embedding_effective={} vocab={} hidden={} bytes={} tile_size={} avoid_full_upload={} max_single_buffer={}",
+         native_vocab_allocation_probe.requested_vocab_projection,

@@ -1,0 +1,9 @@
+ASH-BASETRAIN-GPU-25 LOCAL VALIDATION
+
+zip_integrity = OK after final zip test
+cargo_build = not_executed_in_sandbox_cargo_missing
+runtime_pass = operator_local_required
+
+Expected operator command:
+cargo build -p base_train --bin ash_basetrain_gpu_25_gpu_local_loss_repeatability_audit --jobs 1
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_25_gpu_local_loss_repeatability_audit

@@ -1,0 +1,19 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-28",
+  "buffer_usage_contract_created": true,
+  "allowed_usages": [
+    "STORAGE",
+    "COPY_SRC",
+    "COPY_DST"
+  ],
+  "copy_dst_scope": "zero_init_or_explicit_initialization_only_not_gradient_value_write",
+  "forbidden_usages": [
+    "MAP_WRITE_FOR_GRADIENT_VALUE",
+    "MAP_READ_FOR_TRAINING_DECISION",
+    "VERTEX",
+    "INDEX",
+    "INDIRECT",
+    "QUERY_RESOLVE"
+  ],
+  "pass": true
+}

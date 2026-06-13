@@ -1,0 +1,178 @@
+[
+  {
+    "action_hints": [
+      "ReadyForControlledEnqueueAfterApproval"
+    ],
+    "approval_state": "Granted",
+    "block_reasons": [
+      "RealEnqueueDisabledByPolicy"
+    ],
+    "candidate_id": "candidate-approval-granted",
+    "cue_id": "mock-cue-0001",
+    "decode_session_id": "mock-decode-session-decode22-approval-granted-dry-run",
+    "dry_run_allowed": true,
+    "dry_run_packet_id": "enqueue-dry-run-0001",
+    "dry_run_passed": true,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0001",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "would_enqueue_if_real_run": true
+  },
+  {
+    "action_hints": [
+      "DoNotEnqueue"
+    ],
+    "approval_state": "Denied",
+    "block_reasons": [
+      "ApprovalDenied"
+    ],
+    "candidate_id": "candidate-approval-denied",
+    "cue_id": "mock-cue-0002",
+    "decode_session_id": "mock-decode-session-decode22-approval-denied",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0002",
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0002",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RequestApproval"
+    ],
+    "approval_state": "Pending",
+    "block_reasons": [
+      "ApprovalPending"
+    ],
+    "candidate_id": "candidate-approval-pending",
+    "cue_id": "mock-cue-0003",
+    "decode_session_id": "mock-decode-session-decode22-approval-pending",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0003",
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0003",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "NoAction"
+    ],
+    "approval_state": "NotRequired",
+    "block_reasons": [
+      "QueueCandidateNotRequired"
+    ],
+    "candidate_id": "candidate-auto-accept",
+    "cue_id": "mock-cue-0004",
+    "decode_session_id": "mock-decode-session-decode22-auto-accept-no-queue",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0004",
+    "dry_run_passed": false,
+    "dry_run_requested": false,
+    "queue_candidate_id": null,
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": null,
+    "review_queue_target_hash": null,
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RepairQueueCandidate"
+    ],
+    "approval_state": "Missing",
+    "block_reasons": [
+      "MissingHumanReviewQueueCandidateReceipt"
+    ],
+    "candidate_id": "candidate-missing-queue-receipt",
+    "cue_id": "mock-cue-0005",
+    "decode_session_id": "mock-decode-session-decode22-missing-queue-candidate-receipt",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0005",
+    "dry_run_passed": false,
+    "dry_run_requested": false,
+    "queue_candidate_id": null,
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RepairCandidateChain"
+    ],
+    "approval_state": "Granted",
+    "block_reasons": [
+      "RepairRequired"
+    ],
+    "candidate_id": "candidate-repair-required",
+    "cue_id": "mock-cue-0006",
+    "decode_session_id": "mock-decode-session-decode22-repair-required-dry-run",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0006",
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0006",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:d77115a08b8b0a9453a39f12a1888a5435ae01d764154fb3bee0677a49414f01",
+    "review_queue_target_hash": "sha256:e9ce1102273dde6d1dc40284d88e7c82fc4a92744605ae34031187a3ad795585",
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RequestMoreCalibrationEvidence"
+    ],
+    "approval_state": "Granted",
+    "block_reasons": [
+      "CalibrationEvidenceMissing"
+    ],
+    "candidate_id": "candidate-calibration-insufficient",
+    "cue_id": "mock-cue-0007",
+    "decode_session_id": "mock-decode-session-decode22-calibration-insufficient-dry-run",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0007",
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0007",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:b77127463c51fa947e389f9b2c4f0534780371005882d7a5914b6b5b2129a429",
+    "review_queue_target_hash": "sha256:e7623e3a780d957c3bf6cbe886110fa6c93eeda710eaf238e7161f36124904c6",
+    "would_enqueue_if_real_run": false
+  },
+  {
+    "action_hints": [
+      "RequestApproval"
+    ],
+    "approval_state": "Pending",
+    "block_reasons": [
+      "ApprovalPending"
+    ],
+    "candidate_id": "candidate-reject-rework",
+    "cue_id": "mock-cue-0008",
+    "decode_session_id": "mock-decode-session-decode22-reject-rework-approval-required",
+    "dry_run_allowed": false,
+    "dry_run_packet_id": "enqueue-dry-run-0008",
+    "dry_run_passed": false,
+    "dry_run_requested": true,
+    "queue_candidate_id": "queue-candidate-0008",
+    "real_enqueue_allowed": false,
+    "real_enqueue_executed": false,
+    "review_queue_priority_hash": "sha256:d77115a08b8b0a9453a39f12a1888a5435ae01d764154fb3bee0677a49414f01",
+    "review_queue_target_hash": "sha256:8e18ee38f77cf4cd288ca6b79d531482b09c2c3923555c3b232aa69a4fb590e4",
+    "would_enqueue_if_real_run": false
+  }
+]

@@ -1,0 +1,13 @@
+ASH-BASETRAIN-GPU-26 LOCAL VALIDATION
+
+container_cargo_available = false
+local_cargo_build = NOT_EXECUTED_IN_CONTAINER
+local_runtime_pass = USER_LOCAL_SSOT_REQUIRED
+zip_integrity = CHECKED_DURING_BAKE
+
+Expected operator commands:
+  cargo build -p base_train --bin ash_basetrain_gpu_26_gpu_local_loss_promotion_gate --jobs 1
+  cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_26_gpu_local_loss_promotion_gate
+
+Expected verdict:
+  PASS_ASH_BASETRAIN_GPU_26_GPU_LOCAL_LOSS_PROMOTION_GATE_STABLE_GPU_WINDOW_2048_TARGET_1_LOSS_CANDIDATE_TO_BACKWARD_READINESS_NO_BACKWARD_NO_OPTIMIZER

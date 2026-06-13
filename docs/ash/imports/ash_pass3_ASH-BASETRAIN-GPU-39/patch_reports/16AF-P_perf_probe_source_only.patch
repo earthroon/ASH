@@ -1,0 +1,1301 @@
+diff -ruN 16afp_orig/crates/burn_webgpu_backend/src/lib.rs 16afp_work/crates/burn_webgpu_backend/src/lib.rs
+--- 16afp_orig/crates/burn_webgpu_backend/src/lib.rs	2026-05-06 05:22:14.000000000 +0000
++++ 16afp_work/crates/burn_webgpu_backend/src/lib.rs	2026-05-06 06:00:59.473945025 +0000
+@@ -122,7 +122,7 @@
+ 
+ pub use buffers::{QWaveDispatchInput, QWaveMaps};
+ pub use headwise_atlas::{AtlasActiveTensorSeamSummary, AtlasDispatchOutput, AtlasDispatchTextDensityState, AtlasTextDensityUniform, HeadwiseAtlasDispatcher, HeadwiseAtlasPlan, HeadwiseAtlasRuntimeSpec, PreparedAtlasInputs};
+-pub use native_atlas_ffn::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfFlags, NativeAtlasFfn16AfOutput, NativeAtlasFfn16AfWeights, SHADER_NATIVE_ATLAS_FFN_16AF_DOWN, SHADER_NATIVE_ATLAS_FFN_16AF_GATE, SHADER_NATIVE_ATLAS_FFN_16AF_SWIGLU, SHADER_NATIVE_ATLAS_FFN_16AF_UP};
++pub use native_atlas_ffn::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfFlags, NativeAtlasFfn16AfOutput, NativeAtlasFfn16AfPerfTelemetry, NativeAtlasFfn16AfReadbackMode, NativeAtlasFfn16AfWeights, SHADER_NATIVE_ATLAS_FFN_16AF_DOWN, SHADER_NATIVE_ATLAS_FFN_16AF_GATE, SHADER_NATIVE_ATLAS_FFN_16AF_SWIGLU, SHADER_NATIVE_ATLAS_FFN_16AF_UP};
+ pub use qwave_dispatch::{QWaveDispatcher, SHADER_QWAVE_CAIRO_GATE, SHADER_QWAVE_ENERGY, SHADER_QWAVE_GRADIENT, SHADER_QWAVE_HILBERT_AXIS, SHADER_QWAVE_LOG_NORM, SHADER_QWAVE_OUTPUT, SHADER_QWAVE_TENSOR};
+ pub use raw_bridge::{ActiveTensorHandleState, ActiveTensorRawHandle, BridgeMode, BridgeStats, BurnToRawWgpuBridge, RawBridgeMiss, RawBridgeMissReason, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease};
+ pub use device_handles::{NativeWgpuRuntimeHandles, supports_same_device_raw_bridge, try_build_same_device_raw_bridge, try_extract_runtime_handles};
+diff -ruN 16afp_orig/crates/burn_webgpu_backend/src/native_atlas_ffn.rs 16afp_work/crates/burn_webgpu_backend/src/native_atlas_ffn.rs
+--- 16afp_orig/crates/burn_webgpu_backend/src/native_atlas_ffn.rs	2026-05-06 05:16:26.000000000 +0000
++++ 16afp_work/crates/burn_webgpu_backend/src/native_atlas_ffn.rs	2026-05-06 05:54:10.768184293 +0000
+@@ -8,7 +8,7 @@
+ use anyhow::{anyhow, bail, ensure, Context, Result};
+ use bytemuck::{cast_slice, Pod, Zeroable};
+ use serde::{Deserialize, Serialize};
+-use std::sync::mpsc;
++use std::{sync::mpsc, time::Instant};
+ 
+ use wgpu26 as backend_wgpu;
+ use backend_wgpu::util::DeviceExt;
+@@ -203,6 +203,39 @@
+     pub out: Vec<f32>,
+     pub resolved_backend: String,
+     pub dispatch_log: Vec<String>,
++    pub telemetry: NativeAtlasFfn16AfPerfTelemetry,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum NativeAtlasFfn16AfReadbackMode {
++    FullIntermediates,
++    OutputOnly,
++}
++
++impl NativeAtlasFfn16AfReadbackMode {
++    fn read_intermediates(self) -> bool {
++        matches!(self, Self::FullIntermediates)
++    }
++
++    fn as_label(self) -> &'static str {
++        match self {
++            Self::FullIntermediates => "full_intermediates",
++            Self::OutputOnly => "output_only",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct NativeAtlasFfn16AfPerfTelemetry {
++    pub readback_mode: String,
++    pub gpu_context_reused: bool,
++    pub shader_pipeline_cached: bool,
++    pub weight_upload_ms: f64,
++    pub bind_encode_ms: f64,
++    pub submit_readback_ms: f64,
++    pub total_gpu_ms: f64,
++    pub readback_buffers: usize,
++    pub readback_elements: usize,
+ }
+ 
+ #[derive(Debug)]
+@@ -212,13 +245,25 @@
+ }
+ 
+ #[derive(Debug)]
++struct GpuPipelines {
++    bind_group_layout: backend_wgpu::BindGroupLayout,
++    gate_pipeline: backend_wgpu::ComputePipeline,
++    up_pipeline: backend_wgpu::ComputePipeline,
++    swiglu_pipeline: backend_wgpu::ComputePipeline,
++    down_pipeline: backend_wgpu::ComputePipeline,
++}
++
++#[derive(Debug)]
+ pub struct NativeAtlasFfn16AfDispatcher {
+     gpu: GpuContext,
++    pipelines: GpuPipelines,
+ }
+ 
+ impl NativeAtlasFfn16AfDispatcher {
+     pub fn try_new() -> Result<Self> {
+-        Ok(Self { gpu: init_gpu_context()? })
++        let gpu = init_gpu_context()?;
++        let pipelines = init_pipelines(&gpu.device)?;
++        Ok(Self { gpu, pipelines })
+     }
+ 
+     pub fn dispatch_single_token(
+@@ -226,6 +271,31 @@
+         input_hidden: &[f32],
+         weights: NativeAtlasFfn16AfWeights<'_>,
+     ) -> Result<NativeAtlasFfn16AfOutput> {
++        self.dispatch_single_token_with_readback_mode(
++            input_hidden,
++            weights,
++            NativeAtlasFfn16AfReadbackMode::FullIntermediates,
++        )
++    }
++
++    pub fn dispatch_single_token_output_only(
++        &self,
++        input_hidden: &[f32],
++        weights: NativeAtlasFfn16AfWeights<'_>,
++    ) -> Result<NativeAtlasFfn16AfOutput> {
++        self.dispatch_single_token_with_readback_mode(
++            input_hidden,
++            weights,
++            NativeAtlasFfn16AfReadbackMode::OutputOnly,
++        )
++    }
++
++    pub fn dispatch_single_token_with_readback_mode(
++        &self,
++        input_hidden: &[f32],
++        weights: NativeAtlasFfn16AfWeights<'_>,
++        readback_mode: NativeAtlasFfn16AfReadbackMode,
++    ) -> Result<NativeAtlasFfn16AfOutput> {
+         let flags = NativeAtlasFfn16AfFlags::default();
+         ensure!(flags.enable_native_atlas_ffn, "16AF native atlas FFN flag disabled");
+         ensure!(flags.enable_native_silu_swiglu, "16AF native SiLU/SwiGLU flag disabled");
+@@ -247,7 +317,7 @@
+         let hidden_u32 = u32::try_from(hidden).context("16AF hidden dim exceeds u32")?;
+         let intermediate_u32 = u32::try_from(intermediate).context("16AF intermediate dim exceeds u32")?;
+ 
+-        self.dispatch_gpu(input_hidden, weights, hidden_u32, intermediate_u32)
++        self.dispatch_gpu(input_hidden, weights, hidden_u32, intermediate_u32, readback_mode)
+     }
+ 
+     fn dispatch_gpu(
+@@ -256,8 +326,11 @@
+         weights: NativeAtlasFfn16AfWeights<'_>,
+         hidden: u32,
+         intermediate: u32,
++        readback_mode: NativeAtlasFfn16AfReadbackMode,
+     ) -> Result<NativeAtlasFfn16AfOutput> {
++        let total_started = Instant::now();
+         let gpu = &self.gpu;
++        let pipelines = &self.pipelines;
+         let hidden_len = hidden as usize;
+         let intermediate_len = intermediate as usize;
+         let params = NativeAtlasFfnParams {
+@@ -267,6 +340,7 @@
+             _pad1: 0,
+         };
+ 
++        let upload_started = Instant::now();
+         let params_buffer = gpu.device.create_buffer_init(&BackendBufferInitDescriptor {
+             label: Some("16AF.native_atlas_ffn.params"),
+             contents: cast_slice(&[params]),
+@@ -298,78 +372,12 @@
+         let mid_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_swiglu", intermediate_len);
+         let out_buffer = create_storage_output_buffer(&gpu.device, "16AF.native_atlas_ffn.scratch_out", hidden_len);
+ 
+-        let gate_shader = gpu.device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
+-            label: Some("16AF.native_atlas_ffn.gate.shader"),
+-            source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_GATE.into()),
+-        });
+-        let up_shader = gpu.device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
+-            label: Some("16AF.native_atlas_ffn.up.shader"),
+-            source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_UP.into()),
+-        });
+-        let swiglu_shader = gpu.device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
+-            label: Some("16AF.native_atlas_ffn.swiglu.shader"),
+-            source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_SWIGLU.into()),
+-        });
+-        let down_shader = gpu.device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
+-            label: Some("16AF.native_atlas_ffn.down.shader"),
+-            source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_DOWN.into()),
+-        });
+-
+-        // 16AF-R1: split the FFN into four compute passes so every pipeline stays
+-        // within downlevel max_storage_buffers_per_shader_stage=4.
+-        // Common layout storage count: input/read A, weight/read B, output/read_write C = 3.
+-        let bind_group_layout = gpu.device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
+-            label: Some("16AF.native_atlas_ffn.bgl.storage3"),
+-            entries: &[
+-                uniform_entry(0),
+-                read_storage_entry(1),
+-                read_storage_entry(2),
+-                rw_storage_entry(3),
+-            ],
+-        });
+-
+-        let pipeline_layout = gpu.device.create_pipeline_layout(&backend_wgpu::PipelineLayoutDescriptor {
+-            label: Some("16AF.native_atlas_ffn.pipeline_layout.storage3"),
+-            bind_group_layouts: &[&bind_group_layout],
+-            push_constant_ranges: &[],
+-        });
+-
+-        let gate_pipeline = gpu.device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
+-            label: Some("16AF.native_atlas_ffn.gate_project.pipeline"),
+-            layout: Some(&pipeline_layout),
+-            module: &gate_shader,
+-            entry_point: Some("gate_project"),
+-            compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
+-            cache: None,
+-        });
+-        let up_pipeline = gpu.device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
+-            label: Some("16AF.native_atlas_ffn.up_project.pipeline"),
+-            layout: Some(&pipeline_layout),
+-            module: &up_shader,
+-            entry_point: Some("up_project"),
+-            compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
+-            cache: None,
+-        });
+-        let swiglu_pipeline = gpu.device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
+-            label: Some("16AF.native_atlas_ffn.swiglu_project.pipeline"),
+-            layout: Some(&pipeline_layout),
+-            module: &swiglu_shader,
+-            entry_point: Some("swiglu_project"),
+-            compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
+-            cache: None,
+-        });
+-        let down_pipeline = gpu.device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
+-            label: Some("16AF.native_atlas_ffn.down_project.pipeline"),
+-            layout: Some(&pipeline_layout),
+-            module: &down_shader,
+-            entry_point: Some("down_project"),
+-            compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
+-            cache: None,
+-        });
++        let weight_upload_ms = upload_started.elapsed().as_secs_f64() * 1000.0;
++        let bind_encode_started = Instant::now();
+ 
+         let gate_bind_group = gpu.device.create_bind_group(&backend_wgpu::BindGroupDescriptor {
+             label: Some("16AF.native_atlas_ffn.gate.bind_group"),
+-            layout: &bind_group_layout,
++            layout: &pipelines.bind_group_layout,
+             entries: &[
+                 backend_wgpu::BindGroupEntry { binding: 0, resource: params_buffer.as_entire_binding() },
+                 backend_wgpu::BindGroupEntry { binding: 1, resource: input_buffer.as_entire_binding() },
+@@ -379,7 +387,7 @@
+         });
+         let up_bind_group = gpu.device.create_bind_group(&backend_wgpu::BindGroupDescriptor {
+             label: Some("16AF.native_atlas_ffn.up.bind_group"),
+-            layout: &bind_group_layout,
++            layout: &pipelines.bind_group_layout,
+             entries: &[
+                 backend_wgpu::BindGroupEntry { binding: 0, resource: params_buffer.as_entire_binding() },
+                 backend_wgpu::BindGroupEntry { binding: 1, resource: input_buffer.as_entire_binding() },
+@@ -389,7 +397,7 @@
+         });
+         let swiglu_bind_group = gpu.device.create_bind_group(&backend_wgpu::BindGroupDescriptor {
+             label: Some("16AF.native_atlas_ffn.swiglu.bind_group"),
+-            layout: &bind_group_layout,
++            layout: &pipelines.bind_group_layout,
+             entries: &[
+                 backend_wgpu::BindGroupEntry { binding: 0, resource: params_buffer.as_entire_binding() },
+                 backend_wgpu::BindGroupEntry { binding: 1, resource: gate_buffer.as_entire_binding() },
+@@ -399,7 +407,7 @@
+         });
+         let down_bind_group = gpu.device.create_bind_group(&backend_wgpu::BindGroupDescriptor {
+             label: Some("16AF.native_atlas_ffn.down.bind_group"),
+-            layout: &bind_group_layout,
++            layout: &pipelines.bind_group_layout,
+             entries: &[
+                 backend_wgpu::BindGroupEntry { binding: 0, resource: params_buffer.as_entire_binding() },
+                 backend_wgpu::BindGroupEntry { binding: 1, resource: mid_buffer.as_entire_binding() },
+@@ -417,34 +425,53 @@
+                 label: Some("16AF.native_atlas_ffn.pass.storage3_split"),
+                 timestamp_writes: None,
+             });
+-            pass.set_pipeline(&gate_pipeline);
++            pass.set_pipeline(&pipelines.gate_pipeline);
+             pass.set_bind_group(0, &gate_bind_group, &[]);
+             pass.dispatch_workgroups(div_ceil_u32(intermediate, 128).max(1), 1, 1);
+ 
+-            pass.set_pipeline(&up_pipeline);
++            pass.set_pipeline(&pipelines.up_pipeline);
+             pass.set_bind_group(0, &up_bind_group, &[]);
+             pass.dispatch_workgroups(div_ceil_u32(intermediate, 128).max(1), 1, 1);
+ 
+-            pass.set_pipeline(&swiglu_pipeline);
++            pass.set_pipeline(&pipelines.swiglu_pipeline);
+             pass.set_bind_group(0, &swiglu_bind_group, &[]);
+             pass.dispatch_workgroups(div_ceil_u32(intermediate, 128).max(1), 1, 1);
+ 
+-            pass.set_pipeline(&down_pipeline);
++            pass.set_pipeline(&pipelines.down_pipeline);
+             pass.set_bind_group(0, &down_bind_group, &[]);
+             pass.dispatch_workgroups(div_ceil_u32(hidden, 128).max(1), 1, 1);
+         }
+ 
+-        let gate_readback = queue_readback_copy(&gpu.device, &mut encoder, &gate_buffer, intermediate_len, "16AF.native_atlas_ffn.gate.readback");
+-        let up_readback = queue_readback_copy(&gpu.device, &mut encoder, &up_buffer, intermediate_len, "16AF.native_atlas_ffn.up.readback");
+-        let mid_readback = queue_readback_copy(&gpu.device, &mut encoder, &mid_buffer, intermediate_len, "16AF.native_atlas_ffn.swiglu.readback");
++        let read_intermediates = readback_mode.read_intermediates();
++        let (gate_readback, up_readback, mid_readback) = if read_intermediates {
++            (
++                Some(queue_readback_copy(&gpu.device, &mut encoder, &gate_buffer, intermediate_len, "16AF.native_atlas_ffn.gate.readback")),
++                Some(queue_readback_copy(&gpu.device, &mut encoder, &up_buffer, intermediate_len, "16AF.native_atlas_ffn.up.readback")),
++                Some(queue_readback_copy(&gpu.device, &mut encoder, &mid_buffer, intermediate_len, "16AF.native_atlas_ffn.swiglu.readback")),
++            )
++        } else {
++            (None, None, None)
++        };
+         let out_readback = queue_readback_copy(&gpu.device, &mut encoder, &out_buffer, hidden_len, "16AF.native_atlas_ffn.out.readback");
++        let bind_encode_ms = bind_encode_started.elapsed().as_secs_f64() * 1000.0;
+ 
++        let submit_readback_started = Instant::now();
+         gpu.queue.submit(Some(encoder.finish()));
+ 
+-        let gate = map_readback_f32(&gpu.device, &gate_readback, intermediate_len, "16AF.native_atlas_ffn.gate")?;
+-        let up = map_readback_f32(&gpu.device, &up_readback, intermediate_len, "16AF.native_atlas_ffn.up")?;
+-        let swiglu = map_readback_f32(&gpu.device, &mid_readback, intermediate_len, "16AF.native_atlas_ffn.swiglu")?;
++        let (gate, up, swiglu) = if read_intermediates {
++            (
++                map_readback_f32(&gpu.device, gate_readback.as_ref().expect("gate readback queued"), intermediate_len, "16AF.native_atlas_ffn.gate")?,
++                map_readback_f32(&gpu.device, up_readback.as_ref().expect("up readback queued"), intermediate_len, "16AF.native_atlas_ffn.up")?,
++                map_readback_f32(&gpu.device, mid_readback.as_ref().expect("swiglu readback queued"), intermediate_len, "16AF.native_atlas_ffn.swiglu")?,
++            )
++        } else {
++            (Vec::new(), Vec::new(), Vec::new())
++        };
+         let out = map_readback_f32(&gpu.device, &out_readback, hidden_len, "16AF.native_atlas_ffn.out")?;
++        let submit_readback_ms = submit_readback_started.elapsed().as_secs_f64() * 1000.0;
++        let total_gpu_ms = total_started.elapsed().as_secs_f64() * 1000.0;
++        let readback_buffers = if read_intermediates { 4 } else { 1 };
++        let readback_elements = hidden_len + if read_intermediates { intermediate_len.saturating_mul(3) } else { 0 };
+ 
+         Ok(NativeAtlasFfn16AfOutput {
+             hidden: hidden_len,
+@@ -453,17 +480,109 @@
+             up,
+             swiglu,
+             out,
+-            resolved_backend: "native_atlas_ffn_16AF_R1+storage3_split_passes+owned_wgpu_buffers".to_string(),
++            resolved_backend: format!(
++                "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+{}_readback",
++                readback_mode.as_label()
++            ),
+             dispatch_log: vec![
+                 "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true".to_string(),
+                 "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true".to_string(),
+                 "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used".to_string(),
+                 "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3".to_string(),
++                format!("[16AF-P][perf] readback_mode={} readback_buffers={} readback_elements={}", readback_mode.as_label(), readback_buffers, readback_elements),
++                "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher".to_string(),
+             ],
++            telemetry: NativeAtlasFfn16AfPerfTelemetry {
++                readback_mode: readback_mode.as_label().to_string(),
++                gpu_context_reused: true,
++                shader_pipeline_cached: true,
++                weight_upload_ms,
++                bind_encode_ms,
++                submit_readback_ms,
++                total_gpu_ms,
++                readback_buffers,
++                readback_elements,
++            },
+         })
+     }
+ }
+ 
++fn init_pipelines(device: &BackendDevice) -> Result<GpuPipelines> {
++    let gate_shader = device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
++        label: Some("16AF.native_atlas_ffn.gate.shader.cached"),
++        source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_GATE.into()),
++    });
++    let up_shader = device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
++        label: Some("16AF.native_atlas_ffn.up.shader.cached"),
++        source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_UP.into()),
++    });
++    let swiglu_shader = device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
++        label: Some("16AF.native_atlas_ffn.swiglu.shader.cached"),
++        source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_SWIGLU.into()),
++    });
++    let down_shader = device.create_shader_module(backend_wgpu::ShaderModuleDescriptor {
++        label: Some("16AF.native_atlas_ffn.down.shader.cached"),
++        source: backend_wgpu::ShaderSource::Wgsl(SHADER_NATIVE_ATLAS_FFN_16AF_DOWN.into()),
++    });
++
++    let bind_group_layout = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
++        label: Some("16AF.native_atlas_ffn.bgl.storage3.cached"),
++        entries: &[
++            uniform_entry(0),
++            read_storage_entry(1),
++            read_storage_entry(2),
++            rw_storage_entry(3),
++        ],
++    });
++
++    let pipeline_layout = device.create_pipeline_layout(&backend_wgpu::PipelineLayoutDescriptor {
++        label: Some("16AF.native_atlas_ffn.pipeline_layout.storage3.cached"),
++        bind_group_layouts: &[&bind_group_layout],
++        push_constant_ranges: &[],
++    });
++
++    let gate_pipeline = device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
++        label: Some("16AF.native_atlas_ffn.gate_project.pipeline.cached"),
++        layout: Some(&pipeline_layout),
++        module: &gate_shader,
++        entry_point: Some("gate_project"),
++        compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
++        cache: None,
++    });
++    let up_pipeline = device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
++        label: Some("16AF.native_atlas_ffn.up_project.pipeline.cached"),
++        layout: Some(&pipeline_layout),
++        module: &up_shader,
++        entry_point: Some("up_project"),
++        compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
++        cache: None,
++    });
++    let swiglu_pipeline = device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
++        label: Some("16AF.native_atlas_ffn.swiglu_project.pipeline.cached"),
++        layout: Some(&pipeline_layout),
++        module: &swiglu_shader,
++        entry_point: Some("swiglu_project"),
++        compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
++        cache: None,
++    });
++    let down_pipeline = device.create_compute_pipeline(&backend_wgpu::ComputePipelineDescriptor {
++        label: Some("16AF.native_atlas_ffn.down_project.pipeline.cached"),
++        layout: Some(&pipeline_layout),
++        module: &down_shader,
++        entry_point: Some("down_project"),
++        compilation_options: backend_wgpu::PipelineCompilationOptions::default(),
++        cache: None,
++    });
++
++    Ok(GpuPipelines {
++        bind_group_layout,
++        gate_pipeline,
++        up_pipeline,
++        swiglu_pipeline,
++        down_pipeline,
++    })
++}
++
+ fn init_gpu_context() -> Result<GpuContext> {
+     let instance = backend_wgpu::Instance::default();
+     let adapter = pollster::block_on(instance.request_adapter(&backend_wgpu::RequestAdapterOptions {
+diff -ruN 16afp_orig/crates/model_core/src/bin/af16m_multi_layer_parity.rs 16afp_work/crates/model_core/src/bin/af16m_multi_layer_parity.rs
+--- 16afp_orig/crates/model_core/src/bin/af16m_multi_layer_parity.rs	2026-05-06 05:30:40.000000000 +0000
++++ 16afp_work/crates/model_core/src/bin/af16m_multi_layer_parity.rs	2026-05-06 05:57:46.165119911 +0000
+@@ -1,7 +1,8 @@
+ use anyhow::{anyhow, bail, Context, Result};
++use burn_webgpu_backend::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfReadbackMode};
+ use model_core::{
+     load_full_checkpoint_weights, native_atlas_ffn_16af_weight_layout,
+-    run_native_atlas_ffn_16af_parity_probe_with_top_k, synthetic_hidden_vector_16af,
++    run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode, synthetic_hidden_vector_16af,
+     validate_spec_consistency, ModelSpec, NativeAtlasFfn16AfParityReport,
+ };
+ use serde_json::json;
+@@ -51,6 +52,10 @@
+     let total_layers = full.layers.len();
+     let layers = resolve_layers(&args, total_layers)?;
+     eprintln!("[16AF-M][layers] resolved={}", format_layers(&layers));
++    eprintln!("[16AF-P][perf] dispatcher_reuse=true shader_pipeline_cached=true readback_mode=output_only");
++
++    let dispatcher = NativeAtlasFfn16AfDispatcher::try_new()
++        .context("failed to create reusable 16AF-P native atlas FFN dispatcher")?;
+ 
+     let mut runs: Vec<LayerRun> = Vec::with_capacity(layers.len());
+     let mut first_error: Option<anyhow::Error> = None;
+@@ -65,7 +70,15 @@
+ 
+         let input = synthetic_hidden_vector_16af(layout.hidden);
+         let layer_started = Instant::now();
+-        match run_native_atlas_ffn_16af_parity_probe_with_top_k(&full, layer_idx, &input, args.threshold, args.top_k) {
++        match run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode(
++            &dispatcher,
++            &full,
++            layer_idx,
++            &input,
++            args.threshold,
++            args.top_k,
++            NativeAtlasFfn16AfReadbackMode::OutputOnly,
++        ) {
+             Ok(report) => {
+                 let elapsed_ms = layer_started.elapsed().as_secs_f64() * 1000.0;
+                 eprintln!(
+@@ -82,6 +95,19 @@
+                     report.parity_pass,
+                 );
+                 eprintln!("[16AF-M][runtime] layer={} elapsed_ms={:.3}", report.layer_idx, elapsed_ms);
++                if let Some(telemetry) = report.telemetry.as_ref() {
++                    eprintln!(
++                        "[16AF-P][perf] layer={} readback_mode={} readback_buffers={} readback_elements={} weight_upload_ms={:.3} bind_encode_ms={:.3} submit_readback_ms={:.3} total_gpu_ms={:.3}",
++                        report.layer_idx,
++                        telemetry.readback_mode,
++                        telemetry.readback_buffers,
++                        telemetry.readback_elements,
++                        telemetry.weight_upload_ms,
++                        telemetry.bind_encode_ms,
++                        telemetry.submit_readback_ms,
++                        telemetry.total_gpu_ms,
++                    );
++                }
+                 let layer_failed = !report.parity_pass;
+                 runs.push(LayerRun { report, elapsed_ms });
+                 if layer_failed && args.fail_fast {
+@@ -281,6 +307,7 @@
+         "resolved_backend": run.report.resolved_backend,
+         "weight_layout": run.report.weight_layout,
+         "dispatch_log": run.report.dispatch_log,
++        "telemetry": run.report.telemetry,
+         "forbidden_paths_used": run.report.forbidden_paths_used,
+     })
+ }
+@@ -294,6 +321,21 @@
+     } else {
+         runs.iter().map(|r| r.report.mean_abs_delta).sum::<f32>() / runs.len() as f32
+     };
++    let telemetry_total_gpu_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.total_gpu_ms))
++        .sum::<f64>();
++    let telemetry_weight_upload_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.weight_upload_ms))
++        .sum::<f64>();
++    let telemetry_submit_readback_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.submit_readback_ms))
++        .sum::<f64>();
++    let telemetry_readback_buffers = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.readback_buffers))
++        .sum::<usize>();
++    let telemetry_readback_elements = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.readback_elements))
++        .sum::<usize>();
+     let parity_pass = requested_total > 0
+         && runs.len() == requested_total
+         && failed == 0
+@@ -312,6 +354,11 @@
+         "max_abs_delta_global": max_abs_delta_global,
+         "mean_abs_delta_avg": mean_abs_delta_avg,
+         "elapsed_ms_total": elapsed_ms_total,
++        "telemetry_total_gpu_ms": telemetry_total_gpu_ms,
++        "telemetry_weight_upload_ms": telemetry_weight_upload_ms,
++        "telemetry_submit_readback_ms": telemetry_submit_readback_ms,
++        "telemetry_readback_buffers": telemetry_readback_buffers,
++        "telemetry_readback_elements": telemetry_readback_elements,
+         "parity_pass": parity_pass,
+     })
+ }
+@@ -371,6 +418,11 @@
+ max_abs_delta_global = {}
+ mean_abs_delta_avg = {}
+ elapsed_ms_total = {}
++telemetry_total_gpu_ms = {}
++telemetry_weight_upload_ms = {}
++telemetry_submit_readback_ms = {}
++telemetry_readback_buffers = {}
++telemetry_readback_elements = {}
+ ```
+ 
+ ## Layer Matrix
+@@ -399,6 +451,11 @@
+         payload["summary"]["max_abs_delta_global"].as_f64().unwrap_or(f64::INFINITY),
+         payload["summary"]["mean_abs_delta_avg"].as_f64().unwrap_or(f64::INFINITY),
+         payload["summary"]["elapsed_ms_total"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_total_gpu_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_weight_upload_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_submit_readback_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_readback_buffers"].as_u64().unwrap_or(0),
++        payload["summary"]["telemetry_readback_elements"].as_u64().unwrap_or(0),
+         rows,
+     ))
+ }
+@@ -440,6 +497,11 @@
+ max_abs_delta_global = {}
+ mean_abs_delta_avg = {}
+ elapsed_ms_total = {}
++telemetry_total_gpu_ms = {}
++telemetry_weight_upload_ms = {}
++telemetry_submit_readback_ms = {}
++telemetry_readback_buffers = {}
++telemetry_readback_elements = {}
+ ```
+ "#,
+         if pass { "PASS" } else { "PENDING_OR_FAIL" },
+@@ -459,6 +521,11 @@
+         payload["summary"]["max_abs_delta_global"].as_f64().unwrap_or(f64::INFINITY),
+         payload["summary"]["mean_abs_delta_avg"].as_f64().unwrap_or(f64::INFINITY),
+         payload["summary"]["elapsed_ms_total"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_total_gpu_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_weight_upload_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_submit_readback_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_readback_buffers"].as_u64().unwrap_or(0),
++        payload["summary"]["telemetry_readback_elements"].as_u64().unwrap_or(0),
+     ))
+ }
+ 
+diff -ruN 16afp_orig/crates/model_core/src/bin/af16p_ffn_perf_probe.rs 16afp_work/crates/model_core/src/bin/af16p_ffn_perf_probe.rs
+--- 16afp_orig/crates/model_core/src/bin/af16p_ffn_perf_probe.rs	1970-01-01 00:00:00.000000000 +0000
++++ 16afp_work/crates/model_core/src/bin/af16p_ffn_perf_probe.rs	2026-05-06 05:58:30.182503075 +0000
+@@ -0,0 +1,559 @@
++use anyhow::{anyhow, bail, Context, Result};
++use burn_webgpu_backend::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfReadbackMode};
++use model_core::{
++    load_full_checkpoint_weights, native_atlas_ffn_16af_weight_layout,
++    run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode, synthetic_hidden_vector_16af,
++    validate_spec_consistency, ModelSpec, NativeAtlasFfn16AfParityReport,
++};
++use serde_json::json;
++use std::{env, fs, path::PathBuf, time::Instant};
++
++#[derive(Debug, Clone)]
++struct Args {
++    spec: PathBuf,
++    checkpoints: Vec<PathBuf>,
++    layers: Option<String>,
++    all_layers: bool,
++    threshold: f32,
++    top_k: usize,
++    fail_fast: bool,
++    out_json: PathBuf,
++    out_md: PathBuf,
++    out_acceptance: PathBuf,
++}
++
++#[derive(Debug, Clone)]
++struct LayerRun {
++    report: NativeAtlasFfn16AfParityReport,
++    elapsed_ms: f64,
++}
++
++fn main() -> Result<()> {
++    let started = Instant::now();
++    let args = parse_args()?;
++
++    eprintln!(
++        "[16AF-P][start] build_gate=pass layers={} threshold={} top_k={}",
++        args.layers.as_deref().unwrap_or(if args.all_layers { "all" } else { "0,1,last" }),
++        args.threshold,
++        args.top_k,
++    );
++    eprintln!("[16AF-P][ssot] generation_connected=false runtime_gate=multi_layer_ffn_parity_only");
++    eprintln!("[16AF-P][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true");
++    eprintln!("[16AF-P][ffn] burn_cubecl_ffn_matmul_disabled=true");
++
++    let spec = ModelSpec::load_toml(&args.spec)
++        .with_context(|| format!("failed to load model spec: {}", args.spec.display()))?;
++    validate_spec_consistency(&spec).context("model spec consistency check failed")?;
++
++    let full = load_full_checkpoint_weights(&spec, &args.checkpoints)
++        .with_context(|| format!("failed to load full checkpoint weights: {:?}", args.checkpoints))?;
++
++    let total_layers = full.layers.len();
++    let layers = resolve_layers(&args, total_layers)?;
++    eprintln!("[16AF-P][layers] resolved={}", format_layers(&layers));
++    eprintln!("[16AF-P][perf] dispatcher_reuse=true shader_pipeline_cached=true readback_mode=output_only");
++
++    let dispatcher = NativeAtlasFfn16AfDispatcher::try_new()
++        .context("failed to create reusable 16AF-P native atlas FFN dispatcher")?;
++
++    let mut runs: Vec<LayerRun> = Vec::with_capacity(layers.len());
++    let mut first_error: Option<anyhow::Error> = None;
++
++    for &layer_idx in &layers {
++        let layout = native_atlas_ffn_16af_weight_layout(&full, layer_idx)
++            .with_context(|| format!("failed to resolve 16AF-M FFN weight layout for layer {}", layer_idx))?;
++        eprintln!(
++            "[16AF-P][layout] layer={} hidden={} intermediate={} gate_shape={:?} up_shape={:?} down_shape={:?}",
++            layout.layer_idx, layout.hidden, layout.intermediate, layout.gate_shape, layout.up_shape, layout.down_shape,
++        );
++
++        let input = synthetic_hidden_vector_16af(layout.hidden);
++        let layer_started = Instant::now();
++        match run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode(
++            &dispatcher,
++            &full,
++            layer_idx,
++            &input,
++            args.threshold,
++            args.top_k,
++            NativeAtlasFfn16AfReadbackMode::OutputOnly,
++        ) {
++            Ok(report) => {
++                let elapsed_ms = layer_started.elapsed().as_secs_f64() * 1000.0;
++                eprintln!(
++                    "[16AF-P][ffn-parity] layer={} shape_match={} max_abs_delta={} mean_abs_delta={} nan_count={} inf_count={} top_index_match={} top_k_overlap={}/{} parity_pass={}",
++                    report.layer_idx,
++                    report.shape_match,
++                    report.max_abs_delta,
++                    report.mean_abs_delta,
++                    report.nan_count,
++                    report.inf_count,
++                    report.top_index_match,
++                    report.top_k_overlap,
++                    report.top_k,
++                    report.parity_pass,
++                );
++                eprintln!("[16AF-P][runtime] layer={} elapsed_ms={:.3}", report.layer_idx, elapsed_ms);
++                if let Some(telemetry) = report.telemetry.as_ref() {
++                    eprintln!(
++                        "[16AF-P][perf] layer={} readback_mode={} readback_buffers={} readback_elements={} weight_upload_ms={:.3} bind_encode_ms={:.3} submit_readback_ms={:.3} total_gpu_ms={:.3}",
++                        report.layer_idx,
++                        telemetry.readback_mode,
++                        telemetry.readback_buffers,
++                        telemetry.readback_elements,
++                        telemetry.weight_upload_ms,
++                        telemetry.bind_encode_ms,
++                        telemetry.submit_readback_ms,
++                        telemetry.total_gpu_ms,
++                    );
++                }
++                let layer_failed = !report.parity_pass;
++                runs.push(LayerRun { report, elapsed_ms });
++                if layer_failed && args.fail_fast {
++                    eprintln!("[16AF-P][fail-fast] stopping after layer={}", layer_idx);
++                    break;
++                }
++            }
++            Err(err) => {
++                eprintln!("[16AF-P][fail] layer={} reason={:#}", layer_idx, err);
++                if args.fail_fast {
++                    return Err(err).with_context(|| format!("16AF-M layer {} failed", layer_idx));
++                }
++                first_error = Some(err);
++                break;
++            }
++        }
++    }
++
++    let total_elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
++    let summary = build_summary(&runs, layers.len(), total_elapsed_ms);
++    let payload = json!({
++        "commit": "16AF-P",
++        "runtime_gate": "multi_layer_ffn_parity_only",
++        "build_gate": "pass_by_user_reported_local_cargo_check",
++        "generation_connected": false,
++        "threshold": args.threshold,
++        "top_k": args.top_k,
++        "requested_layers": layers,
++        "layers": runs.iter().map(layer_run_to_json).collect::<Vec<_>>(),
++        "summary": summary,
++    });
++
++    write_report_files(&args, &payload)?;
++
++    let parity_pass = payload["summary"]["parity_pass"].as_bool().unwrap_or(false);
++    eprintln!(
++        "[16AF-P][summary] total={} passed={} failed={} max_abs_delta_global={} mean_abs_delta_avg={} parity_pass={}",
++        payload["summary"]["total"].as_u64().unwrap_or(0),
++        payload["summary"]["passed"].as_u64().unwrap_or(0),
++        payload["summary"]["failed"].as_u64().unwrap_or(0),
++        payload["summary"]["max_abs_delta_global"].as_f64().unwrap_or(f64::INFINITY),
++        payload["summary"]["mean_abs_delta_avg"].as_f64().unwrap_or(f64::INFINITY),
++        parity_pass,
++    );
++
++    if parity_pass {
++        eprintln!("[16AF-P][seal] PASS selected layer parity matrix closed");
++        Ok(())
++    } else if let Some(err) = first_error {
++        eprintln!("[16AF-P][seal] FAIL selected layer parity matrix open");
++        Err(err).context("16AF-P failed before performance probe could be closed")
++    } else {
++        eprintln!("[16AF-P][seal] FAIL selected layer parity matrix open");
++        bail!("16AF-P parity/performance probe failed; see {}", args.out_json.display())
++    }
++}
++
++fn parse_args() -> Result<Args> {
++    let mut spec: Option<PathBuf> = None;
++    let mut checkpoints: Vec<PathBuf> = Vec::new();
++    let mut layers: Option<String> = None;
++    let mut all_layers = false;
++    let mut threshold = 1.0e-3f32;
++    let mut top_k = 8usize;
++    let mut fail_fast = false;
++    let mut out_json = PathBuf::from("infer_debug/16AF-P_ffn_perf_probe.json");
++    let mut out_md = PathBuf::from("infer_debug/16AF-P_ffn_perf_probe.md");
++    let mut out_acceptance = PathBuf::from("acceptance_reports/16AF-P_acceptance.md");
++
++    let mut iter = env::args().skip(1);
++    while let Some(flag) = iter.next() {
++        match flag.as_str() {
++            "--spec" => spec = Some(PathBuf::from(next_value(&mut iter, "--spec")?)),
++            "--checkpoint" => checkpoints.push(PathBuf::from(next_value(&mut iter, "--checkpoint")?)),
++            "--checkpoints" => {
++                let raw = next_value(&mut iter, "--checkpoints")?;
++                checkpoints.extend(raw.split(';').filter(|s| !s.trim().is_empty()).map(PathBuf::from));
++            }
++            "--layers" => layers = Some(next_value(&mut iter, "--layers")?),
++            "--all-layers" => all_layers = true,
++            "--threshold" => threshold = next_value(&mut iter, "--threshold")?.parse().context("invalid --threshold")?,
++            "--top-k" => top_k = next_value(&mut iter, "--top-k")?.parse().context("invalid --top-k")?,
++            "--fail-fast" => fail_fast = parse_bool(&next_value(&mut iter, "--fail-fast")?)?,
++            "--out-json" => out_json = PathBuf::from(next_value(&mut iter, "--out-json")?),
++            "--out-md" => out_md = PathBuf::from(next_value(&mut iter, "--out-md")?),
++            "--out-acceptance" => out_acceptance = PathBuf::from(next_value(&mut iter, "--out-acceptance")?),
++            "--help" | "-h" => {
++                print_usage();
++                std::process::exit(0);
++            }
++            other => bail!("unknown argument: {other}"),
++        }
++    }
++
++    let spec = spec.ok_or_else(|| anyhow!("missing --spec"))?;
++    if checkpoints.is_empty() {
++        bail!("missing --checkpoint or --checkpoints");
++    }
++    if top_k == 0 {
++        bail!("--top-k must be >= 1");
++    }
++    if layers.is_some() && all_layers {
++        bail!("use either --layers or --all-layers, not both");
++    }
++
++    Ok(Args { spec, checkpoints, layers, all_layers, threshold, top_k, fail_fast, out_json, out_md, out_acceptance })
++}
++
++fn next_value(iter: &mut impl Iterator<Item = String>, flag: &str) -> Result<String> {
++    iter.next().ok_or_else(|| anyhow!("missing value for {flag}"))
++}
++
++fn parse_bool(raw: &str) -> Result<bool> {
++    match raw.trim().to_ascii_lowercase().as_str() {
++        "1" | "true" | "yes" | "y" => Ok(true),
++        "0" | "false" | "no" | "n" => Ok(false),
++        other => bail!("invalid boolean value: {other}"),
++    }
++}
++
++fn resolve_layers(args: &Args, total_layers: usize) -> Result<Vec<usize>> {
++    if total_layers == 0 {
++        bail!("model has zero layers");
++    }
++
++    let mut layers = if args.all_layers {
++        (0..total_layers).collect::<Vec<_>>()
++    } else if let Some(raw) = &args.layers {
++        parse_layer_list(raw, total_layers)?
++    } else {
++        default_selected_layers(total_layers)
++    };
++
++    layers.sort_unstable();
++    layers.dedup();
++    if layers.is_empty() {
++        bail!("resolved layer list is empty");
++    }
++    for &layer in &layers {
++        if layer >= total_layers {
++            bail!("layer index out of range: layer={} total_layers={}", layer, total_layers);
++        }
++    }
++    Ok(layers)
++}
++
++fn default_selected_layers(total_layers: usize) -> Vec<usize> {
++    let last = total_layers.saturating_sub(1);
++    if total_layers == 1 {
++        vec![0]
++    } else {
++        vec![0, 1.min(last), last]
++    }
++}
++
++fn parse_layer_list(raw: &str, total_layers: usize) -> Result<Vec<usize>> {
++    let mut out = Vec::new();
++    for item in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
++        if item.eq_ignore_ascii_case("last") {
++            out.push(total_layers.saturating_sub(1));
++        } else if let Some((start, end)) = item.split_once("..") {
++            let start: usize = start.trim().parse().context("invalid layer range start")?;
++            let end: usize = end.trim().parse().context("invalid layer range end")?;
++            if end < start {
++                bail!("invalid layer range: {item}");
++            }
++            out.extend(start..end);
++        } else {
++            out.push(item.parse().with_context(|| format!("invalid layer value: {item}"))?);
++        }
++    }
++    Ok(out)
++}
++
++fn format_layers(layers: &[usize]) -> String {
++    layers.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")
++}
++
++fn layer_run_to_json(run: &LayerRun) -> serde_json::Value {
++    json!({
++        "layer": run.report.layer_idx,
++        "hidden": run.report.hidden,
++        "intermediate": run.report.intermediate,
++        "threshold": run.report.threshold,
++        "shape_match": run.report.shape_match,
++        "max_abs_delta": run.report.max_abs_delta,
++        "mean_abs_delta": run.report.mean_abs_delta,
++        "nan_count": run.report.nan_count,
++        "inf_count": run.report.inf_count,
++        "top_index_match": run.report.top_index_match,
++        "top_k_overlap": run.report.top_k_overlap,
++        "top_k": run.report.top_k,
++        "elapsed_ms": run.elapsed_ms,
++        "parity_pass": run.report.parity_pass,
++        "generation_connected": run.report.generation_connected,
++        "burn_cubecl_ffn_matmul_disabled": run.report.burn_cubecl_ffn_matmul_disabled,
++        "resolved_backend": run.report.resolved_backend,
++        "weight_layout": run.report.weight_layout,
++        "dispatch_log": run.report.dispatch_log,
++        "telemetry": run.report.telemetry,
++        "forbidden_paths_used": run.report.forbidden_paths_used,
++    })
++}
++
++fn build_summary(runs: &[LayerRun], requested_total: usize, elapsed_ms_total: f64) -> serde_json::Value {
++    let passed = runs.iter().filter(|r| r.report.parity_pass).count();
++    let failed = requested_total.saturating_sub(passed);
++    let max_abs_delta_global = runs.iter().map(|r| r.report.max_abs_delta).fold(0.0f32, f32::max);
++    let mean_abs_delta_avg = if runs.is_empty() {
++        f32::INFINITY
++    } else {
++        runs.iter().map(|r| r.report.mean_abs_delta).sum::<f32>() / runs.len() as f32
++    };
++    let telemetry_total_gpu_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.total_gpu_ms))
++        .sum::<f64>();
++    let telemetry_weight_upload_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.weight_upload_ms))
++        .sum::<f64>();
++    let telemetry_submit_readback_ms = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.submit_readback_ms))
++        .sum::<f64>();
++    let telemetry_readback_buffers = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.readback_buffers))
++        .sum::<usize>();
++    let telemetry_readback_elements = runs.iter()
++        .filter_map(|r| r.report.telemetry.as_ref().map(|t| t.readback_elements))
++        .sum::<usize>();
++    let parity_pass = requested_total > 0
++        && runs.len() == requested_total
++        && failed == 0
++        && runs.iter().all(|r| {
++            r.report.parity_pass
++                && !r.report.generation_connected
++                && r.report.burn_cubecl_ffn_matmul_disabled
++                && r.report.forbidden_paths_used.is_empty()
++        });
++
++    json!({
++        "total": requested_total,
++        "completed": runs.len(),
++        "passed": passed,
++        "failed": failed,
++        "max_abs_delta_global": max_abs_delta_global,
++        "mean_abs_delta_avg": mean_abs_delta_avg,
++        "elapsed_ms_total": elapsed_ms_total,
++        "telemetry_total_gpu_ms": telemetry_total_gpu_ms,
++        "telemetry_weight_upload_ms": telemetry_weight_upload_ms,
++        "telemetry_submit_readback_ms": telemetry_submit_readback_ms,
++        "telemetry_readback_buffers": telemetry_readback_buffers,
++        "telemetry_readback_elements": telemetry_readback_elements,
++        "parity_pass": parity_pass,
++    })
++}
++
++fn write_report_files(args: &Args, payload: &serde_json::Value) -> Result<()> {
++    if let Some(parent) = args.out_json.parent() { fs::create_dir_all(parent)?; }
++    if let Some(parent) = args.out_md.parent() { fs::create_dir_all(parent)?; }
++    if let Some(parent) = args.out_acceptance.parent() { fs::create_dir_all(parent)?; }
++
++    fs::write(&args.out_json, serde_json::to_string_pretty(payload)?)?;
++    let md = render_markdown(payload)?;
++    fs::write(&args.out_md, &md)?;
++    fs::write(&args.out_acceptance, render_acceptance(payload)?)?;
++    Ok(())
++}
++
++fn render_markdown(payload: &serde_json::Value) -> Result<String> {
++    let mut rows = String::new();
++    for layer in payload["layers"].as_array().ok_or_else(|| anyhow!("missing layers"))? {
++        rows.push_str(&format!(
++            "| {} | {} | {} | {} | {} | {} | {} | {} | {}/{} | {} | {:.3} |\n",
++            layer["layer"].as_u64().unwrap_or(0),
++            layer["shape_match"].as_bool().unwrap_or(false),
++            layer["max_abs_delta"].as_f64().unwrap_or(f64::INFINITY),
++            layer["mean_abs_delta"].as_f64().unwrap_or(f64::INFINITY),
++            layer["nan_count"].as_u64().unwrap_or(0),
++            layer["inf_count"].as_u64().unwrap_or(0),
++            layer["top_index_match"].as_bool().unwrap_or(false),
++            layer["top_k_overlap"].as_u64().unwrap_or(0),
++            layer["top_k_overlap"].as_u64().unwrap_or(0),
++            layer["top_k"].as_u64().unwrap_or(0),
++            layer["parity_pass"].as_bool().unwrap_or(false),
++            layer["elapsed_ms"].as_f64().unwrap_or(0.0),
++        ));
++    }
++
++    Ok(format!(
++        r#"# 16AF-P Native Atlas FFN Performance Probe Seal
++
++## Status
++
++```txt
++runtime_gate = {}
++generation_connected = {}
++threshold = {}
++top_k = {}
++parity_pass = {}
++```
++
++## Summary
++
++```txt
++total = {}
++completed = {}
++passed = {}
++failed = {}
++max_abs_delta_global = {}
++mean_abs_delta_avg = {}
++elapsed_ms_total = {}
++telemetry_total_gpu_ms = {}
++telemetry_weight_upload_ms = {}
++telemetry_submit_readback_ms = {}
++telemetry_readback_buffers = {}
++telemetry_readback_elements = {}
++```
++
++## Layer Matrix
++
++| layer | shape_match | max_abs_delta | mean_abs_delta | nan | inf | top_index_match | top_k_overlap | top_k_ratio | parity_pass | elapsed_ms |
++|---:|---|---:|---:|---:|---:|---|---:|---|---|---:|
++{}
++## Seal
++
++```txt
++if parity_pass == true:
++    16AF-P FFN performance probe closed
++else:
++    keep generation integration locked
++```
++"#,
++        payload["runtime_gate"].as_str().unwrap_or("unknown"),
++        payload["generation_connected"].as_bool().unwrap_or(false),
++        payload["threshold"].as_f64().unwrap_or(0.0),
++        payload["top_k"].as_u64().unwrap_or(0),
++        payload["summary"]["parity_pass"].as_bool().unwrap_or(false),
++        payload["summary"]["total"].as_u64().unwrap_or(0),
++        payload["summary"]["completed"].as_u64().unwrap_or(0),
++        payload["summary"]["passed"].as_u64().unwrap_or(0),
++        payload["summary"]["failed"].as_u64().unwrap_or(0),
++        payload["summary"]["max_abs_delta_global"].as_f64().unwrap_or(f64::INFINITY),
++        payload["summary"]["mean_abs_delta_avg"].as_f64().unwrap_or(f64::INFINITY),
++        payload["summary"]["elapsed_ms_total"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_total_gpu_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_weight_upload_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_submit_readback_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_readback_buffers"].as_u64().unwrap_or(0),
++        payload["summary"]["telemetry_readback_elements"].as_u64().unwrap_or(0),
++        rows,
++    ))
++}
++
++fn render_acceptance(payload: &serde_json::Value) -> Result<String> {
++    let pass = payload["summary"]["parity_pass"].as_bool().unwrap_or(false);
++    Ok(format!(
++        r#"# 16AF-P Acceptance Report
++
++## Verdict
++
++```txt
++16AF-P = {}
++generation_connected = {}
++runtime_gate = {}
++```
++
++## Criteria
++
++```txt
++AC-16AF-P-1 selected layers shape_match=true: {}
++AC-16AF-P-2 nan_count=0 and inf_count=0: {}
++AC-16AF-P-3 max_abs_delta <= threshold: {}
++AC-16AF-P-4 mean_abs_delta <= threshold: {}
++AC-16AF-P-5 top_index_match=true: {}
++AC-16AF-P-6 top_k_overlap tracked: true
++AC-16AF-P-7 generation_connected=false: {}
++AC-16AF-P-8 forbidden path list empty: {}
++AC-16AF-P-9 JSON + Markdown report written: true
++```
++
++## Summary
++
++```txt
++total = {}
++completed = {}
++passed = {}
++failed = {}
++max_abs_delta_global = {}
++mean_abs_delta_avg = {}
++elapsed_ms_total = {}
++telemetry_total_gpu_ms = {}
++telemetry_weight_upload_ms = {}
++telemetry_submit_readback_ms = {}
++telemetry_readback_buffers = {}
++telemetry_readback_elements = {}
++```
++"#,
++        if pass { "PASS" } else { "PENDING_OR_FAIL" },
++        payload["generation_connected"].as_bool().unwrap_or(false),
++        payload["runtime_gate"].as_str().unwrap_or("unknown"),
++        bool_all_layers(payload, "shape_match"),
++        bool_zero_counts(payload),
++        bool_delta_under_threshold(payload, "max_abs_delta"),
++        bool_delta_under_threshold(payload, "mean_abs_delta"),
++        bool_all_layers(payload, "top_index_match"),
++        !payload["generation_connected"].as_bool().unwrap_or(true),
++        bool_forbidden_paths_empty(payload),
++        payload["summary"]["total"].as_u64().unwrap_or(0),
++        payload["summary"]["completed"].as_u64().unwrap_or(0),
++        payload["summary"]["passed"].as_u64().unwrap_or(0),
++        payload["summary"]["failed"].as_u64().unwrap_or(0),
++        payload["summary"]["max_abs_delta_global"].as_f64().unwrap_or(f64::INFINITY),
++        payload["summary"]["mean_abs_delta_avg"].as_f64().unwrap_or(f64::INFINITY),
++        payload["summary"]["elapsed_ms_total"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_total_gpu_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_weight_upload_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_submit_readback_ms"].as_f64().unwrap_or(0.0),
++        payload["summary"]["telemetry_readback_buffers"].as_u64().unwrap_or(0),
++        payload["summary"]["telemetry_readback_elements"].as_u64().unwrap_or(0),
++    ))
++}
++
++fn bool_all_layers(payload: &serde_json::Value, key: &str) -> bool {
++    payload["layers"].as_array().map(|layers| !layers.is_empty() && layers.iter().all(|l| l[key].as_bool().unwrap_or(false))).unwrap_or(false)
++}
++
++fn bool_zero_counts(payload: &serde_json::Value) -> bool {
++    payload["layers"].as_array().map(|layers| !layers.is_empty() && layers.iter().all(|l| l["nan_count"].as_u64().unwrap_or(1) == 0 && l["inf_count"].as_u64().unwrap_or(1) == 0)).unwrap_or(false)
++}
++
++fn bool_delta_under_threshold(payload: &serde_json::Value, key: &str) -> bool {
++    let threshold = payload["threshold"].as_f64().unwrap_or(0.0);
++    payload["layers"].as_array().map(|layers| !layers.is_empty() && layers.iter().all(|l| l[key].as_f64().unwrap_or(f64::INFINITY) <= threshold)).unwrap_or(false)
++}
++
++fn bool_forbidden_paths_empty(payload: &serde_json::Value) -> bool {
++    payload["layers"].as_array().map(|layers| {
++        !layers.is_empty() && layers.iter().all(|l| {
++            l["forbidden_paths_used"].as_array().map(|items| items.is_empty()).unwrap_or(false)
++        })
++    }).unwrap_or(false)
++}
++
++fn print_usage() {
++    eprintln!("Usage:");
++    eprintln!("  cargo run --manifest-path crates/model_core/Cargo.toml --bin af16p_ffn_perf_probe -- \\");
++    eprintln!("    --spec specs/model_spec_300m_dialogue_continue_gqa8_headwise_atlas.toml \\");
++    eprintln!("    --checkpoint tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors \\");
++    eprintln!("    --layers 0,1,last --threshold 0.001 --top-k 8");
++}
+diff -ruN 16afp_orig/crates/model_core/src/native_atlas_ffn_probe.rs 16afp_work/crates/model_core/src/native_atlas_ffn_probe.rs
+--- 16afp_orig/crates/model_core/src/native_atlas_ffn_probe.rs	2026-05-06 05:29:49.000000000 +0000
++++ 16afp_work/crates/model_core/src/native_atlas_ffn_probe.rs	2026-05-06 05:55:39.482455965 +0000
+@@ -7,7 +7,7 @@
+ 
+ use super::*;
+ use crate::reference_math::{linear_apply, silu};
+-use burn_webgpu_backend::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfWeights};
++use burn_webgpu_backend::{NativeAtlasFfn16AfDispatcher, NativeAtlasFfn16AfPerfTelemetry, NativeAtlasFfn16AfReadbackMode, NativeAtlasFfn16AfWeights};
+ use std::collections::HashSet;
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -45,6 +45,7 @@
+     pub forbidden_paths_used: Vec<String>,
+     pub resolved_backend: String,
+     pub dispatch_log: Vec<String>,
++    pub telemetry: Option<NativeAtlasFfn16AfPerfTelemetry>,
+     pub weight_layout: NativeAtlasFfn16AfWeightLayoutReport,
+ }
+ 
+@@ -99,6 +100,27 @@
+     threshold: f32,
+     top_k: usize,
+ ) -> Result<NativeAtlasFfn16AfParityReport> {
++    let dispatcher = NativeAtlasFfn16AfDispatcher::try_new()?;
++    run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode(
++        &dispatcher,
++        full,
++        layer_idx,
++        input_hidden,
++        threshold,
++        top_k,
++        NativeAtlasFfn16AfReadbackMode::FullIntermediates,
++    )
++}
++
++pub fn run_native_atlas_ffn_16af_parity_probe_with_dispatcher_and_mode(
++    dispatcher: &NativeAtlasFfn16AfDispatcher,
++    full: &FullCheckpointWeights,
++    layer_idx: usize,
++    input_hidden: &[f32],
++    threshold: f32,
++    top_k: usize,
++    readback_mode: NativeAtlasFfn16AfReadbackMode,
++) -> Result<NativeAtlasFfn16AfParityReport> {
+     let layout = native_atlas_ffn_16af_weight_layout(full, layer_idx)?;
+     let layer = full.layers.get(layer_idx)
+         .ok_or_else(|| anyhow!("16AF FFN layer index out of range: layer_idx={} layers={}", layer_idx, full.layers.len()))?;
+@@ -116,8 +138,7 @@
+     }
+     let cpu_out = linear_apply(&swiglu_cpu, &layer.down_proj);
+ 
+-    let dispatcher = NativeAtlasFfn16AfDispatcher::try_new()?;
+-    let gpu = dispatcher.dispatch_single_token(
++    let gpu = dispatcher.dispatch_single_token_with_readback_mode(
+         input_hidden,
+         NativeAtlasFfn16AfWeights {
+             gate_weight: &layer.gate_proj.weight,
+@@ -130,12 +151,15 @@
+             down_out_dim: layer.down_proj.out_dim,
+             down_in_dim: layer.down_proj.in_dim,
+         },
++        readback_mode,
+     )?;
+ 
+-    let shape_match = gpu.out.len() == cpu_out.len()
+-        && gpu.gate.len() == gate_cpu.len()
+-        && gpu.up.len() == up_cpu.len()
+-        && gpu.swiglu.len() == swiglu_cpu.len();
++    let intermediates_omitted = gpu.gate.is_empty() && gpu.up.is_empty() && gpu.swiglu.is_empty();
++    let intermediate_shapes_match = intermediates_omitted
++        || (gpu.gate.len() == gate_cpu.len()
++            && gpu.up.len() == up_cpu.len()
++            && gpu.swiglu.len() == swiglu_cpu.len());
++    let shape_match = gpu.out.len() == cpu_out.len() && intermediate_shapes_match;
+ 
+     let mut max_abs_delta = 0.0f32;
+     let mut sum_abs_delta = 0.0f32;
+@@ -189,6 +213,7 @@
+         forbidden_paths_used,
+         resolved_backend: gpu.resolved_backend,
+         dispatch_log: gpu.dispatch_log,
++        telemetry: Some(gpu.telemetry),
+         weight_layout: layout,
+     })
+ }
+diff -ruN 16afp_orig/scripts/run_16AF_P_ffn_perf_probe.ps1 16afp_work/scripts/run_16AF_P_ffn_perf_probe.ps1
+--- 16afp_orig/scripts/run_16AF_P_ffn_perf_probe.ps1	1970-01-01 00:00:00.000000000 +0000
++++ 16afp_work/scripts/run_16AF_P_ffn_perf_probe.ps1	2026-05-06 06:04:00.771130566 +0000
+@@ -0,0 +1,28 @@
++$ErrorActionPreference = "Stop"
++
++$spec = if ($env:SPEC_PATH) { $env:SPEC_PATH } else { "specs/model_spec_300m_dialogue_continue_gqa8_headwise_atlas.toml" }
++$ckpt = if ($env:CHECKPOINT_PATH) { $env:CHECKPOINT_PATH } else { ".\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors" }
++$layers = if ($env:LAYERS) { $env:LAYERS } else { "all" }
++$threshold = if ($env:THRESHOLD) { $env:THRESHOLD } else { "0.001" }
++$topK = if ($env:TOP_K) { $env:TOP_K } else { "8" }
++
++$args = @(
++  "run", "--manifest-path", "crates/model_core/Cargo.toml",
++  "--bin", "af16p_ffn_perf_probe", "--",
++  "--spec", $spec,
++  "--checkpoint", $ckpt,
++  "--threshold", $threshold,
++  "--top-k", $topK,
++  "--fail-fast", "false",
++  "--out-json", "infer_debug/16AF-P_ffn_perf_probe.json",
++  "--out-md", "infer_debug/16AF-P_ffn_perf_probe.md",
++  "--out-acceptance", "acceptance_reports/16AF-P_acceptance.md"
++)
++
++if ($layers -eq "all") {
++  $args += "--all-layers"
++} else {
++  $args += @("--layers", $layers)
++}
++
++cargo @args
+diff -ruN 16afp_orig/scripts/run_16AF_P_ffn_perf_probe.sh 16afp_work/scripts/run_16AF_P_ffn_perf_probe.sh
+--- 16afp_orig/scripts/run_16AF_P_ffn_perf_probe.sh	1970-01-01 00:00:00.000000000 +0000
++++ 16afp_work/scripts/run_16AF_P_ffn_perf_probe.sh	2026-05-06 06:04:00.780545812 +0000
+@@ -0,0 +1,29 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++SPEC_PATH="${SPEC_PATH:-specs/model_spec_300m_dialogue_continue_gqa8_headwise_atlas.toml}"
++CHECKPOINT_PATH="${CHECKPOINT_PATH:-tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors}"
++LAYERS="${LAYERS:-all}"
++THRESHOLD="${THRESHOLD:-0.001}"
++TOP_K="${TOP_K:-8}"
++
++cmd=(
++  cargo run --manifest-path crates/model_core/Cargo.toml
++  --bin af16p_ffn_perf_probe --
++  --spec "$SPEC_PATH"
++  --checkpoint "$CHECKPOINT_PATH"
++  --threshold "$THRESHOLD"
++  --top-k "$TOP_K"
++  --fail-fast false
++  --out-json infer_debug/16AF-P_ffn_perf_probe.json
++  --out-md infer_debug/16AF-P_ffn_perf_probe.md
++  --out-acceptance acceptance_reports/16AF-P_acceptance.md
++)
++
++if [[ "$LAYERS" == "all" ]]; then
++  cmd+=(--all-layers)
++else
++  cmd+=(--layers "$LAYERS")
++fi
++
++"${cmd[@]}"

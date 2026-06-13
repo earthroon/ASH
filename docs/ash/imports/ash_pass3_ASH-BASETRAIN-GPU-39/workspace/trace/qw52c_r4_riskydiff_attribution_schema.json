@@ -1,0 +1,35 @@
+{
+  "patch_id": "QW-52C-R4",
+  "title": "RiskyDiff Feature Attribution Report / Safe Profile Candidate Seal",
+  "base_patch": "QW-52C-R3",
+  "report_policy_version": "riskydiff_feature_attribution_report_v1",
+  "safe_profile_policy_version": "safe_profile_candidate_seal_v1",
+  "no_apply_policy_version": "no_apply_no_commit_no_promotion_v1",
+  "trace": {
+    "type": "RiskyDiffFeatureAttributionReportTrace",
+    "risky_diff_cases": "Vec<RiskyDiffAttributionCaseReport>",
+    "safe_profile_candidates": "Vec<SafeProfileCandidateReport>",
+    "summary": "RiskyDiffAttributionReportSummary",
+    "decision": "SafeProfileCandidateDecision"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "patch_id": "QW-52C-R13-S6-R0-R3",
+  "fixture_kind": "StaticFixture",
+  "compile_blockers": [
+    {
+      "file": "crates/orchestrator_local/tests/ash_34_event_driven_lora_report.rs",
+      "error_code": "E0659",
+      "ambiguous_symbol": "build_ash_34_event_driven_lora_audit_report",
+      "resolution": "qualified_orchestrator_local_builder_call",
+      "qualified_call_present": true,
+      "unqualified_target_call_present": false,
+      "content_sha256": "sha256:3433cce947f15ff282317b87a10a5cbcde6ead17335ab2c2c3e749f4ad906ce4",
+      "runtime_apply_allowed": false
+    },
+    {
+      "file": "crates/orchestrator_local/tests/ash_37_event_weighted_sft_planning_report.rs",
+      "error_code": "E0659",
+      "ambiguous_symbol": "build_ash_37_event_weighted_lora_sft_planner_audit_report",
+      "resolution": "qualified_orchestrator_local_builder_call",
+      "qualified_call_present": true,
+      "unqualified_target_call_present": false,
+      "content_sha256": "sha256:49cf655a859f4fbeddba23aa7f4412a08fa8058676c3cedb89092f7817f34ff3",
+      "runtime_apply_allowed": false
+    },
+    {
+      "file": "crates/orchestrator_local/tests/ash_29_phase_hint_aging_report.rs",
+      "error_code": "E0659",
+      "ambiguous_symbol": "build_ash_29_phase_hint_aging_audit_report",
+      "resolution": "qualified_orchestrator_local_builder_call",
+      "qualified_call_present": true,
+      "unqualified_target_call_present": false,
+      "content_sha256": "sha256:30666cf319106d46e2902a546b932b30ff909a8ca153af8fa41c17195b8d916e",
+      "runtime_apply_allowed": false
+    }
+  ],
+  "runtime_apply_allowed": false
+}

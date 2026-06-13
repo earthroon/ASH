@@ -1,0 +1,681 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-PERF-REVIEW-00",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "model_spec_vocab_size": 56000,
+  "v5_model_spec_vocab_size": 48259,
+  "checkpoint_fingerprint_vocab_size": 48259,
+  "checkpoint_embedding_vocab_size": 48259,
+  "tokenizer_manifests": [
+    {
+      "path": "artifacts/tokenizer_manifest_v5_final.json",
+      "exists": true,
+      "sha256": "sha256:a449033ff7672e8e771fc3f3e69279e608b4bd5ac220736a68e8f3c84613de49",
+      "tokenizer_id": "tok_v5_20260417",
+      "declared_vocab_size": 48259,
+      "vocab_list_len": 48259,
+      "reserved_tokens_count": 72,
+      "special_tokens": {
+        "pad": {
+          "token": "<pad>",
+          "id": 0
+        },
+        "bos": {
+          "token": "<bos>",
+          "id": 1
+        },
+        "eos": {
+          "token": "<eos>",
+          "id": 2
+        },
+        "unk": {
+          "token": "<unk>",
+          "id": 3
+        }
+      },
+      "normalization": {
+        "collapse_whitespace": false,
+        "lowercase": false,
+        "normalize_dashes": false,
+        "normalize_ellipsis": false,
+        "normalize_quotes": false,
+        "preserve_newlines": true,
+        "preserve_tabs": false,
+        "strip_accents": false,
+        "trim_leading_whitespace": false,
+        "trim_trailing_whitespace": false,
+        "unicode": "nfkc"
+      },
+      "hot_token_cache": {
+        "enabled": true,
+        "selection_mode": "corpus_frequency",
+        "default_top_k": 6000,
+        "allow_dynamic_resize": true,
+        "fallback_mode": "cpu_same_rules_only",
+        "derived_artifact_required": true,
+        "derived_artifact_id": "hotcache_tok_v5_20260417_6000"
+      }
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v6_compat.json",
+      "exists": true,
+      "sha256": "sha256:74f6fb3e35f9eab9b704b91afdee3b6955f3a0018e097b48fe0cb0d25a1ad9c2",
+      "tokenizer_id": null,
+      "declared_vocab_size": null,
+      "vocab_list_len": null,
+      "reserved_tokens_count": null,
+      "special_tokens": null,
+      "normalization": null,
+      "hot_token_cache": null
+    }
+  ],
+  "vocab_48256_hits_count": 4,
+  "vocab_48259_hits_count": 295,
+  "evidence_hits_sample": [
+    {
+      "path": "Cargo.lock",
+      "line": 1203,
+      "text": "checksum = \"91e195e091a93c46f7102ec7818a2aa394e1e1771c3ab4825963fa03e45afb8f\""
+    },
+    {
+      "path": "acceptance_reports/16AI-3_acceptance_PENDING.md",
+      "line": 6,
+      "text": "- AC-16AI-3-2: `vocab_size=48259`."
+    },
+    {
+      "path": "acceptance_reports/16AI-6E-R3_acceptance_PASS_RUNTIME_PROBE.md",
+      "line": 22,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "acceptance_reports/16AI-6V-0_acceptance_PENDING_OR_PASS_SSOT.md",
+      "line": 27,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "acceptance_reports/16AI-6V-1_acceptance_PENDING_OR_PASS_MANIFEST.md",
+      "line": 14,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "acceptance_reports/16AI-6V-2_acceptance_PENDING_OR_PASS_COMPAT_AUDIT.md",
+      "line": 23,
+      "text": "- vocab_size=48259"
+    },
+    {
+      "path": "acceptance_reports/16AI-QW-35B_kv_cache_cursor_trace.md",
+      "line": 63,
+      "text": "--model-spec \".\\specs\\model_spec_v5_48259.toml\" `"
+    },
+    {
+      "path": "acceptance_reports/SFT-GPU-8G_lm_head_vocab_atlas_streaming_ce_seal.md",
+      "line": 39,
+      "text": "[lora_train][lm_head_vocab_atlas] vocab_size=48259 hidden=2048 tile_size=2048 tile_count=24"
+    },
+    {
+      "path": "artifacts/banned_token_ids_v4_noise.json",
+      "line": 584,
+      "text": "48256,"
+    },
+    {
+      "path": "artifacts/tokenizer_generation_banlist_v5.json",
+      "line": 2909,
+      "text": "\"id\": 48256,"
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v5_final.json",
+      "line": 11,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v5_final.json",
+      "line": 289561,
+      "text": "\"id\": 48256,"
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v5_final.json",
+      "line": 290043,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v6_compat.json",
+      "line": 16,
+      "text": "\"base_vocab_size\": 48259,"
+    },
+    {
+      "path": "artifacts/tokenizer_manifest_v6_compat.json",
+      "line": 21,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "artifacts/tokenizer_v6_policy_registry.json",
+      "line": 55,
+      "text": "\"vocab_size\": 48259"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_bake_report.md",
+      "line": 33,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_static_scan.md",
+      "line": 15,
+      "text": "| vocab_size = 48259 recorded | PASS |"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_tokenizer_v6_compat_ssot_source.patch",
+      "line": 16,
+      "text": "+| vocab_size | 48259 |"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_tokenizer_v6_compat_ssot_source.patch",
+      "line": 113,
+      "text": "+- `vocab_size = 48259`"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_tokenizer_v6_compat_ssot_source.patch",
+      "line": 183,
+      "text": "+    \"vocab_size\": 48259,"
+    },
+    {
+      "path": "bake_artifacts/16AI-6V-0_tokenizer_v6_compat_ssot_source.patch",
+      "line": 265,
+      "text": "+| vocab_size | 48259 |"
+    },
+    {
+      "path": "configs/ash_ko_short_lora_500_short_dump.json",
+      "line": 4,
+      "text": "\"model_path\": \"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_lora_500_short_dump.json",
+      "line": 37,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_lora_500_short_train_smoke.json",
+      "line": 4,
+      "text": "\"model_path\": \"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_lora_500_short_train_smoke.json",
+      "line": 37,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_smoke.json",
+      "line": 6,
+      "text": "\"model_path\": \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_smoke.json",
+      "line": 46,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_smoke.native_dump.json",
+      "line": 6,
+      "text": "\"model_path\": \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_smoke.native_dump.json",
+      "line": 46,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_train_200.json",
+      "line": 6,
+      "text": "\"model_path\": \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1_train_200.json",
+      "line": 46,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1b_native_dump.json",
+      "line": 6,
+      "text": "\"model_path\": \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1b_native_dump.json",
+      "line": 45,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features.json",
+      "line": 6,
+      "text": "\"model_path\": \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/ash_ko_short_sft_lm_head_lora_v1b_train_from_features.json",
+      "line": 45,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/tinyllama_1p1b_v5_adapt_from_feature_store_smoke.json",
+      "line": 41,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "configs/tinyllama_1p1b_v5_adapt_smoke.json",
+      "line": 41,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "configs/tinyllama_1p1b_v5_feature_dump.json",
+      "line": 41,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_feature_dump.json",
+      "line": 6,
+      "text": "\"model_path\":  \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_feature_dump.json",
+      "line": 48,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_feature_dump_tiny16.json",
+      "line": 6,
+      "text": "\"model_path\":  \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_feature_dump_tiny16.json",
+      "line": 48,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_sft_smoke.json",
+      "line": 6,
+      "text": "\"model_path\":  \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_sft_smoke.json",
+      "line": 48,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_sft_smoke_tiny16.json",
+      "line": 6,
+      "text": "\"model_path\":  \"specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "configs/tl02_qwave_measure01_sft_smoke_tiny16.json",
+      "line": 48,
+      "text": "\"vocab_size\":  48259,"
+    },
+    {
+      "path": "docs/16AI-6V-0_tokenizer_v6_compat_ssot.md",
+      "line": 11,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "docs/16AI-6V-1_tokenizer_v6_compat_manifest.md",
+      "line": 12,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "docs/16AI-6V_tokenizer_v6_build_contract.md",
+      "line": 10,
+      "text": "- `vocab_size = 48259`"
+    },
+    {
+      "path": "docs/COMMIT_16O_16V_NATIVE_PIPELINE_PROBES.md",
+      "line": 103,
+      "text": "\"tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "docs/COMMIT_16O_16V_NATIVE_PIPELINE_PROBES.md",
+      "line": 189,
+      "text": "- tokenizer vocab size: `48259`"
+    },
+    {
+      "path": "docs/COMMIT_16X_CHECKPOINT_TOKENIZER_FINGERPRINT.md",
+      "line": 50,
+      "text": "\"runtime_tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.json",
+      "line": 11,
+      "text": "48259,"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.json",
+      "line": 24,
+      "text": "\"embedding_vocab_rows\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.json",
+      "line": 29,
+      "text": "48259,"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.json",
+      "line": 40,
+      "text": "\"lm_head_vocab_rows\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.md",
+      "line": 10,
+      "text": "- trainer_vocab_size: `48259`"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.md",
+      "line": 11,
+      "text": "- vocab_len: `48259`"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.md",
+      "line": 12,
+      "text": "- max_id_plus_one: `48259`"
+    },
+    {
+      "path": "infer_debug/16AI-2_alignment_audit.md",
+      "line": 22,
+      "text": "- embedding: `model.embed_tokens.weight:[48259, 2048]:F32`"
+    },
+    {
+      "path": "infer_debug/16AI-5R_wrapper_quality_compare.json",
+      "line": 402,
+      "text": "\"vocab_limit\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-5R_wrapper_quality_compare.md",
+      "line": 418,
+      "text": "\"vocab_limit\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.json",
+      "line": 29469,
+      "text": "\"vocab_limit\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.json",
+      "line": 29484,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.json",
+      "line": 29485,
+      "text": "\"vocab_size_expected\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.md",
+      "line": 10,
+      "text": "| vocab_size | 48259 |"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.md",
+      "line": 29686,
+      "text": "\"vocab_limit\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.md",
+      "line": 29701,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-6E_dp_token_path_probe.md",
+      "line": 29702,
+      "text": "\"vocab_size_expected\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-6G_wrapper_quality_recompare.json",
+      "line": 1945,
+      "text": "\"vocab_limit\": 48259"
+    },
+    {
+      "path": "infer_debug/16AI-6V-0_tokenizer_v6_compat_ssot.json",
+      "line": 19,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-6V-1_tokenizer_v6_compat_manifest.json",
+      "line": 24,
+      "text": "\"vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.json",
+      "line": 104,
+      "text": "\"actual\": \"48259\","
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.json",
+      "line": 106,
+      "text": "\"expected\": \"48259\","
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.json",
+      "line": 124,
+      "text": "\"actual\": \"48259\","
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.json",
+      "line": 126,
+      "text": "\"expected\": \"48259\","
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.md",
+      "line": 39,
+      "text": "| BASE-03 | base_tokenizer.base_vocab_size | 48259 | 48259 | Pass |"
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.md",
+      "line": 41,
+      "text": "| V5-01 | v5.trainer.vocab_size | 48259 | 48259 | Pass |"
+    },
+    {
+      "path": "infer_debug/16AI-6V-2_tokenizer_v6_compat_audit.md",
+      "line": 43,
+      "text": "| COMPAT-02 | compatibility_contract.vocab_size | 48259 | 48259 | Pass |"
+    },
+    {
+      "path": "infer_debug/COMMIT_16O_16V_STATIC_VERIFY.md",
+      "line": 19,
+      "text": "- `infer_debug/commit_16s_spec_vocab_scan.json` confirms bundled tokenizer manifest vocab is `48259` while all bundled `specs/model_spec*.toml` vocab sizes are larger."
+    },
+    {
+      "path": "infer_debug/COMMIT_16X_STATIC_VERIFY.md",
+      "line": 19,
+      "text": "[16X] tokenizer_vocab_size=48259"
+    },
+    {
+      "path": "infer_debug/COMMIT_16X_STATIC_VERIFY.md",
+      "line": 21,
+      "text": "[16X] embedding_shape=[48259, 768]"
+    },
+    {
+      "path": "infer_debug/COMMIT_16X_STATIC_VERIFY.md",
+      "line": 22,
+      "text": "[16X] lm_head_shape=[48259, 768]"
+    },
+    {
+      "path": "infer_debug/COMMIT_16X_STATIC_VERIFY.md",
+      "line": 57,
+      "text": "The bundled tokenizer manifest has vocab size 48259, while `specs/model_spec.toml` declares 56000. 16X intentionally records this as a warning/mismatch reason instead of stopping inference."
+    },
+    {
+      "path": "infer_debug/commit_16AB_diff.patch",
+      "line": 808,
+      "text": "+{\"cmd\":\"run.start\",\"id\":\"probe_16AB_disable_headwise_raw_bridge_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST"
+    },
+    {
+      "path": "infer_debug/commit_16AC_diff.patch",
+      "line": 761,
+      "text": "+{\"cmd\":\"run.start\",\"id\":\"probe_16AC_safe_attention_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/"
+    },
+    {
+      "path": "infer_debug/commit_16AC_diff.patch",
+      "line": 766,
+      "text": "+{\"cmd\":\"run.start\",\"id\":\"probe_16AC_safe_attention_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/"
+    },
+    {
+      "path": "infer_debug/commit_16AC_static_validation.txt",
+      "line": 33,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16AC_safe_attention_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/t"
+    },
+    {
+      "path": "infer_debug/commit_16P3R_diff.patch",
+      "line": 267,
+      "text": "+{\"cmd\":\"run.start\",\"id\":\"probe_16P3R_telemetry_completion_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash"
+    },
+    {
+      "path": "infer_debug/commit_16Y3_bake_report.md",
+      "line": 10,
+      "text": "48259 * 2048 * 4 = 395337728 bytes"
+    },
+    {
+      "path": "infer_debug/commit_16Y3_bake_report.md",
+      "line": 61,
+      "text": "[native-vocab-atlas] built tile_count=48 vocab=48259 hidden=2048 tile_vocab=1024 full_vocab_bytes=395337728"
+    },
+    {
+      "path": "infer_debug/commit_16s_spec_vocab_scan.json",
+      "line": 3,
+      "text": "\"tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/commit_16s_spec_vocab_scan.json",
+      "line": 8,
+      "text": "\"tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/commit_16s_spec_vocab_scan.json",
+      "line": 14,
+      "text": "\"tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/commit_16s_spec_vocab_scan.json",
+      "line": 20,
+      "text": "\"tokenizer_vocab_size\": 48259,"
+    },
+    {
+      "path": "infer_debug/infer_safe_A_r1_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_A_r1_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/t"
+    },
+    {
+      "path": "infer_debug/infer_safe_A_r2_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_A_r2_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/t"
+    },
+    {
+      "path": "infer_debug/infer_safe_A_seed42.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_A_seed42\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/tokenizer"
+    },
+    {
+      "path": "infer_debug/infer_safe_A_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_A_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/toke"
+    },
+    {
+      "path": "infer_debug/infer_safe_Hello_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_Hello_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"Hello\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pa"
+    },
+    {
+      "path": "infer_debug/infer_safe_annyeong_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_annyeong_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"안녕\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pa"
+    },
+    {
+      "path": "infer_debug/infer_safe_today_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_today_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"오늘은\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass"
+    },
+    {
+      "path": "infer_debug/infer_safe_worry_r1_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_worry_r1_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"걱정이네\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_"
+    },
+    {
+      "path": "infer_debug/infer_safe_worry_r2_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_worry_r2_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"걱정이네\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_"
+    },
+    {
+      "path": "infer_debug/infer_safe_worry_seed42_tok1.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"infer_safe_worry_seed42_tok1\",\"payload\":{\"kind\":\"infer\",\"input\":\"걱정이네\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pas"
+    },
+    {
+      "path": "infer_debug/probe_16AA_timestamp_query_requested_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16AA_timestamp_query_requested_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/"
+    },
+    {
+      "path": "infer_debug/probe_16AB_disable_headwise_raw_bridge_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16AB_disable_headwise_raw_bridge_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/"
+    },
+    {
+      "path": "infer_debug/probe_16AC_safe_attention_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16AC_safe_attention_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/t"
+    },
+    {
+      "path": "infer_debug/probe_16P3R_telemetry_completion_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16P3R_telemetry_completion_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_"
+    },
+    {
+      "path": "infer_debug/probe_16P3_telemetry_completion_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16P3_telemetry_completion_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_p"
+    },
+    {
+      "path": "infer_debug/probe_16Y3_gpu_atlas_argmax_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_16Y3_gpu_atlas_argmax_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3"
+    },
+    {
+      "path": "infer_debug/probe_17A_native_base_ascii_A.json",
+      "line": 6,
+      "text": "\"modelSpecPath\": \"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\","
+    },
+    {
+      "path": "infer_debug/probe_17A_native_base_ascii_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_17A_native_base_ascii_A\",\"payload\":{\"kind\":\"infer\",\"prompt\":\"A\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/art"
+    },
+    {
+      "path": "infer_debug/probe_17A_native_input_ascii_A.jsonl",
+      "line": 1,
+      "text": "{\"cmd\":\"run.start\",\"id\":\"probe_17A_native_input_ascii_A\",\"payload\":{\"kind\":\"infer\",\"input\":\"A\",\"task\":\"freeform\",\"modelSpecPath\":\"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml\",\"checkpointPath\":\"D:/1111113232/DUST/1/ash_pass"
+    },
+    {
+      "path": "infer_debug/rewrite_model_spec_v5.py",
+      "line": 5,
+      "text": "dst = Path(r\".\\specs\\model_spec_v5_48259.toml\")"
+    },
+    {
+      "path": "infer_debug/rewrite_model_spec_v5.py",
+      "line": 8,
+      "text": "text = re.sub(r\"(?m)^\\s*vocab_size\\s*=\\s*\\d+\", \"vocab_size = 48259\", text)"
+    },
+    {
+      "path": "infer_debug/vocab_refs_full.txt",
+      "line": 21,
+      "text": "D:\\1111113232\\DUST\\1\\ash_pass3\\specs\\module_lora_attn_q_proj_bundle_6layer_60k_vocab48259.json:2: \"run_name\":  \"module_lora_attn_q_proj_bundle_6layer_60k_vocab48259\","
+    },
+    {
+      "path": "infer_debug/vocab_refs_full.txt",
+      "line": 22,
+      "text": "D:\\1111113232\\DUST\\1\\ash_pass3\\specs\\module_lora_attn_q_proj_bundle_6layer_60k_vocab48259.json:39: \"vocab_size\":  48259,"
+    },
+    {
+      "path": "infer_debug/vocab_refs_full.txt",
+      "line": 23,
+      "text": "D:\\1111113232\\DUST\\1\\ash_pass3\\specs\\module_lora_attn_q_proj_bundle_6layer_60k_vocab48259.json:43: \"output_dir\":  \"D:/1111113232/DUST/1/ash_pass3/workspace/module_lora_attn_q_proj_bundle_6layer_60k_vocab48259\","
+    }
+  ],
+  "summary": {
+    "48259_static_vocab_confirmed": true,
+    "48256_as_runtime_vocab_cap_confirmed": false,
+    "48256_observed_as_token_id_or_banlist_entry": true,
+    "vocab_cap_trace_status": "unresolved_48256_not_confirmed_as_cap_static_archive_confirms_48259_runtime_vocab_lineage"
+  }
+}

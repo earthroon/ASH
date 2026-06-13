@@ -1,0 +1,101 @@
+{
+  "patch_id": "QW-52C-R7",
+  "title": "Approved Safe Profile Dry-run Replay / No Runtime Apply Seal",
+  "base_patch": "QW-52C-R6",
+  "status": "PASS_STATIC_APPROVED_SAFE_PROFILE_DRY_RUN_REPLAY",
+  "dry_run_policy": {
+    "dry_run_policy_version": "approved_safe_profile_dry_run_v1",
+    "no_runtime_apply_policy_version": "dry_run_no_runtime_apply_v1",
+    "require_approved_but_not_applied": true,
+    "require_risky_diff_zero": true,
+    "require_stable_broken_zero": true,
+    "require_beneficial_diff_preserved": true,
+    "min_supervised_dry_run_eligible": 3,
+    "min_dry_run_confidence": 0.6
+  },
+  "summary": {
+    "approved_profile_count": 1,
+    "dry_run_profile_count": 1,
+    "dry_run_pass_count": 1,
+    "dry_run_fail_count": 0,
+    "total_beneficial_diff_count": 1,
+    "total_risky_diff_count": 0,
+    "total_stable_broken_count": 0,
+    "best_dry_run_profile_id": "reduced_dream_weight_v1",
+    "proceed_to_commit_candidate": true,
+    "safe_profile_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "policy_promotion_allowed": false,
+    "runtime_apply_allowed": false
+  },
+  "fixture_results": [
+    {
+      "case_id": "approved_profile_dry_run_pass",
+      "status": "PASS",
+      "dry_run_pass": true
+    },
+    {
+      "case_id": "dry_run_risky_diff_reintroduced",
+      "status": "PASS",
+      "dry_run_pass": false
+    },
+    {
+      "case_id": "pending_profile_skipped",
+      "status": "PASS",
+      "profile_skipped": true
+    },
+    {
+      "case_id": "rejected_profile_skipped",
+      "status": "PASS",
+      "candidate_deleted": false
+    },
+    {
+      "case_id": "missing_r6_approval_receipt_unavailable",
+      "status": "PASS",
+      "dry_run_status": "Unavailable"
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "dry_run_replay_executed": true,
+    "dry_run_result_applied": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_dry_run_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R8",
+    "QW-52C-R7-R1",
+    "QW-52D"
+  ],
+  "notes": [
+    "R7 dry-runs only ApprovedButNotApplied profiles.",
+    "Dry-run pass does not apply safe profile.",
+    "No weight profile is committed.",
+    "No runtime behavior changes."
+  ]
+}

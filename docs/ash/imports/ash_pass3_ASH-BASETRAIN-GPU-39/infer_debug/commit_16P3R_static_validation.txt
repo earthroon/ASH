@@ -1,0 +1,23 @@
+[16P-3R static validation]
+
+Patched files:
+- crates/runtime/src/infer.rs
+- crates/orchestrator_local/src/infer_entry.rs
+
+Search checks:
+--- embedding_row_gather_bytes_source refs ---
+/mnt/data/ash_16p3r_work/crates/runtime/src/infer.rs:495:    pub embedding_row_gather_bytes_source: Option<String>,
+/mnt/data/ash_16p3r_work/crates/runtime/src/infer.rs:522:            embedding_row_gather_bytes_source: None,
+/mnt/data/ash_16p3r_work/crates/runtime/src/infer.rs:582:            embedding_row_gather_bytes_source: None,
+/mnt/data/ash_16p3r_work/crates/runtime/src/infer.rs:2815:        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
+/mnt/data/ash_16p3r_work/crates/runtime/src/infer.rs:2823:        native_vocab_allocation_probe.embedding_row_gather_bytes_source =
+/mnt/data/ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs:451:    output_json.insert("native_embedding_row_gather_bytes_source".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
+/mnt/data/ash_16p3r_work/crates/orchestrator_local/src/infer_entry.rs:821:    response_json.insert("nativeEmbeddingRowGatherBytesSource".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes_source));
+--- 16P-3R telemetry refs ---
+2818:            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=NativeWgpuModel.last_embedding_row_gather_bytes",
+2826:            "[16P-3R][telemetry] embedding_row_gather_bytes={} source=computed_from_prompt_len_hidden_size prompt_len={} hidden={} sizeof_f32={}",
+2834:            "[16P-3R][telemetry] embedding_row_gather_bytes=None source=unavailable effective_embedding_mode={}",
+--- probe exists ---
+-rw-r--r-- 1 root root 1087 May  6 03:54 /mnt/data/ash_16p3r_work/infer_debug/probe_16P3R_telemetry_completion_A.jsonl
+--- cargo availability ---
+bash: line 18: cargo: command not found

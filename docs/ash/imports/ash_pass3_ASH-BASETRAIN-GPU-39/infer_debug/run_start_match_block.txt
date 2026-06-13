@@ -1,0 +1,25 @@
+﻿            }
+            emit_response(&incoming.id, true, json!(items), stdout_lock);
+            Ok(())
+        }
+        "audio.qwave.run" => handle_audio_qwave_run(&incoming, state, stdout_lock),
+        "run.start" => {
+            let kind = incoming.payload.get("kind").and_then(|v| v.as_str()).unwrap_or("infer");
+            match kind {
+                "infer" => handle_infer_run(&incoming, state, stdout_lock),
+                "train" => handle_train_run(&incoming, state, stdout_lock),
+                other => {
+                    let mut run = begin_run(other, &incoming.payload, state)?;
+                    run.status = RunStatus::Completed;
+                    run.progress = Some(1.0);
+                    run.finished_at = Some(now());
+                    run.message = Some("scaffold job completed".into());
+                    save_run(state, &run)?;
+                    state.runs.insert(run.run_id.clone(), run.clone());
+                    emit_response(&incoming.id, true, json!({"runId": run.run_id}), stdout_lock);
+                    emit_event(
+                        "run.updated",
+                        json!({"runId": run.run_id, "status": "completed", "progress": 1.0, "message": run.message}),
+                        stdout_lock,
+                    );
+                    Ok(())

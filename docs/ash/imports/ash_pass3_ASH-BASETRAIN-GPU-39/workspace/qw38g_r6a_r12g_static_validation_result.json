@@ -1,0 +1,70 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12G",
+  "static_validation_status": "PASS_STATIC_VALIDATION",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12G_canary_replay_stability_and_threshold_edge_sweep.ps1",
+  "script_sha256": "137a30141e7827741bd3987209572c319295642b52aa10fda7c92f022366a5fb",
+  "checks": [
+    {
+      "needle": "PASS_CANARY_REPLAY_STABILITY_AND_THRESHOLD_EDGE_SWEEP",
+      "present": true
+    },
+    {
+      "needle": "MARGIN_GATE_BOUNDARY_STABLE_AND_CANARY_REPLAY_PRESERVED",
+      "present": true
+    },
+    {
+      "needle": "ALLOW_WHEN_MARGIN_GREATER_THAN_OR_EQUAL_TO_0_05",
+      "present": true
+    },
+    {
+      "needle": "TARGET_LIKE_MARGIN_AT_THRESHOLD",
+      "present": true
+    },
+    {
+      "needle": "NEGATIVE_CONTROL_ACTUAL_APPLY_BLOCKED",
+      "present": true
+    },
+    {
+      "needle": "NO_MODEL_ARTIFACT_MUTATION",
+      "present": true
+    },
+    {
+      "needle": "production_safe_confirmed = $false",
+      "present": true
+    },
+    {
+      "needle": "root_cause_confirmed = $false",
+      "present": true
+    },
+    {
+      "needle": "checkpoint_modified = $false",
+      "present": true
+    }
+  ],
+  "expected_runtime_outputs": [
+    "workspace/qw38g_r6a_r12g_threshold_edge_sweep_receipt.json",
+    "workspace/qw38g_r6a_r12g_threshold_edge_sweep_summary.json",
+    "workspace/qw38g_r6a_r12g_source_canary_load_audit.json",
+    "workspace/qw38g_r6a_r12g_threshold_edge_case_manifest.json",
+    "workspace/qw38g_r6a_r12g_margin_boundary_sweep_audit.json",
+    "workspace/qw38g_r6a_r12g_canary_replay_stability_audit.json",
+    "workspace/qw38g_r6a_r12g_negative_control_boundary_audit.json",
+    "workspace/qw38g_r6a_r12g_policy_lock_preservation_audit.json",
+    "workspace/qw38g_r6a_r12g_boundary_drift_audit.json",
+    "workspace/qw38g_r6a_r12g_mutation_safety_audit.json",
+    "workspace/qw38g_r6a_r12g_threshold_edge_decision.json",
+    "workspace/qw38g_r6a_r12g_threshold_edge_sweep_report.md"
+  ],
+  "mutation_policy": {
+    "runtime_default_apply": false,
+    "production_safe_confirmed": false,
+    "root_cause_confirmed": false,
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "recommended_next_patch_on_pass": "16AI-QW-38G-R6A-R12A-R12H_POLICY_LOCKED_MICRO_GENERALIZATION_SWEEP"
+}

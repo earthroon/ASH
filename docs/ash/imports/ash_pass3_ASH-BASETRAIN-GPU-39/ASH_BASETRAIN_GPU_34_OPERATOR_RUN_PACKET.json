@@ -1,0 +1,10 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-34",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-35",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-34A",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_34_selected_atlas_group_gradient_scope_contract --jobs 1",
+  "recommended_scope_contract_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_34_selected_atlas_group_gradient_scope_contract",
+  "runtime_gpu_required": false,
+  "selected_group_weight_manifest_required_in_34": false,
+  "pass": true
+}

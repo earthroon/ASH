@@ -1,0 +1,144 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "behavior_change_default": false,
+  "fixtures": [
+    {
+      "fixture_id": "F01_basic_minp_no_prior",
+      "description": "Min-p threshold over weighted score without semantic/transition modifiers",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "static_prior_enabled": false,
+      "transition_guard_enabled": false,
+      "expectation": {
+        "threshold_kind_cpu": "weighted",
+        "threshold_kind_gpu": "weighted",
+        "global_finite_fallback_forbidden": true
+      }
+    },
+    {
+      "fixture_id": "F02_minp_with_static_prior",
+      "description": "Static prior bias must be included in pre-min-p max and retention score",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "static_prior_enabled": true,
+      "transition_guard_enabled": false,
+      "expectation": {
+        "threshold_kind_cpu": "weighted",
+        "threshold_kind_gpu": "weighted"
+      }
+    },
+    {
+      "fixture_id": "F03_minp_with_transition_penalty",
+      "description": "Transition soft penalty must be included in weighted min-p threshold and active set",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "static_prior_enabled": false,
+      "transition_guard_enabled": true,
+      "expectation": {
+        "threshold_kind_cpu": "weighted",
+        "threshold_kind_gpu": "weighted"
+      }
+    },
+    {
+      "fixture_id": "F04_transition_hardblock_before_topk",
+      "description": "Hard-blocked transition token must not survive as GPU selected candidate",
+      "temperature": 0.25,
+      "top_p": 0.9,
+      "top_k": 40,
+      "min_p": 0.03,
+      "static_prior_enabled": false,
+      "transition_guard_enabled": true,
+      "top_k_policy": "bypass_if_not_transition_aware",
+      "expectation": {
+        "selected_transition_hardblock": false
+      }
+    },
+    {
+      "fixture_id": "F05_topk_minp_interaction",
+      "description": "Top-k/min-p interaction must record requested/effective top-k and active counts",
+      "temperature": 0.35,
+      "top_p": 0.92,
+      "top_k": 64,
+      "min_p": 0.05,
+      "transition_guard_enabled": true,
+      "top_k_policy": "bypass_if_not_transition_aware",
+      "expectation": {
+        "top_k_bypass_receipt_required": true
+      }
+    },
+    {
+      "fixture_id": "F06_topp_after_minp",
+      "description": "Top-p must cut over active probabilities after min-p renormalization",
+      "temperature": 0.3,
+      "top_p": 0.8,
+      "top_k": 0,
+      "min_p": 0.05,
+      "expectation": {
+        "active_count_after_top_p_lte_after_min_p": true
+      }
+    },
+    {
+      "fixture_id": "F07_final_mask_empty_recovery",
+      "description": "Empty final mask must recover by pre-min-p/active top1 or strict fail, not arbitrary global token",
+      "temperature": 0.25,
+      "top_p": 0.75,
+      "top_k": 0,
+      "min_p": 0.2,
+      "expectation": {
+        "global_finite_fallback_forbidden": true
+      }
+    },
+    {
+      "fixture_id": "F08_global_fallback_forbidden",
+      "description": "Valid-global-top1 fallback is quality-risk fail under SAMPLER-05",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.95,
+      "expectation": {
+        "status_on_global_fallback": "FAIL_GLOBAL_FINITE_FALLBACK"
+      }
+    },
+    {
+      "fixture_id": "F09_korean_piece_loop_candidate",
+      "description": "Korean particle/ending loop candidates must preserve transition reason/action parity",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "transition_guard_enabled": true,
+      "expectation": {
+        "transition_reason_match": true
+      }
+    },
+    {
+      "fixture_id": "F10_semantic_prior_bias_parity",
+      "description": "QWave/DeltaK static prior bias must produce identical candidate ordering in CPU/GPU trace heads",
+      "temperature": 0.25,
+      "top_p": 0.88,
+      "top_k": 0,
+      "min_p": 0.05,
+      "static_prior_enabled": true,
+      "expectation": {
+        "active_set_match": true
+      }
+    }
+  ],
+  "runtime_env": {
+    "ASH_SAMPLER_PARITY": "probe",
+    "ASH_SAMPLER05_PARITY": "receipt",
+    "ASH_GPU_CANDIDATE_TRACE": "1",
+    "ASH_SAMPLER05_TOPK_POLICY": "bypass_if_not_transition_aware",
+    "ASH_SAMPLER05_FORBID_GLOBAL_FALLBACK": "true",
+    "ASH_SAMPLER05_RECEIPT": "workspace/sampler05_parity_steps.jsonl",
+    "ASH_SAMPLER05_SUMMARY": "workspace/sampler05_summary.json"
+  }
+}

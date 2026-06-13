@@ -1,0 +1,6 @@
+zip_test=OK_PENDING_AFTER_PACKAGING
+local_cargo_build_executed_by_assistant=false
+local_wgpu_runtime_executed_by_assistant=false
+reason=cargo_not_available_in_current_container
+operator_build_command=cargo build -p base_train --bin ash_basetrain_gpu_17_chunk_window_logits_expansion_output_audit --jobs 1
+operator_run_command=cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_17_chunk_window_logits_expansion_output_audit

@@ -1,0 +1,881 @@
+{
+  "build_gate": "pass_by_user_reported_local_cargo_check",
+  "commit": "16AF-P",
+  "generation_connected": false,
+  "layers": [
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 325.0917,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 0,
+      "max_abs_delta": 2.60770320892334e-8,
+      "mean_abs_delta": 2.0633399433478417e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 4.6268,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 9.1428,
+        "total_gpu_ms": 38.9589,
+        "weight_upload_ms": 25.1884
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 0,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 369.476,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 1,
+      "max_abs_delta": 1.5832483768463135e-8,
+      "mean_abs_delta": 2.1861623622498882e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.873,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.3267999999999995,
+        "total_gpu_ms": 23.1095,
+        "weight_upload_ms": 14.9088
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 1,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 284.4674,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 2,
+      "max_abs_delta": 1.6298145055770874e-8,
+      "mean_abs_delta": 2.3017856509710555e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8540000000000001,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.391100000000001,
+        "total_gpu_ms": 22.7517,
+        "weight_upload_ms": 14.5053
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 2,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 270.3968,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 3,
+      "max_abs_delta": 1.4435499906539917e-8,
+      "mean_abs_delta": 2.4335966575250723e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8761,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.3562,
+        "total_gpu_ms": 22.0538,
+        "weight_upload_ms": 13.8209
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 3,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 272.07280000000003,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 4,
+      "max_abs_delta": 1.6763806343078613e-8,
+      "mean_abs_delta": 2.4028665723818676e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8749,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.4469,
+        "total_gpu_ms": 22.5423,
+        "weight_upload_ms": 14.2189
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 4,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 319.99280000000005,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 5,
+      "max_abs_delta": 1.955777406692505e-8,
+      "mean_abs_delta": 2.555091471734272e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8609,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.5921,
+        "total_gpu_ms": 23.4862,
+        "weight_upload_ms": 15.0323
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 5,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 308.6224,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 6,
+      "max_abs_delta": 1.3504177331924438e-8,
+      "mean_abs_delta": 2.562797973837405e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8889,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 28.5382,
+        "total_gpu_ms": 43.3258,
+        "weight_upload_ms": 13.8977
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 6,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 293.9969,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 7,
+      "max_abs_delta": 1.3969838619232178e-8,
+      "mean_abs_delta": 2.4793176400805805e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8643000000000001,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 27.982699999999998,
+        "total_gpu_ms": 42.755300000000005,
+        "weight_upload_ms": 13.9073
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 7,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 313.58140000000003,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 8,
+      "max_abs_delta": 1.6763806343078613e-8,
+      "mean_abs_delta": 2.5876705223026875e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.858,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 28.372600000000002,
+        "total_gpu_ms": 43.2322,
+        "weight_upload_ms": 14.000200000000001
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 8,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 344.6541,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 9,
+      "max_abs_delta": 1.30385160446167e-8,
+      "mean_abs_delta": 2.5239761392015225e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8748,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 30.8857,
+        "total_gpu_ms": 46.3219,
+        "weight_upload_ms": 14.560500000000001
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 9,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 404.2271,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 10,
+      "max_abs_delta": 2.1420419216156006e-8,
+      "mean_abs_delta": 2.676262766954096e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8512,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 59.030699999999996,
+        "total_gpu_ms": 73.7569,
+        "weight_upload_ms": 13.8743
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 10,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 353.0097,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 11,
+      "max_abs_delta": 1.5832483768463135e-8,
+      "mean_abs_delta": 2.7698761062566746e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8545999999999999,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 56.7157,
+        "total_gpu_ms": 72.1535,
+        "weight_upload_ms": 14.5754
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 11,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 335.1811,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 12,
+      "max_abs_delta": 1.4901161193847656e-8,
+      "mean_abs_delta": 2.691240785779314e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.8781,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 57.6055,
+        "total_gpu_ms": 72.502,
+        "weight_upload_ms": 14.017399999999999
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 12,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF][ffn] native-owned WGPU buffers used; raw lease path not used",
+        "[16AF-R1][ffn] storage buffer layout split into gate/up/swiglu/down passes; max storage buffers per pipeline = 3",
+        "[16AF-P][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048",
+        "[16AF-P][perf] dispatcher reuses device/context and cached shader pipelines across layer probes when caller reuses dispatcher"
+      ],
+      "elapsed_ms": 380.4327,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 13,
+      "max_abs_delta": 1.4901161193847656e-8,
+      "mean_abs_delta": 2.727825965109787e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P+storage3_split_passes+cached_pipelines+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.3305,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 57.733399999999996,
+        "total_gpu_ms": 75.6587,
+        "weight_upload_ms": 16.593400000000003
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 13,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    }
+  ],
+  "requested_layers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "runtime_gate": "multi_layer_ffn_parity_only",
+  "summary": {
+    "completed": 14,
+    "elapsed_ms_total": 50325.8817,
+    "failed": 0,
+    "max_abs_delta_global": 2.60770320892334e-8,
+    "mean_abs_delta_avg": 2.4972721668348186e-9,
+    "parity_pass": true,
+    "passed": 14,
+    "telemetry_readback_buffers": 14,
+    "telemetry_readback_elements": 28672,
+    "telemetry_submit_readback_ms": 393.1204,
+    "telemetry_total_gpu_ms": 622.6086999999999,
+    "telemetry_weight_upload_ms": 213.10080000000002,
+    "total": 14
+  },
+  "threshold": 0.0010000000474974513,
+  "top_k": 8
+}

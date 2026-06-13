@@ -1,0 +1,46 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-01",
+  "status": "STATIC_PARITY_FIXTURE_DEFINED_RUNTIME_NOT_RUN",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "candidate_parity_required": true,
+  "selected_token_parity_required": false,
+  "fixtures": [
+    {
+      "id": "minp_basic",
+      "cpu_expected_active_ids": [
+        0,
+        1,
+        2
+      ],
+      "gpu_expected_active_ids": [
+        0,
+        1,
+        2
+      ],
+      "status": "DEFINED_NOT_RUN"
+    },
+    {
+      "id": "topk_minp",
+      "cpu_expected_active_ids": [
+        0,
+        1
+      ],
+      "gpu_expected_active_ids": [
+        0,
+        1
+      ],
+      "status": "DEFINED_NOT_RUN"
+    },
+    {
+      "id": "active_topp",
+      "description": "top-p must accumulate active-set probabilities after top-k/min-p",
+      "status": "DEFINED_NOT_RUN"
+    },
+    {
+      "id": "final_mask_empty",
+      "description": "empty final mask recovers to active_top1 or valid_global_top1, never silent token0",
+      "status": "DEFINED_NOT_RUN"
+    }
+  ],
+  "runtime_execution": "NOT_RUN"
+}

@@ -1,0 +1,16 @@
+{
+  "patch_id": "QW-55A-RUNTIME-00",
+  "title": "Runtime TopK Snapshot Bind / Explicit Enable No Greedy Fallback Seal",
+  "policy_version": "qw55a.runtime00.topk_snapshot_bind.v1",
+  "enabled_default": false,
+  "explicit_enable_required": true,
+  "runtime_topk_snapshot_bound": true,
+  "root_topk": 16,
+  "selector_gate_used": true,
+  "greedy_final_authority_disabled_when_enabled": true,
+  "greedy_fallback_used": false,
+  "forbid_greedy_fallback": true,
+  "failure_policy": "ExplicitSelectorFailureStop",
+  "trace_path": "workspace/runtime_traces/qw55a_runtime00_topk_snapshot_bind_trace.jsonl",
+  "report_path": "artifacts/qw55a_runtime00_topk_snapshot_bind_report.json"
+}

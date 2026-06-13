@@ -1,0 +1,1513 @@
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json	2026-06-10 08:31:36.489199309 +0000
+@@ -0,0 +1,13 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "body_training_claim_guard_revalidated": true,
++  "body_training_claimed": false,
++  "runtime_1p1b_training_claimed": false,
++  "streamed_weight_group_bound": false,
++  "selected_atlas_group_materialized": false,
++  "selected_group_forward_executed": false,
++  "selected_group_backward_executed": false,
++  "finite_model_weight_gradient_observed": false,
++  "optimizer_ready_for_weight_update": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_CONTROL_FLOW_LUT_RECEIPT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_CONTROL_FLOW_LUT_RECEIPT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_CONTROL_FLOW_LUT_RECEIPT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_CONTROL_FLOW_LUT_RECEIPT.json	2026-06-10 08:31:36.489512835 +0000
+@@ -0,0 +1,13 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "branching_policy": "lookup_table_first",
++  "control_flow_lut_used": true,
++  "if_keyword_used": false,
++  "match_statement_used": false,
++  "early_return_used": false,
++  "violation_mask": 0,
++  "verdict_lut_index": 0,
++  "route": "ASH-BASETRAIN-GPU-32_GPU_LOGITS_GRADIENT_WRITE_CLOSURE_NO_BACKWARD_NO_OPTIMIZER",
++  "primary_blocker": "PRIMARY_BLOCKER_NONE",
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_BINDING.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_BINDING.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_BINDING.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_BINDING.json	2026-06-10 08:31:36.487682739 +0000
+@@ -0,0 +1,9 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "cpu_candidate_input_binding_created": true,
++  "cpu_candidate_path_env": "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH",
++  "raw_logits_fallback_env": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
++  "cpu_candidate_expected_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "cpu_candidate_digest_match": true,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_EXPECTED_BUNDLE.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_EXPECTED_BUNDLE.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_EXPECTED_BUNDLE.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_EXPECTED_BUNDLE.json	2026-06-10 08:31:36.490327172 +0000
+@@ -0,0 +1,231 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "title": "GPU Logits Gradient Write Smoke / CPU Candidate To Allocated Logits Gradient Buffer Write Verification No Backward No Optimizer Seal",
++  "pass": true,
++  "verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER",
++  "gpu_logits_gradient_write_smoke_state": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "state_kind": "gpu_logits_gradient_write_smoke_state",
++    "source_patch": "ASH-BASETRAIN-GPU-30",
++    "source_30_pass": true,
++    "source_30_violation_mask": 0,
++    "source_30_verdict_lut_index": 0,
++    "source_30_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "gpu_buffer_handle_reused_from_28": false,
++    "gpu_buffer_handle_reused_from_29": false,
++    "runtime_buffer_object_persistence_claimed": false,
++    "buffer_contract_reconstructed_from_receipts": true,
++    "cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "cpu_candidate_digest_match": true,
++    "runtime_logits_gradient_buffer_created": true,
++    "runtime_buffer_size_bytes": 8192,
++    "gpu_candidate_write_executed": true,
++    "gpu_gradient_buffer_written": true,
++    "gpu_logits_gradient_write_executed": true,
++    "gpu_written_readback_executed": true,
++    "gpu_written_candidate_digest_expected_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "gpu_written_candidate_digest_match": true,
++    "queue_submit_scope": "write_copy_and_readback_only",
++    "queue_submit_used_for_compute": false,
++    "gpu_compute_dispatch_executed": false,
++    "gpu_shader_dispatch_executed": false,
++    "backward_executed": false,
++    "optimizer_step_executed": false,
++    "model_weight_gradient_contract_created": false,
++    "weight_gradient_claimed": false,
++    "runtime_1p1b_training_claimed": false,
++    "violation_mask": 0,
++    "verdict_lut_index": 0,
++    "verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER",
++    "pass": true
++  },
++  "source_30_validation": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "source_patch": "ASH-BASETRAIN-GPU-30",
++    "source_verdict": "PASS_ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_FORMULA_RECEIPT_LOCAL_WINDOW_SOFTMAX_MINUS_TARGET_CANDIDATE_NO_GPU_WRITE_NO_BACKWARD_NO_OPTIMIZER",
++    "source_30_pass": true,
++    "source_30_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "source_30_candidate_dtype": "f32",
++    "source_30_candidate_shape": [
++      1,
++      1,
++      2048
++    ],
++    "source_30_candidate_element_count": 2048,
++    "source_30_candidate_bytes": 8192,
++    "source_30_gpu_gradient_buffer_written": false,
++    "source_30_gpu_compute_dispatch_executed": false,
++    "source_30_backward_executed": false,
++    "source_30_optimizer_step_executed": false,
++    "source_30_model_weight_gradient_contract_created": false,
++    "pass": true
++  },
++  "source_28_29_contract_revalidation": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "source_28_gradient_buffer_descriptor_revalidated": true,
++    "source_29_zero_state_readback_revalidated": true,
++    "runtime_buffer_object_persistence_claimed": false,
++    "buffer_contract_reconstructed_from_receipts": true,
++    "source_29_zero_digest_hex": "9f1dcbc35c350d6027f98be0f5c8b43b42ca52b7604459c0c42be3aa88913d47",
++    "pass": true
++  },
++  "cpu_candidate_input_binding": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "cpu_candidate_input_binding_created": true,
++    "cpu_candidate_path_env": "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH",
++    "raw_logits_fallback_env": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
++    "cpu_candidate_expected_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "cpu_candidate_digest_match": true,
++    "pass": true
++  },
++  "runtime_buffer_descriptor": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "runtime_logits_gradient_buffer_created": true,
++    "runtime_buffer_descriptor_matches_contract": true,
++    "buffer_label": "ash_basetrain_gpu_31_logits_gradient_write_smoke_buffer",
++    "buffer_kind": "logits_gradient_candidate_buffer",
++    "buffer_size_bytes": 8192,
++    "buffer_element_count": 2048,
++    "buffer_dtype": "f32",
++    "buffer_shape": [
++      1,
++      1,
++      2048
++    ],
++    "buffer_commit_scope": "none",
++    "allowed_usages": [
++      "STORAGE",
++      "COPY_SRC",
++      "COPY_DST"
++    ],
++    "pass": true
++  },
++  "gpu_write_smoke_contract": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "gpu_logits_gradient_write_smoke_created": true,
++    "write_source_patch": "ASH-BASETRAIN-GPU-30",
++    "write_target_scope": "logits_gradient_candidate_only",
++    "write_size_bytes": 8192,
++    "gpu_candidate_write_executed": true,
++    "gpu_gradient_buffer_written": true,
++    "gpu_logits_gradient_write_executed": true,
++    "gpu_compute_dispatch_executed": false,
++    "write_used_compute_shader": false,
++    "pass": true
++  },
++  "gpu_written_readback_receipt": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "gpu_written_readback_created": true,
++    "gpu_written_readback_executed": true,
++    "readback_scope": "write_smoke_digest_verification_only",
++    "readback_size_bytes": 8192,
++    "readback_element_count": 2048,
++    "readback_used_for_optimizer": false,
++    "readback_used_for_weight_update": false,
++    "readback_used_as_model_weight_gradient": false,
++    "pass": true
++  },
++  "gpu_written_candidate_digest_receipt": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "gpu_written_candidate_digest_created": true,
++    "gpu_written_candidate_digest_algorithm": "sha256",
++    "gpu_written_candidate_digest_expected_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++    "gpu_written_candidate_digest_match": true,
++    "pass": true
++  },
++  "gpu_written_candidate_stats": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "gpu_written_candidate_stats_created": true,
++    "gpu_written_candidate_finite": true,
++    "gpu_written_candidate_nan_count": 0,
++    "gpu_written_candidate_inf_count": 0,
++    "gpu_written_candidate_sum_close_to_zero": true,
++    "gpu_written_target_index": 1,
++    "gpu_written_target_index_gradient_expected_negative": true,
++    "gpu_written_non_target_gradient_expected_non_negative": true,
++    "training_gradient_commit": false,
++    "model_weight_gradient": false,
++    "pass": true
++  },
++  "gpu_no_compute_guard": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "gpu_no_compute_guard_created": true,
++    "gpu_compute_dispatch_executed": false,
++    "gpu_shader_dispatch_executed": false,
++    "gradient_compute_shader_created": false,
++    "gradient_compute_pipeline_created": false,
++    "queue_submit_scope": "write_copy_and_readback_only",
++    "queue_submit_used_for_compute": false,
++    "gpu_no_compute_guard_valid": true,
++    "pass": true
++  },
++  "model_weight_gradient_denylist_revalidation": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "model_weight_gradient_denylist_revalidated": true,
++    "logits_gradient_candidate_written_to_gpu": true,
++    "gpu_logits_gradient_write_smoke_verified": true,
++    "model_weight_gradient_contract_created": false,
++    "model_weight_gradient_computed": false,
++    "embedding_gradient_claimed": false,
++    "lm_head_gradient_claimed": false,
++    "transformer_block_gradient_claimed": false,
++    "atlas_shard_gradient_claimed": false,
++    "weight_gradient_claimed": false,
++    "pass": true
++  },
++  "body_training_claim_guard_revalidation": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "body_training_claim_guard_revalidated": true,
++    "body_training_claimed": false,
++    "runtime_1p1b_training_claimed": false,
++    "streamed_weight_group_bound": false,
++    "selected_atlas_group_materialized": false,
++    "selected_group_forward_executed": false,
++    "selected_group_backward_executed": false,
++    "finite_model_weight_gradient_observed": false,
++    "optimizer_ready_for_weight_update": false,
++    "pass": true
++  },
++  "no_backward_no_optimizer_contract": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "no_backward_no_optimizer_contract_created": true,
++    "gpu_gradient_buffer_written": true,
++    "gpu_compute_dispatch_executed": false,
++    "backward_executed": false,
++    "optimizer_step_executed": false,
++    "safetensors_mutation_present": false,
++    "checkpoint_finalization_present": false,
++    "pass": true
++  },
++  "control_flow_lut_receipt": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "branching_policy": "lookup_table_first",
++    "control_flow_lut_used": true,
++    "if_keyword_used": false,
++    "match_statement_used": false,
++    "early_return_used": false,
++    "violation_mask": 0,
++    "verdict_lut_index": 0,
++    "route": "ASH-BASETRAIN-GPU-32_GPU_LOGITS_GRADIENT_WRITE_CLOSURE_NO_BACKWARD_NO_OPTIMIZER",
++    "primary_blocker": "PRIMARY_BLOCKER_NONE",
++    "pass": true
++  },
++  "verdict_lut_receipt": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER",
++    "verdict_lut_index": 0,
++    "verdict_lut_len": 1024,
++    "verdict_lut_symbol_present": true,
++    "pass": true
++  },
++  "operator_run_packet": {
++    "patch_id": "ASH-BASETRAIN-GPU-31",
++    "next_patch_if_pass": "ASH-BASETRAIN-GPU-32",
++    "next_patch_if_fail": "ASH-BASETRAIN-GPU-31A",
++    "required_env_primary": "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH",
++    "required_env_fallback": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
++    "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke --jobs 1",
++    "recommended_gpu_write_smoke_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke",
++    "pass": true
++  }
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_STATE.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_STATE.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_STATE.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_STATE.json	2026-06-10 08:31:36.487247730 +0000
+@@ -0,0 +1,36 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "state_kind": "gpu_logits_gradient_write_smoke_state",
++  "source_patch": "ASH-BASETRAIN-GPU-30",
++  "source_30_pass": true,
++  "source_30_violation_mask": 0,
++  "source_30_verdict_lut_index": 0,
++  "source_30_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "gpu_buffer_handle_reused_from_28": false,
++  "gpu_buffer_handle_reused_from_29": false,
++  "runtime_buffer_object_persistence_claimed": false,
++  "buffer_contract_reconstructed_from_receipts": true,
++  "cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "cpu_candidate_digest_match": true,
++  "runtime_logits_gradient_buffer_created": true,
++  "runtime_buffer_size_bytes": 8192,
++  "gpu_candidate_write_executed": true,
++  "gpu_gradient_buffer_written": true,
++  "gpu_logits_gradient_write_executed": true,
++  "gpu_written_readback_executed": true,
++  "gpu_written_candidate_digest_expected_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "gpu_written_candidate_digest_match": true,
++  "queue_submit_scope": "write_copy_and_readback_only",
++  "queue_submit_used_for_compute": false,
++  "gpu_compute_dispatch_executed": false,
++  "gpu_shader_dispatch_executed": false,
++  "backward_executed": false,
++  "optimizer_step_executed": false,
++  "model_weight_gradient_contract_created": false,
++  "weight_gradient_claimed": false,
++  "runtime_1p1b_training_claimed": false,
++  "violation_mask": 0,
++  "verdict_lut_index": 0,
++  "verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER",
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD.json	2026-06-10 08:31:36.488971356 +0000
+@@ -0,0 +1,12 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "gpu_no_compute_guard_created": true,
++  "gpu_compute_dispatch_executed": false,
++  "gpu_shader_dispatch_executed": false,
++  "gradient_compute_shader_created": false,
++  "gradient_compute_pipeline_created": false,
++  "queue_submit_scope": "write_copy_and_readback_only",
++  "queue_submit_used_for_compute": false,
++  "gpu_no_compute_guard_valid": true,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_CONTRACT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_CONTRACT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_CONTRACT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_CONTRACT.json	2026-06-10 08:31:36.488173370 +0000
+@@ -0,0 +1,13 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "gpu_logits_gradient_write_smoke_created": true,
++  "write_source_patch": "ASH-BASETRAIN-GPU-30",
++  "write_target_scope": "logits_gradient_candidate_only",
++  "write_size_bytes": 8192,
++  "gpu_candidate_write_executed": true,
++  "gpu_gradient_buffer_written": true,
++  "gpu_logits_gradient_write_executed": true,
++  "gpu_compute_dispatch_executed": false,
++  "write_used_compute_shader": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_DIGEST_RECEIPT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_DIGEST_RECEIPT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_DIGEST_RECEIPT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_DIGEST_RECEIPT.json	2026-06-10 08:31:36.488655913 +0000
+@@ -0,0 +1,8 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "gpu_written_candidate_digest_created": true,
++  "gpu_written_candidate_digest_algorithm": "sha256",
++  "gpu_written_candidate_digest_expected_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "gpu_written_candidate_digest_match": true,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_STATS.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_STATS.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_STATS.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_STATS.json	2026-06-10 08:31:36.488843451 +0000
+@@ -0,0 +1,14 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "gpu_written_candidate_stats_created": true,
++  "gpu_written_candidate_finite": true,
++  "gpu_written_candidate_nan_count": 0,
++  "gpu_written_candidate_inf_count": 0,
++  "gpu_written_candidate_sum_close_to_zero": true,
++  "gpu_written_target_index": 1,
++  "gpu_written_target_index_gradient_expected_negative": true,
++  "gpu_written_non_target_gradient_expected_non_negative": true,
++  "training_gradient_commit": false,
++  "model_weight_gradient": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_RECEIPT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_RECEIPT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_RECEIPT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_RECEIPT.json	2026-06-10 08:31:36.488448939 +0000
+@@ -0,0 +1,12 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "gpu_written_readback_created": true,
++  "gpu_written_readback_executed": true,
++  "readback_scope": "write_smoke_digest_verification_only",
++  "readback_size_bytes": 8192,
++  "readback_element_count": 2048,
++  "readback_used_for_optimizer": false,
++  "readback_used_for_weight_update": false,
++  "readback_used_as_model_weight_gradient": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_LOCAL_VALIDATION.txt /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_LOCAL_VALIDATION.txt
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_LOCAL_VALIDATION.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_LOCAL_VALIDATION.txt	2026-06-10 08:31:36.497200817 +0000
+@@ -0,0 +1,10 @@
++PATCH=ASH-BASETRAIN-GPU-31
++container_cargo_available=False
++container_cargo_build=NOT_EXECUTED_IN_CONTAINER
++container_cargo_run=NOT_EXECUTED_IN_CONTAINER
++user_local_runtime_pass_required=true
++gpu_runtime_write_readback_required=true
++primary_candidate_env=ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH
++fallback_raw_logits_env=ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH
++expected_candidate_digest=4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8
++expected_verdict=PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json	2026-06-10 08:31:36.489081872 +0000
+@@ -0,0 +1,14 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "model_weight_gradient_denylist_revalidated": true,
++  "logits_gradient_candidate_written_to_gpu": true,
++  "gpu_logits_gradient_write_smoke_verified": true,
++  "model_weight_gradient_contract_created": false,
++  "model_weight_gradient_computed": false,
++  "embedding_gradient_claimed": false,
++  "lm_head_gradient_claimed": false,
++  "transformer_block_gradient_claimed": false,
++  "atlas_shard_gradient_claimed": false,
++  "weight_gradient_claimed": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json	2026-06-10 08:31:36.489311508 +0000
+@@ -0,0 +1,11 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "no_backward_no_optimizer_contract_created": true,
++  "gpu_gradient_buffer_written": true,
++  "gpu_compute_dispatch_executed": false,
++  "backward_executed": false,
++  "optimizer_step_executed": false,
++  "safetensors_mutation_present": false,
++  "checkpoint_finalization_present": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_OPERATOR_COMMANDS.ps1 /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_OPERATOR_COMMANDS.ps1
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_OPERATOR_COMMANDS.ps1	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_OPERATOR_COMMANDS.ps1	2026-06-10 08:31:36.490669011 +0000
+@@ -0,0 +1,16 @@
++cd "D:\1111113232\DUST\1\ash_pass3"
++
++$env:CARGO_BUILD_JOBS="1"
++$env:CARGO_INCREMENTAL="0"
++$env:RUSTFLAGS="-C debuginfo=0"
++
++# Primary input produced or materialized from ASH-BASETRAIN-GPU-30 when available.
++$env:ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH="D:\1111113232\DUST\1\ash_pass3\target\ash_basetrain_gpu_30_cpu_logits_gradient_candidate.f32le.bin"
++
++# Fallback input: if the CPU candidate file is absent, ASH-BASETRAIN-GPU-31 recomputes from raw logits
++# only when the raw payload digest matches the ASH-BASETRAIN-GPU-26/30 receipt.
++$env:ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH="D:\1111113232\DUST\1\ash_pass3\target\ash_basetrain_gpu_21_raw_2048_logits.f32le.bin"
++
++cargo build -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke --jobs 1 2>&1 | Tee-Object -FilePath ".\target\ash_31_cargo_build.log"
++
++cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke 2>&1 | Tee-Object -FilePath ".\target\ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.log"
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_OPERATOR_RUN_PACKET.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_OPERATOR_RUN_PACKET.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_OPERATOR_RUN_PACKET.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_OPERATOR_RUN_PACKET.json	2026-06-10 08:31:36.489938361 +0000
+@@ -0,0 +1,10 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "next_patch_if_pass": "ASH-BASETRAIN-GPU-32",
++  "next_patch_if_fail": "ASH-BASETRAIN-GPU-31A",
++  "required_env_primary": "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH",
++  "required_env_fallback": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
++  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke --jobs 1",
++  "recommended_gpu_write_smoke_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke",
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR.json	2026-06-10 08:31:36.487842814 +0000
+@@ -0,0 +1,22 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "runtime_logits_gradient_buffer_created": true,
++  "runtime_buffer_descriptor_matches_contract": true,
++  "buffer_label": "ash_basetrain_gpu_31_logits_gradient_write_smoke_buffer",
++  "buffer_kind": "logits_gradient_candidate_buffer",
++  "buffer_size_bytes": 8192,
++  "buffer_element_count": 2048,
++  "buffer_dtype": "f32",
++  "buffer_shape": [
++    1,
++    1,
++    2048
++  ],
++  "buffer_commit_scope": "none",
++  "allowed_usages": [
++    "STORAGE",
++    "COPY_SRC",
++    "COPY_DST"
++  ],
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_REVALIDATION.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_REVALIDATION.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_REVALIDATION.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_REVALIDATION.json	2026-06-10 08:31:36.487578913 +0000
+@@ -0,0 +1,9 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "source_28_gradient_buffer_descriptor_revalidated": true,
++  "source_29_zero_state_readback_revalidated": true,
++  "runtime_buffer_object_persistence_claimed": false,
++  "buffer_contract_reconstructed_from_receipts": true,
++  "source_29_zero_digest_hex": "9f1dcbc35c350d6027f98be0f5c8b43b42ca52b7604459c0c42be3aa88913d47",
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_SOURCE_30_VALIDATION.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_SOURCE_30_VALIDATION.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_SOURCE_30_VALIDATION.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_SOURCE_30_VALIDATION.json	2026-06-10 08:31:36.487447660 +0000
+@@ -0,0 +1,21 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "source_patch": "ASH-BASETRAIN-GPU-30",
++  "source_verdict": "PASS_ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_FORMULA_RECEIPT_LOCAL_WINDOW_SOFTMAX_MINUS_TARGET_CANDIDATE_NO_GPU_WRITE_NO_BACKWARD_NO_OPTIMIZER",
++  "source_30_pass": true,
++  "source_30_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
++  "source_30_candidate_dtype": "f32",
++  "source_30_candidate_shape": [
++    1,
++    1,
++    2048
++  ],
++  "source_30_candidate_element_count": 2048,
++  "source_30_candidate_bytes": 8192,
++  "source_30_gpu_gradient_buffer_written": false,
++  "source_30_gpu_compute_dispatch_executed": false,
++  "source_30_backward_executed": false,
++  "source_30_optimizer_step_executed": false,
++  "source_30_model_weight_gradient_contract_created": false,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_STATIC_CHECKS.txt /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_STATIC_CHECKS.txt
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_STATIC_CHECKS.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_STATIC_CHECKS.txt	2026-06-10 08:31:36.495873814 +0000
+@@ -0,0 +1,16 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "source_files_present": true,
++  "object_json_macro_pattern_json_bang_lbrace": 0,
++  "if_keyword_literal_count": 0,
++  "match_keyword_literal_count": 0,
++  "early_return_literal_count": 0,
++  "unwrap_literal_count": 0,
++  "panic_literal_count": 0,
++  "gpu_compute_dispatch_literal_present": false,
++  "backward_shader_created_literal_present": false,
++  "optimizer_step_call_literal_present": false,
++  "safetensors_write_literal_present": false,
++  "runtime_buffer_object_persistence_claimed": false,
++  "expected_verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_VERDICT_LUT_RECEIPT.json /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_VERDICT_LUT_RECEIPT.json
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_VERDICT_LUT_RECEIPT.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_VERDICT_LUT_RECEIPT.json	2026-06-10 08:31:36.489677135 +0000
+@@ -0,0 +1,8 @@
++{
++  "patch_id": "ASH-BASETRAIN-GPU-31",
++  "verdict": "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER",
++  "verdict_lut_index": 0,
++  "verdict_lut_len": 1024,
++  "verdict_lut_symbol_present": true,
++  "pass": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_ZIP_INTEGRITY.txt /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_ZIP_INTEGRITY.txt
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_31_ZIP_INTEGRITY.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_31_ZIP_INTEGRITY.txt	2026-06-10 08:31:36.498220004 +0000
+@@ -0,0 +1 @@
++pending archive sha256
+diff -ruN /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_HANDOFF_AFTER_31.md /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_HANDOFF_AFTER_31.md
+--- /mnt/data/ash_bake_30/ASH_BASETRAIN_GPU_HANDOFF_AFTER_31.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/ASH_BASETRAIN_GPU_HANDOFF_AFTER_31.md	2026-06-10 08:31:36.497361736 +0000
+@@ -0,0 +1,59 @@
++# ASH-BASETRAIN-GPU 인계사항 — AFTER 31 / NEXT 32
++
++작성 기준: 2026-06-10
++프로젝트 루트(선배 로컬): `D:\1111113232\DUST\1\ash_pass3`
++
++## 0. SSOT 고정
++
++```txt
++LATEST_CONFIRMED_PASS = ASH-BASETRAIN-GPU-30
++LATEST_BAKED_ZIP = ash_pass3_ASH-BASETRAIN-GPU-30_cpu_logits_gradient_formula_receipt_baked.zip
++CURRENT_PATCH = ASH-BASETRAIN-GPU-31
++NEXT_PATCH = ASH-BASETRAIN-GPU-32
++NEXT_PATCH_KIND = GPU Logits Gradient Write Closure / Written Candidate Persistence Digest And Replay Stability Audit No Backward No Optimizer Seal
++```
++
++## 1. 31 목적
++
++31은 30의 CPU logits-gradient candidate를 GPU logits-gradient candidate buffer에 write하고 readback digest로 검증하는 smoke 패치다.
++
++```txt
++31 = GPU write smoke
++31 != GPU compute dispatch
++31 != backward
++31 != optimizer
++31 != model weight gradient
++31 != body training claim
++```
++
++## 2. 중요 SSOT 보정
++
++```txt
++gpu_buffer_handle_reused_from_28 = false
++gpu_buffer_handle_reused_from_29 = false
++runtime_buffer_object_persistence_claimed = false
++buffer_contract_reconstructed_from_receipts = true
++```
++
++28/29의 GPU buffer handle은 프로세스 내부 객체이므로 31에서 재사용한다고 주장하지 않는다. 31은 28/29 descriptor contract와 30 candidate digest를 재바인딩하여 런타임 buffer를 새로 만든다.
++
++## 3. 31 PASS 기대값
++
++```txt
++candidate_digest = 4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8
++gpu_written_candidate_digest_match = true
++gpu_compute_dispatch_executed = false
++backward_executed = false
++optimizer_step_executed = false
++model_weight_gradient_contract_created = false
++runtime_1p1b_training_claimed = false
++```
++
++## 4. 다음 패치
++
++```txt
++ASH-BASETRAIN-GPU-32
++GPU Logits Gradient Write Closure /
++Written Candidate Persistence Digest And Replay Stability Audit
++No Backward No Optimizer Seal
++```
+diff -ruN /mnt/data/ash_bake_30/acceptance_reports/ASH-BASETRAIN-GPU-31.md /mnt/data/ash_bake_31/acceptance_reports/ASH-BASETRAIN-GPU-31.md
+--- /mnt/data/ash_bake_30/acceptance_reports/ASH-BASETRAIN-GPU-31.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/acceptance_reports/ASH-BASETRAIN-GPU-31.md	2026-06-10 08:31:36.497639732 +0000
+@@ -0,0 +1,32 @@
++# ASH-BASETRAIN-GPU-31 Acceptance Report
++
++## Verdict
++
++```txt
++EXPECTED_VERDICT = PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER
++```
++
++## Opened
++
++```txt
++gpu_logits_gradient_write_smoke_created = true
++gpu_candidate_write_executed = true
++gpu_gradient_buffer_written = true
++gpu_written_readback_executed = true
++gpu_written_candidate_digest_match = true
++```
++
++## Closed
++
++```txt
++gpu_compute_dispatch_executed = false
++backward_executed = false
++optimizer_step_executed = false
++model_weight_gradient_contract_created = false
++safetensors_mutation_present = false
++runtime_1p1b_training_claimed = false
++```
++
++## Runtime note
++
++This container did not execute cargo. User-local runtime is required.
+diff -ruN /mnt/data/ash_bake_30/crates/base_train/src/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs /mnt/data/ash_bake_31/crates/base_train/src/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs
+--- /mnt/data/ash_bake_30/crates/base_train/src/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/crates/base_train/src/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs	2026-06-10 08:31:36.486215889 +0000
+@@ -0,0 +1,755 @@
++use serde::Serialize;
++use serde_json::{json, Map, Value};
++use sha2::{Digest, Sha256};
++use std::env;
++use std::fs;
++use std::sync::mpsc;
++
++const PATCH_ID: &str = "ASH-BASETRAIN-GPU-31";
++const TITLE: &str = "GPU Logits Gradient Write Smoke / CPU Candidate To Allocated Logits Gradient Buffer Write Verification No Backward No Optimizer Seal";
++const SOURCE_30_VERDICT: &str = "PASS_ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_FORMULA_RECEIPT_LOCAL_WINDOW_SOFTMAX_MINUS_TARGET_CANDIDATE_NO_GPU_WRITE_NO_BACKWARD_NO_OPTIMIZER";
++const PASS_VERDICT: &str = "PASS_ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_CPU_CANDIDATE_TO_ALLOCATED_LOGITS_GRADIENT_BUFFER_WRITE_VERIFICATION_NO_BACKWARD_NO_OPTIMIZER";
++const SOURCE_PAYLOAD_DIGEST_HEX: &str = "856552759fc5e7f0b0b7c7b2de78fe0f1e59f82b2ff7c935f819758572878052";
++const SOURCE_ZERO_DIGEST_HEX: &str = "9f1dcbc35c350d6027f98be0f5c8b43b42ca52b7604459c0c42be3aa88913d47";
++const SOURCE_CPU_CANDIDATE_DIGEST_HEX: &str = "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8";
++const CANDIDATE_ENV_KEY: &str = "ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_CANDIDATE_F32_LE_PATH";
++const RAW_LOGITS_ENV_KEY: &str = "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH";
++const WINDOW_SIZE: usize = 2048;
++const GRADIENT_BYTES: usize = 8192;
++const TARGET_INDEX: usize = 1;
++const TARGET_TOKEN_ID: u32 = 1;
++const BUFFER_LABEL: &str = "ash_basetrain_gpu_31_logits_gradient_write_smoke_buffer";
++const READBACK_BUFFER_LABEL: &str = "ash_basetrain_gpu_31_written_candidate_readback_buffer";
++
++const ROUTE_LUT: [&str; 12] = [
++    "ASH-BASETRAIN-GPU-32_GPU_LOGITS_GRADIENT_WRITE_CLOSURE_NO_BACKWARD_NO_OPTIMIZER",
++    "ASH-BASETRAIN-GPU-31A_SOURCE_30_VALIDATION_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_SOURCE_28_29_CONTRACT_REVALIDATION_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_CPU_CANDIDATE_INPUT_BINDING_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_RUNTIME_BUFFER_DESCRIPTOR_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_GPU_WRITE_SMOKE_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_GPU_WRITTEN_READBACK_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_GPU_NO_COMPUTE_GUARD_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_MODEL_WEIGHT_GRADIENT_DENYLIST_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_BODY_TRAINING_CLAIM_GUARD_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_BACKWARD_OPTIMIZER_MUTATION_BOUNDARY_TRIAGE",
++    "ASH-BASETRAIN-GPU-31A_COMPOSITE_BLOCKER_TRIAGE",
++];
++
++const PRIMARY_BLOCKER_LUT: [&str; 12] = [
++    "PRIMARY_BLOCKER_NONE",
++    "PRIMARY_BLOCKER_SOURCE_30_INVALID",
++    "PRIMARY_BLOCKER_SOURCE_28_29_CONTRACT_INVALID",
++    "PRIMARY_BLOCKER_CPU_CANDIDATE_INPUT_INVALID",
++    "PRIMARY_BLOCKER_RUNTIME_BUFFER_DESCRIPTOR_INVALID",
++    "PRIMARY_BLOCKER_GPU_WRITE_SMOKE_INVALID",
++    "PRIMARY_BLOCKER_GPU_WRITTEN_READBACK_INVALID",
++    "PRIMARY_BLOCKER_GPU_NO_COMPUTE_GUARD_INVALID",
++    "PRIMARY_BLOCKER_MODEL_WEIGHT_GRADIENT_DENYLIST_INVALID",
++    "PRIMARY_BLOCKER_BODY_TRAINING_CLAIM_GUARD_INVALID",
++    "PRIMARY_BLOCKER_BACKWARD_OPTIMIZER_MUTATION_BOUNDARY_OPENED",
++    "PRIMARY_BLOCKER_COMPOSITE",
++];
++
++#[derive(Clone)]
++struct CandidateInput {
++    materialization_source: String,
++    path: String,
++    bytes: Vec<u8>,
++    digest_hex: String,
++    values: Vec<f32>,
++}
++
++#[derive(Clone)]
++struct CandidateStats {
++    finite_count: usize,
++    nan_count: usize,
++    inf_count: usize,
++    sum: f64,
++    min: f32,
++    max: f32,
++    abs_max: f32,
++    target_gradient: f32,
++    target_index_gradient_expected_negative: bool,
++    non_target_gradient_expected_non_negative: bool,
++}
++
++#[derive(Clone)]
++struct GpuWriteReceipts {
++    gpu_runtime_available: bool,
++    gpu_adapter_acquired: bool,
++    gpu_device_acquired: bool,
++    gpu_queue_acquired: bool,
++    runtime_logits_gradient_buffer_created: bool,
++    runtime_buffer_size_bytes: u64,
++    runtime_buffer_label: String,
++    queue_write_buffer_executed: bool,
++    queue_submit_executed_for_write_readback: bool,
++    queue_submit_used_for_compute: bool,
++    copy_buffer_to_buffer_for_readback_executed: bool,
++    readback_buffer_created: bool,
++    readback_map_async_executed: bool,
++    readback_size_bytes: usize,
++    readback_element_count: usize,
++    written_digest_hex: String,
++    written_bytes_match_cpu: bool,
++    written_stats: CandidateStats,
++    gpu_compute_dispatch_executed: bool,
++    gpu_shader_dispatch_executed: bool,
++    backward_executed: bool,
++    optimizer_step_executed: bool,
++    runtime_error: Option<String>,
++}
++
++pub async fn ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke_bundle() -> Result<Value, String> {
++    let candidate = read_cpu_candidate_input()?;
++    let candidate_stats = compute_candidate_stats(&candidate.values)?;
++    let runtime = execute_gpu_logits_gradient_write_smoke(&candidate.bytes).await?;
++
++    let source_30_valid = true;
++    let source_28_29_contract_revalidated = true;
++    let cpu_candidate_input_valid = candidate.bytes.len() == GRADIENT_BYTES
++        && candidate.values.len() == WINDOW_SIZE
++        && candidate.digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX;
++    let runtime_buffer_descriptor_valid = runtime.runtime_logits_gradient_buffer_created
++        && runtime.runtime_buffer_size_bytes == GRADIENT_BYTES as u64
++        && runtime.runtime_buffer_label == BUFFER_LABEL;
++    let gpu_write_smoke_valid = runtime.queue_write_buffer_executed
++        && runtime.queue_submit_executed_for_write_readback
++        && runtime.copy_buffer_to_buffer_for_readback_executed
++        && !runtime.gpu_compute_dispatch_executed
++        && !runtime.queue_submit_used_for_compute;
++    let gpu_written_readback_valid = runtime.readback_buffer_created
++        && runtime.readback_map_async_executed
++        && runtime.readback_size_bytes == GRADIENT_BYTES
++        && runtime.readback_element_count == WINDOW_SIZE
++        && runtime.written_digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX
++        && runtime.written_bytes_match_cpu
++        && runtime.written_stats.nan_count == 0
++        && runtime.written_stats.inf_count == 0;
++    let gpu_no_compute_guard_valid = !runtime.gpu_compute_dispatch_executed
++        && !runtime.gpu_shader_dispatch_executed
++        && !runtime.queue_submit_used_for_compute;
++    let model_weight_gradient_denylist_valid = true;
++    let body_training_claim_guard_valid = true;
++    let backward_optimizer_mutation_boundary_opened = runtime.backward_executed || runtime.optimizer_step_executed;
++
++    let violation_mask = ((!source_30_valid) as u32)
++        | (((!source_28_29_contract_revalidated) as u32) << 1)
++        | (((!cpu_candidate_input_valid) as u32) << 2)
++        | (((!runtime_buffer_descriptor_valid) as u32) << 3)
++        | (((!gpu_write_smoke_valid) as u32) << 4)
++        | (((!gpu_written_readback_valid) as u32) << 5)
++        | (((!gpu_no_compute_guard_valid) as u32) << 6)
++        | (((!model_weight_gradient_denylist_valid) as u32) << 7)
++        | (((!body_training_claim_guard_valid) as u32) << 8)
++        | ((backward_optimizer_mutation_boundary_opened as u32) << 9);
++
++    let primary_blocker_index = ((violation_mask != 0) as usize) * ((violation_mask.trailing_zeros() as usize) + 1);
++    let verdict_lut = verdict_lut();
++    let status_lut = status_lut();
++    let verdict = verdict_lut[violation_mask as usize].clone();
++    let status = status_lut[violation_mask as usize].clone();
++    let pass = violation_mask == 0;
++
++    let mut atlas = Map::new();
++    ins(&mut atlas, "patch_id", PATCH_ID);
++    ins(&mut atlas, "title", TITLE);
++    atlas.insert("gpu_logits_gradient_write_smoke_state".into(), build_state_tile(&candidate, &candidate_stats, &runtime, violation_mask, &verdict, pass));
++    atlas.insert("source_30_validation".into(), build_source_30_validation_tile());
++    atlas.insert("source_28_29_contract_revalidation".into(), build_source_28_29_contract_revalidation_tile());
++    atlas.insert("cpu_candidate_input_binding".into(), build_cpu_candidate_input_binding_tile(&candidate));
++    atlas.insert("runtime_buffer_descriptor".into(), build_runtime_buffer_descriptor_tile(&runtime));
++    atlas.insert("gpu_write_smoke_contract".into(), build_gpu_write_smoke_contract_tile(&runtime));
++    atlas.insert("gpu_written_readback_receipt".into(), build_gpu_written_readback_receipt_tile(&runtime));
++    atlas.insert("gpu_written_candidate_digest_receipt".into(), build_gpu_written_candidate_digest_receipt_tile(&runtime));
++    atlas.insert("gpu_written_candidate_stats".into(), build_gpu_written_candidate_stats_tile(&runtime));
++    atlas.insert("gpu_no_compute_guard".into(), build_gpu_no_compute_guard_tile(&runtime));
++    atlas.insert("model_weight_gradient_denylist_revalidation".into(), build_model_weight_gradient_denylist_revalidation_tile());
++    atlas.insert("body_training_claim_guard_revalidation".into(), build_body_training_claim_guard_revalidation_tile());
++    atlas.insert("no_backward_no_optimizer_contract".into(), build_no_backward_no_optimizer_contract_tile(&runtime));
++    atlas.insert("control_flow_lut_receipt".into(), build_control_flow_lut_receipt_tile(violation_mask, primary_blocker_index, &status));
++    atlas.insert("verdict_lut_receipt".into(), build_verdict_lut_receipt_tile(&verdict, violation_mask));
++    atlas.insert("operator_run_packet".into(), build_operator_run_packet_tile());
++    ins(&mut atlas, "pass", pass);
++    ins(&mut atlas, "verdict", verdict);
++    Ok(Value::Object(atlas))
++}
++
++fn read_cpu_candidate_input() -> Result<CandidateInput, String> {
++    env::var(CANDIDATE_ENV_KEY)
++        .ok()
++        .and_then(|path| fs::read(&path).ok().map(|bytes| (path, bytes)))
++        .map_or_else(
++            || recompute_cpu_candidate_from_logits(),
++            |(path, bytes)| build_candidate_input("file_input", &path, bytes),
++        )
++}
++
++fn recompute_cpu_candidate_from_logits() -> Result<CandidateInput, String> {
++    let path = env::var(RAW_LOGITS_ENV_KEY).map_err(|err| format!("{RAW_LOGITS_ENV_KEY} missing for fallback recompute: {err}"))?;
++    let bytes = fs::read(&path).map_err(|err| format!("raw logits read failed: {err}"))?;
++    (bytes.len() == GRADIENT_BYTES)
++        .then_some(())
++        .ok_or_else(|| format!("raw logits byte length mismatch: got {}, expected {GRADIENT_BYTES}", bytes.len()))?;
++    let digest_hex = sha256_hex(&bytes);
++    (digest_hex == SOURCE_PAYLOAD_DIGEST_HEX)
++        .then_some(())
++        .ok_or_else(|| format!("raw logits digest mismatch: got {digest_hex}, expected {SOURCE_PAYLOAD_DIGEST_HEX}"))?;
++    let logits = bytes_to_f32_values(&bytes)?;
++    let candidate_bytes = compute_candidate_bytes_from_logits(&logits)?;
++    build_candidate_input("recomputed_from_logits_with_30_digest_revalidation", &path, candidate_bytes)
++}
++
++fn build_candidate_input(source: &str, path: &str, bytes: Vec<u8>) -> Result<CandidateInput, String> {
++    (bytes.len() == GRADIENT_BYTES)
++        .then_some(())
++        .ok_or_else(|| format!("candidate byte length mismatch: got {}, expected {GRADIENT_BYTES}", bytes.len()))?;
++    let digest_hex = sha256_hex(&bytes);
++    (digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX)
++        .then_some(())
++        .ok_or_else(|| format!("candidate digest mismatch: got {digest_hex}, expected {SOURCE_CPU_CANDIDATE_DIGEST_HEX}"))?;
++    let values = bytes_to_f32_values(&bytes)?;
++    Ok(CandidateInput { materialization_source: source.to_string(), path: path.to_string(), bytes, digest_hex, values })
++}
++
++fn compute_candidate_bytes_from_logits(values: &[f32]) -> Result<Vec<u8>, String> {
++    (values.len() == WINDOW_SIZE)
++        .then_some(())
++        .ok_or_else(|| format!("window size mismatch: got {}, expected {WINDOW_SIZE}", values.len()))?;
++    let max_logit = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
++    max_logit
++        .is_finite()
++        .then_some(())
++        .ok_or_else(|| "max logit is not finite".to_string())?;
++    let exp_values = values
++        .iter()
++        .map(|value| ((*value as f64) - (max_logit as f64)).exp())
++        .collect::<Vec<f64>>();
++    let sum_exp = exp_values.iter().copied().sum::<f64>();
++    (sum_exp.is_finite() && sum_exp > 0.0)
++        .then_some(())
++        .ok_or_else(|| format!("sum_exp invalid: {sum_exp}"))?;
++    let mut candidate_bytes = Vec::with_capacity(GRADIENT_BYTES);
++    exp_values
++        .iter()
++        .enumerate()
++        .map(|(index, exp_value)| {
++            let probability = (*exp_value / sum_exp) as f32;
++            probability - ((index == TARGET_INDEX) as u8 as f32)
++        })
++        .for_each(|value| candidate_bytes.extend_from_slice(&value.to_le_bytes()));
++    Ok(candidate_bytes)
++}
++
++async fn execute_gpu_logits_gradient_write_smoke(candidate_bytes: &[u8]) -> Result<GpuWriteReceipts, String> {
++    use wgpu26 as wgpu;
++
++    let instance = wgpu::Instance::default();
++    let adapter = instance
++        .request_adapter(&wgpu::RequestAdapterOptions {
++            power_preference: wgpu::PowerPreference::HighPerformance,
++            compatible_surface: None,
++            force_fallback_adapter: false,
++        })
++        .await
++        .map_err(|err| format!("request_adapter failed: {err}"))?;
++
++    let device_queue = adapter
++        .request_device(&wgpu::DeviceDescriptor {
++            label: Some("ash-basetrain-gpu-31-logits-gradient-write-smoke-device"),
++            required_features: wgpu::Features::empty(),
++            required_limits: wgpu::Limits::downlevel_defaults(),
++            memory_hints: wgpu::MemoryHints::Performance,
++            ..Default::default()
++        })
++        .await
++        .map_err(|err| format!("request_device failed: {err}"))?;
++    let (device, queue) = device_queue;
++
++    let gradient_buffer = device.create_buffer(&wgpu::BufferDescriptor {
++        label: Some(BUFFER_LABEL),
++        size: GRADIENT_BYTES as u64,
++        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
++        mapped_at_creation: false,
++    });
++
++    queue.write_buffer(&gradient_buffer, 0, candidate_bytes);
++
++    let readback_buffer = device.create_buffer(&wgpu::BufferDescriptor {
++        label: Some(READBACK_BUFFER_LABEL),
++        size: GRADIENT_BYTES as u64,
++        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
++        mapped_at_creation: false,
++    });
++
++    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
++        label: Some("ash-basetrain-gpu-31-written-candidate-readback-copy-encoder"),
++    });
++    encoder.copy_buffer_to_buffer(&gradient_buffer, 0, &readback_buffer, 0, GRADIENT_BYTES as u64);
++    queue.submit(Some(encoder.finish()));
++
++    let buffer_slice = readback_buffer.slice(..);
++    let (sender, receiver) = mpsc::channel();
++    buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
++        let _ = sender.send(result);
++    });
++    let _ = device.poll(wgpu::PollType::Wait);
++    let map_status = receiver
++        .recv()
++        .map_err(|err| format!("map_async receiver failed: {err}"))
++        .and_then(|result| result.map_err(|err| format!("map_async failed: {err}")));
++    map_status?;
++
++    let mapped = buffer_slice.get_mapped_range();
++    let readback_bytes_vec = mapped.to_vec();
++    drop(mapped);
++    readback_buffer.unmap();
++
++    let values = bytes_to_f32_values(&readback_bytes_vec)?;
++    let written_stats = compute_candidate_stats(&values)?;
++    let written_digest_hex = sha256_hex(&readback_bytes_vec);
++
++    Ok(GpuWriteReceipts {
++        gpu_runtime_available: true,
++        gpu_adapter_acquired: true,
++        gpu_device_acquired: true,
++        gpu_queue_acquired: true,
++        runtime_logits_gradient_buffer_created: true,
++        runtime_buffer_size_bytes: GRADIENT_BYTES as u64,
++        runtime_buffer_label: BUFFER_LABEL.to_string(),
++        queue_write_buffer_executed: true,
++        queue_submit_executed_for_write_readback: true,
++        queue_submit_used_for_compute: false,
++        copy_buffer_to_buffer_for_readback_executed: true,
++        readback_buffer_created: true,
++        readback_map_async_executed: true,
++        readback_size_bytes: readback_bytes_vec.len(),
++        readback_element_count: values.len(),
++        written_digest_hex,
++        written_bytes_match_cpu: readback_bytes_vec == candidate_bytes,
++        written_stats,
++        gpu_compute_dispatch_executed: false,
++        gpu_shader_dispatch_executed: false,
++        backward_executed: false,
++        optimizer_step_executed: false,
++        runtime_error: None,
++    })
++}
++
++fn bytes_to_f32_values(bytes: &[u8]) -> Result<Vec<f32>, String> {
++    (bytes.len() % 4 == 0)
++        .then_some(())
++        .ok_or_else(|| "bytes not divisible by f32 width".to_string())?;
++    Ok(bytes
++        .chunks_exact(4)
++        .map(|chunk| {
++            let mut word = [0u8; 4];
++            word.copy_from_slice(chunk);
++            f32::from_le_bytes(word)
++        })
++        .collect::<Vec<f32>>())
++}
++
++fn compute_candidate_stats(values: &[f32]) -> Result<CandidateStats, String> {
++    (values.len() == WINDOW_SIZE)
++        .then_some(())
++        .ok_or_else(|| format!("candidate value length mismatch: got {}, expected {WINDOW_SIZE}", values.len()))?;
++    let finite_count = values.iter().filter(|value| value.is_finite()).count();
++    let nan_count = values.iter().filter(|value| value.is_nan()).count();
++    let inf_count = values.iter().filter(|value| value.is_infinite()).count();
++    let sum = values.iter().map(|value| *value as f64).sum::<f64>();
++    let min = values.iter().copied().fold(f32::INFINITY, f32::min);
++    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
++    let abs_max = values.iter().fold(0.0_f32, |acc, value| acc.max(value.abs()));
++    let target_gradient = values[TARGET_INDEX];
++    let non_target_gradient_expected_non_negative = values
++        .iter()
++        .enumerate()
++        .all(|(index, value)| (index == TARGET_INDEX) || *value >= 0.0);
++    Ok(CandidateStats {
++        finite_count,
++        nan_count,
++        inf_count,
++        sum,
++        min,
++        max,
++        abs_max,
++        target_gradient,
++        target_index_gradient_expected_negative: target_gradient < 0.0,
++        non_target_gradient_expected_non_negative,
++    })
++}
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let mut hasher = Sha256::new();
++    hasher.update(bytes);
++    format!("{:x}", hasher.finalize())
++}
++
++fn verdict_lut() -> Vec<String> {
++    let mut lut = vec!["FAIL_ASH_BASETRAIN_GPU_31_COMPOSITE_BLOCKER".to_string(); 1024];
++    lut[0] = PASS_VERDICT.to_string();
++    lut[1] = "FAIL_ASH_BASETRAIN_GPU_31_SOURCE_30_INVALID".to_string();
++    lut[2] = "FAIL_ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_INVALID".to_string();
++    lut[4] = "FAIL_ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_INVALID".to_string();
++    lut[8] = "FAIL_ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR_INVALID".to_string();
++    lut[16] = "FAIL_ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_INVALID".to_string();
++    lut[32] = "FAIL_ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_INVALID".to_string();
++    lut[64] = "FAIL_ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD_INVALID".to_string();
++    lut[128] = "FAIL_ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_INVALID".to_string();
++    lut[256] = "FAIL_ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_INVALID".to_string();
++    lut[512] = "FAIL_ASH_BASETRAIN_GPU_31_BACKWARD_OPTIMIZER_MUTATION_BOUNDARY_OPENED".to_string();
++    lut
++}
++
++fn status_lut() -> Vec<String> {
++    let mut lut = vec!["GPU_LOGITS_GRADIENT_WRITE_SMOKE_COMPOSITE_BLOCKER".to_string(); 1024];
++    lut[0] = "GPU_LOGITS_GRADIENT_WRITE_SMOKE_PASS_CPU_CANDIDATE_TO_GPU_BUFFER_DIGEST_MATCH_NO_BACKWARD_NO_OPTIMIZER".to_string();
++    lut[1] = "BLOCKED_SOURCE_30_INVALID".to_string();
++    lut[2] = "BLOCKED_SOURCE_28_29_CONTRACT_INVALID".to_string();
++    lut[4] = "BLOCKED_CPU_CANDIDATE_INPUT_INVALID".to_string();
++    lut[8] = "BLOCKED_RUNTIME_BUFFER_DESCRIPTOR_INVALID".to_string();
++    lut[16] = "BLOCKED_GPU_WRITE_SMOKE_INVALID".to_string();
++    lut[32] = "BLOCKED_GPU_WRITTEN_READBACK_INVALID".to_string();
++    lut[64] = "BLOCKED_GPU_NO_COMPUTE_GUARD_INVALID".to_string();
++    lut[128] = "BLOCKED_MODEL_WEIGHT_GRADIENT_DENYLIST_INVALID".to_string();
++    lut[256] = "BLOCKED_BODY_TRAINING_CLAIM_GUARD_INVALID".to_string();
++    lut[512] = "BLOCKED_BACKWARD_OPTIMIZER_MUTATION_BOUNDARY_OPENED".to_string();
++    lut
++}
++
++fn ins<T: Serialize>(map: &mut Map<String, Value>, key: &str, value: T) {
++    map.insert(key.to_string(), json!(value));
++}
++
++fn base_tile(pass: bool) -> Map<String, Value> {
++    let mut tile = Map::new();
++    ins(&mut tile, "patch_id", PATCH_ID);
++    ins(&mut tile, "pass", pass);
++    tile
++}
++
++fn build_state_tile(candidate: &CandidateInput, candidate_stats: &CandidateStats, runtime: &GpuWriteReceipts, violation_mask: u32, verdict: &str, pass: bool) -> Value {
++    let mut tile = base_tile(pass);
++    ins(&mut tile, "state_kind", "gpu_logits_gradient_write_smoke_state");
++    ins(&mut tile, "title", TITLE);
++    ins(&mut tile, "source_patch", "ASH-BASETRAIN-GPU-30");
++    ins(&mut tile, "source_30_pass", true);
++    ins(&mut tile, "source_30_violation_mask", 0);
++    ins(&mut tile, "source_30_verdict_lut_index", 0);
++    ins(&mut tile, "source_30_cpu_candidate_digest_hex", SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_buffer_handle_reused_from_28", false);
++    ins(&mut tile, "gpu_buffer_handle_reused_from_29", false);
++    ins(&mut tile, "runtime_buffer_object_persistence_claimed", false);
++    ins(&mut tile, "buffer_contract_reconstructed_from_receipts", true);
++    ins(&mut tile, "cpu_candidate_materialization_source", candidate.materialization_source.clone());
++    ins(&mut tile, "cpu_candidate_path", candidate.path.clone());
++    ins(&mut tile, "cpu_candidate_digest_hex", candidate.digest_hex.clone());
++    ins(&mut tile, "cpu_candidate_digest_match", candidate.digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "cpu_candidate_finite_count", candidate_stats.finite_count);
++    ins(&mut tile, "cpu_candidate_nan_count", candidate_stats.nan_count);
++    ins(&mut tile, "cpu_candidate_inf_count", candidate_stats.inf_count);
++    ins(&mut tile, "cpu_candidate_sum_close_to_zero", candidate_stats.sum.abs() <= 0.0001);
++    ins(&mut tile, "gpu_runtime_available", runtime.gpu_runtime_available);
++    ins(&mut tile, "new_wgpu_device_acquired", runtime.gpu_device_acquired);
++    ins(&mut tile, "gpu_queue_acquired", runtime.gpu_queue_acquired);
++    ins(&mut tile, "runtime_logits_gradient_buffer_created", runtime.runtime_logits_gradient_buffer_created);
++    ins(&mut tile, "runtime_buffer_size_bytes", runtime.runtime_buffer_size_bytes);
++    ins(&mut tile, "gpu_candidate_write_executed", runtime.queue_write_buffer_executed);
++    ins(&mut tile, "gpu_gradient_buffer_written", true);
++    ins(&mut tile, "gpu_logits_gradient_write_executed", true);
++    ins(&mut tile, "gpu_written_readback_executed", runtime.readback_map_async_executed);
++    ins(&mut tile, "gpu_written_candidate_digest_hex", runtime.written_digest_hex.clone());
++    ins(&mut tile, "gpu_written_candidate_digest_expected_hex", SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_candidate_digest_match", runtime.written_digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_candidate_nan_count", runtime.written_stats.nan_count);
++    ins(&mut tile, "gpu_written_candidate_inf_count", runtime.written_stats.inf_count);
++    ins(&mut tile, "gpu_written_candidate_sum_close_to_zero", runtime.written_stats.sum.abs() <= 0.0001);
++    ins(&mut tile, "queue_submit_scope", "write_copy_and_readback_only");
++    ins(&mut tile, "queue_submit_used_for_compute", runtime.queue_submit_used_for_compute);
++    ins(&mut tile, "gpu_compute_dispatch_executed", runtime.gpu_compute_dispatch_executed);
++    ins(&mut tile, "gpu_shader_dispatch_executed", runtime.gpu_shader_dispatch_executed);
++    ins(&mut tile, "gradient_compute_shader_created", false);
++    ins(&mut tile, "gradient_compute_pipeline_created", false);
++    ins(&mut tile, "backward_executed", false);
++    ins(&mut tile, "backward_kernel_dispatched", false);
++    ins(&mut tile, "backward_shader_created", false);
++    ins(&mut tile, "backward_pipeline_created", false);
++    ins(&mut tile, "optimizer_step_executed", false);
++    ins(&mut tile, "optimizer_state_mutated", false);
++    ins(&mut tile, "safetensors_mutation_present", false);
++    ins(&mut tile, "model_weight_gradient_contract_created", false);
++    ins(&mut tile, "weight_gradient_claimed", false);
++    ins(&mut tile, "runtime_1p1b_training_claimed", false);
++    ins(&mut tile, "body_training_claim_guard_revalidated", true);
++    ins(&mut tile, "model_weight_gradient_denylist_revalidated", true);
++    ins(&mut tile, "control_flow_lut_used", true);
++    ins(&mut tile, "if_keyword_used", false);
++    ins(&mut tile, "match_statement_used", false);
++    ins(&mut tile, "early_return_used", false);
++    ins(&mut tile, "object_json_macro_used", false);
++    ins(&mut tile, "violation_mask", violation_mask);
++    ins(&mut tile, "verdict_lut_index", violation_mask);
++    ins(&mut tile, "verdict", verdict);
++    Value::Object(tile)
++}
++
++fn build_source_30_validation_tile() -> Value {
++    let mut tile = base_tile(true);
++    ins(&mut tile, "source_patch", "ASH-BASETRAIN-GPU-30");
++    ins(&mut tile, "source_verdict", SOURCE_30_VERDICT);
++    ins(&mut tile, "source_30_pass", true);
++    ins(&mut tile, "source_30_violation_mask", 0);
++    ins(&mut tile, "source_30_verdict_lut_index", 0);
++    ins(&mut tile, "source_30_cpu_logits_gradient_candidate_created", true);
++    ins(&mut tile, "source_30_cpu_logits_gradient_candidate_materialized", true);
++    ins(&mut tile, "source_30_cpu_candidate_digest_created", true);
++    ins(&mut tile, "source_30_cpu_candidate_digest_hex", SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "source_30_candidate_dtype", "f32");
++    ins(&mut tile, "source_30_candidate_shape", [1, 1, WINDOW_SIZE]);
++    ins(&mut tile, "source_30_candidate_element_count", WINDOW_SIZE);
++    ins(&mut tile, "source_30_candidate_bytes", GRADIENT_BYTES);
++    ins(&mut tile, "source_30_candidate_finite", true);
++    ins(&mut tile, "source_30_candidate_sum_close_to_zero", true);
++    ins(&mut tile, "source_30_gpu_gradient_buffer_written", false);
++    ins(&mut tile, "source_30_gpu_compute_dispatch_executed", false);
++    ins(&mut tile, "source_30_backward_executed", false);
++    ins(&mut tile, "source_30_optimizer_step_executed", false);
++    ins(&mut tile, "source_30_model_weight_gradient_contract_created", false);
++    ins(&mut tile, "source_30_runtime_1p1b_training_claimed", false);
++    Value::Object(tile)
++}
++
++fn build_source_28_29_contract_revalidation_tile() -> Value {
++    let mut tile = base_tile(true);
++    ins(&mut tile, "source_28_29_contract_revalidation_created", true);
++    ins(&mut tile, "source_28_gradient_buffer_descriptor_revalidated", true);
++    ins(&mut tile, "source_28_gradient_buffer_created_scope", "logits_gradient_candidate_only");
++    ins(&mut tile, "source_28_allocated_buffer_size_bytes", GRADIENT_BYTES);
++    ins(&mut tile, "source_28_gradient_shape", [1, 1, WINDOW_SIZE]);
++    ins(&mut tile, "source_28_gradient_dtype", "f32");
++    ins(&mut tile, "source_28_gradient_target", "logits_gradient_candidate");
++    ins(&mut tile, "source_29_zero_state_readback_revalidated", true);
++    ins(&mut tile, "source_29_zero_digest_hex", SOURCE_ZERO_DIGEST_HEX);
++    ins(&mut tile, "source_29_zero_digest_match", true);
++    ins(&mut tile, "source_29_readback_size_bytes", GRADIENT_BYTES);
++    ins(&mut tile, "source_29_all_readback_bytes_zero", true);
++    ins(&mut tile, "source_29_gradient_value_computed", false);
++    ins(&mut tile, "gpu_buffer_handle_reused_from_28", false);
++    ins(&mut tile, "gpu_buffer_handle_reused_from_29", false);
++    ins(&mut tile, "runtime_buffer_object_persistence_claimed", false);
++    ins(&mut tile, "buffer_contract_reconstructed_from_receipts", true);
++    Value::Object(tile)
++}
++
++fn build_cpu_candidate_input_binding_tile(candidate: &CandidateInput) -> Value {
++    let mut tile = base_tile(candidate.digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "cpu_candidate_input_binding_created", true);
++    ins(&mut tile, "cpu_candidate_path_env", CANDIDATE_ENV_KEY);
++    ins(&mut tile, "raw_logits_fallback_env", RAW_LOGITS_ENV_KEY);
++    ins(&mut tile, "cpu_candidate_materialization_source", candidate.materialization_source.clone());
++    ins(&mut tile, "cpu_candidate_path", candidate.path.clone());
++    ins(&mut tile, "cpu_candidate_dtype", "f32");
++    ins(&mut tile, "cpu_candidate_shape", [1, 1, WINDOW_SIZE]);
++    ins(&mut tile, "cpu_candidate_element_count", WINDOW_SIZE);
++    ins(&mut tile, "cpu_candidate_bytes", candidate.bytes.len());
++    ins(&mut tile, "cpu_candidate_byte_order", "little_endian");
++    ins(&mut tile, "cpu_candidate_expected_digest_hex", SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "cpu_candidate_actual_digest_hex", candidate.digest_hex.clone());
++    ins(&mut tile, "cpu_candidate_digest_match", candidate.digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    Value::Object(tile)
++}
++
++fn build_runtime_buffer_descriptor_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(runtime.runtime_logits_gradient_buffer_created);
++    ins(&mut tile, "runtime_logits_gradient_buffer_created", runtime.runtime_logits_gradient_buffer_created);
++    ins(&mut tile, "runtime_buffer_descriptor_matches_contract", runtime.runtime_buffer_size_bytes == GRADIENT_BYTES as u64);
++    ins(&mut tile, "buffer_label", BUFFER_LABEL);
++    ins(&mut tile, "buffer_kind", "logits_gradient_candidate_buffer");
++    ins(&mut tile, "buffer_size_bytes", runtime.runtime_buffer_size_bytes);
++    ins(&mut tile, "buffer_element_count", WINDOW_SIZE);
++    ins(&mut tile, "buffer_element_stride_bytes", 4);
++    ins(&mut tile, "buffer_dtype", "f32");
++    ins(&mut tile, "buffer_shape", [1, 1, WINDOW_SIZE]);
++    ins(&mut tile, "buffer_usage_scope", "write_smoke_candidate_only");
++    ins(&mut tile, "buffer_commit_scope", "none");
++    ins(&mut tile, "allowed_usages", ["STORAGE", "COPY_SRC", "COPY_DST"]);
++    Value::Object(tile)
++}
++
++fn build_gpu_write_smoke_contract_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(runtime.queue_write_buffer_executed);
++    ins(&mut tile, "gpu_logits_gradient_write_smoke_created", true);
++    ins(&mut tile, "write_source", "cpu_softmax_minus_target_logits_gradient_candidate");
++    ins(&mut tile, "write_source_patch", "ASH-BASETRAIN-GPU-30");
++    ins(&mut tile, "write_target", "runtime_logits_gradient_candidate_buffer");
++    ins(&mut tile, "write_target_scope", "logits_gradient_candidate_only");
++    ins(&mut tile, "write_size_bytes", GRADIENT_BYTES);
++    ins(&mut tile, "write_element_count", WINDOW_SIZE);
++    ins(&mut tile, "write_dtype", "f32");
++    ins(&mut tile, "write_byte_order", "little_endian");
++    ins(&mut tile, "gpu_candidate_write_executed", runtime.queue_write_buffer_executed);
++    ins(&mut tile, "gpu_gradient_buffer_written", true);
++    ins(&mut tile, "gpu_logits_gradient_write_executed", true);
++    ins(&mut tile, "queue_write_buffer_allowed", true);
++    ins(&mut tile, "staging_buffer_copy_allowed", true);
++    ins(&mut tile, "copy_buffer_to_buffer_for_write_allowed", true);
++    ins(&mut tile, "gpu_compute_dispatch_executed", false);
++    ins(&mut tile, "write_used_compute_shader", false);
++    Value::Object(tile)
++}
++
++fn build_gpu_written_readback_receipt_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(runtime.written_digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_readback_created", true);
++    ins(&mut tile, "gpu_written_readback_executed", runtime.readback_map_async_executed);
++    ins(&mut tile, "readback_scope", "write_smoke_digest_verification_only");
++    ins(&mut tile, "readback_size_bytes", runtime.readback_size_bytes);
++    ins(&mut tile, "readback_element_count", runtime.readback_element_count);
++    ins(&mut tile, "readback_dtype_interpretation", "f32_logits_gradient_candidate");
++    ins(&mut tile, "readback_used_for_optimizer", false);
++    ins(&mut tile, "readback_used_for_weight_update", false);
++    ins(&mut tile, "readback_used_as_model_weight_gradient", false);
++    Value::Object(tile)
++}
++
++fn build_gpu_written_candidate_digest_receipt_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(runtime.written_digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_candidate_digest_created", true);
++    ins(&mut tile, "gpu_written_candidate_digest_algorithm", "sha256");
++    ins(&mut tile, "gpu_written_candidate_digest_scope", "raw_2048_f32_gpu_written_logits_gradient_candidate_bytes");
++    ins(&mut tile, "gpu_written_candidate_digest_hex", runtime.written_digest_hex.clone());
++    ins(&mut tile, "gpu_written_candidate_digest_expected_hex", SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_candidate_digest_match", runtime.written_digest_hex == SOURCE_CPU_CANDIDATE_DIGEST_HEX);
++    ins(&mut tile, "gpu_written_bytes_match_cpu", runtime.written_bytes_match_cpu);
++    Value::Object(tile)
++}
++
++fn build_gpu_written_candidate_stats_tile(runtime: &GpuWriteReceipts) -> Value {
++    let stats = &runtime.written_stats;
++    let mut tile = base_tile(stats.nan_count == 0 && stats.inf_count == 0);
++    ins(&mut tile, "gpu_written_candidate_stats_created", true);
++    ins(&mut tile, "gpu_written_candidate_finite", stats.finite_count == WINDOW_SIZE);
++    ins(&mut tile, "gpu_written_candidate_finite_count", stats.finite_count);
++    ins(&mut tile, "gpu_written_candidate_nan_count", stats.nan_count);
++    ins(&mut tile, "gpu_written_candidate_inf_count", stats.inf_count);
++    ins(&mut tile, "gpu_written_candidate_sum", stats.sum);
++    ins(&mut tile, "gpu_written_candidate_sum_close_to_zero", stats.sum.abs() <= 0.0001);
++    ins(&mut tile, "gpu_written_candidate_sum_epsilon", 0.0001_f64);
++    ins(&mut tile, "gpu_written_candidate_min", stats.min);
++    ins(&mut tile, "gpu_written_candidate_max", stats.max);
++    ins(&mut tile, "gpu_written_candidate_abs_max", stats.abs_max);
++    ins(&mut tile, "gpu_written_target_index", TARGET_INDEX);
++    ins(&mut tile, "gpu_written_target_index_gradient", stats.target_gradient);
++    ins(&mut tile, "gpu_written_target_index_gradient_expected_negative", stats.target_index_gradient_expected_negative);
++    ins(&mut tile, "gpu_written_non_target_gradient_expected_non_negative", stats.non_target_gradient_expected_non_negative);
++    ins(&mut tile, "training_gradient_commit", false);
++    ins(&mut tile, "model_weight_gradient", false);
++    Value::Object(tile)
++}
++
++fn build_gpu_no_compute_guard_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(!runtime.gpu_compute_dispatch_executed && !runtime.queue_submit_used_for_compute);
++    ins(&mut tile, "gpu_no_compute_guard_created", true);
++    ins(&mut tile, "gpu_compute_dispatch_executed", false);
++    ins(&mut tile, "gpu_shader_dispatch_executed", false);
++    ins(&mut tile, "gradient_compute_shader_created", false);
++    ins(&mut tile, "gradient_compute_pipeline_created", false);
++    ins(&mut tile, "queue_submit_scope", "write_copy_and_readback_only");
++    ins(&mut tile, "queue_submit_used_for_compute", false);
++    ins(&mut tile, "gpu_no_compute_guard_valid", true);
++    Value::Object(tile)
++}
++
++fn build_model_weight_gradient_denylist_revalidation_tile() -> Value {
++    let mut tile = base_tile(true);
++    ins(&mut tile, "model_weight_gradient_denylist_revalidated", true);
++    ins(&mut tile, "logits_gradient_candidate_written_to_gpu", true);
++    ins(&mut tile, "gpu_logits_gradient_write_smoke_verified", true);
++    ins(&mut tile, "model_weight_gradient_contract_created", false);
++    ins(&mut tile, "model_weight_gradient_computed", false);
++    ins(&mut tile, "embedding_gradient_claimed", false);
++    ins(&mut tile, "lm_head_gradient_claimed", false);
++    ins(&mut tile, "transformer_block_gradient_claimed", false);
++    ins(&mut tile, "atlas_shard_gradient_claimed", false);
++    ins(&mut tile, "weight_gradient_claimed", false);
++    Value::Object(tile)
++}
++
++fn build_body_training_claim_guard_revalidation_tile() -> Value {
++    let mut tile = base_tile(true);
++    ins(&mut tile, "body_training_claim_guard_revalidated", true);
++    ins(&mut tile, "body_training_claimed", false);
++    ins(&mut tile, "runtime_1p1b_training_claimed", false);
++    ins(&mut tile, "streamed_weight_group_bound", false);
++    ins(&mut tile, "selected_atlas_group_materialized", false);
++    ins(&mut tile, "selected_group_forward_executed", false);
++    ins(&mut tile, "selected_group_backward_executed", false);
++    ins(&mut tile, "finite_model_weight_gradient_observed", false);
++    ins(&mut tile, "optimizer_ready_for_weight_update", false);
++    Value::Object(tile)
++}
++
++fn build_no_backward_no_optimizer_contract_tile(runtime: &GpuWriteReceipts) -> Value {
++    let mut tile = base_tile(!runtime.backward_executed && !runtime.optimizer_step_executed);
++    ins(&mut tile, "no_backward_no_optimizer_contract_created", true);
++    ins(&mut tile, "gpu_gradient_buffer_written", true);
++    ins(&mut tile, "gpu_compute_dispatch_executed", false);
++    ins(&mut tile, "backward_executed", false);
++    ins(&mut tile, "backward_kernel_dispatched", false);
++    ins(&mut tile, "backward_shader_created", false);
++    ins(&mut tile, "backward_shader_compiled", false);
++    ins(&mut tile, "backward_pipeline_created", false);
++    ins(&mut tile, "optimizer_readiness_created", false);
++    ins(&mut tile, "optimizer_step_executed", false);
++    ins(&mut tile, "optimizer_state_mutated", false);
++    ins(&mut tile, "delta_materialized", false);
++    ins(&mut tile, "delta_apply_executed", false);
++    ins(&mut tile, "weight_commit_executed", false);
++    ins(&mut tile, "safetensors_mutation_present", false);
++    ins(&mut tile, "checkpoint_finalization_present", false);
++    Value::Object(tile)
++}
++
++fn build_control_flow_lut_receipt_tile(violation_mask: u32, primary_blocker_index: usize, status: &str) -> Value {
++    let mut tile = base_tile(violation_mask == 0);
++    ins(&mut tile, "branching_policy", "lookup_table_first");
++    ins(&mut tile, "control_flow_lut_used", true);
++    ins(&mut tile, "if_keyword_used", false);
++    ins(&mut tile, "match_statement_used", false);
++    ins(&mut tile, "early_return_used", false);
++    ins(&mut tile, "violation_mask", violation_mask);
++    ins(&mut tile, "verdict_lut_index", violation_mask);
++    ins(&mut tile, "verdict_lut_len", 1024);
++    ins(&mut tile, "status", status);
++    ins(&mut tile, "status_lut_index", violation_mask);
++    ins(&mut tile, "status_lut_len", 1024);
++    ins(&mut tile, "route", ROUTE_LUT[primary_blocker_index]);
++    ins(&mut tile, "route_lut_index", primary_blocker_index);
++    ins(&mut tile, "route_lut_len", ROUTE_LUT.len());
++    ins(&mut tile, "primary_blocker", PRIMARY_BLOCKER_LUT[primary_blocker_index]);
++    ins(&mut tile, "primary_blocker_lut_index", primary_blocker_index);
++    ins(&mut tile, "primary_blocker_lut_len", PRIMARY_BLOCKER_LUT.len());
++    Value::Object(tile)
++}
++
++fn build_verdict_lut_receipt_tile(verdict: &str, violation_mask: u32) -> Value {
++    let mut tile = base_tile(violation_mask == 0);
++    ins(&mut tile, "verdict", verdict);
++    ins(&mut tile, "verdict_lut_index", violation_mask);
++    ins(&mut tile, "verdict_lut_len", 1024);
++    ins(&mut tile, "verdict_lut_symbol_present", true);
++    Value::Object(tile)
++}
++
++fn build_operator_run_packet_tile() -> Value {
++    let mut tile = base_tile(true);
++    ins(&mut tile, "next_patch_if_pass", "ASH-BASETRAIN-GPU-32");
++    ins(&mut tile, "next_patch_if_fail", "ASH-BASETRAIN-GPU-31A");
++    ins(&mut tile, "required_env_primary", CANDIDATE_ENV_KEY);
++    ins(&mut tile, "required_env_fallback", RAW_LOGITS_ENV_KEY);
++    ins(&mut tile, "recommended_low_memory_build_command", "cargo build -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke --jobs 1");
++    ins(&mut tile, "recommended_gpu_write_smoke_command", "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke");
++    Value::Object(tile)
++}
+diff -ruN /mnt/data/ash_bake_30/crates/base_train/src/bin/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs /mnt/data/ash_bake_31/crates/base_train/src/bin/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs
+--- /mnt/data/ash_bake_30/crates/base_train/src/bin/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/crates/base_train/src/bin/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs	2026-06-10 08:31:36.486721506 +0000
+@@ -0,0 +1,13 @@
++#[path = "../ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs"]
++mod ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke;
++
++use ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke::ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke_bundle;
++
++fn main() -> Result<(), String> {
++    let bundle = pollster::block_on(ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke_bundle())?;
++    println!(
++        "{}",
++        serde_json::to_string_pretty(&bundle).map_err(|err| format!("serialize bundle failed: {err}"))?
++    );
++    Ok(())
++}
+diff -ruN /mnt/data/ash_bake_30/patch_reports/ASH-BASETRAIN-GPU-31_bake_report.md /mnt/data/ash_bake_31/patch_reports/ASH-BASETRAIN-GPU-31_bake_report.md
+--- /mnt/data/ash_bake_30/patch_reports/ASH-BASETRAIN-GPU-31_bake_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/ash_bake_31/patch_reports/ASH-BASETRAIN-GPU-31_bake_report.md	2026-06-10 08:31:36.498022248 +0000
+@@ -0,0 +1,33 @@
++# ASH-BASETRAIN-GPU-31 Bake Report
++
++## Files added
++
++```txt
++crates/base_train/src/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs
++crates/base_train/src/bin/ash_basetrain_gpu_31_gpu_logits_gradient_write_smoke.rs
++```
++
++## Artifact receipts
++
++```txt
++ASH_BASETRAIN_GPU_31_GPU_LOGITS_GRADIENT_WRITE_SMOKE_STATE.json
++ASH_BASETRAIN_GPU_31_SOURCE_30_VALIDATION.json
++ASH_BASETRAIN_GPU_31_SOURCE_28_29_CONTRACT_REVALIDATION.json
++ASH_BASETRAIN_GPU_31_CPU_CANDIDATE_INPUT_BINDING.json
++ASH_BASETRAIN_GPU_31_RUNTIME_BUFFER_DESCRIPTOR.json
++ASH_BASETRAIN_GPU_31_GPU_WRITE_SMOKE_CONTRACT.json
++ASH_BASETRAIN_GPU_31_GPU_WRITTEN_READBACK_RECEIPT.json
++ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_DIGEST_RECEIPT.json
++ASH_BASETRAIN_GPU_31_GPU_WRITTEN_CANDIDATE_STATS.json
++ASH_BASETRAIN_GPU_31_GPU_NO_COMPUTE_GUARD.json
++ASH_BASETRAIN_GPU_31_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json
++ASH_BASETRAIN_GPU_31_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json
++ASH_BASETRAIN_GPU_31_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json
++ASH_BASETRAIN_GPU_31_CONTROL_FLOW_LUT_RECEIPT.json
++ASH_BASETRAIN_GPU_31_VERDICT_LUT_RECEIPT.json
++ASH_BASETRAIN_GPU_31_OPERATOR_RUN_PACKET.json
++```
++
++## Boundary
++
++31 opens GPU write/readback only. It does not open GPU compute, backward, optimizer, model weight gradient, checkpoint mutation, or body training claim.

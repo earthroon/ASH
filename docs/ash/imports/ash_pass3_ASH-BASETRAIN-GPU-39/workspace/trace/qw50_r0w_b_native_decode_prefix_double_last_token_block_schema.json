@@ -1,0 +1,28 @@
+{
+  "patch_id": "QW-50-R0W-B",
+  "title": "Native Decode Prefix Double Last Token Block / No Sampler Mutation Seal",
+  "base_patch": "QW-50-R0W-A",
+  "related_runtime_chain": "QW-52C-R13-S6",
+  "schema_version": "1.0.0",
+  "rule": {
+    "if_generated_tail_equals_last_token": "do_not_push_last_token_into_generated_prefix",
+    "else": "preserve_existing_last_token_prefix_push_behavior"
+  },
+  "forbidden_mutations": {
+    "sampler_mutation": false,
+    "logit_mutation": false,
+    "token_ban_added": false,
+    "hard_ban_added": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "model_weight_mutation": false,
+    "lora_scale_mutation": false
+  },
+  "trace_fields_added": [
+    "last_token_push.pushed"
+  ],
+  "serde_backward_compatibility": {
+    "last_token_push.pushed": "default_false"
+  }
+}

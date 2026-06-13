@@ -1,0 +1,27 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-30",
+  "title": "CPU Logits Gradient Formula Receipt / Local Window Softmax Minus Target Candidate No GPU Write No Backward No Optimizer Seal",
+  "state_kind": "cpu_logits_gradient_formula_receipt_state",
+  "source_patch": "ASH-BASETRAIN-GPU-29",
+  "source_29_pass": true,
+  "cpu_logits_formula_receipt_created": true,
+  "softmax_minus_target_computed": true,
+  "cpu_logits_gradient_candidate_created": true,
+  "candidate_digest_hex": "COMPUTED_AT_RUNTIME_FROM_CPU_CANDIDATE_BYTES",
+  "candidate_shape": [
+    1,
+    1,
+    2048
+  ],
+  "candidate_element_count": 2048,
+  "candidate_bytes": 8192,
+  "gpu_gradient_buffer_write_executed": false,
+  "gpu_compute_dispatch_executed": false,
+  "backward_executed": false,
+  "optimizer_step_executed": false,
+  "model_weight_gradient_contract_created": false,
+  "runtime_1p1b_training_claimed": false,
+  "violation_mask": 0,
+  "verdict_lut_index": 0,
+  "expected_verdict": "PASS_ASH_BASETRAIN_GPU_30_CPU_LOGITS_GRADIENT_FORMULA_RECEIPT_LOCAL_WINDOW_SOFTMAX_MINUS_TARGET_CANDIDATE_NO_GPU_WRITE_NO_BACKWARD_NO_OPTIMIZER"
+}

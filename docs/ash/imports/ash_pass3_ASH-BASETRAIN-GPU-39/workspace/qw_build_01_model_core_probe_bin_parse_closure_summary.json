@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-BUILD-01",
+  "status": "STATIC_PASS_MODEL_CORE_PROBE_BIN_PARSE_CLOSURE",
+  "source_zip": "ash_pass3_16AI-QW-LEGACY-01_runtime_unz_legacy_default_build_quarantine_baked (2).zip",
+  "source_log": "붙여넣은 텍스트 (1).txt",
+  "failed_crate": "model_core",
+  "failed_target": "bin af16ai6b_cheonjiin_structural_probe",
+  "failed_path": "crates/model_core/src/bin/af16ai6b_cheonjiin_structural_probe.rs",
+  "error_axis": "Rust parse ambiguity from cast expression with < comparison",
+  "changed_files": [
+    "crates/model_core/src/bin/af16ai6b_cheonjiin_structural_probe.rs",
+    "scripts/run_16AI_QW_BUILD_01_model_core_probe_bin_parse_closure.ps1",
+    "patch_reports/16AI-QW-BUILD-01_model_core_probe_bin_parse_closure.md",
+    "acceptance_reports/16AI-QW-BUILD-01_model_core_probe_bin_parse_closure.md"
+  ],
+  "legacy_quarantine_modified": false,
+  "sherpa_modified": false,
+  "r12a_r1_hidden_capture_modified": false,
+  "weights_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "compile_executed_in_container": false,
+  "recommended_next": "rerun cargo build, then rerun R12A-R1 trace capture expansion"
+}

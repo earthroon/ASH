@@ -1,0 +1,126 @@
+[
+  {
+    "case_id": "normal_low_risk_alignment",
+    "final_status": "Normal",
+    "generated_pieces": [
+      "오늘",
+      "날씨가",
+      "좋네요",
+      "."
+    ],
+    "mirror_resonance_score": 0.72,
+    "self_echo_score": 0.1,
+    "residual_loop_score": 0.12,
+    "phase_escape_score": 0.2,
+    "phase_escape_shadow_recommended": false,
+    "diversity_risk_score": 0.08,
+    "detector_aggregate_risk_score": 0.18,
+    "stable_quarantine_class": "StablePhraseCandidate",
+    "loop_start_token": null,
+    "first_bad_token": null,
+    "expected": {
+      "sample_status": "Valid",
+      "is_supervised_eval_eligible": true,
+      "normal_supporting_signal_count_min": 3
+    }
+  },
+  {
+    "case_id": "salad_self_echo_loop_alignment",
+    "final_status": "Salad",
+    "generated_pieces": [
+      "있고",
+      "풋살화",
+      "나오죠",
+      "풋살화",
+      "나오죠",
+      "나오죠"
+    ],
+    "mirror_resonance_score": -0.42,
+    "self_echo_score": 0.88,
+    "residual_loop_score": 0.91,
+    "phase_escape_score": 0.76,
+    "phase_escape_shadow_recommended": true,
+    "diversity_risk_score": 0.84,
+    "detector_aggregate_risk_score": 0.86,
+    "stable_quarantine_class": "QuarantineCandidate",
+    "loop_start_token": 2,
+    "first_bad_token": 2,
+    "expected": {
+      "sample_status": "Valid",
+      "is_supervised_eval_eligible": true,
+      "salad_supporting_signal_count_min": 4
+    }
+  },
+  {
+    "case_id": "collapse_critical_alignment",
+    "final_status": "Collapse",
+    "generated_pieces": [
+      "나오죠",
+      "나오죠",
+      "나오죠",
+      "나오죠"
+    ],
+    "mirror_resonance_score": -0.7,
+    "self_echo_score": 0.95,
+    "residual_loop_score": 0.97,
+    "phase_escape_score": 0.82,
+    "phase_escape_shadow_recommended": true,
+    "diversity_risk_score": 0.9,
+    "detector_aggregate_risk_score": 0.94,
+    "stable_quarantine_class": "QuarantineCandidate",
+    "loop_start_token": 0,
+    "first_bad_token": 0,
+    "expected": {
+      "sample_status": "Valid",
+      "is_supervised_eval_eligible": true,
+      "final_status": "Collapse"
+    }
+  },
+  {
+    "case_id": "review_ambiguous_alignment",
+    "final_status": "Review",
+    "generated_pieces": [
+      "그런데",
+      "이건",
+      "조금",
+      "애매합니다"
+    ],
+    "mirror_resonance_score": 0.43,
+    "self_echo_score": 0.36,
+    "residual_loop_score": 0.41,
+    "phase_escape_score": 0.4,
+    "phase_escape_shadow_recommended": false,
+    "diversity_risk_score": 0.38,
+    "detector_aggregate_risk_score": 0.42,
+    "stable_quarantine_class": "ReviewQueueCandidate",
+    "loop_start_token": null,
+    "first_bad_token": null,
+    "expected": {
+      "sample_status": "Valid",
+      "is_supervised_eval_eligible": false,
+      "review_supporting_signal_count_min": 2
+    }
+  },
+  {
+    "case_id": "missing_label_unlabeled_alignment",
+    "final_status": "Unknown",
+    "generated_pieces": [
+      "출력",
+      "있음"
+    ],
+    "mirror_resonance_score": 0.2,
+    "self_echo_score": 0.2,
+    "residual_loop_score": 0.2,
+    "phase_escape_score": null,
+    "phase_escape_shadow_recommended": null,
+    "diversity_risk_score": 0.2,
+    "detector_aggregate_risk_score": 0.2,
+    "stable_quarantine_class": null,
+    "loop_start_token": null,
+    "first_bad_token": null,
+    "expected": {
+      "sample_status": "Unlabeled",
+      "is_supervised_eval_eligible": false
+    }
+  }
+]

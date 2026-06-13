@@ -1,0 +1,310 @@
+--- /mnt/data/r3_base/crates/model_core/src/bin/ash_ft39_dataloader_microbatch_preflight.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r3_work/crates/model_core/src/bin/ash_ft39_dataloader_microbatch_preflight.rs	2026-06-08 15:21:47.090579839 +0000
+@@ -14,9 +14,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft39_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-39\",\"status\":\"BLOCKED_ASH_FT39_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-39","status":"BLOCKED_ASH_FT39_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-39\",\"status\":\"BLOCKED_ASH_FT39_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", format!(r#"{{"patch_id":"ASH-FT-39","status":"BLOCKED_ASH_FT39_WORKER_SPAWN_FAILED","error":"{}","next_stage_allowed":false}}"#, err)); std::process::exit(4); }
+     }
+ }
+ 
+--- /mnt/data/r3_base/crates/model_core/src/bin/ash_ft44_delta_candidate_payload_materialization.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r3_work/crates/model_core/src/bin/ash_ft44_delta_candidate_payload_materialization.rs	2026-06-08 15:21:47.090860290 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft44_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-44\",\"status\":\"BLOCKED_ASH_FT44_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-44","status":"BLOCKED_ASH_FT44_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-44\",\"status\":\"BLOCKED_ASH_FT44_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+--- /mnt/data/r3_base/crates/model_core/src/wgpu_review_gate_policy.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r3_work/crates/model_core/src/wgpu_review_gate_policy.rs	2026-06-08 15:20:18.672380268 +0000
+@@ -115,6 +115,12 @@
+     }
+ }
+ 
++impl Default for GateRuntimeDims {
++    fn default() -> Self {
++        Self::ash_tok_tensor_smoke()
++    }
++}
++
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+ #[repr(C)]
+ pub struct GatePolicyDescriptor {
+--- /mnt/data/r3_base/crates/model_core/src/lib.rs	2026-06-08 14:34:42.000000000 +0000
++++ /mnt/data/r3_work/crates/model_core/src/lib.rs	2026-06-08 15:20:18.673152085 +0000
+@@ -2096,7 +2096,17 @@
+ pub mod ash_tok_tensor_17a_wgpu_review_gate_kernelization;
+ pub mod ash_tok_tensor_17_tokenizer_tensor_adapter_text_commit_review_gate;
+ 
+-pub use wgpu_review_gate_policy::{banked_gate_flags, gate_flags, BankedGatePolicyDescriptor, GatePolicyDescriptor, GateRuntimeDims, GateStage};
++pub use wgpu_review_gate_policy::{
++    banked_gate_flags, gate_flags, BankedGatePolicyDescriptor, GatePolicyDescriptor, GateRuntimeDims, GateStage,
++    ash_tok_tensor_34_token_selection_execution_policy_descriptor,
++    ash_tok_tensor_35_decode_review_policy_descriptor,
++    ash_tok_tensor_36_decode_execution_policy_descriptor,
++    ash_tok_tensor_37_assistant_emit_review_policy_descriptor,
++    ash_tok_tensor_38_assistant_emit_execution_policy_descriptor,
++    ash_tok_tensor_39_user_visible_output_commit_review_policy_descriptor,
++    ash_tok_tensor_40_user_visible_output_commit_execution_policy_descriptor,
++    ash_tok_tensor_41_runtime_sequence_append_review_policy_descriptor,
++};
+ pub use wgpu_review_gate_receipt::{WgpuGateReceiptBuffer, WgpuGateReceiptSummary};
+ pub use wgpu_review_gate_runtime::{ash_tok_tensor_17a_wgpu_runtime_plan, dispatch_wgpu_review_gate_contract, WgpuReviewGateRuntimePlan};
+ pub use ash_tok_tensor_17a_wgpu_review_gate_kernelization::{
+--- /mnt/data/r3_base/crates/base_train/src/pipeline.rs	2026-06-08 13:14:20.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/pipeline.rs	2026-06-08 15:20:18.674237547 +0000
+@@ -387,6 +387,20 @@
+                 allow_optimizer_after_decode_review: false,
+                 require_decode_review_receipt: true,
+                 tokenizer_tensor_adapter_decode_review_policy: Default::default(),
++                enable_text_commit_review_gate: true,
++                allow_text_commit_review: true,
++                allow_approved_text_commit_candidate: true,
++                allow_assistant_emit_after_text_commit_review: false,
++                allow_user_visible_output_after_text_commit_review: false,
++                allow_chat_buffer_mutation_after_text_commit_review: false,
++                allow_runtime_sequence_append_after_text_commit_review: false,
++                allow_kv_cache_mutation_after_text_commit_review: false,
++                allow_generation_after_text_commit_review: false,
++                allow_loss_after_text_commit_review: false,
++                allow_backward_after_text_commit_review: false,
++                allow_optimizer_after_text_commit_review: false,
++                require_text_commit_review_receipt: true,
++                tokenizer_tensor_adapter_text_commit_review_policy: Default::default(),
+                 eval_every_steps: 1000,
+                 smoke_validate_on_save: false,
+                 init_checkpoint_paths,
+@@ -604,7 +618,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterKvMutationReviewSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_kv_mutation_review_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -617,7 +631,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterKvMutationExecutionSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_kv_mutation_execution_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -630,7 +644,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterGenerationContinuationReviewSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_generation_continuation_review_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -643,7 +657,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterGenerationContinuationExecutionSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_generation_continuation_execution_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -656,7 +670,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterTransformerForwardReviewSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_transformer_forward_review_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -669,7 +683,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterTransformerForwardExecutionSeal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_transformer_forward_execution_gate(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -682,7 +696,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterLogitsProjectionReviewGate29Seal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_logits_projection_review_gate_29(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+@@ -695,7 +709,7 @@
+ ) -> Result<crate::config::TokenizerTensorAdapterLogitsProjectionExecutionGate30Seal, String> {
+     let dims = model_core::GateRuntimeDims::default();
+     crate::config::validate_tokenizer_tensor_adapter_logits_projection_execution_gate_30(
+-        &cfg.runtime,
++        &cfg.training,
+         dims,
+     )
+ }
+--- /mnt/data/r3_base/crates/base_train/src/training.rs	2026-06-08 13:14:20.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/training.rs	2026-06-08 15:20:18.673847661 +0000
+@@ -1302,7 +1302,7 @@
+     crate::pipeline::ash_tok_tensor_25_dispatch_generation_continuation_review_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_25_generation_continuation_review_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+@@ -1344,7 +1344,7 @@
+     crate::pipeline::ash_tok_tensor_26_dispatch_generation_continuation_execution_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_26_generation_continuation_execution_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+@@ -1385,7 +1385,7 @@
+     crate::pipeline::ash_tok_tensor_27_dispatch_transformer_forward_review_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_27_transformer_forward_review_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+@@ -1429,7 +1429,7 @@
+     crate::pipeline::ash_tok_tensor_28_dispatch_transformer_forward_execution_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_28_transformer_forward_execution_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+@@ -1444,7 +1444,7 @@
+     crate::pipeline::ash_tok_tensor_29_dispatch_logits_projection_review_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_29_logits_projection_review_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+@@ -1459,7 +1459,7 @@
+     crate::pipeline::ash_tok_tensor_30_dispatch_logits_projection_execution_from_pipeline(cfg)
+         .map(|_| {
+             let policy = crate::config::build_ash_tok_tensor_30_logits_projection_execution_gate_policy_descriptor(
+-                &cfg.runtime,
++                &cfg.training,
+                 model_core::GateRuntimeDims::default(),
+             );
+             model_core::dispatch_wgpu_review_gate_contract(policy).into()
+--- /mnt/data/r3_base/crates/base_train/src/ash_basetrain_gpu_03r1_atlas_group_upload_candidate_byte_estimate_repair.rs	2026-06-08 13:37:58.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_03r1_atlas_group_upload_candidate_byte_estimate_repair.rs	2026-06-08 15:21:09.210465502 +0000
+@@ -21,7 +21,7 @@
+ pub const ASH_BASETRAIN_GPU_03R1_STATUS: &str =
+     "PASS_ASH_BASETRAIN_GPU_03R1_ATLAS_GROUP_UPLOAD_CANDIDATE_BYTE_ESTIMATE_REPAIR_ZERO_BYTE_CHUNK_ESTIMATE_RECOMPUTE_NO_GPU_BUFFER_WRITE";
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu03r1TensorShapeRegistryDerivation {
+     pub patch_id: &'static str,
+     pub metadata_source_id: &'static str,
+@@ -120,7 +120,7 @@
+     pub pass: bool,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu03r1BakeBundle {
+     pub repaired_upload_candidate: AtlasGroupShardStreamingUploadCandidate,
+     pub tensor_shape_registry_derivation: AshBaseTrainGpu03r1TensorShapeRegistryDerivation,
+@@ -190,7 +190,7 @@
+ ) -> AtlasGroupShardStreamingUploadCandidate {
+     let mut candidate = ash_basetrain_gpu_03_upload_candidate_from_fixture();
+     let registry = ash_basetrain_gpu_03r1_shape_registry_derivation_from_model_spec_fixture();
+-    let shape = &registry.tensor_shape_entries[0];
++    let shape = registry.tensor_shape_entries[0].clone();
+ 
+     for group in &mut candidate.upload_groups {
+         if group.group_id != "block_0000_attention" {
+@@ -215,7 +215,7 @@
+     let source_candidate = ash_basetrain_gpu_03_upload_candidate_from_fixture();
+     let repaired_candidate = ash_basetrain_gpu_03r1_repaired_upload_candidate_from_fixture();
+     let registry = ash_basetrain_gpu_03r1_shape_registry_derivation_from_model_spec_fixture();
+-    let shape = &registry.tensor_shape_entries[0];
++    let shape = registry.tensor_shape_entries[0].clone();
+ 
+     let source_chunk = source_candidate
+         .upload_groups
+--- /mnt/data/r3_base/crates/base_train/src/ash_basetrain_gpu_04r1_atlas_group_gpu_upload_readiness_reaudit.rs	2026-06-08 13:54:45.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_04r1_atlas_group_gpu_upload_readiness_reaudit.rs	2026-06-08 15:21:09.209686234 +0000
+@@ -17,7 +17,7 @@
+ pub const ASH_BASETRAIN_GPU_04R1_STATUS: &str =
+     "PASS_ASH_BASETRAIN_GPU_04R1_ATLAS_GROUP_GPU_UPLOAD_READINESS_REAUDIT_REPAIRED_UPLOAD_CANDIDATE_NO_FORWARD_NO_OPTIMIZER";
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r1UploadReadinessReaudit {
+     pub patch_id: &'static str,
+     pub title: &'static str,
+@@ -99,7 +99,7 @@
+     pub pass: bool,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r1BakeBundle {
+     pub repaired_upload_candidate: AtlasGroupShardStreamingUploadCandidate,
+     pub upload_readiness_reaudit: AshBaseTrainGpu04r1UploadReadinessReaudit,
+--- /mnt/data/r3_base/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs	2026-06-08 14:03:41.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_04r2_atlas_group_shard_gpu_upload_execution_rerun.rs	2026-06-08 15:21:09.209890185 +0000
+@@ -22,7 +22,7 @@
+ pub const ASH_BASETRAIN_GPU_04R2_PASS_STATUS: &str =
+     "PASS_ASH_BASETRAIN_GPU_04R2_ATLAS_GROUP_SHARD_GPU_UPLOAD_EXECUTION_RERUN_REPAIRED_UPLOAD_CANDIDATE_TO_ACTUAL_GPU_BUFFER_STATE_NO_FORWARD_NO_OPTIMIZER";
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r2PlannedUploadChunk {
+     pub chunk_id: String,
+     pub group_id: String,
+@@ -84,7 +84,7 @@
+     pub pass: bool,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu04r2BakeBundle {
+     pub source_readiness: AshBaseTrainGpu04r1UploadReadinessReaudit,
+     pub source_repaired_upload_candidate: AtlasGroupShardStreamingUploadCandidate,
+--- /mnt/data/r3_base/crates/base_train/src/ash_basetrain_gpu_05b_atlas_group_upload_candidate_byte_estimate_repair_plan.rs	2026-06-08 13:28:04.000000000 +0000
++++ /mnt/data/r3_work/crates/base_train/src/ash_basetrain_gpu_05b_atlas_group_upload_candidate_byte_estimate_repair_plan.rs	2026-06-08 15:21:09.210166197 +0000
+@@ -26,7 +26,7 @@
+ pub const ASH_BASETRAIN_GPU_05B_STATUS: &str =
+     "PASS_ASH_BASETRAIN_GPU_05B_ATLAS_GROUP_UPLOAD_CANDIDATE_BYTE_ESTIMATE_REPAIR_PLAN_ZERO_BYTE_CHUNK_TO_REPAIR_CANDIDATE_NO_UPLOAD_NO_DISPATCH";
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu05bByteEstimateRepairPlan {
+     pub patch_id: &'static str,
+     pub title: &'static str,
+@@ -167,7 +167,7 @@
+     pub checkpoint_finalization_blocked: bool,
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
++#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu05bBakeBundle {
+     pub repair_plan: AshBaseTrainGpu05bByteEstimateRepairPlan,
+     pub receipt: AshBaseTrainGpu05bRepairPlanReceipt,

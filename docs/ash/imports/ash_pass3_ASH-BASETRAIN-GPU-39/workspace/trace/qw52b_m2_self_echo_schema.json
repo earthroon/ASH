@@ -1,0 +1,43 @@
+{
+  "patch_id": "QW-52B-M2",
+  "title": "Self Echo / Reflection Lock Detector Seal",
+  "base_patch": "QW-52B-M1",
+  "detector_id": "self_echo_detector",
+  "detector_family": "output_self_reflection_lock",
+  "normalized_piece_function": [
+    "trim",
+    "unicode_nfc_expected_upstream",
+    "space_collapse",
+    "ascii_lowercase_disabled",
+    "hangul_no_lowercase_transform"
+  ],
+  "config_default": {
+    "recent_window_size": 8,
+    "token_echo_weight": 0.2,
+    "piece_echo_weight": 0.2,
+    "ngram_echo_weight": 0.2,
+    "qwave_echo_weight": 0.15,
+    "cji_xyz_echo_weight": 0.1,
+    "phase_lock_weight": 0.1,
+    "contextless_reentry_weight": 0.05,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85
+  },
+  "mutation_policy_required": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false
+  },
+  "required_invariant": {
+    "trace_only": true,
+    "missing_recent_window_becomes_unavailable": true,
+    "contextless_reentry_is_evidence_only": true,
+    "no_candidate_selection_change": true
+  }
+}

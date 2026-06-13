@@ -1,0 +1,460 @@
+{
+  "attention_native": false,
+  "checkpoint": {
+    "checkpoint_paths": [
+      ".\\tokenizer_v5\\artifacts\\full_model_vocab_v5_resized.safetensors"
+    ],
+    "embedding": {
+      "dtype": "F32",
+      "key": "model.embed_tokens.weight",
+      "shape": [
+        48259,
+        2048
+      ]
+    },
+    "embedding_candidates_checked": [
+      "model.embed_tokens.weight",
+      "tok_embeddings.weight",
+      "embed_tokens.weight"
+    ],
+    "embedding_hidden": 2048,
+    "embedding_hidden_match_spec": true,
+    "embedding_lm_head_rows_match": true,
+    "embedding_rows_match_spec_vocab": true,
+    "embedding_vocab_rows": 48259,
+    "lm_head": {
+      "dtype": "F32",
+      "key": "lm_head.weight",
+      "shape": [
+        48259,
+        2048
+      ]
+    },
+    "lm_head_candidates_checked": [
+      "lm_head.weight",
+      "output.weight"
+    ],
+    "lm_head_hidden": 2048,
+    "lm_head_hidden_match_spec": true,
+    "lm_head_rows_match_spec_vocab": true,
+    "lm_head_vocab_rows": 48259
+  },
+  "fallback_cpu_reference": true,
+  "generation_connected_default": false,
+  "kv_cache_native": false,
+  "manifest": {
+    "byte_fallback": true,
+    "duplicate_id_count": 0,
+    "duplicate_token_count": 0,
+    "holes_count": 0,
+    "hot_token_cache_enabled": true,
+    "hot_token_cache_top_k": 6000,
+    "ids_contiguous_zero_based": true,
+    "manifest_id": "tok_v5_20260417",
+    "max_id": 48258,
+    "max_id_matches_trainer": true,
+    "max_id_plus_one": 48259,
+    "tokenizer_spec_id": "tokenizer_v5",
+    "trainer_vocab_matches_spec": true,
+    "trainer_vocab_size": 48259,
+    "vocab_hash": "sha256:43381259fac2ecb25bf192ac33d482ec13aed6d7e05e8e2eb397bc6700188e3a",
+    "vocab_len": 48259,
+    "vocab_len_matches_trainer": true
+  },
+  "runtime_gate": "tokenizer_manifest_vocab_checkpoint_alignment_only",
+  "seal": "16AI-2",
+  "spec": {
+    "hidden_size": 2048,
+    "num_layers": 14,
+    "path": "specs/model_spec_300m_dialogue_continue_gqa8_headwise_atlas.toml",
+    "vocab_size": 48259
+  },
+  "special_tokens": [
+    {
+      "decoded": "",
+      "encode_ids": [
+        0
+      ],
+      "encode_len": 1,
+      "label": "pad",
+      "manifest_special_id": 0,
+      "reserved_exact_id": 0,
+      "roundtrip_exact": false,
+      "single_token_exact": true,
+      "token": "<pad>",
+      "vocab_exact_id": 0,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "",
+      "encode_ids": [
+        1
+      ],
+      "encode_len": 1,
+      "label": "bos",
+      "manifest_special_id": 1,
+      "reserved_exact_id": 1,
+      "roundtrip_exact": false,
+      "single_token_exact": true,
+      "token": "<bos>",
+      "vocab_exact_id": 1,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "",
+      "encode_ids": [
+        2
+      ],
+      "encode_len": 1,
+      "label": "eos",
+      "manifest_special_id": 2,
+      "reserved_exact_id": 2,
+      "roundtrip_exact": false,
+      "single_token_exact": true,
+      "token": "<eos>",
+      "vocab_exact_id": 2,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "<unk>",
+      "encode_ids": [
+        3
+      ],
+      "encode_len": 1,
+      "label": "unk",
+      "manifest_special_id": 3,
+      "reserved_exact_id": 3,
+      "roundtrip_exact": true,
+      "single_token_exact": true,
+      "token": "<unk>",
+      "vocab_exact_id": 3,
+      "warning": null
+    },
+    {
+      "decoded": "< b r>",
+      "encode_ids": [
+        48063,
+        47843,
+        47951,
+        48065
+      ],
+      "encode_len": 4,
+      "label": "<br>",
+      "manifest_special_id": null,
+      "reserved_exact_id": 21,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "<br>",
+      "vocab_exact_id": 21,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "<|u s e r|>",
+      "encode_ids": [
+        48063,
+        48127,
+        48120,
+        47874,
+        47783,
+        47951,
+        48127,
+        48065
+      ],
+      "encode_len": 8,
+      "label": "<|user|>",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "<|user|>",
+      "vocab_exact_id": null,
+      "warning": "chat_special_fragmented"
+    },
+    {
+      "decoded": "<| a s s i s t a n t|>",
+      "encode_ids": [
+        48063,
+        48127,
+        43430,
+        47874,
+        47874,
+        47742,
+        47874,
+        47956,
+        43430,
+        47743,
+        47956,
+        48127,
+        48065
+      ],
+      "encode_len": 13,
+      "label": "<|assistant|>",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "<|assistant|>",
+      "vocab_exact_id": null,
+      "warning": "chat_special_fragmented"
+    },
+    {
+      "decoded": "사 용 자",
+      "encode_ids": [
+        1638,
+        2899,
+        1115
+      ],
+      "encode_len": 3,
+      "label": "사용자",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "사용자",
+      "vocab_exact_id": null,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "사 용 자:",
+      "encode_ids": [
+        1638,
+        2899,
+        1115,
+        48061
+      ],
+      "encode_len": 4,
+      "label": "사용자:",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "사용자:",
+      "vocab_exact_id": null,
+      "warning": "role_marker_fragmented"
+    },
+    {
+      "decoded": "어 시 스 턴 트",
+      "encode_ids": [
+        852,
+        877,
+        1551,
+        15030,
+        2391
+      ],
+      "encode_len": 5,
+      "label": "어시스턴트",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "어시스턴트",
+      "vocab_exact_id": null,
+      "warning": "roundtrip_not_exact"
+    },
+    {
+      "decoded": "어 시 스 턴 트:",
+      "encode_ids": [
+        852,
+        877,
+        1551,
+        15030,
+        2391,
+        48061
+      ],
+      "encode_len": 6,
+      "label": "어시스턴트:",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": false,
+      "single_token_exact": false,
+      "token": "어시스턴트:",
+      "vocab_exact_id": null,
+      "warning": "role_marker_fragmented"
+    },
+    {
+      "decoded": "###",
+      "encode_ids": [
+        48038,
+        48038,
+        48038
+      ],
+      "encode_len": 3,
+      "label": "###",
+      "manifest_special_id": null,
+      "reserved_exact_id": null,
+      "roundtrip_exact": true,
+      "single_token_exact": false,
+      "token": "###",
+      "vocab_exact_id": null,
+      "warning": null
+    }
+  ],
+  "summary": {
+    "elapsed_ms": 1596.49,
+    "fragmented_probe_count": 4,
+    "hard_alignment_pass": true,
+    "pass": true,
+    "suspicious_wrapper_count": 4
+  },
+  "tokenizer_manifest_path": ".\\artifacts\\tokenizer_manifest_v5_final.json",
+  "wrapper_roundtrip": [
+    {
+      "char_count": 21,
+      "decoded": "브라 질 장 수 풍 뎅 이 의 장 점은 무 엇 인가요?",
+      "ids": [
+        28934,
+        1044,
+        1851,
+        2137,
+        9585,
+        43406,
+        373,
+        369,
+        1851,
+        21944,
+        5600,
+        47763,
+        7913,
+        334
+      ],
+      "raw_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+      "roundtrip_exact": false,
+      "suspicious_char_split": true,
+      "token_count": 14,
+      "token_per_char": 0.6666666666666666,
+      "wrapped_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+      "wrapper": "plain"
+    },
+    {
+      "char_count": 33,
+      "decoded": "사 용 자: 브라 질 장 수 풍 뎅 이 의 장 점은 무 엇 인가요?\n어 시 스 턴 트:",
+      "ids": [
+        1638,
+        2899,
+        1115,
+        48061,
+        28934,
+        1044,
+        1851,
+        2137,
+        9585,
+        43406,
+        373,
+        369,
+        1851,
+        21944,
+        5600,
+        47763,
+        7913,
+        334,
+        21,
+        852,
+        877,
+        1551,
+        15030,
+        2391,
+        48061
+      ],
+      "raw_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+      "roundtrip_exact": false,
+      "suspicious_char_split": true,
+      "token_count": 25,
+      "token_per_char": 0.7575757575757576,
+      "wrapped_text": "사용자: 브라질 장수풍뎅이의 장점은 무엇인가요?\n어시스턴트:",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "char_count": 38,
+      "decoded": "### 사 용 자\n브라 질 장 수 풍 뎅 이 의 장 점은 무 엇 인가요?\n\n### 답 변\n",
+      "ids": [
+        48038,
+        48038,
+        48038,
+        1638,
+        2899,
+        1115,
+        21,
+        28934,
+        1044,
+        1851,
+        2137,
+        9585,
+        43406,
+        373,
+        369,
+        1851,
+        21944,
+        5600,
+        47763,
+        7913,
+        334,
+        21,
+        21,
+        48038,
+        48038,
+        48038,
+        19586,
+        13121,
+        21
+      ],
+      "raw_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+      "roundtrip_exact": false,
+      "suspicious_char_split": true,
+      "token_count": 29,
+      "token_per_char": 0.7631578947368421,
+      "wrapped_text": "### 사용자\n브라질 장수풍뎅이의 장점은 무엇인가요?\n\n### 답변\n",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "char_count": 45,
+      "decoded": "<|u s e r|>\n브라 질 장 수 풍 뎅 이 의 장 점은 무 엇 인가요?\n<| a s s i s t a n t|>\n",
+      "ids": [
+        48063,
+        48127,
+        48120,
+        47874,
+        47783,
+        47951,
+        48127,
+        48065,
+        21,
+        28934,
+        1044,
+        1851,
+        2137,
+        9585,
+        43406,
+        373,
+        369,
+        1851,
+        21944,
+        5600,
+        47763,
+        7913,
+        334,
+        21,
+        48063,
+        48127,
+        43430,
+        47874,
+        47874,
+        47742,
+        47874,
+        47956,
+        43430,
+        47743,
+        47956,
+        48127,
+        48065,
+        21
+      ],
+      "raw_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+      "roundtrip_exact": false,
+      "suspicious_char_split": true,
+      "token_count": 38,
+      "token_per_char": 0.8444444444444444,
+      "wrapped_text": "<|user|>\n브라질 장수풍뎅이의 장점은 무엇인가요?\n<|assistant|>\n",
+      "wrapper": "chatml-lite"
+    }
+  ]
+}

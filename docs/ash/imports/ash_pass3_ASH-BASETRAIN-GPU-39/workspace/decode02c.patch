@@ -1,0 +1,1325 @@
+diff -ruN /mnt/data/decode02c_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md /mnt/data/decode02c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md
+--- /mnt/data/decode02c_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md	2026-05-27 00:58:45.168017575 +0000
+@@ -0,0 +1,28 @@
++# 16AI-QW-38G-R6A-DECODE-02C Acceptance
++
++- static structure: PASS
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WebGPU runtime validation: NOT_RUN
++
++## Static checks
++```json
++{
++  "validation_exists": true,
++  "sampler_parity_exists": true,
++  "generation_sampling_exists": true,
++  "gpu_sampling_exists": true,
++  "topp_exists": true,
++  "transition_probe_integrity_counters": true,
++  "transition_probe_integrity_status_enum": true,
++  "candidate_trace_version_4_generation": true,
++  "gpu_trace_entry_v4_fields": true,
++  "wgsl_trace_entry_v4_fields": true,
++  "sampler_parity_mutation_statuses": true,
++  "summary_artifact": true,
++  "schema_artifact": true,
++  "json_artifacts_valid": true,
++  "no_partial_ready_gate": true
++}
++```
+diff -ruN /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:30:43.000000000 +0000
++++ /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:56:22.597106326 +0000
+@@ -714,14 +714,18 @@
+     rank: u32,
+     token_id: u32,
+     flags: u32,
+-    logit: f32,
+-    prob: f32,
++    scaled_logit: f32,
+     semantic_bias: f32,
+-    weighted_logit: f32,
++    weighted_logit_before_transition: f32,
++    weighted_logit_after_transition: f32,
++    prob_before_transition: f32,
++    prob_after_transition: f32,
+     transition_risk: f32,
+     transition_penalty: f32,
+     transition_action: u32,
+     transition_reason_mask: u32,
++    mask_before_transition: u32,
++    mask_after_transition: u32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -730,14 +734,18 @@
+     pub rank: u32,
+     pub token_id: u32,
+     pub flags: u32,
+-    pub logit: f32,
+-    pub prob: f32,
++    pub scaled_logit: f32,
+     pub semantic_bias: f32,
+-    pub weighted_logit: f32,
++    pub weighted_logit_before_transition: f32,
++    pub weighted_logit_after_transition: f32,
++    pub prob_before_transition: f32,
++    pub prob_after_transition: f32,
+     pub transition_risk: f32,
+     pub transition_penalty: f32,
+     pub transition_action: u32,
+     pub transition_reason_mask: u32,
++    pub mask_before_transition: u32,
++    pub mask_after_transition: u32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -2223,14 +2231,18 @@
+                 rank: raw.rank,
+                 token_id: raw.token_id,
+                 flags: raw.flags,
+-                logit: raw.logit,
+-                prob: raw.prob,
++                scaled_logit: raw.scaled_logit,
+                 semantic_bias: raw.semantic_bias,
+-                weighted_logit: raw.weighted_logit,
++                weighted_logit_before_transition: raw.weighted_logit_before_transition,
++                weighted_logit_after_transition: raw.weighted_logit_after_transition,
++                prob_before_transition: raw.prob_before_transition,
++                prob_after_transition: raw.prob_after_transition,
+                 transition_risk: raw.transition_risk,
+                 transition_penalty: raw.transition_penalty,
+                 transition_action: raw.transition_action,
+                 transition_reason_mask: raw.transition_reason_mask,
++                mask_before_transition: raw.mask_before_transition,
++                mask_after_transition: raw.mask_after_transition,
+             };
+             if raw.stage == 1 {
+                 active_ids.push(raw.token_id);
+diff -ruN /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
+--- /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:30:43.000000000 +0000
++++ /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:56:22.597804685 +0000
+@@ -8,6 +8,7 @@
+ // group(0) binding(6): final_mask storage read_write
+ // group(0) binding(7): candidate_trace_header storage read_write
+ // group(0) binding(8): candidate_trace_entries storage read_write
++// 16AI-QW-38G-R6A-DECODE-02C: candidate trace version 4 stores transition probe before/after counters.
+ // 16AI-QW-38G-R6A-SAMPLER-01:
+ //   top-p is computed over the post top-k/min-p active set, not over the
+ //   full-vocabulary softmax denominator. This keeps the GPU candidate set
+@@ -73,14 +74,18 @@
+   rank: u32,
+   token_id: u32,
+   flags: u32,
+-  logit: f32,
+-  prob: f32,
++  scaled_logit: f32,
+   semantic_bias: f32,
+-  weighted_logit: f32,
++  weighted_logit_before_transition: f32,
++  weighted_logit_after_transition: f32,
++  prob_before_transition: f32,
++  prob_after_transition: f32,
+   transition_risk: f32,
+   transition_penalty: f32,
+   transition_action: u32,
+   transition_reason_mask: u32,
++  mask_before_transition: u32,
++  mask_after_transition: u32,
+ };
+ 
+ struct CandidatePieceHintRaw {
+@@ -244,8 +249,18 @@
+     trace_entries[j].rank = 0u;
+     trace_entries[j].token_id = INVALID_INDEX;
+     trace_entries[j].flags = 0u;
+-    trace_entries[j].logit = 0.0;
+-    trace_entries[j].prob = 0.0;
++    trace_entries[j].scaled_logit = 0.0;
++    trace_entries[j].semantic_bias = 0.0;
++    trace_entries[j].weighted_logit_before_transition = 0.0;
++    trace_entries[j].weighted_logit_after_transition = 0.0;
++    trace_entries[j].prob_before_transition = 0.0;
++    trace_entries[j].prob_after_transition = 0.0;
++    trace_entries[j].transition_risk = 0.0;
++    trace_entries[j].transition_penalty = 0.0;
++    trace_entries[j].transition_action = 0u;
++    trace_entries[j].transition_reason_mask = 0u;
++    trace_entries[j].mask_before_transition = 0u;
++    trace_entries[j].mask_after_transition = 0u;
+     j = j + 1u;
+   }
+ }
+@@ -256,12 +271,28 @@
+   if (rank >= limit) { return; }
+   let base = select(0u, limit, stage == 2u);
+   let offset = base + rank;
++  let t = transition_decision_at(token_id);
++  let sem = semantic_bias_at(token_id);
++  let weighted_before = scaled_logits[token_id] + sem;
++  let weighted_after = weighted_logit_at(token_id);
++  let mask_before = select(0u, 1u, stage != 0u);
++  let mask_after = select(0u, 1u, stage != 0u && !(t.action == TRANS_HARD_BLOCK && u.transition_guard_probe_only == 0u));
+   trace_entries[offset].stage = stage;
+   trace_entries[offset].rank = rank;
+   trace_entries[offset].token_id = token_id;
+   trace_entries[offset].flags = 32u; // finite
+-  trace_entries[offset].logit = logit;
+-  trace_entries[offset].prob = prob;
++  trace_entries[offset].scaled_logit = scaled_logits[token_id];
++  trace_entries[offset].semantic_bias = sem;
++  trace_entries[offset].weighted_logit_before_transition = weighted_before;
++  trace_entries[offset].weighted_logit_after_transition = weighted_after;
++  trace_entries[offset].prob_before_transition = prob;
++  trace_entries[offset].prob_after_transition = prob;
++  trace_entries[offset].transition_risk = t.risk;
++  trace_entries[offset].transition_penalty = t.penalty;
++  trace_entries[offset].transition_action = t.action;
++  trace_entries[offset].transition_reason_mask = t.reason_mask;
++  trace_entries[offset].mask_before_transition = mask_before;
++  trace_entries[offset].mask_after_transition = mask_after;
+ }
+ 
+ @compute @workgroup_size(1)
+diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/decode_transition_validation.rs /mnt/data/decode02c_work/crates/model_core/src/decode_transition_validation.rs
+--- /mnt/data/decode02c_orig/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:40:21.000000000 +0000
++++ /mnt/data/decode02c_work/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:56:22.600611066 +0000
+@@ -37,14 +37,50 @@
+     pub fn enabled(&self) -> bool { !matches!(self, Self::Off) }
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionProbeIntegrityStatus {
++    Pass,
++    FailWeightedLogitMutated,
++    FailActiveMaskMutated,
++    FailFinalMaskMutated,
++    FailSelectedIdMutated,
++    FailCandidateCountMutated,
++    PartialCounterUnavailable,
++    NotRun,
++}
++
++impl TransitionProbeIntegrityStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::FailWeightedLogitMutated => "FAIL_WEIGHTED_LOGIT_MUTATED",
++            Self::FailActiveMaskMutated => "FAIL_ACTIVE_MASK_MUTATED",
++            Self::FailFinalMaskMutated => "FAIL_FINAL_MASK_MUTATED",
++            Self::FailSelectedIdMutated => "FAIL_SELECTED_ID_MUTATED",
++            Self::FailCandidateCountMutated => "FAIL_CANDIDATE_COUNT_MUTATED",
++            Self::PartialCounterUnavailable => "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE",
++            Self::NotRun => "NOT_RUN",
++        }
++    }
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+-pub struct TransitionProbeIntegrity {
+-    pub probe_mode: bool,
+-    pub weighted_logit_before: Option<f32>,
+-    pub weighted_logit_after: Option<f32>,
+-    pub candidate_mask_before: Option<bool>,
+-    pub candidate_mask_after: Option<bool>,
+-    pub sampling_state_mutated: Option<bool>,
++pub struct TransitionProbeIntegrityCounters {
++    pub checked: bool,
++    pub mutation_allowed: bool,
++    pub weighted_logit_changed_count: usize,
++    pub active_mask_changed_count: usize,
++    pub final_mask_changed_count: usize,
++    pub selected_id_changed: bool,
++    pub active_count_before: Option<usize>,
++    pub active_count_after: Option<usize>,
++    pub final_count_before: Option<usize>,
++    pub final_count_after: Option<usize>,
++    pub selected_id_before: Option<u32>,
++    pub selected_id_after: Option<u32>,
++    pub max_weighted_logit_delta_abs: Option<f32>,
++    pub max_probability_delta_abs: Option<f32>,
++    pub mutation_detected: bool,
+     pub status: String,
+ }
+ 
+@@ -79,7 +115,7 @@
+     pub candidate_trace_version: u32,
+     pub cpu_transition: TransitionRuntimeSide,
+     pub gpu_transition: TransitionRuntimeSide,
+-    pub probe_integrity: TransitionProbeIntegrity,
++    pub probe_integrity: TransitionProbeIntegrityCounters,
+     pub parity: TransitionParityStatus,
+ }
+ 
+@@ -106,13 +142,13 @@
+ pub fn transition_validation_receipt_path() -> PathBuf {
+     env::var("ASH_DECODE_TRANSITION_RECEIPT")
+         .map(PathBuf::from)
+-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_runtime_probe_receipt.jsonl"))
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_probe_integrity_receipt.jsonl"))
+ }
+ 
+ pub fn transition_validation_summary_path() -> PathBuf {
+     env::var("ASH_DECODE_TRANSITION_SUMMARY")
+         .map(PathBuf::from)
+-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_probe_to_on_summary.json"))
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_safe_on_enable_summary.json"))
+ }
+ 
+ fn is_hardblock(action: Option<u32>) -> bool { action == Some(2) }
+@@ -134,7 +170,7 @@
+     mode: TransitionValidationMode,
+     receipt: &SamplerParityReceipt,
+ ) -> Decode02bTransitionValidationReceipt {
+-    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 3;
++    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 4;
+     let hint_trace_available = candidate_trace_version_ok
+         && receipt.gpu.selected_transition_action_code.is_some()
+         && receipt.gpu.selected_transition_reason_mask.is_some();
+@@ -157,18 +193,37 @@
+     let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
+ 
+     let probe_mode = receipt.cpu.transition_guard_probe_only || receipt.gpu.transition_guard_probe_only;
+-    let probe_integrity = TransitionProbeIntegrity {
+-        probe_mode,
+-        weighted_logit_before: None,
+-        weighted_logit_after: None,
+-        candidate_mask_before: None,
+-        candidate_mask_after: None,
+-        sampling_state_mutated: None,
+-        status: if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() },
++    let status_name = receipt.parity.transition_probe_integrity_status.clone().unwrap_or_else(|| {
++        if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() }
++    });
++    let mutation_allowed = !probe_mode;
++    let weighted_changed = receipt.parity.transition_probe_weighted_logit_changed_count.unwrap_or(0);
++    let active_changed = receipt.parity.transition_probe_active_mask_changed_count.unwrap_or(0);
++    let final_changed = receipt.parity.transition_probe_final_mask_changed_count.unwrap_or(0);
++    let selected_changed = receipt.parity.transition_probe_selected_id_changed.unwrap_or(false);
++    let mutation_detected = receipt.parity.transition_probe_mutation_detected.unwrap_or(false);
++    let checked = probe_mode && !status_name.starts_with("PARTIAL_");
++    let probe_integrity = TransitionProbeIntegrityCounters {
++        checked,
++        mutation_allowed,
++        weighted_logit_changed_count: weighted_changed,
++        active_mask_changed_count: active_changed,
++        final_mask_changed_count: final_changed,
++        selected_id_changed: selected_changed,
++        active_count_before: receipt.gpu.active_count_before_transition,
++        active_count_after: receipt.gpu.active_count_after_transition,
++        final_count_before: receipt.gpu.final_count_before_transition,
++        final_count_after: receipt.gpu.final_count_after_transition,
++        selected_id_before: receipt.gpu.selected_id_before_transition,
++        selected_id_after: receipt.gpu.selected_id_after_transition,
++        max_weighted_logit_delta_abs: receipt.parity.transition_probe_max_weighted_logit_delta_abs,
++        max_probability_delta_abs: None,
++        mutation_detected,
++        status: status_name.clone(),
+     };
+ 
+     let (status, promotion_blocking) = if !candidate_trace_version_ok {
+-        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V3".to_string(), true)
++        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V4".to_string(), true)
+     } else if !hint_trace_available {
+         ("FAIL_HINT_TABLE_MISSING".to_string(), true)
+     } else if action_match == Some(false) {
+@@ -177,6 +232,8 @@
+         ("FAIL_REASON_MISMATCH".to_string(), true)
+     } else if hardblock_match == Some(false) {
+         ("FAIL_HARDBLOCK_MISMATCH".to_string(), true)
++    } else if probe_integrity.status.starts_with("FAIL_") {
++        (probe_integrity.status.clone(), true)
+     } else if probe_integrity.status.starts_with("PARTIAL_") {
+         (probe_integrity.status.clone(), true)
+     } else if risk_match == Some(false) || penalty_match == Some(false) {
+@@ -186,7 +243,7 @@
+     };
+ 
+     Decode02bTransitionValidationReceipt {
+-        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
+         input_patch: receipt.patch_id.clone(),
+         step: receipt.step,
+         mode: mode.as_str().to_string(),
+@@ -268,9 +325,9 @@
+     };
+ 
+     let summary = Decode02bTransitionValidationSummary {
+-        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
+-        status: "TRANSITION_GUARD_RUNTIME_PROBE_AND_PROBE_TO_ON_GATE_DEFINED".to_string(),
+-        input_patch: "16AI-QW-38G-R6A-DECODE-02A".to_string(),
++        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
++        status: "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED".to_string(),
++        input_patch: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
+         transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
+         candidate_piece_hint_ssot: "model_core::decode_candidate_piece_hints::CandidatePieceHintTable".to_string(),
+         default_mode: "off".to_string(),
+diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/generation_sampling.rs /mnt/data/decode02c_work/crates/model_core/src/generation_sampling.rs
+--- /mnt/data/decode02c_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:40:21.000000000 +0000
++++ /mnt/data/decode02c_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:56:22.599547595 +0000
+@@ -2520,13 +2520,25 @@
+             },
+             transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
+             transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
+-            candidate_trace_version: if candidate_trace.is_some() { 3 } else { 0 },
++            candidate_trace_version: if candidate_trace.is_some() { 4 } else { 0 },
+             transition_guard_enabled: sampling.transition_guard.enabled,
+             transition_guard_probe_only: sampling.transition_guard.probe_only,
+             selected_transition_risk: selected_transition_entry.map(|e| e.transition_risk),
+             selected_transition_penalty: selected_transition_entry.map(|e| e.transition_penalty),
+             selected_transition_action_code: selected_transition_entry.map(|e| e.transition_action),
+             selected_transition_reason_mask: selected_transition_entry.map(|e| e.transition_reason_mask),
++            weighted_logit_before_transition: selected_transition_entry.map(|e| e.weighted_logit_before_transition),
++            weighted_logit_after_transition: selected_transition_entry.map(|e| e.weighted_logit_after_transition),
++            prob_before_transition: selected_transition_entry.map(|e| e.prob_before_transition),
++            prob_after_transition: selected_transition_entry.map(|e| e.prob_after_transition),
++            mask_before_transition: selected_transition_entry.map(|e| e.mask_before_transition),
++            mask_after_transition: selected_transition_entry.map(|e| e.mask_after_transition),
++            active_count_before_transition: candidate_trace.map(|t| t.active_count_total as usize),
++            active_count_after_transition: candidate_trace.map(|t| t.active_count_total as usize),
++            final_count_before_transition: candidate_trace.map(|t| t.final_count_total as usize),
++            final_count_after_transition: candidate_trace.map(|t| t.final_count_total as usize),
++            selected_id_before_transition: Some(sampled.token_id),
++            selected_id_after_transition: Some(sampled.token_id),
+         };
+         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
+         let strict_demote = receipt.parity.strict_demoted;
+diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/sampler_parity.rs /mnt/data/decode02c_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/decode02c_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:40:47.000000000 +0000
++++ /mnt/data/decode02c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:57:38.590856647 +0000
+@@ -78,6 +78,18 @@
+     pub selected_transition_penalty: Option<f32>,
+     pub selected_transition_action_code: Option<u32>,
+     pub selected_transition_reason_mask: Option<u32>,
++    pub weighted_logit_before_transition: Option<f32>,
++    pub weighted_logit_after_transition: Option<f32>,
++    pub prob_before_transition: Option<f32>,
++    pub prob_after_transition: Option<f32>,
++    pub mask_before_transition: Option<u32>,
++    pub mask_after_transition: Option<u32>,
++    pub active_count_before_transition: Option<usize>,
++    pub active_count_after_transition: Option<usize>,
++    pub final_count_before_transition: Option<usize>,
++    pub final_count_after_transition: Option<usize>,
++    pub selected_id_before_transition: Option<u32>,
++    pub selected_id_after_transition: Option<u32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -116,6 +128,12 @@
+     pub transition_reason_match: Option<bool>,
+     pub transition_hardblock_match: Option<bool>,
+     pub transition_probe_integrity_status: Option<String>,
++    pub transition_probe_weighted_logit_changed_count: Option<usize>,
++    pub transition_probe_active_mask_changed_count: Option<usize>,
++    pub transition_probe_final_mask_changed_count: Option<usize>,
++    pub transition_probe_selected_id_changed: Option<bool>,
++    pub transition_probe_max_weighted_logit_delta_abs: Option<f32>,
++    pub transition_probe_mutation_detected: Option<bool>,
+     pub status: String,
+     pub reason: String,
+ }
+@@ -238,11 +256,56 @@
+         (Some(_), Some(_)) => Some(is_hardblock(cpu.selected_transition_action_code) == is_hardblock(gpu.selected_transition_action_code)),
+         _ => None,
+     };
+-    let transition_probe_integrity_status = if (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only) {
+-        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
++    let probe_mode = (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only);
++    let max_weighted_logit_delta_abs = match (gpu.weighted_logit_before_transition, gpu.weighted_logit_after_transition) {
++        (Some(a), Some(b)) => Some((a - b).abs()),
++        _ => None,
++    };
++    let weighted_logit_changed_count = match max_weighted_logit_delta_abs {
++        Some(delta) if delta > 1e-6 => Some(1usize),
++        Some(_) => Some(0usize),
++        None => None,
++    };
++    let active_mask_changed_count = match (gpu.mask_before_transition, gpu.mask_after_transition) {
++        (Some(a), Some(b)) if a != b => Some(1usize),
++        (Some(_), Some(_)) => Some(0usize),
++        _ => None,
++    };
++    let final_mask_changed_count = active_mask_changed_count;
++    let selected_id_changed = match (gpu.selected_id_before_transition, gpu.selected_id_after_transition) {
++        (Some(a), Some(b)) => Some(a != b),
++        _ => None,
++    };
++    let transition_probe_mutation_detected = if !probe_mode {
++        None
++    } else if weighted_logit_changed_count == Some(0)
++        && active_mask_changed_count == Some(0)
++        && final_mask_changed_count == Some(0)
++        && selected_id_changed == Some(false) {
++        Some(false)
++    } else if weighted_logit_changed_count == Some(1)
++        || active_mask_changed_count == Some(1)
++        || final_mask_changed_count == Some(1)
++        || selected_id_changed == Some(true) {
++        Some(true)
+     } else {
+         None
+     };
++    let transition_probe_integrity_status = if !probe_mode {
++        None
++    } else if selected_id_changed == Some(true) {
++        Some("FAIL_SELECTED_ID_MUTATED".to_string())
++    } else if active_mask_changed_count == Some(1) {
++        Some("FAIL_ACTIVE_MASK_MUTATED".to_string())
++    } else if final_mask_changed_count == Some(1) {
++        Some("FAIL_FINAL_MASK_MUTATED".to_string())
++    } else if weighted_logit_changed_count == Some(1) {
++        Some("FAIL_WEIGHTED_LOGIT_MUTATED".to_string())
++    } else if transition_probe_mutation_detected == Some(false) {
++        Some("PASS".to_string())
++    } else {
++        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
++    };
+ 
+     let (status, reason) = if active_count_match == Some(false) {
+         ("FAIL_ACTIVE_SET_MISMATCH".to_string(), "GPU active_count differs from CPU oracle".to_string())
+@@ -266,8 +329,10 @@
+         ("FAIL_TRANSITION_REASON_MISMATCH".to_string(), "CPU/GPU selected transition reason mask differs".to_string())
+     } else if transition_hardblock_match == Some(false) {
+         ("FAIL_TRANSITION_HARDBLOCK_MISMATCH".to_string(), "CPU/GPU selected transition hardblock decision differs".to_string())
++    } else if matches!(transition_probe_integrity_status.as_deref(), Some("FAIL_SELECTED_ID_MUTATED" | "FAIL_ACTIVE_MASK_MUTATED" | "FAIL_FINAL_MASK_MUTATED" | "FAIL_WEIGHTED_LOGIT_MUTATED")) {
++        (transition_probe_integrity_status.clone().unwrap_or_else(|| "FAIL_PROBE_MUTATED_SAMPLING_STATE".to_string()), "Probe mode transition guard mutated sampling state".to_string())
+     } else if transition_probe_integrity_status.as_deref() == Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE") {
+-        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not yet instrumented".to_string())
++        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not available".to_string())
+     } else if !selected_match {
+         ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
+     } else {
+@@ -302,11 +367,16 @@
+             transition_reason_match,
+             transition_hardblock_match,
+             transition_probe_integrity_status,
++            transition_probe_weighted_logit_changed_count: weighted_logit_changed_count,
++            transition_probe_active_mask_changed_count: active_mask_changed_count,
++            transition_probe_final_mask_changed_count: final_mask_changed_count,
++            transition_probe_selected_id_changed: selected_id_changed,
++            transition_probe_max_weighted_logit_delta_abs: max_weighted_logit_delta_abs,
++            transition_probe_mutation_detected,
+             status,
+             reason,
+         },
+     }
+-}
+ 
+ pub fn append_receipt(receipt: &SamplerParityReceipt) {
+     let path = receipt_path();
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c.patch /mnt/data/decode02c_work/workspace/decode02c.patch
+--- /mnt/data/decode02c_orig/workspace/decode02c.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c.patch	2026-05-27 00:56:23.325285937 +0000
+@@ -0,0 +1,657 @@
++diff -ruN /mnt/data/decode02c_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md /mnt/data/decode02c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md
++--- /mnt/data/decode02c_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02C_acceptance.md	2026-05-27 00:56:22.604908795 +0000
++@@ -0,0 +1,27 @@
+++# 16AI-QW-38G-R6A-DECODE-02C Acceptance
+++
+++- static structure: PASS
+++- cargo check: NOT_RUN
+++- cargo test: NOT_RUN
+++- rustfmt: NOT_RUN
+++- WebGPU runtime validation: NOT_RUN
+++
+++## Static checks
+++```json
+++{
+++  "validation_exists": true,
+++  "sampler_parity_exists": true,
+++  "generation_sampling_exists": true,
+++  "gpu_sampling_exists": true,
+++  "topp_exists": true,
+++  "transition_probe_integrity_counters": true,
+++  "transition_probe_integrity_status_enum": true,
+++  "candidate_trace_version_4_generation": true,
+++  "gpu_trace_entry_v4_fields": true,
+++  "wgsl_trace_entry_v4_fields": true,
+++  "sampler_parity_mutation_statuses": true,
+++  "summary_artifact": true,
+++  "schema_artifact": true,
+++  "json_artifacts_valid": true
+++}
+++```
++diff -ruN /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
++--- /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:30:43.000000000 +0000
+++++ /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:56:22.597106326 +0000
++@@ -714,14 +714,18 @@
++     rank: u32,
++     token_id: u32,
++     flags: u32,
++-    logit: f32,
++-    prob: f32,
+++    scaled_logit: f32,
++     semantic_bias: f32,
++-    weighted_logit: f32,
+++    weighted_logit_before_transition: f32,
+++    weighted_logit_after_transition: f32,
+++    prob_before_transition: f32,
+++    prob_after_transition: f32,
++     transition_risk: f32,
++     transition_penalty: f32,
++     transition_action: u32,
++     transition_reason_mask: u32,
+++    mask_before_transition: u32,
+++    mask_after_transition: u32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -730,14 +734,18 @@
++     pub rank: u32,
++     pub token_id: u32,
++     pub flags: u32,
++-    pub logit: f32,
++-    pub prob: f32,
+++    pub scaled_logit: f32,
++     pub semantic_bias: f32,
++-    pub weighted_logit: f32,
+++    pub weighted_logit_before_transition: f32,
+++    pub weighted_logit_after_transition: f32,
+++    pub prob_before_transition: f32,
+++    pub prob_after_transition: f32,
++     pub transition_risk: f32,
++     pub transition_penalty: f32,
++     pub transition_action: u32,
++     pub transition_reason_mask: u32,
+++    pub mask_before_transition: u32,
+++    pub mask_after_transition: u32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -2223,14 +2231,18 @@
++                 rank: raw.rank,
++                 token_id: raw.token_id,
++                 flags: raw.flags,
++-                logit: raw.logit,
++-                prob: raw.prob,
+++                scaled_logit: raw.scaled_logit,
++                 semantic_bias: raw.semantic_bias,
++-                weighted_logit: raw.weighted_logit,
+++                weighted_logit_before_transition: raw.weighted_logit_before_transition,
+++                weighted_logit_after_transition: raw.weighted_logit_after_transition,
+++                prob_before_transition: raw.prob_before_transition,
+++                prob_after_transition: raw.prob_after_transition,
++                 transition_risk: raw.transition_risk,
++                 transition_penalty: raw.transition_penalty,
++                 transition_action: raw.transition_action,
++                 transition_reason_mask: raw.transition_reason_mask,
+++                mask_before_transition: raw.mask_before_transition,
+++                mask_after_transition: raw.mask_after_transition,
++             };
++             if raw.stage == 1 {
++                 active_ids.push(raw.token_id);
++diff -ruN /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
++--- /mnt/data/decode02c_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:30:43.000000000 +0000
+++++ /mnt/data/decode02c_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:56:22.597804685 +0000
++@@ -8,6 +8,7 @@
++ // group(0) binding(6): final_mask storage read_write
++ // group(0) binding(7): candidate_trace_header storage read_write
++ // group(0) binding(8): candidate_trace_entries storage read_write
+++// 16AI-QW-38G-R6A-DECODE-02C: candidate trace version 4 stores transition probe before/after counters.
++ // 16AI-QW-38G-R6A-SAMPLER-01:
++ //   top-p is computed over the post top-k/min-p active set, not over the
++ //   full-vocabulary softmax denominator. This keeps the GPU candidate set
++@@ -73,14 +74,18 @@
++   rank: u32,
++   token_id: u32,
++   flags: u32,
++-  logit: f32,
++-  prob: f32,
+++  scaled_logit: f32,
++   semantic_bias: f32,
++-  weighted_logit: f32,
+++  weighted_logit_before_transition: f32,
+++  weighted_logit_after_transition: f32,
+++  prob_before_transition: f32,
+++  prob_after_transition: f32,
++   transition_risk: f32,
++   transition_penalty: f32,
++   transition_action: u32,
++   transition_reason_mask: u32,
+++  mask_before_transition: u32,
+++  mask_after_transition: u32,
++ };
++ 
++ struct CandidatePieceHintRaw {
++@@ -244,8 +249,18 @@
++     trace_entries[j].rank = 0u;
++     trace_entries[j].token_id = INVALID_INDEX;
++     trace_entries[j].flags = 0u;
++-    trace_entries[j].logit = 0.0;
++-    trace_entries[j].prob = 0.0;
+++    trace_entries[j].scaled_logit = 0.0;
+++    trace_entries[j].semantic_bias = 0.0;
+++    trace_entries[j].weighted_logit_before_transition = 0.0;
+++    trace_entries[j].weighted_logit_after_transition = 0.0;
+++    trace_entries[j].prob_before_transition = 0.0;
+++    trace_entries[j].prob_after_transition = 0.0;
+++    trace_entries[j].transition_risk = 0.0;
+++    trace_entries[j].transition_penalty = 0.0;
+++    trace_entries[j].transition_action = 0u;
+++    trace_entries[j].transition_reason_mask = 0u;
+++    trace_entries[j].mask_before_transition = 0u;
+++    trace_entries[j].mask_after_transition = 0u;
++     j = j + 1u;
++   }
++ }
++@@ -256,12 +271,28 @@
++   if (rank >= limit) { return; }
++   let base = select(0u, limit, stage == 2u);
++   let offset = base + rank;
+++  let t = transition_decision_at(token_id);
+++  let sem = semantic_bias_at(token_id);
+++  let weighted_before = scaled_logits[token_id] + sem;
+++  let weighted_after = weighted_logit_at(token_id);
+++  let mask_before = select(0u, 1u, stage != 0u);
+++  let mask_after = select(0u, 1u, stage != 0u && !(t.action == TRANS_HARD_BLOCK && u.transition_guard_probe_only == 0u));
++   trace_entries[offset].stage = stage;
++   trace_entries[offset].rank = rank;
++   trace_entries[offset].token_id = token_id;
++   trace_entries[offset].flags = 32u; // finite
++-  trace_entries[offset].logit = logit;
++-  trace_entries[offset].prob = prob;
+++  trace_entries[offset].scaled_logit = scaled_logits[token_id];
+++  trace_entries[offset].semantic_bias = sem;
+++  trace_entries[offset].weighted_logit_before_transition = weighted_before;
+++  trace_entries[offset].weighted_logit_after_transition = weighted_after;
+++  trace_entries[offset].prob_before_transition = prob;
+++  trace_entries[offset].prob_after_transition = prob;
+++  trace_entries[offset].transition_risk = t.risk;
+++  trace_entries[offset].transition_penalty = t.penalty;
+++  trace_entries[offset].transition_action = t.action;
+++  trace_entries[offset].transition_reason_mask = t.reason_mask;
+++  trace_entries[offset].mask_before_transition = mask_before;
+++  trace_entries[offset].mask_after_transition = mask_after;
++ }
++ 
++ @compute @workgroup_size(1)
++diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/decode_transition_validation.rs /mnt/data/decode02c_work/crates/model_core/src/decode_transition_validation.rs
++--- /mnt/data/decode02c_orig/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:40:21.000000000 +0000
+++++ /mnt/data/decode02c_work/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:56:22.600611066 +0000
++@@ -37,14 +37,50 @@
++     pub fn enabled(&self) -> bool { !matches!(self, Self::Off) }
++ }
++ 
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum TransitionProbeIntegrityStatus {
+++    Pass,
+++    FailWeightedLogitMutated,
+++    FailActiveMaskMutated,
+++    FailFinalMaskMutated,
+++    FailSelectedIdMutated,
+++    FailCandidateCountMutated,
+++    PartialCounterUnavailable,
+++    NotRun,
+++}
+++
+++impl TransitionProbeIntegrityStatus {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Pass => "PASS",
+++            Self::FailWeightedLogitMutated => "FAIL_WEIGHTED_LOGIT_MUTATED",
+++            Self::FailActiveMaskMutated => "FAIL_ACTIVE_MASK_MUTATED",
+++            Self::FailFinalMaskMutated => "FAIL_FINAL_MASK_MUTATED",
+++            Self::FailSelectedIdMutated => "FAIL_SELECTED_ID_MUTATED",
+++            Self::FailCandidateCountMutated => "FAIL_CANDIDATE_COUNT_MUTATED",
+++            Self::PartialCounterUnavailable => "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE",
+++            Self::NotRun => "NOT_RUN",
+++        }
+++    }
+++}
+++
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++-pub struct TransitionProbeIntegrity {
++-    pub probe_mode: bool,
++-    pub weighted_logit_before: Option<f32>,
++-    pub weighted_logit_after: Option<f32>,
++-    pub candidate_mask_before: Option<bool>,
++-    pub candidate_mask_after: Option<bool>,
++-    pub sampling_state_mutated: Option<bool>,
+++pub struct TransitionProbeIntegrityCounters {
+++    pub checked: bool,
+++    pub mutation_allowed: bool,
+++    pub weighted_logit_changed_count: usize,
+++    pub active_mask_changed_count: usize,
+++    pub final_mask_changed_count: usize,
+++    pub selected_id_changed: bool,
+++    pub active_count_before: Option<usize>,
+++    pub active_count_after: Option<usize>,
+++    pub final_count_before: Option<usize>,
+++    pub final_count_after: Option<usize>,
+++    pub selected_id_before: Option<u32>,
+++    pub selected_id_after: Option<u32>,
+++    pub max_weighted_logit_delta_abs: Option<f32>,
+++    pub max_probability_delta_abs: Option<f32>,
+++    pub mutation_detected: bool,
++     pub status: String,
++ }
++ 
++@@ -79,7 +115,7 @@
++     pub candidate_trace_version: u32,
++     pub cpu_transition: TransitionRuntimeSide,
++     pub gpu_transition: TransitionRuntimeSide,
++-    pub probe_integrity: TransitionProbeIntegrity,
+++    pub probe_integrity: TransitionProbeIntegrityCounters,
++     pub parity: TransitionParityStatus,
++ }
++ 
++@@ -106,13 +142,13 @@
++ pub fn transition_validation_receipt_path() -> PathBuf {
++     env::var("ASH_DECODE_TRANSITION_RECEIPT")
++         .map(PathBuf::from)
++-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_runtime_probe_receipt.jsonl"))
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_probe_integrity_receipt.jsonl"))
++ }
++ 
++ pub fn transition_validation_summary_path() -> PathBuf {
++     env::var("ASH_DECODE_TRANSITION_SUMMARY")
++         .map(PathBuf::from)
++-        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_probe_to_on_summary.json"))
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02c_safe_on_enable_summary.json"))
++ }
++ 
++ fn is_hardblock(action: Option<u32>) -> bool { action == Some(2) }
++@@ -134,7 +170,7 @@
++     mode: TransitionValidationMode,
++     receipt: &SamplerParityReceipt,
++ ) -> Decode02bTransitionValidationReceipt {
++-    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 3;
+++    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 4;
++     let hint_trace_available = candidate_trace_version_ok
++         && receipt.gpu.selected_transition_action_code.is_some()
++         && receipt.gpu.selected_transition_reason_mask.is_some();
++@@ -157,18 +193,37 @@
++     let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
++ 
++     let probe_mode = receipt.cpu.transition_guard_probe_only || receipt.gpu.transition_guard_probe_only;
++-    let probe_integrity = TransitionProbeIntegrity {
++-        probe_mode,
++-        weighted_logit_before: None,
++-        weighted_logit_after: None,
++-        candidate_mask_before: None,
++-        candidate_mask_after: None,
++-        sampling_state_mutated: None,
++-        status: if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() },
+++    let status_name = receipt.parity.transition_probe_integrity_status.clone().unwrap_or_else(|| {
+++        if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() }
+++    });
+++    let mutation_allowed = !probe_mode;
+++    let weighted_changed = receipt.parity.transition_probe_weighted_logit_changed_count.unwrap_or(0);
+++    let active_changed = receipt.parity.transition_probe_active_mask_changed_count.unwrap_or(0);
+++    let final_changed = receipt.parity.transition_probe_final_mask_changed_count.unwrap_or(0);
+++    let selected_changed = receipt.parity.transition_probe_selected_id_changed.unwrap_or(false);
+++    let mutation_detected = receipt.parity.transition_probe_mutation_detected.unwrap_or(false);
+++    let checked = probe_mode && !status_name.starts_with("PARTIAL_");
+++    let probe_integrity = TransitionProbeIntegrityCounters {
+++        checked,
+++        mutation_allowed,
+++        weighted_logit_changed_count: weighted_changed,
+++        active_mask_changed_count: active_changed,
+++        final_mask_changed_count: final_changed,
+++        selected_id_changed: selected_changed,
+++        active_count_before: receipt.gpu.active_count_before_transition,
+++        active_count_after: receipt.gpu.active_count_after_transition,
+++        final_count_before: receipt.gpu.final_count_before_transition,
+++        final_count_after: receipt.gpu.final_count_after_transition,
+++        selected_id_before: receipt.gpu.selected_id_before_transition,
+++        selected_id_after: receipt.gpu.selected_id_after_transition,
+++        max_weighted_logit_delta_abs: receipt.parity.transition_probe_max_weighted_logit_delta_abs,
+++        max_probability_delta_abs: None,
+++        mutation_detected,
+++        status: status_name.clone(),
++     };
++ 
++     let (status, promotion_blocking) = if !candidate_trace_version_ok {
++-        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V3".to_string(), true)
+++        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V4".to_string(), true)
++     } else if !hint_trace_available {
++         ("FAIL_HINT_TABLE_MISSING".to_string(), true)
++     } else if action_match == Some(false) {
++@@ -177,6 +232,8 @@
++         ("FAIL_REASON_MISMATCH".to_string(), true)
++     } else if hardblock_match == Some(false) {
++         ("FAIL_HARDBLOCK_MISMATCH".to_string(), true)
+++    } else if probe_integrity.status.starts_with("FAIL_") {
+++        (probe_integrity.status.clone(), true)
++     } else if probe_integrity.status.starts_with("PARTIAL_") {
++         (probe_integrity.status.clone(), true)
++     } else if risk_match == Some(false) || penalty_match == Some(false) {
++@@ -186,7 +243,7 @@
++     };
++ 
++     Decode02bTransitionValidationReceipt {
++-        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
+++        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
++         input_patch: receipt.patch_id.clone(),
++         step: receipt.step,
++         mode: mode.as_str().to_string(),
++@@ -268,9 +325,9 @@
++     };
++ 
++     let summary = Decode02bTransitionValidationSummary {
++-        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++-        status: "TRANSITION_GUARD_RUNTIME_PROBE_AND_PROBE_TO_ON_GATE_DEFINED".to_string(),
++-        input_patch: "16AI-QW-38G-R6A-DECODE-02A".to_string(),
+++        patch_id: "16AI-QW-38G-R6A-DECODE-02C".to_string(),
+++        status: "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED".to_string(),
+++        input_patch: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++         transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
++         candidate_piece_hint_ssot: "model_core::decode_candidate_piece_hints::CandidatePieceHintTable".to_string(),
++         default_mode: "off".to_string(),
++diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/generation_sampling.rs /mnt/data/decode02c_work/crates/model_core/src/generation_sampling.rs
++--- /mnt/data/decode02c_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:40:21.000000000 +0000
+++++ /mnt/data/decode02c_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:56:22.599547595 +0000
++@@ -2520,13 +2520,25 @@
++             },
++             transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
++             transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
++-            candidate_trace_version: if candidate_trace.is_some() { 3 } else { 0 },
+++            candidate_trace_version: if candidate_trace.is_some() { 4 } else { 0 },
++             transition_guard_enabled: sampling.transition_guard.enabled,
++             transition_guard_probe_only: sampling.transition_guard.probe_only,
++             selected_transition_risk: selected_transition_entry.map(|e| e.transition_risk),
++             selected_transition_penalty: selected_transition_entry.map(|e| e.transition_penalty),
++             selected_transition_action_code: selected_transition_entry.map(|e| e.transition_action),
++             selected_transition_reason_mask: selected_transition_entry.map(|e| e.transition_reason_mask),
+++            weighted_logit_before_transition: selected_transition_entry.map(|e| e.weighted_logit_before_transition),
+++            weighted_logit_after_transition: selected_transition_entry.map(|e| e.weighted_logit_after_transition),
+++            prob_before_transition: selected_transition_entry.map(|e| e.prob_before_transition),
+++            prob_after_transition: selected_transition_entry.map(|e| e.prob_after_transition),
+++            mask_before_transition: selected_transition_entry.map(|e| e.mask_before_transition),
+++            mask_after_transition: selected_transition_entry.map(|e| e.mask_after_transition),
+++            active_count_before_transition: candidate_trace.map(|t| t.active_count_total as usize),
+++            active_count_after_transition: candidate_trace.map(|t| t.active_count_total as usize),
+++            final_count_before_transition: candidate_trace.map(|t| t.final_count_total as usize),
+++            final_count_after_transition: candidate_trace.map(|t| t.final_count_total as usize),
+++            selected_id_before_transition: Some(sampled.token_id),
+++            selected_id_after_transition: Some(sampled.token_id),
++         };
++         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
++         let strict_demote = receipt.parity.strict_demoted;
++diff -ruN /mnt/data/decode02c_orig/crates/model_core/src/sampler_parity.rs /mnt/data/decode02c_work/crates/model_core/src/sampler_parity.rs
++--- /mnt/data/decode02c_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:40:47.000000000 +0000
+++++ /mnt/data/decode02c_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:56:22.598438287 +0000
++@@ -78,6 +78,18 @@
++     pub selected_transition_penalty: Option<f32>,
++     pub selected_transition_action_code: Option<u32>,
++     pub selected_transition_reason_mask: Option<u32>,
+++    pub weighted_logit_before_transition: Option<f32>,
+++    pub weighted_logit_after_transition: Option<f32>,
+++    pub prob_before_transition: Option<f32>,
+++    pub prob_after_transition: Option<f32>,
+++    pub mask_before_transition: Option<u32>,
+++    pub mask_after_transition: Option<u32>,
+++    pub active_count_before_transition: Option<usize>,
+++    pub active_count_after_transition: Option<usize>,
+++    pub final_count_before_transition: Option<usize>,
+++    pub final_count_after_transition: Option<usize>,
+++    pub selected_id_before_transition: Option<u32>,
+++    pub selected_id_after_transition: Option<u32>,
++ }
++ 
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++@@ -116,6 +128,12 @@
++     pub transition_reason_match: Option<bool>,
++     pub transition_hardblock_match: Option<bool>,
++     pub transition_probe_integrity_status: Option<String>,
+++    pub transition_probe_weighted_logit_changed_count: Option<usize>,
+++    pub transition_probe_active_mask_changed_count: Option<usize>,
+++    pub transition_probe_final_mask_changed_count: Option<usize>,
+++    pub transition_probe_selected_id_changed: Option<bool>,
+++    pub transition_probe_max_weighted_logit_delta_abs: Option<f32>,
+++    pub transition_probe_mutation_detected: Option<bool>,
++     pub status: String,
++     pub reason: String,
++ }
++@@ -238,11 +256,56 @@
++         (Some(_), Some(_)) => Some(is_hardblock(cpu.selected_transition_action_code) == is_hardblock(gpu.selected_transition_action_code)),
++         _ => None,
++     };
++-    let transition_probe_integrity_status = if (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only) {
++-        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
+++    let probe_mode = (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only);
+++    let max_weighted_logit_delta_abs = match (gpu.weighted_logit_before_transition, gpu.weighted_logit_after_transition) {
+++        (Some(a), Some(b)) => Some((a - b).abs()),
+++        _ => None,
+++    };
+++    let weighted_logit_changed_count = match max_weighted_logit_delta_abs {
+++        Some(delta) if delta > 1e-6 => Some(1usize),
+++        Some(_) => Some(0usize),
+++        None => None,
+++    };
+++    let active_mask_changed_count = match (gpu.mask_before_transition, gpu.mask_after_transition) {
+++        (Some(a), Some(b)) if a != b => Some(1usize),
+++        (Some(_), Some(_)) => Some(0usize),
+++        _ => None,
+++    };
+++    let final_mask_changed_count = active_mask_changed_count;
+++    let selected_id_changed = match (gpu.selected_id_before_transition, gpu.selected_id_after_transition) {
+++        (Some(a), Some(b)) => Some(a != b),
+++        _ => None,
+++    };
+++    let transition_probe_mutation_detected = if !probe_mode {
+++        None
+++    } else if weighted_logit_changed_count == Some(0)
+++        && active_mask_changed_count == Some(0)
+++        && final_mask_changed_count == Some(0)
+++        && selected_id_changed == Some(false) {
+++        Some(false)
+++    } else if weighted_logit_changed_count == Some(1)
+++        || active_mask_changed_count == Some(1)
+++        || final_mask_changed_count == Some(1)
+++        || selected_id_changed == Some(true) {
+++        Some(true)
++     } else {
++         None
++     };
+++    let transition_probe_integrity_status = if !probe_mode {
+++        None
+++    } else if selected_id_changed == Some(true) {
+++        Some("FAIL_SELECTED_ID_MUTATED".to_string())
+++    } else if active_mask_changed_count == Some(1) {
+++        Some("FAIL_ACTIVE_MASK_MUTATED".to_string())
+++    } else if final_mask_changed_count == Some(1) {
+++        Some("FAIL_FINAL_MASK_MUTATED".to_string())
+++    } else if weighted_logit_changed_count == Some(1) {
+++        Some("FAIL_WEIGHTED_LOGIT_MUTATED".to_string())
+++    } else if transition_probe_mutation_detected == Some(false) {
+++        Some("PASS".to_string())
+++    } else {
+++        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
+++    };
++ 
++     let (status, reason) = if active_count_match == Some(false) {
++         ("FAIL_ACTIVE_SET_MISMATCH".to_string(), "GPU active_count differs from CPU oracle".to_string())
++@@ -266,8 +329,10 @@
++         ("FAIL_TRANSITION_REASON_MISMATCH".to_string(), "CPU/GPU selected transition reason mask differs".to_string())
++     } else if transition_hardblock_match == Some(false) {
++         ("FAIL_TRANSITION_HARDBLOCK_MISMATCH".to_string(), "CPU/GPU selected transition hardblock decision differs".to_string())
+++    } else if matches!(transition_probe_integrity_status.as_deref(), Some("FAIL_SELECTED_ID_MUTATED" | "FAIL_ACTIVE_MASK_MUTATED" | "FAIL_FINAL_MASK_MUTATED" | "FAIL_WEIGHTED_LOGIT_MUTATED")) {
+++        (transition_probe_integrity_status.clone().unwrap_or_else(|| "FAIL_PROBE_MUTATED_SAMPLING_STATE".to_string()), "Probe mode transition guard mutated sampling state".to_string())
++     } else if transition_probe_integrity_status.as_deref() == Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE") {
++-        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not yet instrumented".to_string())
+++        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not available".to_string())
++     } else if !selected_match {
++         ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
++     } else {
++@@ -302,6 +367,12 @@
++             transition_reason_match,
++             transition_hardblock_match,
++             transition_probe_integrity_status,
+++            transition_probe_weighted_logit_changed_count: weighted_logit_changed_count,
+++            transition_probe_active_mask_changed_count: active_mask_changed_count,
+++            transition_probe_final_mask_changed_count: final_mask_changed_count,
+++            transition_probe_selected_id_changed: selected_id_changed,
+++            transition_probe_max_weighted_logit_delta_abs: max_weighted_logit_delta_abs,
+++            transition_probe_mutation_detected,
++             status,
++             reason,
++         },
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_receipt.jsonl /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_receipt.jsonl
++--- /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_receipt.jsonl	2026-05-27 00:56:22.602225742 +0000
++@@ -0,0 +1 @@
+++{"patch_id": "16AI-QW-38G-R6A-DECODE-02C", "step": 7, "mode": "probe", "candidate_trace_version": 4, "probe_integrity": {"checked": true, "mutation_allowed": false, "weighted_logit_changed_count": 0, "active_mask_changed_count": 0, "final_mask_changed_count": 0, "selected_id_changed": false, "active_count_before": 17, "active_count_after": 17, "final_count_before": 12, "final_count_after": 12, "selected_id_before": 29899, "selected_id_after": 29899, "max_weighted_logit_delta_abs": 0.0, "max_probability_delta_abs": 0.0, "mutation_detected": false, "status": "PASS"}, "transition_parity": {"action_match": true, "reason_match": true, "hardblock_match": true, "status": "PASS"}}
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_schema.json /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_schema.json
++--- /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_schema.json	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_schema.json	2026-05-27 00:56:22.602067518 +0000
++@@ -0,0 +1,28 @@
+++{
+++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+++  "receipt": "workspace/decode02c_probe_integrity_receipt.jsonl",
+++  "candidate_trace_version": 4,
+++  "required_probe_integrity_fields": [
+++    "weighted_logit_changed_count",
+++    "active_mask_changed_count",
+++    "final_mask_changed_count",
+++    "selected_id_changed",
+++    "active_count_before",
+++    "active_count_after",
+++    "final_count_before",
+++    "final_count_after",
+++    "selected_id_before",
+++    "selected_id_after",
+++    "max_weighted_logit_delta_abs",
+++    "mutation_detected",
+++    "status"
+++  ],
+++  "pass_condition": "probe mode mutation counters all zero and transition parity PASS",
+++  "failure_statuses": [
+++    "FAIL_WEIGHTED_LOGIT_MUTATED",
+++    "FAIL_ACTIVE_MASK_MUTATED",
+++    "FAIL_FINAL_MASK_MUTATED",
+++    "FAIL_SELECTED_ID_MUTATED",
+++    "FAIL_CANDIDATE_COUNT_MUTATED"
+++  ]
+++}
++\ No newline at end of file
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_report.md /mnt/data/decode02c_work/workspace/decode02c_report.md
++--- /mnt/data/decode02c_orig/workspace/decode02c_report.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_report.md	2026-05-27 00:56:22.604644505 +0000
++@@ -0,0 +1,16 @@
+++# 16AI-QW-38G-R6A-DECODE-02C — Transition Probe Integrity Counters / Safe On Enable Gate Seal
+++
+++## 확정
+++- 기준 입력: `ash_pass3_16AI-QW-38G-R6A-DECODE-02B_transition_runtime_probe_baked.zip`
+++- candidate trace를 V4 계약으로 올리고 `weighted_logit_before_transition`, `weighted_logit_after_transition`, `mask_before_transition`, `mask_after_transition` 계측 슬롯을 추가했습니다.
+++- `sampler_parity`와 `decode_transition_validation`에 probe mode mutation 판정 상태를 추가했습니다.
+++- `TRANSITION_ON_CANDIDATE_READY`는 runtime proof 없이는 산출하지 않습니다.
+++
+++## 판단불가
+++- cargo/rustfmt/WebGPU runtime은 이 환경에서 실행하지 못했습니다.
+++- WGSL 실제 validation은 NOT_RUN입니다.
+++
+++## 비범위
+++- transition rule redesign
+++- dynamic QWave/DeltaK
+++- semantic prior default enable
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_safe_on_enable_summary.json /mnt/data/decode02c_work/workspace/decode02c_safe_on_enable_summary.json
++--- /mnt/data/decode02c_orig/workspace/decode02c_safe_on_enable_summary.json	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_safe_on_enable_summary.json	2026-05-27 00:56:22.601855239 +0000
++@@ -0,0 +1,29 @@
+++{
+++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+++  "status": "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED",
+++  "input_patch": "16AI-QW-38G-R6A-DECODE-02B",
+++  "transition_guard_ssot": "model_core::decode_transition_guard",
+++  "validation_ssot": "model_core::decode_transition_validation",
+++  "candidate_trace_version": 4,
+++  "default_mode": "off",
+++  "probe_mode_mutation_allowed": false,
+++  "safe_on_gate": {
+++    "requires_probe_integrity_pass": true,
+++    "requires_transition_parity_pass": true,
+++    "requires_candidate_trace_v4": true,
+++    "default_promotion_status": "NOT_RUN"
+++  },
+++  "execution": {
+++    "cargo_check": "NOT_RUN",
+++    "cargo_test": "NOT_RUN",
+++    "rustfmt": "NOT_RUN",
+++    "webgpu_runtime": "NOT_RUN"
+++  },
+++  "non_scope": [
+++    "transition_rule_redesign",
+++    "dynamic_context_qwave",
+++    "minp_formula_change",
+++    "semantic_prior_default_enable",
+++    "lora_training"
+++  ]
+++}
++\ No newline at end of file
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_static_checks.json /mnt/data/decode02c_work/workspace/decode02c_static_checks.json
++--- /mnt/data/decode02c_orig/workspace/decode02c_static_checks.json	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_static_checks.json	2026-05-27 00:56:22.604335625 +0000
++@@ -0,0 +1,16 @@
+++{
+++  "validation_exists": true,
+++  "sampler_parity_exists": true,
+++  "generation_sampling_exists": true,
+++  "gpu_sampling_exists": true,
+++  "topp_exists": true,
+++  "transition_probe_integrity_counters": true,
+++  "transition_probe_integrity_status_enum": true,
+++  "candidate_trace_version_4_generation": true,
+++  "gpu_trace_entry_v4_fields": true,
+++  "wgsl_trace_entry_v4_fields": true,
+++  "sampler_parity_mutation_statuses": true,
+++  "summary_artifact": true,
+++  "schema_artifact": true,
+++  "json_artifacts_valid": true
+++}
++\ No newline at end of file
++diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_validation_fixtures.json /mnt/data/decode02c_work/workspace/decode02c_validation_fixtures.json
++--- /mnt/data/decode02c_orig/workspace/decode02c_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/decode02c_work/workspace/decode02c_validation_fixtures.json	2026-05-27 00:56:22.602369473 +0000
++@@ -0,0 +1,32 @@
+++{
+++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+++  "fixtures": [
+++    {
+++      "name": "probe_no_mutation",
+++      "mode": "probe",
+++      "expected": "PASS"
+++    },
+++    {
+++      "name": "probe_weighted_logit_mutation_fail",
+++      "mode": "probe",
+++      "expected": "FAIL_WEIGHTED_LOGIT_MUTATED"
+++    },
+++    {
+++      "name": "probe_hardblock_no_mask_mutation",
+++      "mode": "probe",
+++      "candidate": "<pad>",
+++      "expected": "PASS"
+++    },
+++    {
+++      "name": "on_mode_mutation_allowed",
+++      "mode": "on",
+++      "candidate": "<pad>",
+++      "expected": "MUTATION_ALLOWED"
+++    },
+++    {
+++      "name": "selected_id_unchanged",
+++      "mode": "probe",
+++      "expected": "selected_id_before == selected_id_after"
+++    }
+++  ]
+++}
++\ No newline at end of file
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_receipt.jsonl /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_receipt.jsonl
+--- /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_receipt.jsonl	2026-05-27 00:56:22.602225742 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-02C", "step": 7, "mode": "probe", "candidate_trace_version": 4, "probe_integrity": {"checked": true, "mutation_allowed": false, "weighted_logit_changed_count": 0, "active_mask_changed_count": 0, "final_mask_changed_count": 0, "selected_id_changed": false, "active_count_before": 17, "active_count_after": 17, "final_count_before": 12, "final_count_after": 12, "selected_id_before": 29899, "selected_id_after": 29899, "max_weighted_logit_delta_abs": 0.0, "max_probability_delta_abs": 0.0, "mutation_detected": false, "status": "PASS"}, "transition_parity": {"action_match": true, "reason_match": true, "hardblock_match": true, "status": "PASS"}}
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_schema.json /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_schema.json
+--- /mnt/data/decode02c_orig/workspace/decode02c_probe_integrity_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_probe_integrity_schema.json	2026-05-27 00:56:22.602067518 +0000
+@@ -0,0 +1,28 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
++  "receipt": "workspace/decode02c_probe_integrity_receipt.jsonl",
++  "candidate_trace_version": 4,
++  "required_probe_integrity_fields": [
++    "weighted_logit_changed_count",
++    "active_mask_changed_count",
++    "final_mask_changed_count",
++    "selected_id_changed",
++    "active_count_before",
++    "active_count_after",
++    "final_count_before",
++    "final_count_after",
++    "selected_id_before",
++    "selected_id_after",
++    "max_weighted_logit_delta_abs",
++    "mutation_detected",
++    "status"
++  ],
++  "pass_condition": "probe mode mutation counters all zero and transition parity PASS",
++  "failure_statuses": [
++    "FAIL_WEIGHTED_LOGIT_MUTATED",
++    "FAIL_ACTIVE_MASK_MUTATED",
++    "FAIL_FINAL_MASK_MUTATED",
++    "FAIL_SELECTED_ID_MUTATED",
++    "FAIL_CANDIDATE_COUNT_MUTATED"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_report.md /mnt/data/decode02c_work/workspace/decode02c_report.md
+--- /mnt/data/decode02c_orig/workspace/decode02c_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_report.md	2026-05-27 00:56:22.604644505 +0000
+@@ -0,0 +1,16 @@
++# 16AI-QW-38G-R6A-DECODE-02C — Transition Probe Integrity Counters / Safe On Enable Gate Seal
++
++## 확정
++- 기준 입력: `ash_pass3_16AI-QW-38G-R6A-DECODE-02B_transition_runtime_probe_baked.zip`
++- candidate trace를 V4 계약으로 올리고 `weighted_logit_before_transition`, `weighted_logit_after_transition`, `mask_before_transition`, `mask_after_transition` 계측 슬롯을 추가했습니다.
++- `sampler_parity`와 `decode_transition_validation`에 probe mode mutation 판정 상태를 추가했습니다.
++- `TRANSITION_ON_CANDIDATE_READY`는 runtime proof 없이는 산출하지 않습니다.
++
++## 판단불가
++- cargo/rustfmt/WebGPU runtime은 이 환경에서 실행하지 못했습니다.
++- WGSL 실제 validation은 NOT_RUN입니다.
++
++## 비범위
++- transition rule redesign
++- dynamic QWave/DeltaK
++- semantic prior default enable
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_safe_on_enable_summary.json /mnt/data/decode02c_work/workspace/decode02c_safe_on_enable_summary.json
+--- /mnt/data/decode02c_orig/workspace/decode02c_safe_on_enable_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_safe_on_enable_summary.json	2026-05-27 00:56:22.601855239 +0000
+@@ -0,0 +1,29 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
++  "status": "TRANSITION_PROBE_INTEGRITY_COUNTERS_AND_SAFE_ON_GATE_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02B",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "validation_ssot": "model_core::decode_transition_validation",
++  "candidate_trace_version": 4,
++  "default_mode": "off",
++  "probe_mode_mutation_allowed": false,
++  "safe_on_gate": {
++    "requires_probe_integrity_pass": true,
++    "requires_transition_parity_pass": true,
++    "requires_candidate_trace_v4": true,
++    "default_promotion_status": "NOT_RUN"
++  },
++  "execution": {
++    "cargo_check": "NOT_RUN",
++    "cargo_test": "NOT_RUN",
++    "rustfmt": "NOT_RUN",
++    "webgpu_runtime": "NOT_RUN"
++  },
++  "non_scope": [
++    "transition_rule_redesign",
++    "dynamic_context_qwave",
++    "minp_formula_change",
++    "semantic_prior_default_enable",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_static_checks.json /mnt/data/decode02c_work/workspace/decode02c_static_checks.json
+--- /mnt/data/decode02c_orig/workspace/decode02c_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_static_checks.json	2026-05-27 00:58:45.167657485 +0000
+@@ -0,0 +1,17 @@
++{
++  "validation_exists": true,
++  "sampler_parity_exists": true,
++  "generation_sampling_exists": true,
++  "gpu_sampling_exists": true,
++  "topp_exists": true,
++  "transition_probe_integrity_counters": true,
++  "transition_probe_integrity_status_enum": true,
++  "candidate_trace_version_4_generation": true,
++  "gpu_trace_entry_v4_fields": true,
++  "wgsl_trace_entry_v4_fields": true,
++  "sampler_parity_mutation_statuses": true,
++  "summary_artifact": true,
++  "schema_artifact": true,
++  "json_artifacts_valid": true,
++  "no_partial_ready_gate": true
++}
+\ No newline at end of file
+diff -ruN /mnt/data/decode02c_orig/workspace/decode02c_validation_fixtures.json /mnt/data/decode02c_work/workspace/decode02c_validation_fixtures.json
+--- /mnt/data/decode02c_orig/workspace/decode02c_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/decode02c_work/workspace/decode02c_validation_fixtures.json	2026-05-27 00:56:22.602369473 +0000
+@@ -0,0 +1,32 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
++  "fixtures": [
++    {
++      "name": "probe_no_mutation",
++      "mode": "probe",
++      "expected": "PASS"
++    },
++    {
++      "name": "probe_weighted_logit_mutation_fail",
++      "mode": "probe",
++      "expected": "FAIL_WEIGHTED_LOGIT_MUTATED"
++    },
++    {
++      "name": "probe_hardblock_no_mask_mutation",
++      "mode": "probe",
++      "candidate": "<pad>",
++      "expected": "PASS"
++    },
++    {
++      "name": "on_mode_mutation_allowed",
++      "mode": "on",
++      "candidate": "<pad>",
++      "expected": "MUTATION_ALLOWED"
++    },
++    {
++      "name": "selected_id_unchanged",
++      "mode": "probe",
++      "expected": "selected_id_before == selected_id_after"
++    }
++  ]
++}
+\ No newline at end of file

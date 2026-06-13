@@ -1,0 +1,24 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MEM-02",
+  "adjudication": "PASS_STATIC_BAKE_PENDING_LOCAL_CARGO_BUILD",
+  "mem02_cleanup_receipt_added": true,
+  "mem02_ledger_append_added": true,
+  "post_artifact_receipt_embedding_added": true,
+  "repetition_penalty_ceiling": 1.10,
+  "repetition_penalty_clamped_files": [
+    "crates/ash_core/src/decode_stability.rs",
+    "crates/ash_core/src/gating.rs",
+    "crates/runtime/src/infer.rs",
+    "crates/model_core/src/native_wgpu.rs",
+    "crates/model_core/src/generation_sampling.rs",
+    "crates/model_core/src/reference_checkpoint.rs"
+  ],
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "local_cargo_build_ran": false,
+  "local_cargo_build_note": "cargo is not available in this bake environment; run cargo build -p orchestrator_local --bin orchestrator_local locally."
+}

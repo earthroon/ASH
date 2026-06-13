@@ -1,0 +1,21 @@
+SFT-FFN-TEX-ATLAS-04A static validation
+
+Environment limitation:
+- cargo/rustc/rustfmt were unavailable in the bake container.
+- Runtime compile/test validation was not executed.
+
+Static checks performed:
+- Added ash_core atomic compaction module.
+- Added ash_core test file with 8 seal/guard tests.
+- Added backend shader shell and Rust contract shell.
+- Connected ash_core module/export in lib.rs.
+- Connected burn_webgpu_backend module/export in lib.rs.
+- Verified new files exist.
+- Verified brace balance for new Rust/WGSL files.
+- Verified acceptance and bake artifact files exist.
+
+Expected local validation:
+- cargo test -p ash_core sft_ffn_tex_atlas_04a -- --nocapture
+- cargo test -p ash_core sft_ffn_tex_atlas_04 -- --nocapture
+- cargo test -p ash_core sft_ffn_tex_atlas_03 -- --nocapture
+- cargo test -p burn_webgpu_backend ffn_texture_atlas_atomic_compaction -- --nocapture

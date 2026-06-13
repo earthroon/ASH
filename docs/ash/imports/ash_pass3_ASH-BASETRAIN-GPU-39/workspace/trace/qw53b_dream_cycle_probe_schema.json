@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-53B",
+  "title": "Legacy Dream Cycle Probe / Idle Association Sandbox Seal",
+  "base_patch": "QW-53A",
+  "schema": "DreamCycleProbeTrace",
+  "dream_policy_version": "legacy_dream_cycle_probe_v1",
+  "association_policy_version": "dream_association_triplet_v1",
+  "compaction_policy_version": "dream_nrem_compaction_v1",
+  "outputs": {
+    "association_jsonl": "artifacts/qw53b_dream_association_samples.jsonl",
+    "manifest": "artifacts/qw53b_dream_cycle_probe_manifest.json"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "live_decode_intervention": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "stable_phrase_memory_write": false,
+    "quarantine_memory_write": false,
+    "dream_insight_apply": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

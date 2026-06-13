@@ -1,0 +1,32 @@
+SFT-GPU-RUN-06 STATIC VALIDATION
+
+PASS file generation
+PASS ash_core module export linked
+PASS lora_train module export linked
+PASS burn_webgpu_backend module export linked
+PASS new Rust file brace balance
+PASS source RUN-05 operator approval seal required
+PASS promotion intent required
+PASS artifact revalidation guard present
+PASS runtime compatibility guard present
+PASS adapter load sanity guard present
+PASS current pointer unchanged guard present
+PASS textureLoad guard present
+PASS textureSample/sampler/normalized UV fetch rejection present
+PASS promotion apply default false
+PASS runtime current pointer update default false
+PASS current pointer switch default false in backend boundary
+PASS lifecycle mutation default false
+PASS slot action apply default false
+PASS rollback execution default false
+PASS ASH current binding default false
+PASS runtime SFT training default false
+PASS runtime gradient write default false
+PASS runtime optimizer step default false
+PASS acceptance report generated
+PASS bake report generated
+
+PENDING cargo test -p ash_core sft_gpu_run_06 -- --nocapture
+PENDING cargo test -p lora_train gpu_trained_runtime_attach_dry_run -- --nocapture
+PENDING cargo test -p burn_webgpu_backend gpu_trained_runtime_attach_dry_run -- --nocapture
+PENDING actual runtime adapter loader dry-run from target backend

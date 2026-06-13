@@ -1,0 +1,45 @@
+{
+  "patch_id": "QW-52A-R3",
+  "title": "Cheonjiin Projection Alignment Probe / Hidden-Space Similarity Receipt",
+  "base_patch": "QW-52A-R2",
+  "status": "PASS_STATIC",
+  "alignment_probe": {
+    "module": "model_core::cheonjiin_projection_alignment_probe",
+    "available": true,
+    "hidden_snapshot_read_only": true,
+    "candidate_attach_api_available": true,
+    "snapshot_point": "lm_head_input",
+    "diagnostic_math_only": true
+  },
+  "existing_sources": {
+    "cheonjiin_projection_input_bridge": true,
+    "qwave_conditioning_projection_dry_run": true,
+    "native_hidden_snapshot_source": true
+  },
+  "alignment": {
+    "hidden_dim_source": "model_spec_or_read_only_snapshot",
+    "projected_dim_source": "qwave_conditioning_projection_dry_run",
+    "dim_match_required": true,
+    "cosine_similarity_diagnostic_only": true
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "hidden_state_fusion": false,
+    "residual_stream_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "adapter_projection_applied": false,
+    "webgpu_shader_added": false,
+    "python_trace_mutation": false,
+    "python_receipt_mutation": false
+  },
+  "not_run": {
+    "cargo_check": "cargo unavailable in bake environment",
+    "runtime_probe": "cargo unavailable in bake environment"
+  },
+  "next_candidates": ["QW-52A-R4", "QW-52B"]
+}

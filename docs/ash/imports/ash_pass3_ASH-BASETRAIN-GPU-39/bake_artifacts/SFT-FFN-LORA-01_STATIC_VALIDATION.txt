@@ -1,0 +1,23 @@
+SFT-FFN-LORA-01 static validation
+EXISTS crates/ash_core/src/sft_ffn_lora_target.rs: True size=40555
+EXISTS crates/ash_core/tests/sft_ffn_lora_01_down_projection_target.rs: True size=6987
+EXISTS crates/burn_webgpu_backend/src/ffn_lora_target.rs: True size=1430
+EXISTS crates/ash_core/src/lib.rs: True size=13512
+EXISTS crates/burn_webgpu_backend/src/lib.rs: True size=8914
+EXISTS acceptance_reports/SFT-FFN-LORA-01_ffn_down_projection_lora_target.md: True size=2203
+EXISTS bake_artifacts/SFT-FFN-LORA-01_BAKE_REPORT.md: True size=1652
+BRACE_BALANCE crates/ash_core/src/sft_ffn_lora_target.rs: 0
+CONTAINS_LORA01 crates/ash_core/src/sft_ffn_lora_target.rs: True
+BRACE_BALANCE crates/ash_core/tests/sft_ffn_lora_01_down_projection_target.rs: 0
+CONTAINS_LORA01 crates/ash_core/tests/sft_ffn_lora_01_down_projection_target.rs: True
+BRACE_BALANCE crates/burn_webgpu_backend/src/ffn_lora_target.rs: 0
+CONTAINS_LORA01 crates/burn_webgpu_backend/src/ffn_lora_target.rs: True
+BRACE_BALANCE crates/ash_core/src/lib.rs: 0
+CONTAINS_LORA01 crates/ash_core/src/lib.rs: True
+BRACE_BALANCE crates/burn_webgpu_backend/src/lib.rs: 0
+CONTAINS_LORA01 crates/burn_webgpu_backend/src/lib.rs: True
+ASH_CORE_MOD_CONNECTED: True
+ASH_CORE_USE_CONNECTED: True
+BACKEND_MOD_CONNECTED: True
+BACKEND_USE_CONNECTED: True
+CARGO_AVAILABLE: False

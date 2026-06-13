@@ -1,0 +1,7 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-27",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_27_gpu_backward_preflight --jobs 1",
+  "recommended_backward_preflight_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_27_gpu_backward_preflight",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-28",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-27A"
+}

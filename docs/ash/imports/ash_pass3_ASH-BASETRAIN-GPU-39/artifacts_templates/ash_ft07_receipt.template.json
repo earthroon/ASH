@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-FT-07",
+  "title": "Single Atlas Group Optimizer Dry-run / No Candidate Write Seal",
+  "status": "PENDING_RUNTIME",
+  "guards": {
+    "single_group_only": true,
+    "optimizer_dryrun_only": true,
+    "candidate_write_allowed": false,
+    "candidate_weight_write_executed": false,
+    "persist_optimizer_state": false,
+    "optimizer_state_write_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "full_model_forward_executed": false,
+    "decode_executed": false,
+    "generation_executed": false,
+    "real_corpus_train_executed": false,
+    "multi_group_train_executed": false
+  },
+  "verdict": "PENDING_RUNTIME"
+}

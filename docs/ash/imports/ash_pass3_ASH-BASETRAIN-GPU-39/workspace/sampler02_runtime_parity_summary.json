@@ -1,0 +1,26 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-02",
+  "status": "GPU_CPU_PARITY_RUNTIME_RECEIPT_BAKED_STATIC",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "parity_mode_default": "Off",
+  "env": {
+    "ASH_SAMPLER_PARITY": "off|probe|strict",
+    "ASH_SAMPLER_PARITY_TOP_N": "default 64",
+    "ASH_SAMPLER_PARITY_MAX_STEPS": "default 16",
+    "ASH_SAMPLER_PARITY_RECEIPT": "default workspace/sampler02_runtime_parity_receipt.jsonl"
+  },
+  "receipt": "workspace/sampler02_runtime_parity_receipt.jsonl",
+  "checked_steps": 0,
+  "pass_steps": 0,
+  "warn_steps": 0,
+  "fail_steps": 0,
+  "candidate_set_required_for_pass": true,
+  "selected_token_required_for_pass": false,
+  "trace_completeness": "PARTIAL until GPU candidate trace buffer ABI is added; selected/recovery CPU shadow receipt is active",
+  "non_scope": [
+    "deltak_qwave_weighted_minp",
+    "shader_algorithm_rewrite",
+    "tokenizer_decode_ssot",
+    "context_router"
+  ]
+}

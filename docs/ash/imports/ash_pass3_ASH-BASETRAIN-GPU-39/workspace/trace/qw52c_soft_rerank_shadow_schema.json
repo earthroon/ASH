@@ -1,0 +1,40 @@
+{
+  "patch_id": "QW-52C",
+  "title": "Controlled Awareness Soft Rerank Shadow / No Hard Ban Seal",
+  "schema_version": "controlled_awareness_soft_rerank_shadow_v1",
+  "status_values": [
+    "Unavailable",
+    "Partial",
+    "Simulated",
+    "Pass",
+    "Warn"
+  ],
+  "candidate_fields": [
+    "token_id",
+    "piece",
+    "candidate_rank_before",
+    "candidate_rank_shadow",
+    "awareness_risk_score",
+    "soft_penalty",
+    "soft_boost",
+    "shadow_score",
+    "hard_ban_applied",
+    "token_selection_changed"
+  ],
+  "mutation_policy_all_false": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

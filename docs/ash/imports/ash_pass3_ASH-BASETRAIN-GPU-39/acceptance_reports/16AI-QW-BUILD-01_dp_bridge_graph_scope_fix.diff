@@ -1,0 +1,22 @@
+--- /mnt/data/qw34_orig_one/crates/tokenizer_core/src/hangul_qwave_dp_bridge.rs	2026-05-20 07:25:22.000000000 +0000
++++ /mnt/data/qw34_fix/crates/tokenizer_core/src/hangul_qwave_dp_bridge.rs	2026-05-21 04:31:21.132950015 +0000
+@@ -500,7 +500,7 @@
+         if !finite(path.baseline_cost) || !finite(path.baseline_score) {
+             return Err(QWaveTokenizerDpBridgeError::NonFiniteBaselineCost);
+         }
+-        let qwave_continuity_reward = graph.pulse_curve.mean_binding * policy.continuity_reward_weight;
++        let qwave_continuity_reward = sentence_graph.pulse_curve.mean_binding * policy.continuity_reward_weight;
+         let qwave_graph_alignment_reward = graph_power * policy.graph_alignment_reward_weight;
+         let qwave_boundary_mismatch_penalty = path.boundary_mismatch_count as f32 * policy.boundary_mismatch_penalty_weight;
+         let qwave_byte_fallback_penalty = path.byte_like_token_count as f32 * policy.byte_fallback_penalty_weight;
+--- /mnt/data/qw34_orig_one/crates/tokenizer_core/src/hangul_qwave_sentence_graph.rs	2026-05-20 07:14:56.000000000 +0000
++++ /mnt/data/qw34_fix/crates/tokenizer_core/src/hangul_qwave_sentence_graph.rs	2026-05-21 04:31:21.133730845 +0000
+@@ -3,7 +3,7 @@
+ use crate::structure_tensor::StructureTensorObservation;
+ use serde::{Deserialize, Serialize};
+ use sha2::{Digest, Sha256};
+-use std::collections::{HashMap, HashSet};
++use std::collections::HashMap;
+ 
+ fn short_sha256_hex<T: Serialize>(value: &T) -> String {
+     let bytes = serde_json::to_vec(value).unwrap_or_default();

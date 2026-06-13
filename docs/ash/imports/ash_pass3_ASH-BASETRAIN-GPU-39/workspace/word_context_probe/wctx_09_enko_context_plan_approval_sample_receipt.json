@@ -1,0 +1,73 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-09",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX02-C003",
+  "source_injection_candidate_receipt_key": "sha256:5b81c57fd46917baaf4d3916ca4bcad6d4b7d8d8a042cccb39212c17e54a0da0",
+  "decision_receipt": {
+    "approval_receipt_id": "approval:WCTX02-C003:pending:d45e9769fa410e83",
+    "source_candidate_receipt_key": "sha256:5b81c57fd46917baaf4d3916ca4bcad6d4b7d8d8a042cccb39212c17e54a0da0",
+    "decision": {
+      "decision_id": "decision:WCTX02-C003:pending",
+      "decision": "pending",
+      "operator_id": null,
+      "operator_label": null,
+      "reason": "pending manual review",
+      "reviewed_scopes": [],
+      "explicit_manual_decision": false
+    },
+    "checklist": {
+      "domain_ssot_checked": false,
+      "candidate_block_marker_checked": false,
+      "candidate_only_mode_checked": false,
+      "apply_false_checked": false,
+      "diff_reviewed": false,
+      "rollback_reviewed": false,
+      "no_active_prompt_mutation_checked": false,
+      "no_generation_input_mutation_checked": false,
+      "no_runtime_default_apply_checked": false,
+      "no_auto_translation_mutation_checked": false
+    },
+    "approval_valid": true,
+    "approval_invalid_reasons": [],
+    "can_proceed_to_dry_run": false,
+    "can_apply_to_runtime": false
+  },
+  "manual_apply_gate": {
+    "gate_id": "manual_gate:WCTX02-C003:b8dbc3bfc807119b",
+    "gate_open_for_dry_run": false,
+    "gate_open_for_runtime_apply": false,
+    "requires_manual_approval": true,
+    "requires_dry_run_before_apply": true,
+    "requires_rollback_snapshot": true,
+    "source_candidate_prompt_hash": "sha256:84a6687a876ed3858e57de5fc45fda9004ec12ee8eeae177da41d021826027d9",
+    "source_active_prompt_hash": null,
+    "source_rollback_hash": null,
+    "gate_reason": "manual review pending; dry-run gate closed"
+  },
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "active_prompt_mutated": false,
+    "generation_input_mutated": false,
+    "candidate_prompt_applied": false,
+    "runtime_default_apply": false,
+    "rerank_applied": false,
+    "auto_approved": false,
+    "operator_approval_missing": false,
+    "approval_reason_missing": false,
+    "checklist_incomplete": false,
+    "dry_run_gate_open": false,
+    "runtime_apply_gate_open": false,
+    "rollback_missing": false,
+    "diff_missing": false,
+    "marker_missing": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true
+  },
+  "deterministic_receipt_key": "sha256:8ef020fb8c0af11a32f468a890fbab84c164a9f25d9873060eb90cb35b456fd2",
+  "created_by": "ash_core::word_context_context_plan_approval",
+  "schema_version": 1
+}

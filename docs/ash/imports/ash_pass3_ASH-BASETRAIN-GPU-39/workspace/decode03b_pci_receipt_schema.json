@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
+  "title": "Path Confidence Index / PCI Receipt Seal",
+  "schema_version": 1,
+  "behavior_change": false,
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03A",
+  "required_fields": [
+    "patch_id",
+    "input_patch",
+    "schema_version",
+    "run_id",
+    "step",
+    "backend",
+    "sampler_ssot",
+    "behavior_change",
+    "input",
+    "config",
+    "components",
+    "pci_raw",
+    "bucket_raw",
+    "bucket_stable",
+    "bucket_transition",
+    "risk_flags"
+  ],
+  "pci_contract": {
+    "range": [0.0, 1.0],
+    "buckets": {
+      "Confident": "pci >= 0.88",
+      "Stable": "0.70 <= pci < 0.88",
+      "Uncertain": "0.45 <= pci < 0.70",
+      "Unstable": "0.20 <= pci < 0.45",
+      "Collapsing": "pci < 0.20"
+    },
+    "hard_caps": [
+      "nan_seen or inf_seen => pci = 0.0",
+      "empty_active_set_seen => pci <= 0.20",
+      "global_finite_fallback_seen => pci <= 0.35",
+      "guard_entropy_inversion and selected_rank > 5 => pci <= 0.45",
+      "min_p_overcompression and active_count_final <= 2 => pci <= 0.50"
+    ]
+  },
+  "ssot": "DECODE-03A entropy/confidence metric receipt",
+  "next_patch": "16AI-QW-38G-R6A-DECODE-03C Dynamic Sampler Shadow Policy Seal"
+}

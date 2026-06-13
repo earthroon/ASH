@@ -1,0 +1,62 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-04",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "cue_id": "mock-cue-0001",
+  "candidate_id": "candidate-a6eb2784696fa5df",
+  "source_en_hash": "sha256:eedee88485b4931a98f4b759257aef83db4edc87d1e02b56fa66b92072d644ec",
+  "candidate_ko_hash": "sha256:28f3c3fd1037778e817801a549615961911969afd53fba03dee639dca97e6965",
+  "token_trace_hash": "sha256:70183048aaa3fd2b67a020fd265e0486325873b000c1ef730d22e24629fbf4a2",
+  "sampling_config_hash": "sha256:547d67ed333b942db07634b8fd3a3d68114db36c1d867ab4d9aeb02f8da114a6",
+  "cue_snapshot": {
+    "start_ms": 1000,
+    "end_ms": 3200,
+    "duration_ms": 2200,
+    "source_char_count": 29,
+    "candidate_char_count": 17,
+    "max_lines": 2,
+    "max_chars_per_line": 18,
+    "cps_limit": 17.0
+  },
+  "token_snapshot": {
+    "token_count": 3,
+    "token_ids_hash": "sha256:cb36a560f41132022d1448f94f818b960a6818ff4c88b086963f5a08dc11467c",
+    "token_pieces_hash": "sha256:2a11e4eb686a06ccc60fb066a15093acc0dbe3dd91c3f96f4c7a46ce67f6b32a",
+    "first_token_id": 101,
+    "last_token_id": 303,
+    "has_byte_token": false,
+    "has_unknown_token": false,
+    "has_control_token": false,
+    "has_mojibake_risk": false
+  },
+  "risk_snapshot": {
+    "salad_score": 0.0,
+    "morph_loop_score": 0.0,
+    "repetition_score": 0.0,
+    "byte_leak_score": 0.0,
+    "mojibake_score": 0.0,
+    "hallucination_risk": null,
+    "omission_risk": null,
+    "hard_risk_detected": false,
+    "retry_recommended": false,
+    "rollback_recommended": false,
+    "review_required": false
+  },
+  "score_snapshot": {
+    "subtitle_surface_score": 0.0,
+    "source_adequacy_score": null,
+    "glossary_score": null,
+    "register_consistency_score": null,
+    "qe_score": null,
+    "final_quality_score": null
+  },
+  "decision": "not_evaluated",
+  "decision_reason": "static_fixture_only",
+  "runtime_decode_executed": false,
+  "generation_executed": false,
+  "model_forward_executed": false,
+  "sampling_executed": false,
+  "rerank_applied": false,
+  "qe_model_executed": false,
+  "created_by": "ash_core::enko_decode_quality_receipt",
+  "schema_version": 1
+}

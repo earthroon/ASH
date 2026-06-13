@@ -1,0 +1,49 @@
+# 16AI-QW-38G-R6A-DECODE-19
+## Final Quality Score Aggregator / Multi-Gate Score Composition Seal
+
+status: PASS_STATIC_FINAL_QUALITY_SCORE_AGGREGATOR_CONTRACT
+domain_ssot: en_to_ko_translation_subtitle_machine
+depends_on:
+  - 16AI-QW-38G-R6A-DECODE-04
+  - 16AI-QW-38G-R6A-DECODE-09
+  - 16AI-QW-38G-R6A-DECODE-10
+  - 16AI-QW-38G-R6A-DECODE-11
+  - 16AI-QW-38G-R6A-DECODE-12
+  - 16AI-QW-38G-R6A-DECODE-13
+  - 16AI-QW-38G-R6A-DECODE-14
+  - 16AI-QW-38G-R6A-DECODE-15
+  - 16AI-QW-38G-R6A-DECODE-16
+  - 16AI-QW-38G-R6A-DECODE-17
+  - 16AI-QW-38G-R6A-DECODE-18
+
+final_quality_score_policy_created_count: 1
+final_quality_score_receipt_created_count: 8
+deterministic_key_created_count: 8
+score_aggregated_count: 1
+score_aggregated_with_review_count: 2
+score_aggregated_deferred_count: 2
+score_capped_by_commit_block_count: 1
+score_incomplete_missing_component_count: 1
+score_invalid_candidate_chain_count: 1
+excellent_band_count: 1
+good_band_count: 0
+review_band_count: 3
+poor_band_count: 1
+blocked_band_count: 1
+incomplete_band_count: 2
+component_count_per_complete_score: 8
+missing_component_detected_count: 1
+candidate_id_mismatch_detected_count: 1
+commit_block_cap_applied_count: 1
+deferred_score_cap_applied_count: 2
+final_quality_score_written_count: 8
+runtime_decode_executed_count: 0
+model_forward_executed_count: 0
+sampling_executed_count: 0
+external_score_model_executed_count: 0
+candidate_commit_executed_count: 0
+subtitle_export_executed_count: 0
+decode18_final_commit_receipt_required: true
+decode04_quality_score_final_quality_slot_extended: true
+duplicate_receipt_key_count: 0
+domain_ssot_mismatch_count: 0

@@ -1,0 +1,35 @@
+--- /mnt/data/qw35b_pristine/crates/model_core/src/generation_sampling.rs	2026-05-07 09:43:40.000000000 +0000
++++ crates/model_core/src/generation_sampling.rs	2026-05-22 07:08:23.805695770 +0000
+@@ -1,4 +1,5 @@
+ use super::*;
++use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+ use std::collections::BTreeMap;
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+@@ -2970,6 +2971,8 @@
+         );
+         telemetry.sampled_decode_applied = false;
+         telemetry.finalize(finish_reason);
++        let generated_tail_len = out.len().saturating_sub(if prompt_ids.is_empty() { 1 } else { prompt_ids.len() });
++        emit_kv_cache_cursor_trace_summary(prefill.state.kv.prompt_len, generated_tail_len, &prefill.state.kv);
+         Ok((out, telemetry))
+     }
+ 
+@@ -3118,6 +3121,8 @@
+         );
+         telemetry.sampled_decode_applied = false;
+         telemetry.finalize(finish_reason);
++        let generated_tail_len = out.len().saturating_sub(if prompt_ids.is_empty() { 1 } else { prompt_ids.len() });
++        emit_kv_cache_cursor_trace_summary(prefill.state.kv.prompt_len, generated_tail_len, &prefill.state.kv);
+         Ok((out, telemetry))
+     }
+ 
+@@ -3165,6 +3170,8 @@
+             }
+         }
+ 
++        let generated_tail_len = out.len().saturating_sub(if prompt_ids.is_empty() { 1 } else { prompt_ids.len() });
++        emit_kv_cache_cursor_trace_summary(prefill.state.kv.prompt_len, generated_tail_len, &prefill.state.kv);
+         Ok(out)
+     }
+ 

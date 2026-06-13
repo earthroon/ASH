@@ -1,0 +1,881 @@
+{
+  "build_gate": "pass_by_user_reported_local_cargo_check",
+  "cache": {
+    "cached_layers": 14,
+    "mode": "ffn_weights_only",
+    "preupload": true,
+    "preupload_ms": 361.6366,
+    "summed_layer_preupload_ms": 344.2897999999999,
+    "total_bytes": 1937768448
+  },
+  "commit": "16AF-P2",
+  "generation_connected": false,
+  "layers": [
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 459.7867,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 0,
+      "max_abs_delta": 2.60770320892334e-8,
+      "mean_abs_delta": 2.0633399433478417e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.3971,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 184.0788,
+        "total_gpu_ms": 185.75449999999998,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 0,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 317.7205,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 1,
+      "max_abs_delta": 1.5832483768463135e-8,
+      "mean_abs_delta": 2.1861623622498882e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.1257000000000001,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 2.1721000000000004,
+        "total_gpu_ms": 3.7716999999999996,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 1,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 331.787,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 2,
+      "max_abs_delta": 1.6298145055770874e-8,
+      "mean_abs_delta": 2.3017856509710555e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9359999999999999,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 1.9607999999999999,
+        "total_gpu_ms": 3.1234,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 2,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 297.30580000000003,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 3,
+      "max_abs_delta": 1.4435499906539917e-8,
+      "mean_abs_delta": 2.4335966575250723e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.1459000000000001,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 1.9802000000000002,
+        "total_gpu_ms": 3.4759,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 3,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 292.4998,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 4,
+      "max_abs_delta": 1.6763806343078613e-8,
+      "mean_abs_delta": 2.4028665723818676e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9233,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 5.574199999999999,
+        "total_gpu_ms": 6.7271,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 4,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 291.8718,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 5,
+      "max_abs_delta": 1.955777406692505e-8,
+      "mean_abs_delta": 2.555091471734272e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.0809000000000002,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 5.6623,
+        "total_gpu_ms": 7.0165,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 5,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 352.21340000000004,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 6,
+      "max_abs_delta": 1.3504177331924438e-8,
+      "mean_abs_delta": 2.562797973837405e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9711000000000001,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 6.332199999999999,
+        "total_gpu_ms": 7.5357,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 6,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 278.0724,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 7,
+      "max_abs_delta": 1.3969838619232178e-8,
+      "mean_abs_delta": 2.4793176400805805e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9141,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 6.4193999999999996,
+        "total_gpu_ms": 7.564,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 7,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 279.2036,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 8,
+      "max_abs_delta": 1.6763806343078613e-8,
+      "mean_abs_delta": 2.5876705223026875e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9695,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 6.3572999999999995,
+        "total_gpu_ms": 7.5546,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 8,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 269.7208,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 9,
+      "max_abs_delta": 1.30385160446167e-8,
+      "mean_abs_delta": 2.5239761392015225e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9441,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 6.8815,
+        "total_gpu_ms": 8.0543,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 9,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 351.0604,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 10,
+      "max_abs_delta": 2.1420419216156006e-8,
+      "mean_abs_delta": 2.676262766954096e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 1.0892,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 7.1595,
+        "total_gpu_ms": 8.5497,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 10,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 330.07599999999996,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 11,
+      "max_abs_delta": 1.5832483768463135e-8,
+      "mean_abs_delta": 2.7698761062566746e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9246,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 12.9789,
+        "total_gpu_ms": 14.1283,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 11,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 278.5585,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 12,
+      "max_abs_delta": 1.4901161193847656e-8,
+      "mean_abs_delta": 2.691240785779314e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9479,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 13.08,
+        "total_gpu_ms": 14.2558,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 12,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    },
+    {
+      "burn_cubecl_ffn_matmul_disabled": true,
+      "cached_weight": true,
+      "dispatch_log": [
+        "[16AF][ffn] enable_native_atlas_ffn=true enable_silu_swiglu=true",
+        "[16AF][ffn] burn_cubecl_ffn_matmul_disabled=true",
+        "[16AF-P2][cache] cached_weight=true; gate/up/down weights reused from native-owned WGPU buffers",
+        "[16AF-P2][perf] readback_mode=output_only readback_buffers=1 readback_elements=2048 weight_upload_ms=0"
+      ],
+      "elapsed_ms": 311.9689,
+      "forbidden_paths_used": [],
+      "generation_connected": false,
+      "hidden": 2048,
+      "inf_count": 0,
+      "intermediate": 5632,
+      "layer": 13,
+      "max_abs_delta": 1.4901161193847656e-8,
+      "mean_abs_delta": 2.727825965109787e-9,
+      "nan_count": 0,
+      "parity_pass": true,
+      "resolved_backend": "native_atlas_ffn_16AF_P2+storage3_split_passes+cached_weight_buffers+output_only_readback",
+      "shape_match": true,
+      "telemetry": {
+        "bind_encode_ms": 0.9287,
+        "gpu_context_reused": true,
+        "readback_buffers": 1,
+        "readback_elements": 2048,
+        "readback_mode": "output_only",
+        "shader_pipeline_cached": true,
+        "submit_readback_ms": 13.036000000000001,
+        "total_gpu_ms": 14.194,
+        "weight_upload_ms": 0.0
+      },
+      "threshold": 0.0010000000474974513,
+      "top_index_match": true,
+      "top_k": 8,
+      "top_k_overlap": 8,
+      "weight_layout": {
+        "down_bias_present": false,
+        "down_shape": [
+          2048,
+          5632
+        ],
+        "gate_bias_present": false,
+        "gate_shape": [
+          5632,
+          2048
+        ],
+        "hidden": 2048,
+        "intermediate": 5632,
+        "layer_idx": 13,
+        "row_major_weight_layout": true,
+        "up_bias_present": false,
+        "up_shape": [
+          5632,
+          2048
+        ]
+      }
+    }
+  ],
+  "perf_summary": {
+    "readback_mode": "output_only",
+    "weight_upload_reduction_ratio": 1.0,
+    "weight_upload_sum_after_ms": 0.0,
+    "weight_upload_sum_before_ms": 213.099
+  },
+  "requested_layers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "runtime_gate": "ffn_weight_preupload_perf_only",
+  "summary": {
+    "completed": 14,
+    "elapsed_ms_total": 50050.742300000005,
+    "failed": 0,
+    "max_abs_delta_global": 2.60770320892334e-8,
+    "mean_abs_delta_avg": 2.4972721668348186e-9,
+    "parity_pass": true,
+    "passed": 14,
+    "telemetry_readback_buffers": 14,
+    "telemetry_readback_elements": 28672,
+    "telemetry_submit_readback_ms": 273.6732,
+    "telemetry_total_gpu_ms": 291.70550000000003,
+    "telemetry_weight_upload_ms": 0.0,
+    "total": 14
+  },
+  "threshold": 0.0010000000474974513,
+  "top_k": 8
+}

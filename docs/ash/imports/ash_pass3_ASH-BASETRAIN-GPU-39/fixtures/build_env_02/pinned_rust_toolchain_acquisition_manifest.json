@@ -1,0 +1,63 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-BUILD-ENV-02",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "manifest_type": "pinned_rust_toolchain_acquisition",
+  "preceded_by": "16AI-QW-38G-R6A-BUILD-00-R1",
+  "created_at": "2026-05-29T07:12:00+09:00",
+  "current_toolchain": {
+    "channel": "stable",
+    "profile": "minimal",
+    "components": [
+      "rustfmt",
+      "clippy"
+    ]
+  },
+  "pin_policy": {
+    "exact_version_required_now": false,
+    "exact_version_candidate": null,
+    "pin_source": "external_runner_receipt_or_ci_success",
+    "nightly_allowed": false,
+    "exact_version_pin_deferred_until_successful_external_runner_receipt": true,
+    "reason": "local environment has no cargo/rustc; exact pinning without executed evidence would be unsupported"
+  },
+  "execution_targets": [
+    "rustc --version",
+    "cargo --version",
+    "rustup show",
+    "python3 tools/provision_rust_toolchain.py --verify --emit-receipt",
+    "python3 tools/run_build_00_r1_cargo_environment_rerun.py",
+    "cargo test -p tokenizer_core --test decode_qa_05_control_token_guard",
+    "cargo test -p tokenizer_core --test decode_qa_06_byte_utf8_guard",
+    "cargo test -p tokenizer_core --test decode_qa_07_linebreak_guard",
+    "cargo test -p tokenizer_core --test decode_qa_08_degeneration_guard",
+    "cargo test -p tokenizer_core --test decode_qa_09_termination_guard",
+    "cargo test -p tokenizer_core --test decode_qa_10_subtitle_smoke",
+    "cargo test -p tokenizer_core --test decode_qa_11_regression_matrix",
+    "cargo test -p tokenizer_core --test decode_qa_12_quality_closure",
+    "cargo test -p tokenizer_core --test decode_run_00_runtime_guard_chain",
+    "cargo run -p tokenizer_core --bin decode_run_00_runtime_guard_chain"
+  ],
+  "receipt_contract": {
+    "required_receipts": [
+      "workspace/build_env_02_external_runner_receipt.json",
+      "workspace/build_env_02_external_runner_stdout.log",
+      "workspace/build_env_02_external_runner_stderr.log",
+      "workspace/build_00_r1_static_build_receipt.json",
+      "workspace/build_00_r1_cargo_check_report.json",
+      "workspace/decode_run_00_execution_receipt.json",
+      "workspace/decode_run_00_runtime_guard_chain_result.json",
+      "workspace/decode_run_00_runtime_guard_chain_summary.json"
+    ],
+    "conditional_receipts": [
+      "workspace/build_00_r1_missing_path_dependency_classification.json",
+      "workspace/build_00_r1_tokenizer_core_test_report.json",
+      "workspace/build_00_r1_decode_run_00_execution_report.json"
+    ]
+  },
+  "forbidden_claims": [
+    "external runner executed without receipt",
+    "cargo test passed without cargo execution",
+    "runtime_ready_decode_confirmed true without executed guard chain",
+    "Python guard substitution"
+  ]
+}

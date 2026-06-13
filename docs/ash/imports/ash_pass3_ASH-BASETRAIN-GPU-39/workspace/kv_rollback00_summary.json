@@ -1,0 +1,50 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-03",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "behavior_change": false,
+  "probe_only": true,
+  "mode": "SnapshotOnly",
+  "requires_salad03": true,
+  "salad03_status_seen": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "steps_observed": 0,
+  "snapshot": {
+    "created_count": 0,
+    "target_found_count": 0,
+    "target_missing_count": 0,
+    "ring_capacity": 16,
+    "evicted_count": 0
+  },
+  "probe": {
+    "shape_probe_passed_count": 0,
+    "hash_probe_passed_count": 0,
+    "forked_replay_attempted_count": 0,
+    "forked_replay_passed_count": 0,
+    "restore_verified_count": 0
+  },
+  "backend_capability": {
+    "backend": "static_bake",
+    "supports_snapshot": true,
+    "supports_restore": false,
+    "supports_forked_restore": false,
+    "supports_kv_hash": false,
+    "supports_position_restore": false,
+    "supports_sampler_state_restore": false,
+    "requires_gpu_readback": false,
+    "snapshot_cost_estimate": "unknown",
+    "notes": [
+      "static bake only"
+    ]
+  },
+  "safety": {
+    "main_state_changed_count": 0,
+    "restore_without_snapshot_count": 0,
+    "position_mismatch_count": 0,
+    "shape_mismatch_count": 0
+  },
+  "acceptance": {
+    "ready_for_salad03_controlled_execute": false,
+    "ready_for_kv_rollback01_forked_replay": false,
+    "reason": "static bake defined; runtime snapshot/restore probe not run"
+  }
+}

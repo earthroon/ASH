@@ -1,0 +1,23 @@
+{
+  "candidate_id": "candidate-omission-fail",
+  "candidate_ko": "문 열지 마.",
+  "candidate_quality_receipt_hash": "mock-quality-receipt-hash",
+  "cue_id": "mock-cue-0002",
+  "decode_session_id": "mock-decode-session-omission-fail",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "expected_decision": "RewriteRecommended",
+  "expected_reason": "OmissionMeaningLoss",
+  "final_gate_receipt_hash": "mock-final-gate-receipt-hash",
+  "patch_id": "16AI-QW-38G-R6A-DECODE-14",
+  "qe_adapter_receipt_hash": "mock-qe-receipt-hash",
+  "source_en": "Don't open the door until I call you.",
+  "span_error_receipt_hash": "mock-span-receipt-hash",
+  "span_errors": [
+    {
+      "candidate_span": null,
+      "error_type": "Omission",
+      "severity": "Major",
+      "source_span": "until I call you"
+    }
+  ]
+}

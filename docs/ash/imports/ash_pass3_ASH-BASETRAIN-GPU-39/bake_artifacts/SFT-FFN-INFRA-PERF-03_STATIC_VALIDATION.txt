@@ -1,0 +1,26 @@
+SFT-FFN-INFRA-PERF-03 static validation
+base: ash_pass3_SFT-FFN-LORA-14_slot_arbitration_baked.zip
+
+[modules]
+OK infer_entry_json_projection.rs exists
+OK orchestrator_local lib.rs exports projection module
+OK StandardInferResult derives Serialize
+
+[infer_entry low-level mapping scan]
+OK low-level probe internals removed from infer_entry.rs
+
+[projection helper]
+OK serde_json::to_value projection present
+OK overlay merge helper present
+OK manual probe mapping guard sealed
+
+[no runtime mutation flags]
+OK current pointer mutation closed
+OK promotion apply closed
+OK runtime mutation closed
+
+[syntax balance]
+crates/orchestrator_local/src/infer_entry.rs {'{': 70, '}': 70, '(': 548, ')': 548, '[': 9, ']': 9}
+crates/orchestrator_local/src/infer_entry_json_projection.rs {'{': 31, '}': 31, '(': 792, ')': 792, '[': 5, ']': 5}
+crates/orchestrator_local/tests/infer_entry_json_projection.rs {'{': 10, '}': 10, '(': 54, ')': 54, '[': 7, ']': 7}
+crates/runtime/src/infer.rs {'{': 547, '}': 547, '(': 1757, ')': 1757, '[': 158, ']': 158}

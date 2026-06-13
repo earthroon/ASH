@@ -1,0 +1,19 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MEM-01A",
+  "base_patch_id": "16AI-QW-38G-R6A-MEM-01",
+  "patch_name": "Memory Budget Receipt Serialization Macro Recursion Hotfix Seal",
+  "build_error": "recursion limit reached while expanding $crate::json_internal! at crates/orchestrator_local/src/memory_budget_guard.rs:236",
+  "root_cause": "decision_receipt_json used a large serde_json::json! object literal, causing macro expansion recursion depth overflow in orchestrator_local.",
+  "fix": "Replaced the large json! receipt literal with a typed MemoryBudgetReceipt struct serialized via serde_json::to_value; removed serde_json::json import.",
+  "recursion_limit_attribute_added": false,
+  "reason_no_recursion_limit_attribute": "Avoids masking macro recursion expansion rather than increasing crate-wide macro recursion budget.",
+  "model_files_modified": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "status": "PASS_STATIC_MACRO_RECURSION_HOTFIX_PENDING_LOCAL_CARGO_BUILD",
+  "adjudication": "PASS_JSON_MACRO_REMOVED_TYPED_RECEIPT_SERIALIZATION_ACTIVE"
+}

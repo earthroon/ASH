@@ -1,0 +1,41 @@
+crates/model_core/src/tokenizer_v5_output_decode_smoke.rs: PASS
+crates/model_core/tests/qw_tok05_output_decode_smoke.rs: PASS
+crates/model_core/tests/qw_tok05_output_id_range_recheck.rs: PASS
+crates/model_core/tests/qw_tok05_no_quality_claim.rs: PASS
+crates/model_core/tests/qw_tok05_no_runtime_mutation.rs: PASS
+artifacts/qw_tok05_output_decode_smoke_report.json: PASS
+artifacts/qw_tok05_decoded_output_text.json: PASS
+artifacts/qw_tok05_decode_sanity_receipt.json: PASS
+artifacts/qw_tok05_no_quality_claim_receipt.json: PASS
+workspace/runtime_traces/qw_tok05_output_decode_smoke_trace.jsonl: PASS
+workspace/trace/qw_tok05_output_decode_smoke_receipt.json: PASS
+lib module wired: PASS
+QwTok05OutputDecodeSmokeConfig: PASS
+QwTok05OutputIdSourceProbe: PASS
+QwTok05OutputIdRangeRecheck: PASS
+QwTok05TokenizerDecodeProbe: PASS
+QwTok05DecodedOutputTextRecord: PASS
+QwTok05ControlTokenLeakReport: PASS
+QwTok05DecodeSanityReceipt: PASS
+QwTok05NoQualityClaimSeal: PASS
+QwTok05NoRuntimeMutationSeal: PASS
+QwTok05OutputDecodeSmokeReport: PASS
+build_qw_tok05_output_decode_smoke_report: PASS
+build_qw_tok05_output_id_range_recheck: PASS
+build_qw_tok05_no_quality_claim_seal: PASS
+build_qw_tok05_no_runtime_mutation_seal: PASS
+QW_TOK05_EXPECTED_VOCAB_SIZE: usize = 48_259: PASS
+QW_TOK05_EXPECTED_MAX_TOKEN_ID: usize = 48_258: PASS
+default blocks allow_model_inference: false: PASS
+default blocks allow_token_generation: false: PASS
+default blocks allow_sampler_execution: false: PASS
+default blocks allow_qw_selector_execution: false: PASS
+default blocks allow_mcts_execution: false: PASS
+default blocks allow_translation_quality_evaluation: false: PASS
+default blocks allow_subtitle_quality_evaluation: false: PASS
+default blocks allow_training_mutation: false: PASS
+default blocks allow_checkpoint_write: false: PASS
+default blocks allow_runtime_spec_write: false: PASS
+default blocks allow_tokenizer_rewrite: false: PASS
+no checkpoint/model/tokenizer weight files packaged: PASS
+overall: PASS

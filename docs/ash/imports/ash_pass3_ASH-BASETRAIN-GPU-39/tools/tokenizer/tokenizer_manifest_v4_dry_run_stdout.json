@@ -1,0 +1,28 @@
+{
+  "manifest_id": "tok_v4_20260414125905",
+  "source_manifest_id": "tok_20260407010717598",
+  "target_tokenizer_spec_id": "tokenizer_v4",
+  "target_declared_vocab_size": 56832,
+  "generated_vocab_size": 56300,
+  "shortfall": 532,
+  "reserved_count": 72,
+  "byte_block_count": 256,
+  "target_nonbyte_slots": 56504,
+  "selected_nonbyte_count": 55972,
+  "selected_byte_count": 256,
+  "source_nonbyte_count": 55965,
+  "external_candidate_nonbyte_count": 7,
+  "external_candidate_byte_count": 0,
+  "used_external_nonbyte_count": 7,
+  "used_source_nonbyte_fallback_count": 55965,
+  "notes": [
+    "generated vocab size 56300 does not match draft trainer.vocab_size 56832",
+    "shortfall=532; provide more candidate non-byte tokens or raise target/source strategy"
+  ],
+  "candidate_dedupe": {
+    "input_candidates": 7,
+    "duplicate_candidates": 0,
+    "score_promotions": 0
+  },
+  "dry_run": true
+}

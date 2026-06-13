@@ -1,0 +1,38 @@
+# SFT-FFN-LORA-11 Static Validation
+
+## File presence
+- OK crates/ash_core/src/sft_ffn_lora_current_pointer_switch.rs
+- OK crates/ash_core/src/sft_ffn_texture_load_guard.rs
+- OK crates/ash_core/tests/sft_ffn_lora_11_current_pointer_switch.rs
+- OK crates/ash_core/tests/sft_ffn_texture_load_guard_01.rs
+- OK crates/burn_webgpu_backend/src/ffn_lora_current_pointer_switch.rs
+- OK crates/burn_webgpu_backend/src/ffn_texture_load_guard.rs
+- OK crates/burn_webgpu_backend/tests/ffn_texture_load_guard_01.rs
+- OK acceptance_reports/SFT-FFN-LORA-11_current_pointer_switch.md
+
+## Module exports
+- OK ash_core current pointer module exported
+- OK ash_core textureLoad guard module exported
+- OK backend current pointer module exported
+- OK backend textureLoad guard module exported
+
+## Guard constants / defaults
+- OK textureSample weight fetch default closed
+- OK unreviewed adapter attach default closed
+- OK standalone texture guard reports textureSample closed
+- OK backend boundary textureSample closed
+
+## WGSL FFN shader scan
+- OK no textureSample( call found in FFN shader files
+- OK textureLoad found in FFN shader files
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_batched_projection.wgsl:2:// Smoke-only path. Uses textureLoad with integer coordinates, mip level 0, and no
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_batched_projection.wgsl:31:    return textureLoad(ffn_weight_atlas, coord, 0);
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_hybrid_lora.wgsl:4://   base_out = textureLoad(base_ffn_atlas, integer_coord, 0)
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_hybrid_lora.wgsl:34:    return textureLoad(base_ffn_atlas, vec2<i32>(i32(col_pack), i32(row)), 0);
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_hybrid_lora.wgsl:47:    // Contract shell: real implementation must accumulate base_out through numeric textureLoad.
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_projection.wgsl:1:// SFT-FFN-TEX-ATLAS-02 textureLoad FFN projection parity shader shell.
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_projection.wgsl:2:// This shader is intentionally parity-only. It uses textureLoad with integer coordinates,
+crates/burn_webgpu_backend/src/shaders/ffn_texture_atlas_projection.wgsl:32:    return textureLoad(ffn_weight_atlas, coord, 0);
+
+## Cargo validation
+- cargo unavailable in this environment; runtime compile validation pending

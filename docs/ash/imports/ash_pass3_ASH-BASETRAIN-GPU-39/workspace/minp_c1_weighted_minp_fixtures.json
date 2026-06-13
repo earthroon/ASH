@@ -1,0 +1,92 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1",
+  "fixtures": [
+    {
+      "name": "no_source_fallback",
+      "semantic_prior_enabled": true,
+      "qwave_scores": null,
+      "deltak_scores": null,
+      "expected": "weighted_logit == scaled_logit; candidate set equals vanilla"
+    },
+    {
+      "name": "bias_formula",
+      "scaled_logit": 10.0,
+      "qwave_score": 0.8,
+      "deltak_score": 0.5,
+      "weights": {
+        "qwave": 0.2,
+        "deltak": 0.15,
+        "cross": 0.1
+      },
+      "bias_cap": 0.75,
+      "expected_bias": 0.275,
+      "expected_weighted_logit": 10.275
+    },
+    {
+      "name": "weighted_min_p",
+      "logits": [
+        10.0,
+        9.0,
+        8.0,
+        2.0
+      ],
+      "semantic_bias": [
+        0.0,
+        0.5,
+        0.4,
+        0.75
+      ],
+      "weighted": [
+        10.0,
+        9.5,
+        8.4,
+        2.75
+      ],
+      "min_p": 0.1,
+      "expected_kept": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "prior_rescue",
+      "logits": [
+        10.0,
+        7.6,
+        7.0
+      ],
+      "semantic_bias": [
+        0.0,
+        0.2,
+        0.0
+      ],
+      "min_p": 0.1,
+      "vanilla_kept": [
+        0
+      ],
+      "weighted_kept": [
+        0,
+        1
+      ],
+      "rescued_by_semantic_prior": [
+        1
+      ]
+    },
+    {
+      "name": "banned_token_cannot_resurrect",
+      "logits": [
+        10.0,
+        7.6
+      ],
+      "semantic_bias": [
+        0.0,
+        0.75
+      ],
+      "banned": [
+        1
+      ],
+      "expected": "token 1 remains removed"
+    }
+  ]
+}

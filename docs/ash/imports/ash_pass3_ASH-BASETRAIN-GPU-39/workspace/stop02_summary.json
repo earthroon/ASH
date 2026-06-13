@@ -1,0 +1,50 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-STOP-02",
+  "input_patch": "16AI-QW-38G-R6A-STOP-01",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "SurfaceOnly",
+  "surface_only": true,
+  "default_enable": true,
+  "requires_stop01": true,
+  "stop01_status_seen": null,
+  "steps_observed": 0,
+  "finalization": {
+    "finalized_count": 0,
+    "surface_behavior_change_count": 0,
+    "ledger_behavior_change_count": 0,
+    "ledger_mutated_count": 0,
+    "virtual_eos_added_count": 0,
+    "ledger_eos_appended_count": 0
+  },
+  "tail_policy": {
+    "preserve_all_count": 0,
+    "mark_risk_tail_count": 0,
+    "hide_risk_tail_surface_only_count": 0,
+    "truncate_ledger_tail_count": 0
+  },
+  "surface_kind": {
+    "safe_stopped_count": 0,
+    "partial_output_count": 0,
+    "salad_risk_stopped_count": 0,
+    "resample_failed_stopped_count": 0,
+    "rollback_failed_stopped_count": 0,
+    "numeric_safety_stopped_count": 0,
+    "global_fallback_stopped_count": 0
+  },
+  "user_surface": {
+    "user_visible_count": 0,
+    "retry_available_count": 0,
+    "continue_from_safe_point_count": 0,
+    "require_user_acknowledgement_count": 0
+  },
+  "safety": {
+    "silent_truncate_count": 0,
+    "ledger_mutation_count": 0,
+    "eos_ledger_append_count": 0,
+    "missing_stop_reason_count": 0,
+    "visible_range_invalid_count": 0
+  },
+  "ready_for_stop03_ledger_eos_commit": false,
+  "ready_for_salad04_korean_morph_loop_guard": true,
+  "reason": "surface finalization schema baked; run STOP-01 receipt fixtures before UI enable"
+}

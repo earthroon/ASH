@@ -1,0 +1,58 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03B",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "name": "decode03b_module_exists",
+      "status": "PASS",
+      "detail": "crates/model_core/src/decode03b_pci.rs"
+    },
+    {
+      "name": "lib_module_registered",
+      "status": "PASS",
+      "detail": "lib.rs has mod decode03b_pci"
+    },
+    {
+      "name": "lib_exports_registered",
+      "status": "PASS",
+      "detail": "lib.rs reexports DECODE-03B API"
+    },
+    {
+      "name": "sampler_hook_registered",
+      "status": "PASS",
+      "detail": "sampler_parity append_receipt calls DECODE-03B hook"
+    },
+    {
+      "name": "behavior_change_false_contract",
+      "status": "PASS",
+      "detail": "receipt writes behavior_change=false"
+    },
+    {
+      "name": "pci_bounds_function",
+      "status": "PASS",
+      "detail": "PCI clamp/bucket functions present"
+    },
+    {
+      "name": "hard_caps_present",
+      "status": "PASS",
+      "detail": "numeric/empty/global fallback caps present"
+    },
+    {
+      "name": "summary_writer_present",
+      "status": "PASS",
+      "detail": "summary writer present"
+    },
+    {
+      "name": "workspace_schema_present",
+      "status": "PASS",
+      "detail": "receipt schema present"
+    },
+    {
+      "name": "workspace_summary_present",
+      "status": "PASS",
+      "detail": "static summary present"
+    }
+  ]
+}

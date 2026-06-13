@@ -1,0 +1,14 @@
+{
+  "patch_id": "ASH-FT-35",
+  "title": "Training Sample Window / Sequence Pack Builder Seal",
+  "mode": "training_sample_window_sequence_pack_builder",
+  "base_required": "ASH-FT-34",
+  "window_mode": "fixed_length_causal_candidate",
+  "sequence_length": 512,
+  "stride": 512,
+  "packing_strategy": "sample_boundary_preserving",
+  "finalize_loss_objective": false,
+  "allow_model_forward": false,
+  "allow_training": false,
+  "next_patch": "ASH-FT-36"
+}

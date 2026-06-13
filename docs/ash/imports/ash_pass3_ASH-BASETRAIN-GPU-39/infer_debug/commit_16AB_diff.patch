@@ -1,0 +1,808 @@
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/audio_kernel/src/qwave_pipeline.rs 16AB_work/crates/audio_kernel/src/qwave_pipeline.rs
+--- 16AA_orig/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:35:30.877455655 +0000
+@@ -220,6 +220,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/model_core/src/native_wgpu.rs 16AB_work/crates/model_core/src/native_wgpu.rs
+--- 16AA_orig/crates/model_core/src/native_wgpu.rs	2026-05-05 10:55:46.000000000 +0000
++++ 16AB_work/crates/model_core/src/native_wgpu.rs	2026-05-06 02:36:30.608265511 +0000
+@@ -484,6 +484,9 @@
+     vocab_atlas: Option<NativeVocabAtlas>,
+     embedding_row_gather_enabled: bool,
+     embedding_full_bytes: usize,
++    disable_native_headwise_atlas: bool,
++    disable_native_raw_bridge: bool,
++    disable_native_qkv_bridge: bool,
+     last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
+     native_device_bootstrap: Option<ExistingDeviceBootstrap>,
+     runtime_handles: Option<NativeWgpuRuntimeHandles>,
+@@ -1306,6 +1309,12 @@
+         .collect()
+ }
+     pub fn same_device_raw_bridge(&self) -> Option<BurnToRawWgpuBridge> {
++        if self.disable_native_raw_bridge {
++            eprintln!(
++                "[16AB][raw-bridge] skipped reason=disabled_by_policy stage=same_device_raw_bridge"
++            );
++            return None;
++        }
+         self.runtime_handles
+             .as_ref()
+             .map(|handles| handles.build_raw_bridge())
+@@ -1326,7 +1335,7 @@
+             .unwrap_or(false);
+         let runtime_handles_field_ok = self.runtime_handles.is_some();
+         let runtime_handles_live_ok = try_extract_runtime_handles(&self.device).is_some();
+-        let direct_raw_bridge_ok = try_build_same_device_raw_bridge(&self.device).is_some();
++        let direct_raw_bridge_ok = if self.disable_native_raw_bridge { false } else { try_build_same_device_raw_bridge(&self.device).is_some() };
+         let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
+         let gpu_sampling_ok = self.gpu_sampling_runtime.is_some();
+         let gpu_penalty_ok = self.gpu_penalty_runtime.is_some();
+@@ -1354,6 +1363,13 @@
+         logits: &LastLogitsGpu,
+         stats: &mut BridgeStats,
+     ) -> Option<RawBridgeOutcome> {
++        if self.disable_native_raw_bridge || self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
++            eprintln!(
++                "[16AB][raw-bridge] skipped reason=disabled_by_policy label={}",
++                label
++            );
++            return None;
++        }
+         let bridge = self.same_device_raw_bridge()?;
+         let gpu_last_row = logits.gpu_last_row.as_ref()?;
+         bridge
+@@ -1375,7 +1391,7 @@
+         spec: ModelSpec,
+         checkpoint_paths: &[impl AsRef<Path>],
+     ) -> Result<Self> {
+-        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false)
++        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false, false, false, false)
+     }
+ 
+     pub fn from_full_checkpoints_with_vocab_atlas(
+@@ -1385,6 +1401,9 @@
+         vocab_tile_size: usize,
+         max_single_buffer_bytes: usize,
+         use_embedding_row_gather: bool,
++        disable_native_headwise_atlas: bool,
++        disable_native_raw_bridge: bool,
++        disable_native_qkv_bridge: bool,
+     ) -> Result<Self> {
+         if checkpoint_paths.is_empty() {
+             bail!("native WebGPU inference requires at least one checkpoint path")
+@@ -1399,10 +1418,23 @@
+         let runtime_handles = Some(bootstrap.runtime_handles.clone());
+         let gpu_sampling_runtime = runtime_handles.as_ref().map(GpuSamplingRuntime::from_handles);
+         let gpu_penalty_runtime = runtime_handles.as_ref().map(GpuPenaltyPass::from_handles);
+-        let atlas_dispatcher = HeadwiseAtlasDispatcher::try_new_default().ok();
++        eprintln!(
++            "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++            disable_native_headwise_atlas,
++            disable_native_raw_bridge,
++            disable_native_qkv_bridge,
++        );
++        let atlas_dispatcher = if disable_native_headwise_atlas || disable_native_qkv_bridge {
++            eprintln!(
++                "[16AB][headwise-atlas] disabled_by_policy=true stage=init"
++            );
++            None
++        } else {
++            HeadwiseAtlasDispatcher::try_new_default().ok()
++        };
+         let runtime_handles_field_ok = runtime_handles.is_some();
+         let runtime_handles_live_ok = try_extract_runtime_handles(&device).is_some();
+-        let direct_raw_bridge_ok = try_build_same_device_raw_bridge(&device).is_some();
++        let direct_raw_bridge_ok = if disable_native_raw_bridge { false } else { try_build_same_device_raw_bridge(&device).is_some() };
+         println!(
+             "[native-trace][init] device_source=existing existing_id={} source={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
+             existing_id,
+@@ -1452,6 +1484,9 @@
+             vocab_atlas,
+             embedding_row_gather_enabled: use_embedding_row_gather,
+             embedding_full_bytes,
++            disable_native_headwise_atlas,
++            disable_native_raw_bridge,
++            disable_native_qkv_bridge,
+             last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
+             native_device_bootstrap: Some(bootstrap),
+             runtime_handles,
+@@ -1472,7 +1507,7 @@
+         checkpoint_paths: &[impl AsRef<Path>],
+         loras: Vec<&RuntimeLoraAttachment>,
+     ) -> Result<Self> {
+-        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false)
++        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false, false, false, false)
+     }
+ 
+     pub fn load_toml_with_loras_and_vocab_atlas(
+@@ -1483,6 +1518,9 @@
+         vocab_tile_size: usize,
+         max_single_buffer_bytes: usize,
+         use_embedding_row_gather: bool,
++        disable_native_headwise_atlas: bool,
++        disable_native_raw_bridge: bool,
++        disable_native_qkv_bridge: bool,
+     ) -> Result<Self> {
+         let spec = ModelSpec::load_toml(spec_path)?;
+         for lora in &loras {
+@@ -1495,6 +1533,9 @@
+             vocab_tile_size,
+             max_single_buffer_bytes,
+             use_embedding_row_gather,
++            disable_native_headwise_atlas,
++            disable_native_raw_bridge,
++            disable_native_qkv_bridge,
+         )?;
+         model.attached_loras = loras.into_iter().cloned().collect();
+         Ok(model)
+@@ -2448,6 +2489,12 @@
+         kv_heads: usize,
+         head_dim: usize,
+     ) -> Result<Option<Tensor<NativeInferenceBackend, 4>>> {
++        if self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
++            eprintln!(
++                "[16AB][headwise-atlas] skipped reason=disabled_by_policy stage=try_grouped_query_attention_via_atlas"
++            );
++            return Ok(None);
++        }
+         if !Self::should_use_headwise_atlas_router() {
+             return Ok(None);
+         }
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/orchestrator_local/src/infer_entry.rs 16AB_work/crates/orchestrator_local/src/infer_entry.rs
+--- 16AA_orig/crates/orchestrator_local/src/infer_entry.rs	2026-05-05 10:51:40.000000000 +0000
++++ 16AB_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:35:06.373368038 +0000
+@@ -298,6 +298,21 @@
+         "nativeEmbeddingMode",
+         "native_embedding_mode",
+     ));
++    let disable_native_headwise_atlas = payload_bool(
++        &incoming.payload,
++        "disableNativeHeadwiseAtlas",
++        "disable_native_headwise_atlas",
++    );
++    let disable_native_raw_bridge = payload_bool(
++        &incoming.payload,
++        "disableNativeRawBridge",
++        "disable_native_raw_bridge",
++    );
++    let disable_native_qkv_bridge = payload_bool(
++        &incoming.payload,
++        "disableNativeQkvBridge",
++        "disable_native_qkv_bridge",
++    );
+     eprintln!(
+         "[16Y-2][projection-mode] requested_vocab_projection={} requested_embedding_mode={} tile_size={} avoid_full_upload={} max_single_buffer={}",
+         native_vocab_projection.as_str(),
+@@ -306,6 +321,12 @@
+         native_avoid_full_vocab_gpu_upload,
+         native_max_single_gpu_buffer_bytes,
+     );
++    eprintln!(
++        "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++        disable_native_headwise_atlas,
++        disable_native_raw_bridge,
++        disable_native_qkv_bridge,
++    );
+ 
+     let seed = incoming.payload.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
+ 
+@@ -336,6 +357,9 @@
+         disable_native_structure_routing,
+         disable_native_text_density,
+         disable_native_gpu_penalty,
++        disable_native_headwise_atlas,
++        disable_native_raw_bridge,
++        disable_native_qkv_bridge,
+         native_vocab_projection,
+         native_vocab_tile_size,
+         native_avoid_full_vocab_gpu_upload,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/orchestrator_local/src/lib.rs 16AB_work/crates/orchestrator_local/src/lib.rs
+--- 16AA_orig/crates/orchestrator_local/src/lib.rs	2026-05-05 09:55:52.000000000 +0000
++++ 16AB_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:35:51.198273349 +0000
+@@ -586,6 +586,9 @@
+             disable_native_structure_routing: false,
+             disable_native_text_density: false,
+             disable_native_gpu_penalty: false,
++            disable_native_headwise_atlas: false,
++            disable_native_raw_bridge: false,
++            disable_native_qkv_bridge: false,
+             native_vocab_projection: Default::default(),
+             native_vocab_tile_size: 1024,
+             native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_final_layers6.rs 16AB_work/crates/runtime/examples/infer_final_layers6.rs
+--- 16AA_orig/crates/runtime/examples/infer_final_layers6.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:35:30.879319135 +0000
+@@ -82,6 +82,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_only.rs 16AB_work/crates/runtime/examples/infer_only.rs
+--- 16AA_orig/crates/runtime/examples/infer_only.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:35:30.880212651 +0000
+@@ -194,6 +194,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_only_v4_lora.rs 16AB_work/crates/runtime/examples/infer_only_v4_lora.rs
+--- 16AA_orig/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:35:30.881274279 +0000
+@@ -332,6 +332,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_run01.rs 16AB_work/crates/runtime/examples/infer_run01.rs
+--- 16AA_orig/crates/runtime/examples/infer_run01.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:35:30.882045272 +0000
+@@ -25,6 +25,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/causal_lm.rs 16AB_work/crates/runtime/src/causal_lm.rs
+--- 16AA_orig/crates/runtime/src/causal_lm.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:35:30.883456708 +0000
+@@ -293,6 +293,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/infer/request_resolution.rs 16AB_work/crates/runtime/src/infer/request_resolution.rs
+--- 16AA_orig/crates/runtime/src/infer/request_resolution.rs	2026-05-05 09:57:32.000000000 +0000
++++ 16AB_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:35:06.371912957 +0000
+@@ -51,6 +51,9 @@
+     pub disable_native_structure_routing: bool,
+     pub disable_native_text_density: bool,
+     pub disable_native_gpu_penalty: bool,
++    pub disable_native_headwise_atlas: bool,
++    pub disable_native_raw_bridge: bool,
++    pub disable_native_qkv_bridge: bool,
+     pub native_vocab_projection: NativeVocabProjectionMode,
+     pub native_vocab_tile_size: usize,
+     pub native_avoid_full_vocab_gpu_upload: bool,
+@@ -116,6 +119,9 @@
+             disable_native_structure_routing: req.disable_native_structure_routing,
+             disable_native_text_density: req.disable_native_text_density,
+             disable_native_gpu_penalty: req.disable_native_gpu_penalty,
++            disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++            disable_native_raw_bridge: req.disable_native_raw_bridge,
++            disable_native_qkv_bridge: req.disable_native_qkv_bridge,
+             native_vocab_projection: req.native_vocab_projection,
+             native_vocab_tile_size: req.native_vocab_tile_size,
+             native_avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/infer.rs 16AB_work/crates/runtime/src/infer.rs
+--- 16AA_orig/crates/runtime/src/infer.rs	2026-05-05 10:51:40.000000000 +0000
++++ 16AB_work/crates/runtime/src/infer.rs	2026-05-06 02:35:06.370820298 +0000
+@@ -609,6 +609,9 @@
+     pub disable_native_structure_routing: bool,
+     pub disable_native_text_density: bool,
+     pub disable_native_gpu_penalty: bool,
++    pub disable_native_headwise_atlas: bool,
++    pub disable_native_raw_bridge: bool,
++    pub disable_native_qkv_bridge: bool,
+     pub native_vocab_projection: NativeVocabProjectionMode,
+     pub native_vocab_tile_size: usize,
+     pub native_avoid_full_vocab_gpu_upload: bool,
+@@ -1001,6 +1004,9 @@
+     pub disable_native_structure_routing: bool,
+     pub disable_native_text_density: bool,
+     pub disable_native_gpu_penalty: bool,
++    pub disable_native_headwise_atlas: bool,
++    pub disable_native_raw_bridge: bool,
++    pub disable_native_qkv_bridge: bool,
+     pub structure_routing_config_attempted: bool,
+     pub text_density_config_attempted: bool,
+     pub gpu_penalty_config_attempted: bool,
+@@ -2138,6 +2144,9 @@
+         disable_native_structure_routing: req.disable_native_structure_routing,
+         disable_native_text_density: req.disable_native_text_density,
+         disable_native_gpu_penalty: req.disable_native_gpu_penalty,
++        disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++        disable_native_raw_bridge: req.disable_native_raw_bridge,
++        disable_native_qkv_bridge: req.disable_native_qkv_bridge,
+         structure_routing_config_attempted,
+         text_density_config_attempted,
+         gpu_penalty_config_attempted,
+@@ -2325,6 +2334,12 @@
+                 native_full_vocab_bytes,
+                 req.native_max_single_gpu_buffer_bytes,
+             );
++            eprintln!(
++                "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++                req.disable_native_headwise_atlas,
++                req.disable_native_raw_bridge,
++                req.disable_native_qkv_bridge,
++            );
+             match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+                 &req.model_spec_path,
+                 &req.checkpoint_paths,
+@@ -2333,6 +2348,9 @@
+                 req.native_vocab_tile_size,
+                 req.native_max_single_gpu_buffer_bytes,
+                 native_use_embedding_row_gather,
++                req.disable_native_headwise_atlas,
++                req.disable_native_raw_bridge,
++                req.disable_native_qkv_bridge,
+             ) {
+                 Ok(mut native_model) => {
+                     eprintln!("[debug] native_wgpu_enabled = true");
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/lora_smoke.rs 16AB_work/crates/runtime/src/lora_smoke.rs
+--- 16AA_orig/crates/runtime/src/lora_smoke.rs	2026-05-05 09:54:38.000000000 +0000
++++ 16AB_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:35:30.884199047 +0000
+@@ -128,6 +128,9 @@
+         disable_native_structure_routing: false,
+         disable_native_text_density: false,
+         disable_native_gpu_penalty: false,
++        disable_native_headwise_atlas: false,
++        disable_native_raw_bridge: false,
++        disable_native_qkv_bridge: false,
+         native_vocab_projection: Default::default(),
+         native_vocab_tile_size: 1024,
+         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/infer_debug/commit_16AB_diff.patch 16AB_work/infer_debug/commit_16AB_diff.patch
+--- 16AA_orig/infer_debug/commit_16AB_diff.patch	1970-01-01 00:00:00.000000000 +0000
++++ 16AB_work/infer_debug/commit_16AB_diff.patch	2026-05-06 02:38:38.598681422 +0000
+@@ -0,0 +1,377 @@
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/audio_kernel/src/qwave_pipeline.rs 16AB_work/crates/audio_kernel/src/qwave_pipeline.rs
++--- 16AA_orig/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/audio_kernel/src/qwave_pipeline.rs	2026-05-06 02:35:30.877455655 +0000
++@@ -220,6 +220,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/model_core/src/native_wgpu.rs 16AB_work/crates/model_core/src/native_wgpu.rs
++--- 16AA_orig/crates/model_core/src/native_wgpu.rs	2026-05-05 10:55:46.000000000 +0000
+++++ 16AB_work/crates/model_core/src/native_wgpu.rs	2026-05-06 02:36:30.608265511 +0000
++@@ -484,6 +484,9 @@
++     vocab_atlas: Option<NativeVocabAtlas>,
++     embedding_row_gather_enabled: bool,
++     embedding_full_bytes: usize,
+++    disable_native_headwise_atlas: bool,
+++    disable_native_raw_bridge: bool,
+++    disable_native_qkv_bridge: bool,
++     last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
++     native_device_bootstrap: Option<ExistingDeviceBootstrap>,
++     runtime_handles: Option<NativeWgpuRuntimeHandles>,
++@@ -1306,6 +1309,12 @@
++         .collect()
++ }
++     pub fn same_device_raw_bridge(&self) -> Option<BurnToRawWgpuBridge> {
+++        if self.disable_native_raw_bridge {
+++            eprintln!(
+++                "[16AB][raw-bridge] skipped reason=disabled_by_policy stage=same_device_raw_bridge"
+++            );
+++            return None;
+++        }
++         self.runtime_handles
++             .as_ref()
++             .map(|handles| handles.build_raw_bridge())
++@@ -1326,7 +1335,7 @@
++             .unwrap_or(false);
++         let runtime_handles_field_ok = self.runtime_handles.is_some();
++         let runtime_handles_live_ok = try_extract_runtime_handles(&self.device).is_some();
++-        let direct_raw_bridge_ok = try_build_same_device_raw_bridge(&self.device).is_some();
+++        let direct_raw_bridge_ok = if self.disable_native_raw_bridge { false } else { try_build_same_device_raw_bridge(&self.device).is_some() };
++         let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
++         let gpu_sampling_ok = self.gpu_sampling_runtime.is_some();
++         let gpu_penalty_ok = self.gpu_penalty_runtime.is_some();
++@@ -1354,6 +1363,13 @@
++         logits: &LastLogitsGpu,
++         stats: &mut BridgeStats,
++     ) -> Option<RawBridgeOutcome> {
+++        if self.disable_native_raw_bridge || self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
+++            eprintln!(
+++                "[16AB][raw-bridge] skipped reason=disabled_by_policy label={}",
+++                label
+++            );
+++            return None;
+++        }
++         let bridge = self.same_device_raw_bridge()?;
++         let gpu_last_row = logits.gpu_last_row.as_ref()?;
++         bridge
++@@ -1375,7 +1391,7 @@
++         spec: ModelSpec,
++         checkpoint_paths: &[impl AsRef<Path>],
++     ) -> Result<Self> {
++-        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false)
+++        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false, false, false, false)
++     }
++ 
++     pub fn from_full_checkpoints_with_vocab_atlas(
++@@ -1385,6 +1401,9 @@
++         vocab_tile_size: usize,
++         max_single_buffer_bytes: usize,
++         use_embedding_row_gather: bool,
+++        disable_native_headwise_atlas: bool,
+++        disable_native_raw_bridge: bool,
+++        disable_native_qkv_bridge: bool,
++     ) -> Result<Self> {
++         if checkpoint_paths.is_empty() {
++             bail!("native WebGPU inference requires at least one checkpoint path")
++@@ -1399,10 +1418,23 @@
++         let runtime_handles = Some(bootstrap.runtime_handles.clone());
++         let gpu_sampling_runtime = runtime_handles.as_ref().map(GpuSamplingRuntime::from_handles);
++         let gpu_penalty_runtime = runtime_handles.as_ref().map(GpuPenaltyPass::from_handles);
++-        let atlas_dispatcher = HeadwiseAtlasDispatcher::try_new_default().ok();
+++        eprintln!(
+++            "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+++            disable_native_headwise_atlas,
+++            disable_native_raw_bridge,
+++            disable_native_qkv_bridge,
+++        );
+++        let atlas_dispatcher = if disable_native_headwise_atlas || disable_native_qkv_bridge {
+++            eprintln!(
+++                "[16AB][headwise-atlas] disabled_by_policy=true stage=init"
+++            );
+++            None
+++        } else {
+++            HeadwiseAtlasDispatcher::try_new_default().ok()
+++        };
++         let runtime_handles_field_ok = runtime_handles.is_some();
++         let runtime_handles_live_ok = try_extract_runtime_handles(&device).is_some();
++-        let direct_raw_bridge_ok = try_build_same_device_raw_bridge(&device).is_some();
+++        let direct_raw_bridge_ok = if disable_native_raw_bridge { false } else { try_build_same_device_raw_bridge(&device).is_some() };
++         println!(
++             "[native-trace][init] device_source=existing existing_id={} source={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
++             existing_id,
++@@ -1452,6 +1484,9 @@
++             vocab_atlas,
++             embedding_row_gather_enabled: use_embedding_row_gather,
++             embedding_full_bytes,
+++            disable_native_headwise_atlas,
+++            disable_native_raw_bridge,
+++            disable_native_qkv_bridge,
++             last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
++             native_device_bootstrap: Some(bootstrap),
++             runtime_handles,
++@@ -1472,7 +1507,7 @@
++         checkpoint_paths: &[impl AsRef<Path>],
++         loras: Vec<&RuntimeLoraAttachment>,
++     ) -> Result<Self> {
++-        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false)
+++        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false, false, false, false)
++     }
++ 
++     pub fn load_toml_with_loras_and_vocab_atlas(
++@@ -1483,6 +1518,9 @@
++         vocab_tile_size: usize,
++         max_single_buffer_bytes: usize,
++         use_embedding_row_gather: bool,
+++        disable_native_headwise_atlas: bool,
+++        disable_native_raw_bridge: bool,
+++        disable_native_qkv_bridge: bool,
++     ) -> Result<Self> {
++         let spec = ModelSpec::load_toml(spec_path)?;
++         for lora in &loras {
++@@ -1495,6 +1533,9 @@
++             vocab_tile_size,
++             max_single_buffer_bytes,
++             use_embedding_row_gather,
+++            disable_native_headwise_atlas,
+++            disable_native_raw_bridge,
+++            disable_native_qkv_bridge,
++         )?;
++         model.attached_loras = loras.into_iter().cloned().collect();
++         Ok(model)
++@@ -2448,6 +2489,12 @@
++         kv_heads: usize,
++         head_dim: usize,
++     ) -> Result<Option<Tensor<NativeInferenceBackend, 4>>> {
+++        if self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
+++            eprintln!(
+++                "[16AB][headwise-atlas] skipped reason=disabled_by_policy stage=try_grouped_query_attention_via_atlas"
+++            );
+++            return Ok(None);
+++        }
++         if !Self::should_use_headwise_atlas_router() {
++             return Ok(None);
++         }
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/orchestrator_local/src/infer_entry.rs 16AB_work/crates/orchestrator_local/src/infer_entry.rs
++--- 16AA_orig/crates/orchestrator_local/src/infer_entry.rs	2026-05-05 10:51:40.000000000 +0000
+++++ 16AB_work/crates/orchestrator_local/src/infer_entry.rs	2026-05-06 02:35:06.373368038 +0000
++@@ -298,6 +298,21 @@
++         "nativeEmbeddingMode",
++         "native_embedding_mode",
++     ));
+++    let disable_native_headwise_atlas = payload_bool(
+++        &incoming.payload,
+++        "disableNativeHeadwiseAtlas",
+++        "disable_native_headwise_atlas",
+++    );
+++    let disable_native_raw_bridge = payload_bool(
+++        &incoming.payload,
+++        "disableNativeRawBridge",
+++        "disable_native_raw_bridge",
+++    );
+++    let disable_native_qkv_bridge = payload_bool(
+++        &incoming.payload,
+++        "disableNativeQkvBridge",
+++        "disable_native_qkv_bridge",
+++    );
++     eprintln!(
++         "[16Y-2][projection-mode] requested_vocab_projection={} requested_embedding_mode={} tile_size={} avoid_full_upload={} max_single_buffer={}",
++         native_vocab_projection.as_str(),
++@@ -306,6 +321,12 @@
++         native_avoid_full_vocab_gpu_upload,
++         native_max_single_gpu_buffer_bytes,
++     );
+++    eprintln!(
+++        "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+++        disable_native_headwise_atlas,
+++        disable_native_raw_bridge,
+++        disable_native_qkv_bridge,
+++    );
++ 
++     let seed = incoming.payload.get("seed").and_then(|v| v.as_u64()).unwrap_or(42);
++ 
++@@ -336,6 +357,9 @@
++         disable_native_structure_routing,
++         disable_native_text_density,
++         disable_native_gpu_penalty,
+++        disable_native_headwise_atlas,
+++        disable_native_raw_bridge,
+++        disable_native_qkv_bridge,
++         native_vocab_projection,
++         native_vocab_tile_size,
++         native_avoid_full_vocab_gpu_upload,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/orchestrator_local/src/lib.rs 16AB_work/crates/orchestrator_local/src/lib.rs
++--- 16AA_orig/crates/orchestrator_local/src/lib.rs	2026-05-05 09:55:52.000000000 +0000
+++++ 16AB_work/crates/orchestrator_local/src/lib.rs	2026-05-06 02:35:51.198273349 +0000
++@@ -586,6 +586,9 @@
++             disable_native_structure_routing: false,
++             disable_native_text_density: false,
++             disable_native_gpu_penalty: false,
+++            disable_native_headwise_atlas: false,
+++            disable_native_raw_bridge: false,
+++            disable_native_qkv_bridge: false,
++             native_vocab_projection: Default::default(),
++             native_vocab_tile_size: 1024,
++             native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_final_layers6.rs 16AB_work/crates/runtime/examples/infer_final_layers6.rs
++--- 16AA_orig/crates/runtime/examples/infer_final_layers6.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/examples/infer_final_layers6.rs	2026-05-06 02:35:30.879319135 +0000
++@@ -82,6 +82,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_only.rs 16AB_work/crates/runtime/examples/infer_only.rs
++--- 16AA_orig/crates/runtime/examples/infer_only.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/examples/infer_only.rs	2026-05-06 02:35:30.880212651 +0000
++@@ -194,6 +194,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_only_v4_lora.rs 16AB_work/crates/runtime/examples/infer_only_v4_lora.rs
++--- 16AA_orig/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/examples/infer_only_v4_lora.rs	2026-05-06 02:35:30.881274279 +0000
++@@ -332,6 +332,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/examples/infer_run01.rs 16AB_work/crates/runtime/examples/infer_run01.rs
++--- 16AA_orig/crates/runtime/examples/infer_run01.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/examples/infer_run01.rs	2026-05-06 02:35:30.882045272 +0000
++@@ -25,6 +25,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/causal_lm.rs 16AB_work/crates/runtime/src/causal_lm.rs
++--- 16AA_orig/crates/runtime/src/causal_lm.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/src/causal_lm.rs	2026-05-06 02:35:30.883456708 +0000
++@@ -293,6 +293,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/infer/request_resolution.rs 16AB_work/crates/runtime/src/infer/request_resolution.rs
++--- 16AA_orig/crates/runtime/src/infer/request_resolution.rs	2026-05-05 09:57:32.000000000 +0000
+++++ 16AB_work/crates/runtime/src/infer/request_resolution.rs	2026-05-06 02:35:06.371912957 +0000
++@@ -51,6 +51,9 @@
++     pub disable_native_structure_routing: bool,
++     pub disable_native_text_density: bool,
++     pub disable_native_gpu_penalty: bool,
+++    pub disable_native_headwise_atlas: bool,
+++    pub disable_native_raw_bridge: bool,
+++    pub disable_native_qkv_bridge: bool,
++     pub native_vocab_projection: NativeVocabProjectionMode,
++     pub native_vocab_tile_size: usize,
++     pub native_avoid_full_vocab_gpu_upload: bool,
++@@ -116,6 +119,9 @@
++             disable_native_structure_routing: req.disable_native_structure_routing,
++             disable_native_text_density: req.disable_native_text_density,
++             disable_native_gpu_penalty: req.disable_native_gpu_penalty,
+++            disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+++            disable_native_raw_bridge: req.disable_native_raw_bridge,
+++            disable_native_qkv_bridge: req.disable_native_qkv_bridge,
++             native_vocab_projection: req.native_vocab_projection,
++             native_vocab_tile_size: req.native_vocab_tile_size,
++             native_avoid_full_vocab_gpu_upload: req.native_avoid_full_vocab_gpu_upload,
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/infer.rs 16AB_work/crates/runtime/src/infer.rs
++--- 16AA_orig/crates/runtime/src/infer.rs	2026-05-05 10:51:40.000000000 +0000
+++++ 16AB_work/crates/runtime/src/infer.rs	2026-05-06 02:35:06.370820298 +0000
++@@ -609,6 +609,9 @@
++     pub disable_native_structure_routing: bool,
++     pub disable_native_text_density: bool,
++     pub disable_native_gpu_penalty: bool,
+++    pub disable_native_headwise_atlas: bool,
+++    pub disable_native_raw_bridge: bool,
+++    pub disable_native_qkv_bridge: bool,
++     pub native_vocab_projection: NativeVocabProjectionMode,
++     pub native_vocab_tile_size: usize,
++     pub native_avoid_full_vocab_gpu_upload: bool,
++@@ -1001,6 +1004,9 @@
++     pub disable_native_structure_routing: bool,
++     pub disable_native_text_density: bool,
++     pub disable_native_gpu_penalty: bool,
+++    pub disable_native_headwise_atlas: bool,
+++    pub disable_native_raw_bridge: bool,
+++    pub disable_native_qkv_bridge: bool,
++     pub structure_routing_config_attempted: bool,
++     pub text_density_config_attempted: bool,
++     pub gpu_penalty_config_attempted: bool,
++@@ -2138,6 +2144,9 @@
++         disable_native_structure_routing: req.disable_native_structure_routing,
++         disable_native_text_density: req.disable_native_text_density,
++         disable_native_gpu_penalty: req.disable_native_gpu_penalty,
+++        disable_native_headwise_atlas: req.disable_native_headwise_atlas,
+++        disable_native_raw_bridge: req.disable_native_raw_bridge,
+++        disable_native_qkv_bridge: req.disable_native_qkv_bridge,
++         structure_routing_config_attempted,
++         text_density_config_attempted,
++         gpu_penalty_config_attempted,
++@@ -2325,6 +2334,12 @@
++                 native_full_vocab_bytes,
++                 req.native_max_single_gpu_buffer_bytes,
++             );
+++            eprintln!(
+++                "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
+++                req.disable_native_headwise_atlas,
+++                req.disable_native_raw_bridge,
+++                req.disable_native_qkv_bridge,
+++            );
++             match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
++                 &req.model_spec_path,
++                 &req.checkpoint_paths,
++@@ -2333,6 +2348,9 @@
++                 req.native_vocab_tile_size,
++                 req.native_max_single_gpu_buffer_bytes,
++                 native_use_embedding_row_gather,
+++                req.disable_native_headwise_atlas,
+++                req.disable_native_raw_bridge,
+++                req.disable_native_qkv_bridge,
++             ) {
++                 Ok(mut native_model) => {
++                     eprintln!("[debug] native_wgpu_enabled = true");
++diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/crates/runtime/src/lora_smoke.rs 16AB_work/crates/runtime/src/lora_smoke.rs
++--- 16AA_orig/crates/runtime/src/lora_smoke.rs	2026-05-05 09:54:38.000000000 +0000
+++++ 16AB_work/crates/runtime/src/lora_smoke.rs	2026-05-06 02:35:30.884199047 +0000
++@@ -128,6 +128,9 @@
++         disable_native_structure_routing: false,
++         disable_native_text_density: false,
++         disable_native_gpu_penalty: false,
+++        disable_native_headwise_atlas: false,
+++        disable_native_raw_bridge: false,
+++        disable_native_qkv_bridge: false,
++         native_vocab_projection: Default::default(),
++         native_vocab_tile_size: 1024,
++         native_avoid_full_vocab_gpu_upload: true,
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/infer_debug/commit_16AB_static_validation.txt 16AB_work/infer_debug/commit_16AB_static_validation.txt
+--- 16AA_orig/infer_debug/commit_16AB_static_validation.txt	1970-01-01 00:00:00.000000000 +0000
++++ 16AB_work/infer_debug/commit_16AB_static_validation.txt	2026-05-06 02:38:29.947467290 +0000
+@@ -0,0 +1,41 @@
++# Commit 16AB Static Validation
++
++## Policy fields
++crates/runtime/src/infer.rs:612:    pub disable_native_headwise_atlas: bool,
++crates/runtime/src/infer.rs:1007:    pub disable_native_headwise_atlas: bool,
++crates/runtime/src/infer.rs:2147:        disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++crates/runtime/src/infer.rs:2339:                req.disable_native_headwise_atlas,
++crates/runtime/src/infer.rs:2351:                req.disable_native_headwise_atlas,
++crates/runtime/src/infer/request_resolution.rs:54:    pub disable_native_headwise_atlas: bool,
++crates/runtime/src/infer/request_resolution.rs:122:            disable_native_headwise_atlas: req.disable_native_headwise_atlas,
++crates/orchestrator_local/src/infer_entry.rs:301:    let disable_native_headwise_atlas = payload_bool(
++crates/orchestrator_local/src/infer_entry.rs:303:        "disableNativeHeadwiseAtlas",
++crates/orchestrator_local/src/infer_entry.rs:304:        "disable_native_headwise_atlas",
++crates/orchestrator_local/src/infer_entry.rs:326:        disable_native_headwise_atlas,
++crates/orchestrator_local/src/infer_entry.rs:360:        disable_native_headwise_atlas,
++crates/model_core/src/native_wgpu.rs:487:    disable_native_headwise_atlas: bool,
++crates/model_core/src/native_wgpu.rs:1366:        if self.disable_native_raw_bridge || self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
++crates/model_core/src/native_wgpu.rs:1404:        disable_native_headwise_atlas: bool,
++crates/model_core/src/native_wgpu.rs:1423:            disable_native_headwise_atlas,
++crates/model_core/src/native_wgpu.rs:1427:        let atlas_dispatcher = if disable_native_headwise_atlas || disable_native_qkv_bridge {
++crates/model_core/src/native_wgpu.rs:1487:            disable_native_headwise_atlas,
++crates/model_core/src/native_wgpu.rs:1521:        disable_native_headwise_atlas: bool,
++crates/model_core/src/native_wgpu.rs:1536:            disable_native_headwise_atlas,
++crates/model_core/src/native_wgpu.rs:2492:        if self.disable_native_headwise_atlas || self.disable_native_qkv_bridge {
++
++## Gate logs
++crates/orchestrator_local/src/infer_entry.rs:325:        "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++crates/runtime/src/infer.rs:2338:                "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++crates/model_core/src/native_wgpu.rs:1314:                "[16AB][raw-bridge] skipped reason=disabled_by_policy stage=same_device_raw_bridge"
++crates/model_core/src/native_wgpu.rs:1368:                "[16AB][raw-bridge] skipped reason=disabled_by_policy label={}",
++crates/model_core/src/native_wgpu.rs:1422:            "[16AB][policy] disable_headwise_atlas={} disable_raw_bridge={} disable_qkv_bridge={}",
++crates/model_core/src/native_wgpu.rs:1429:                "[16AB][headwise-atlas] disabled_by_policy=true stage=init"
++crates/model_core/src/native_wgpu.rs:2494:                "[16AB][headwise-atlas] skipped reason=disabled_by_policy stage=try_grouped_query_attention_via_atlas"
++
++## Constructor signatures
++crates/model_core/src/native_wgpu.rs:1394:        Self::from_full_checkpoints_with_vocab_atlas(spec, checkpoint_paths, false, 1024, usize::MAX, false, false, false, false)
++crates/model_core/src/native_wgpu.rs:1397:    pub fn from_full_checkpoints_with_vocab_atlas(
++crates/model_core/src/native_wgpu.rs:1510:        Self::load_toml_with_loras_and_vocab_atlas(spec_path, checkpoint_paths, loras, false, 1024, usize::MAX, false, false, false, false)
++crates/model_core/src/native_wgpu.rs:1513:    pub fn load_toml_with_loras_and_vocab_atlas(
++crates/model_core/src/native_wgpu.rs:1529:        let mut model = Self::from_full_checkpoints_with_vocab_atlas(
++crates/runtime/src/infer.rs:2343:            match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+diff -ruN '--exclude=target' '--exclude=*.safetensors' 16AA_orig/infer_debug/probe_16AB_disable_headwise_raw_bridge_A.jsonl 16AB_work/infer_debug/probe_16AB_disable_headwise_raw_bridge_A.jsonl
+--- 16AA_orig/infer_debug/probe_16AB_disable_headwise_raw_bridge_A.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ 16AB_work/infer_debug/probe_16AB_disable_headwise_raw_bridge_A.jsonl	2026-05-06 02:38:20.899302639 +0000
+@@ -0,0 +1 @@
++{"cmd":"run.start","id":"probe_16AB_disable_headwise_raw_bridge_A","payload":{"kind":"infer","input":"A","task":"freeform","modelSpecPath":"D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml","checkpointPath":"D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors","tokenizerManifestPath":"D:/1111113232/DUST/1/ash_pass3/artifacts/tokenizer_manifest_v5_final.json","maxNewTokens":1,"decodeMaxNewTokens":1,"decodeTemperature":0.0,"seed":42,"nativeVocabProjection":"gpu_atlas","nativeVocabTileSize":1024,"nativeAvoidFullVocabGpuUpload":true,"nativeMaxSingleGpuBufferBytes":268435456,"nativeEmbeddingMode":"row_gather","disableNativeGpuProfiler":true,"disableNativeAutotuneTiming":true,"disableTimestampQuery":false,"disableNativeStructureRouting":true,"disableNativeTextDensity":true,"disableNativeGpuPenalty":true,"disableNativeHeadwiseAtlas":true,"disableNativeRawBridge":true,"disableNativeQkvBridge":true}}

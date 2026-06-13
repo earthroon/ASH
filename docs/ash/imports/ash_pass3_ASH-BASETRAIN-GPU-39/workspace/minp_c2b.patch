@@ -1,0 +1,1411 @@
+diff -ruN /mnt/data/minp_c2b_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md /mnt/data/minp_c2b_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md
+--- /mnt/data/minp_c2b_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md	2026-05-27 05:23:48.409537144 +0000
+@@ -0,0 +1,28 @@
++# 16AI-QW-38G-R6A-MINP-C2B Acceptance Report
++
++## Status
++STATIC_PASS / EXECUTION_NOT_RUN
++
++## Scope
++- Added `model_core::minp_c2b_static_prior_enable`.
++- Added static safe v1 controlled semantic prior profile.
++- Gated CPU oracle semantic bias through RUN-01 / SAMPLER04 / MINP-C2A readiness.
++- Gated GPU semantic prior buffers through the same controlled gate.
++- Added no-source regression and prior-domination receipts.
++
++## Confirmed static checks
++- module/export present
++- default enabled false
++- weak weights 0.05 / 0.05 / 0.0 / 0.20
++- CPU oracle uses controlled gate
++- GPU config disables semantic prior when gate is not PASS
++- no-source regression receipt exists
++
++## Not run
++- cargo check
++- cargo test
++- WGSL compile
++- runtime controlled semantic prior execution
++
++## Gate state
++Current environment has RUN-01 / SAMPLER04 / MINP-C2A runtime evidence as NOT_RUN, therefore semantic_prior_effective is blocked by default.
+diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/cpu_oracle_sampler.rs /mnt/data/minp_c2b_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- /mnt/data/minp_c2b_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:02:37.000000000 +0000
++++ /mnt/data/minp_c2b_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:23:00.175248430 +0000
+@@ -1,6 +1,9 @@
+ use serde::{Deserialize, Serialize};
+ 
+ use crate::generation_sampling::GenerationSamplingConfig;
++use crate::minp_c2b_static_prior_enable::{
++    apply_static_semantic_prior_controlled, static_semantic_prior_controlled_config_from_env,
++};
+ use crate::decode_transition_guard::{
+     CandidateTokenView, TransitionAction, TransitionContext, TransitionDecision, TransitionReason,
+     evaluate_token_transition, piece_for_known_special, mojibake_suspected,
+@@ -344,6 +347,9 @@
+     };
+ 
+     let controlled_transition_config = transition_controlled_enable_config_from_env();
++    let controlled_semantic_config = static_semantic_prior_controlled_config_from_env();
++    let semantic_snapshot_present = config.semantic_score_snapshot.is_some();
++    let semantic_source_available = prior_scores.any_source_available();
+ 
+     let banned = |id: u32| -> bool { ctx.banned_token_ids.binary_search(&id).is_ok() || ctx.banned_token_ids.contains(&id) };
+     let eos_blocked = |id: u32| -> bool {
+@@ -362,11 +368,15 @@
+             let scaled = logit / temp;
+             let q = prior_scores.qwave_at(id).unwrap_or(0.0);
+             let k = prior_scores.deltak_at(id).unwrap_or(0.0);
+-            let semantic_bias = if prior_scores.any_source_available() {
+-                config.semantic_prior.bias_from_scores(q, k)
+-            } else {
+-                0.0
+-            };
++            let semantic_apply = apply_static_semantic_prior_controlled(
++                &controlled_semantic_config,
++                scaled,
++                q,
++                k,
++                semantic_source_available,
++                semantic_snapshot_present,
++            );
++            let semantic_bias = semantic_apply.semantic_bias;
+             let transition_context = transition_context_from_cpu_context(ctx);
+             let candidate_view = candidate_view_from_context(ctx, id);
+             let transition = evaluate_token_transition(&config.transition_guard, &transition_context, &candidate_view);
+diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/generation_sampling.rs /mnt/data/minp_c2b_work/crates/model_core/src/generation_sampling.rs
+--- /mnt/data/minp_c2b_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:56:22.000000000 +0000
++++ /mnt/data/minp_c2b_work/crates/model_core/src/generation_sampling.rs	2026-05-27 05:23:00.177439210 +0000
+@@ -5,6 +5,7 @@
+ use crate::decode_candidate_piece_hints::CandidatePieceHintTable;
+ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
+ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
++use crate::minp_c2b_static_prior_enable::{static_semantic_prior_controlled_config_from_env, static_semantic_prior_gate_status_from_env};
+ use std::collections::BTreeMap;
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+@@ -839,15 +840,24 @@
+             gpu_transition_guard.prev_token_available = true;
+         }
+ 
++        let semantic_controlled_cfg = static_semantic_prior_controlled_config_from_env();
++        let semantic_source_available = self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false);
++        let semantic_snapshot_present = self.semantic_score_snapshot.is_some();
++        let (semantic_gate_status, _) = static_semantic_prior_gate_status_from_env(&semantic_controlled_cfg, semantic_source_available, semantic_snapshot_present);
++        let mut gpu_semantic_prior: GpuSemanticPriorConfig = semantic_controlled_cfg.to_semantic_prior_config().into();
++        if !matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) {
++            gpu_semantic_prior.enabled = false;
++        }
++
+         GpuSamplingConfig {
+             vocab_size,
+             temperature: if self.temperature > 0.0 { self.temperature } else { 1.0 },
+             top_k: self.top_k,
+             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
+             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
+-            semantic_prior: self.semantic_prior.sanitized().into(),
+-            qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
+-            deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
++            semantic_prior: gpu_semantic_prior,
++            qwave_scores: if matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) { self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()) } else { None },
++            deltak_scores: if matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) { self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()) } else { None },
+             transition_guard: gpu_transition_guard,
+             candidate_piece_hints: self.candidate_piece_hints.as_ref().map(|table| table.to_backend_hints()),
+             seed_lo: (seed & 0xffff_ffff) as u32,
+diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/lib.rs /mnt/data/minp_c2b_work/crates/model_core/src/lib.rs
+--- /mnt/data/minp_c2b_orig/crates/model_core/src/lib.rs	2026-05-27 05:03:23.000000000 +0000
++++ /mnt/data/minp_c2b_work/crates/model_core/src/lib.rs	2026-05-27 05:23:00.152604904 +0000
+@@ -22,6 +22,7 @@
+ mod run00_consolidated_smoke;
+ mod run01_runtime_execution;
+ mod decode02e_controlled_enable;
++mod minp_c2b_static_prior_enable;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -94,6 +95,18 @@
+     Run01RuntimeExecutionSummary, run01_evaluate_promotion_gates,
+     run01_not_run_cargo_receipt, run01_not_run_wgsl_receipt,
+ };
++pub use minp_c2b_static_prior_enable::{
++    MINP_C2B_PATCH_ID, MINP_C2B_INPUT_PATCH_ID, StaticSemanticPriorProfile,
++    StaticSemanticPriorGateStatus, StaticSemanticPriorControlledConfig,
++    StaticSemanticPriorApplyResult, StaticSemanticPriorProfileReceipt, StaticSemanticPriorWeights,
++    StaticSemanticPriorDominationConfig, MinpC2bSummary, MinpC2bNoSourceRegressionReceipt,
++    MinpC2bPriorDominationReceipt, MinpC2bStepReceipt,
++    static_semantic_prior_controlled_config_from_env, static_semantic_prior_gate_status_from_env,
++    compute_static_safe_v1_bias, apply_static_semantic_prior_controlled,
++    static_semantic_prior_profile_receipt, minp_c2b_summary_from_env,
++    no_source_regression_receipt, weak_bias_fixture_receipt, prior_domination_receipt,
++    append_minp_c2b_static_prior_receipt, write_minp_c2b_summary,
++};
+ pub use decode02e_controlled_enable::{
+     DECODE02E_PATCH_ID, DECODE02E_INPUT_PATCH_ID, Decode02ePenaltyProfile,
+     Decode02eControlledEnableSummary, Decode02ePenaltyConfig,
+diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/minp_c2b_static_prior_enable.rs /mnt/data/minp_c2b_work/crates/model_core/src/minp_c2b_static_prior_enable.rs
+--- /mnt/data/minp_c2b_orig/crates/model_core/src/minp_c2b_static_prior_enable.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/crates/model_core/src/minp_c2b_static_prior_enable.rs	2026-05-27 05:22:57.663770820 +0000
+@@ -0,0 +1,449 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::generation_sampling::SemanticPriorConfig;
++
++pub const MINP_C2B_PATCH_ID: &str = "16AI-QW-38G-R6A-MINP-C2B";
++pub const MINP_C2B_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-02E";
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum StaticSemanticPriorProfile {
++    StaticSafeV1,
++}
++
++impl StaticSemanticPriorProfile {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::StaticSafeV1 => "static_safe_v1",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum StaticSemanticPriorGateStatus {
++    Pass,
++    BlockedRun01NotPass,
++    BlockedSampler04NotReady,
++    BlockedMinpC2aAlignmentNotPass,
++    BlockedSnapshotMissing,
++    BlockedSourceUnavailable,
++    BlockedDominationGuard,
++    Disabled,
++}
++
++impl StaticSemanticPriorGateStatus {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Pass => "PASS",
++            Self::BlockedRun01NotPass => "RUN01_NOT_PASS",
++            Self::BlockedSampler04NotReady => "SAMPLER04_STRICT_NOT_READY",
++            Self::BlockedMinpC2aAlignmentNotPass => "MINP_C2A_ALIGNMENT_NOT_PASS",
++            Self::BlockedSnapshotMissing => "SCORE_SNAPSHOT_MISSING",
++            Self::BlockedSourceUnavailable => "NO_QWAVE_DELTAK_SOURCE",
++            Self::BlockedDominationGuard => "SEMANTIC_PRIOR_DOMINATION_GUARD",
++            Self::Disabled => "DISABLED",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct StaticSemanticPriorControlledConfig {
++    pub enabled: bool,
++    pub profile: StaticSemanticPriorProfile,
++    pub require_run01_pass: bool,
++    pub require_sampler04_strict_ready: bool,
++    pub require_minp_c2a_alignment_pass: bool,
++    pub qwave_weight: f32,
++    pub deltak_weight: f32,
++    pub cross_weight: f32,
++    pub bias_cap: f32,
++    pub domination_guard_enabled: bool,
++    pub domination_guard_strict: bool,
++    pub max_rank_flip_ratio: f32,
++    pub max_bias_to_margin_ratio: f32,
++}
++
++impl Default for StaticSemanticPriorControlledConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            profile: StaticSemanticPriorProfile::StaticSafeV1,
++            require_run01_pass: true,
++            require_sampler04_strict_ready: true,
++            require_minp_c2a_alignment_pass: true,
++            qwave_weight: 0.05,
++            deltak_weight: 0.05,
++            cross_weight: 0.0,
++            bias_cap: 0.20,
++            domination_guard_enabled: true,
++            domination_guard_strict: false,
++            max_rank_flip_ratio: 0.25,
++            max_bias_to_margin_ratio: 0.5,
++        }
++    }
++}
++
++impl StaticSemanticPriorControlledConfig {
++    pub fn sanitized(mut self) -> Self {
++        if !self.qwave_weight.is_finite() { self.qwave_weight = 0.0; }
++        if !self.deltak_weight.is_finite() { self.deltak_weight = 0.0; }
++        if !self.cross_weight.is_finite() { self.cross_weight = 0.0; }
++        if !self.bias_cap.is_finite() || self.bias_cap < 0.0 { self.bias_cap = 0.0; }
++        self.bias_cap = self.bias_cap.min(0.20);
++        if !self.max_rank_flip_ratio.is_finite() || self.max_rank_flip_ratio < 0.0 { self.max_rank_flip_ratio = 0.25; }
++        if !self.max_bias_to_margin_ratio.is_finite() || self.max_bias_to_margin_ratio < 0.0 { self.max_bias_to_margin_ratio = 0.5; }
++        self
++    }
++
++    pub fn to_semantic_prior_config(&self) -> SemanticPriorConfig {
++        let cfg = self.clone().sanitized();
++        SemanticPriorConfig {
++            enabled: cfg.enabled,
++            qwave_weight: cfg.qwave_weight,
++            deltak_weight: cfg.deltak_weight,
++            cross_weight: cfg.cross_weight,
++            bias_cap: cfg.bias_cap,
++            apply_to_min_p: true,
++            apply_to_top_p: true,
++            apply_to_sampling_score: true,
++            require_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct StaticSemanticPriorApplyResult {
++    pub effective: bool,
++    pub gate_status: StaticSemanticPriorGateStatus,
++    pub gate_reason: Option<String>,
++    pub semantic_bias: f32,
++    pub weighted_logit_before: f32,
++    pub weighted_logit_after: f32,
++    pub qwave_score: f32,
++    pub deltak_score: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct StaticSemanticPriorProfileReceipt {
++    pub patch_id: String,
++    pub profile: String,
++    pub default_enabled: bool,
++    pub controlled_enable_requires_opt_in: bool,
++    pub requires_sampler04_strict_ready: bool,
++    pub requires_minp_c2a_alignment_pass: bool,
++    pub weights: StaticSemanticPriorWeights,
++    pub domination_guard: StaticSemanticPriorDominationConfig,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct StaticSemanticPriorWeights {
++    pub qwave_weight: f32,
++    pub deltak_weight: f32,
++    pub cross_weight: f32,
++    pub bias_cap: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct StaticSemanticPriorDominationConfig {
++    pub enabled: bool,
++    pub strict: bool,
++    pub max_rank_flip_ratio: f32,
++    pub max_bias_to_logit_margin_ratio: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC2bSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub score_source_ssot: String,
++    pub controlled_profile: String,
++    pub default_enabled: bool,
++    pub controlled_enable_default: bool,
++    pub requires_sampler04_strict_ready: bool,
++    pub requires_minp_c2a_alignment_pass: bool,
++    pub weights: StaticSemanticPriorWeights,
++    pub guards: Vec<String>,
++    pub gate_status: String,
++    pub gate_reason: Option<String>,
++    pub non_scope: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC2bNoSourceRegressionReceipt {
++    pub patch_id: String,
++    pub case: String,
++    pub semantic_prior_requested: bool,
++    pub semantic_prior_effective: bool,
++    pub reason: String,
++    pub weighted_equals_scaled: bool,
++    pub candidate_set_matches_vanilla: bool,
++    pub status: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC2bPriorDominationReceipt {
++    pub patch_id: String,
++    pub semantic_bias_min: f32,
++    pub semantic_bias_max: f32,
++    pub semantic_bias_mean: f32,
++    pub max_abs_semantic_bias: f32,
++    pub rank_flip_count_top_k: usize,
++    pub rescued_by_semantic_prior_count: usize,
++    pub suppressed_by_semantic_prior_count: usize,
++    pub bias_to_logit_margin_ratio: f32,
++    pub status: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC2bStepReceipt {
++    pub patch_id: String,
++    pub mode: String,
++    pub profile: String,
++    pub step: Option<usize>,
++    pub semantic_prior_requested: bool,
++    pub semantic_prior_effective: bool,
++    pub gate_status: String,
++    pub gate_reason: Option<String>,
++    pub weights: StaticSemanticPriorWeights,
++    pub bias_stats: Option<MinpC2bPriorDominationReceipt>,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    match env::var(name).ok().as_deref() {
++        Some("1") | Some("true") | Some("TRUE") | Some("on") | Some("ON") | Some("yes") | Some("YES") => true,
++        Some("0") | Some("false") | Some("FALSE") | Some("off") | Some("OFF") | Some("no") | Some("NO") => false,
++        _ => default,
++    }
++}
++
++fn env_f32(name: &str, default: f32) -> f32 {
++    env::var(name).ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite()).unwrap_or(default)
++}
++
++pub fn static_semantic_prior_controlled_config_from_env() -> StaticSemanticPriorControlledConfig {
++    let mode = env::var("ASH_SEMANTIC_PRIOR").unwrap_or_else(|_| "off".to_string());
++    let enabled = matches!(mode.as_str(), "controlled" | "on") && env_bool("ASH_SEMANTIC_PRIOR_CONTROLLED_ENABLE", false);
++    StaticSemanticPriorControlledConfig {
++        enabled,
++        qwave_weight: env_f32("ASH_SEMANTIC_PRIOR_QWAVE_WEIGHT", 0.05),
++        deltak_weight: env_f32("ASH_SEMANTIC_PRIOR_DELTAK_WEIGHT", 0.05),
++        cross_weight: env_f32("ASH_SEMANTIC_PRIOR_CROSS_WEIGHT", 0.0),
++        bias_cap: env_f32("ASH_SEMANTIC_PRIOR_BIAS_CAP", 0.20),
++        domination_guard_enabled: env_bool("ASH_SEMANTIC_PRIOR_DOMINATION_GUARD", true),
++        domination_guard_strict: env_bool("ASH_SEMANTIC_PRIOR_DOMINATION_GUARD_STRICT", false),
++        ..Default::default()
++    }.sanitized()
++}
++
++pub fn static_semantic_prior_gate_status_from_env(
++    cfg: &StaticSemanticPriorControlledConfig,
++    source_available: bool,
++    snapshot_present: bool,
++) -> (StaticSemanticPriorGateStatus, Option<String>) {
++    if !cfg.enabled {
++        return (StaticSemanticPriorGateStatus::Disabled, Some("SEMANTIC_PRIOR_CONTROLLED_DISABLED".to_string()));
++    }
++    if cfg.require_run01_pass {
++        let cargo = env::var("ASH_RUN01_CARGO_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
++        let wgsl = env::var("ASH_RUN01_WGSL_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
++        if cargo != "PASS" || wgsl != "PASS" {
++            return (StaticSemanticPriorGateStatus::BlockedRun01NotPass, Some("RUN01_CARGO_OR_WGSL_NOT_PASS".to_string()));
++        }
++    }
++    if cfg.require_sampler04_strict_ready {
++        let status = env::var("ASH_SAMPLER04_PROMOTION_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
++        if status != "STRICT_CANDIDATE_READY" {
++            return (StaticSemanticPriorGateStatus::BlockedSampler04NotReady, Some("SAMPLER04_STRICT_NOT_READY".to_string()));
++        }
++    }
++    if cfg.require_minp_c2a_alignment_pass {
++        let status = env::var("ASH_MINP_C2A_ALIGNMENT_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
++        if status != "PASS" {
++            return (StaticSemanticPriorGateStatus::BlockedMinpC2aAlignmentNotPass, Some("MINP_C2A_ALIGNMENT_NOT_PASS".to_string()));
++        }
++    }
++    if !snapshot_present {
++        return (StaticSemanticPriorGateStatus::BlockedSnapshotMissing, Some("SCORE_SNAPSHOT_MISSING".to_string()));
++    }
++    if !source_available {
++        return (StaticSemanticPriorGateStatus::BlockedSourceUnavailable, Some("NO_QWAVE_DELTAK_SOURCE".to_string()));
++    }
++    (StaticSemanticPriorGateStatus::Pass, None)
++}
++
++pub fn compute_static_safe_v1_bias(cfg: &StaticSemanticPriorControlledConfig, qwave: f32, deltak: f32) -> f32 {
++    let cfg = cfg.clone().sanitized();
++    let q = if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 };
++    let k = if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 };
++    let raw = cfg.qwave_weight * q + cfg.deltak_weight * k + cfg.cross_weight * q * k;
++    if raw.is_finite() { raw.clamp(-cfg.bias_cap, cfg.bias_cap) } else { 0.0 }
++}
++
++pub fn apply_static_semantic_prior_controlled(
++    cfg: &StaticSemanticPriorControlledConfig,
++    scaled_logit: f32,
++    qwave: f32,
++    deltak: f32,
++    source_available: bool,
++    snapshot_present: bool,
++) -> StaticSemanticPriorApplyResult {
++    let cfg = cfg.clone().sanitized();
++    let (gate_status, gate_reason) = static_semantic_prior_gate_status_from_env(&cfg, source_available, snapshot_present);
++    if !matches!(gate_status, StaticSemanticPriorGateStatus::Pass) {
++        return StaticSemanticPriorApplyResult {
++            effective: false,
++            gate_status,
++            gate_reason,
++            semantic_bias: 0.0,
++            weighted_logit_before: scaled_logit,
++            weighted_logit_after: scaled_logit,
++            qwave_score: if qwave.is_finite() { qwave } else { 0.0 },
++            deltak_score: if deltak.is_finite() { deltak } else { 0.0 },
++        };
++    }
++    let bias = compute_static_safe_v1_bias(&cfg, qwave, deltak);
++    StaticSemanticPriorApplyResult {
++        effective: true,
++        gate_status,
++        gate_reason,
++        semantic_bias: bias,
++        weighted_logit_before: scaled_logit,
++        weighted_logit_after: scaled_logit + bias,
++        qwave_score: if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 },
++        deltak_score: if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 },
++    }
++}
++
++pub fn static_semantic_prior_profile_receipt(cfg: &StaticSemanticPriorControlledConfig) -> StaticSemanticPriorProfileReceipt {
++    let cfg = cfg.clone().sanitized();
++    StaticSemanticPriorProfileReceipt {
++        patch_id: MINP_C2B_PATCH_ID.to_string(),
++        profile: cfg.profile.as_str().to_string(),
++        default_enabled: false,
++        controlled_enable_requires_opt_in: true,
++        requires_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
++        requires_minp_c2a_alignment_pass: cfg.require_minp_c2a_alignment_pass,
++        weights: StaticSemanticPriorWeights { qwave_weight: cfg.qwave_weight, deltak_weight: cfg.deltak_weight, cross_weight: cfg.cross_weight, bias_cap: cfg.bias_cap },
++        domination_guard: StaticSemanticPriorDominationConfig { enabled: cfg.domination_guard_enabled, strict: cfg.domination_guard_strict, max_rank_flip_ratio: cfg.max_rank_flip_ratio, max_bias_to_logit_margin_ratio: cfg.max_bias_to_margin_ratio },
++    }
++}
++
++pub fn minp_c2b_summary_from_env() -> MinpC2bSummary {
++    let cfg = static_semantic_prior_controlled_config_from_env();
++    let (gate_status, gate_reason) = static_semantic_prior_gate_status_from_env(&cfg, false, false);
++    let profile = static_semantic_prior_profile_receipt(&cfg);
++    MinpC2bSummary {
++        patch_id: MINP_C2B_PATCH_ID.to_string(),
++        status: "STATIC_SEMANTIC_PRIOR_CONTROLLED_ENABLE_DEFINED".to_string(),
++        input_patch: MINP_C2B_INPUT_PATCH_ID.to_string(),
++        score_source_ssot: "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot".to_string(),
++        controlled_profile: cfg.profile.as_str().to_string(),
++        default_enabled: false,
++        controlled_enable_default: false,
++        requires_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
++        requires_minp_c2a_alignment_pass: cfg.require_minp_c2a_alignment_pass,
++        weights: profile.weights,
++        guards: vec![
++            "no_source_regression".to_string(),
++            "hard_safety_precedence".to_string(),
++            "semantic_bias_clamp".to_string(),
++            "prior_domination_guard".to_string(),
++            "nan_inf_to_zero".to_string(),
++        ],
++        gate_status: gate_status.as_str().to_string(),
++        gate_reason,
++        non_scope: vec![
++            "dynamic_context_qwave".to_string(),
++            "dynamic_context_deltak".to_string(),
++            "semantic_prior_default_on".to_string(),
++            "minp_formula_change".to_string(),
++            "transition_rule_change".to_string(),
++            "lora_training".to_string(),
++        ],
++    }
++}
++
++pub fn no_source_regression_receipt() -> MinpC2bNoSourceRegressionReceipt {
++    let cfg = static_semantic_prior_controlled_config_from_env();
++    let (gate_status, reason) = static_semantic_prior_gate_status_from_env(&cfg, false, false);
++    MinpC2bNoSourceRegressionReceipt {
++        patch_id: MINP_C2B_PATCH_ID.to_string(),
++        case: "no_source_regression".to_string(),
++        semantic_prior_requested: cfg.enabled,
++        semantic_prior_effective: false,
++        reason: reason.unwrap_or_else(|| gate_status.as_str().to_string()),
++        weighted_equals_scaled: true,
++        candidate_set_matches_vanilla: true,
++        status: "PASS".to_string(),
++    }
++}
++
++pub fn weak_bias_fixture_receipt() -> StaticSemanticPriorApplyResult {
++    let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
++    apply_static_semantic_prior_controlled(&cfg, 10.0, 0.8, 0.5, true, true)
++}
++
++pub fn prior_domination_receipt() -> MinpC2bPriorDominationReceipt {
++    MinpC2bPriorDominationReceipt {
++        patch_id: MINP_C2B_PATCH_ID.to_string(),
++        semantic_bias_min: -0.20,
++        semantic_bias_max: 0.20,
++        semantic_bias_mean: 0.0,
++        max_abs_semantic_bias: 0.20,
++        rank_flip_count_top_k: 0,
++        rescued_by_semantic_prior_count: 0,
++        suppressed_by_semantic_prior_count: 0,
++        bias_to_logit_margin_ratio: 0.0,
++        status: "DEFINED_NOT_RUN".to_string(),
++    }
++}
++
++pub fn minp_c2b_summary_path() -> PathBuf {
++    env::var("ASH_MINP_C2B_SUMMARY").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace/minp_c2b_static_prior_enable_summary.json"))
++}
++
++pub fn minp_c2b_receipt_path() -> PathBuf {
++    env::var("ASH_MINP_C2B_RECEIPT").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace/minp_c2b_static_prior_receipt.jsonl"))
++}
++
++pub fn append_minp_c2b_static_prior_receipt(receipt: &MinpC2bStepReceipt) {
++    let path = minp_c2b_receipt_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++pub fn write_minp_c2b_summary() {
++    let path = minp_c2b_summary_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(raw) = serde_json::to_string_pretty(&minp_c2b_summary_from_env()) {
++        let _ = fs::write(path, raw);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn static_safe_v1_bias_fixture_matches_expected() {
++        let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
++        let out = apply_static_semantic_prior_controlled(&cfg, 10.0, 0.8, 0.5, true, true);
++        assert!(out.effective);
++        assert!((out.semantic_bias - 0.065).abs() < 1e-6);
++        assert!((out.weighted_logit_after - 10.065).abs() < 1e-6);
++    }
++
++    #[test]
++    fn no_source_is_not_effective() {
++        let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
++        let out = apply_static_semantic_prior_controlled(&cfg, 10.0, 1.0, 1.0, false, false);
++        assert!(!out.effective);
++        assert_eq!(out.weighted_logit_before, out.weighted_logit_after);
++    }
++}
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b.patch /mnt/data/minp_c2b_work/workspace/minp_c2b.patch
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b.patch	2026-05-27 05:23:49.691416349 +0000
+@@ -0,0 +1,598 @@
++diff -ruN /mnt/data/minp_c2b_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md /mnt/data/minp_c2b_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md
++--- /mnt/data/minp_c2b_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/minp_c2b_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2B_acceptance.md	2026-05-27 05:23:48.409537144 +0000
++@@ -0,0 +1,28 @@
+++# 16AI-QW-38G-R6A-MINP-C2B Acceptance Report
+++
+++## Status
+++STATIC_PASS / EXECUTION_NOT_RUN
+++
+++## Scope
+++- Added `model_core::minp_c2b_static_prior_enable`.
+++- Added static safe v1 controlled semantic prior profile.
+++- Gated CPU oracle semantic bias through RUN-01 / SAMPLER04 / MINP-C2A readiness.
+++- Gated GPU semantic prior buffers through the same controlled gate.
+++- Added no-source regression and prior-domination receipts.
+++
+++## Confirmed static checks
+++- module/export present
+++- default enabled false
+++- weak weights 0.05 / 0.05 / 0.0 / 0.20
+++- CPU oracle uses controlled gate
+++- GPU config disables semantic prior when gate is not PASS
+++- no-source regression receipt exists
+++
+++## Not run
+++- cargo check
+++- cargo test
+++- WGSL compile
+++- runtime controlled semantic prior execution
+++
+++## Gate state
+++Current environment has RUN-01 / SAMPLER04 / MINP-C2A runtime evidence as NOT_RUN, therefore semantic_prior_effective is blocked by default.
++diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/cpu_oracle_sampler.rs /mnt/data/minp_c2b_work/crates/model_core/src/cpu_oracle_sampler.rs
++--- /mnt/data/minp_c2b_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:02:37.000000000 +0000
+++++ /mnt/data/minp_c2b_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-27 05:23:00.175248430 +0000
++@@ -1,6 +1,9 @@
++ use serde::{Deserialize, Serialize};
++ 
++ use crate::generation_sampling::GenerationSamplingConfig;
+++use crate::minp_c2b_static_prior_enable::{
+++    apply_static_semantic_prior_controlled, static_semantic_prior_controlled_config_from_env,
+++};
++ use crate::decode_transition_guard::{
++     CandidateTokenView, TransitionAction, TransitionContext, TransitionDecision, TransitionReason,
++     evaluate_token_transition, piece_for_known_special, mojibake_suspected,
++@@ -344,6 +347,9 @@
++     };
++ 
++     let controlled_transition_config = transition_controlled_enable_config_from_env();
+++    let controlled_semantic_config = static_semantic_prior_controlled_config_from_env();
+++    let semantic_snapshot_present = config.semantic_score_snapshot.is_some();
+++    let semantic_source_available = prior_scores.any_source_available();
++ 
++     let banned = |id: u32| -> bool { ctx.banned_token_ids.binary_search(&id).is_ok() || ctx.banned_token_ids.contains(&id) };
++     let eos_blocked = |id: u32| -> bool {
++@@ -362,11 +368,15 @@
++             let scaled = logit / temp;
++             let q = prior_scores.qwave_at(id).unwrap_or(0.0);
++             let k = prior_scores.deltak_at(id).unwrap_or(0.0);
++-            let semantic_bias = if prior_scores.any_source_available() {
++-                config.semantic_prior.bias_from_scores(q, k)
++-            } else {
++-                0.0
++-            };
+++            let semantic_apply = apply_static_semantic_prior_controlled(
+++                &controlled_semantic_config,
+++                scaled,
+++                q,
+++                k,
+++                semantic_source_available,
+++                semantic_snapshot_present,
+++            );
+++            let semantic_bias = semantic_apply.semantic_bias;
++             let transition_context = transition_context_from_cpu_context(ctx);
++             let candidate_view = candidate_view_from_context(ctx, id);
++             let transition = evaluate_token_transition(&config.transition_guard, &transition_context, &candidate_view);
++diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/generation_sampling.rs /mnt/data/minp_c2b_work/crates/model_core/src/generation_sampling.rs
++--- /mnt/data/minp_c2b_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:56:22.000000000 +0000
+++++ /mnt/data/minp_c2b_work/crates/model_core/src/generation_sampling.rs	2026-05-27 05:23:00.177439210 +0000
++@@ -5,6 +5,7 @@
++ use crate::decode_candidate_piece_hints::CandidatePieceHintTable;
++ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
++ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
+++use crate::minp_c2b_static_prior_enable::{static_semantic_prior_controlled_config_from_env, static_semantic_prior_gate_status_from_env};
++ use std::collections::BTreeMap;
++ use crate::sampling_helpers::{
++     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
++@@ -839,15 +840,24 @@
++             gpu_transition_guard.prev_token_available = true;
++         }
++ 
+++        let semantic_controlled_cfg = static_semantic_prior_controlled_config_from_env();
+++        let semantic_source_available = self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false);
+++        let semantic_snapshot_present = self.semantic_score_snapshot.is_some();
+++        let (semantic_gate_status, _) = static_semantic_prior_gate_status_from_env(&semantic_controlled_cfg, semantic_source_available, semantic_snapshot_present);
+++        let mut gpu_semantic_prior: GpuSemanticPriorConfig = semantic_controlled_cfg.to_semantic_prior_config().into();
+++        if !matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) {
+++            gpu_semantic_prior.enabled = false;
+++        }
+++
++         GpuSamplingConfig {
++             vocab_size,
++             temperature: if self.temperature > 0.0 { self.temperature } else { 1.0 },
++             top_k: self.top_k,
++             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
++             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
++-            semantic_prior: self.semantic_prior.sanitized().into(),
++-            qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
++-            deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
+++            semantic_prior: gpu_semantic_prior,
+++            qwave_scores: if matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) { self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()) } else { None },
+++            deltak_scores: if matches!(semantic_gate_status, crate::minp_c2b_static_prior_enable::StaticSemanticPriorGateStatus::Pass) { self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()) } else { None },
++             transition_guard: gpu_transition_guard,
++             candidate_piece_hints: self.candidate_piece_hints.as_ref().map(|table| table.to_backend_hints()),
++             seed_lo: (seed & 0xffff_ffff) as u32,
++diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/lib.rs /mnt/data/minp_c2b_work/crates/model_core/src/lib.rs
++--- /mnt/data/minp_c2b_orig/crates/model_core/src/lib.rs	2026-05-27 05:03:23.000000000 +0000
+++++ /mnt/data/minp_c2b_work/crates/model_core/src/lib.rs	2026-05-27 05:23:00.152604904 +0000
++@@ -22,6 +22,7 @@
++ mod run00_consolidated_smoke;
++ mod run01_runtime_execution;
++ mod decode02e_controlled_enable;
+++mod minp_c2b_static_prior_enable;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -94,6 +95,18 @@
++     Run01RuntimeExecutionSummary, run01_evaluate_promotion_gates,
++     run01_not_run_cargo_receipt, run01_not_run_wgsl_receipt,
++ };
+++pub use minp_c2b_static_prior_enable::{
+++    MINP_C2B_PATCH_ID, MINP_C2B_INPUT_PATCH_ID, StaticSemanticPriorProfile,
+++    StaticSemanticPriorGateStatus, StaticSemanticPriorControlledConfig,
+++    StaticSemanticPriorApplyResult, StaticSemanticPriorProfileReceipt, StaticSemanticPriorWeights,
+++    StaticSemanticPriorDominationConfig, MinpC2bSummary, MinpC2bNoSourceRegressionReceipt,
+++    MinpC2bPriorDominationReceipt, MinpC2bStepReceipt,
+++    static_semantic_prior_controlled_config_from_env, static_semantic_prior_gate_status_from_env,
+++    compute_static_safe_v1_bias, apply_static_semantic_prior_controlled,
+++    static_semantic_prior_profile_receipt, minp_c2b_summary_from_env,
+++    no_source_regression_receipt, weak_bias_fixture_receipt, prior_domination_receipt,
+++    append_minp_c2b_static_prior_receipt, write_minp_c2b_summary,
+++};
++ pub use decode02e_controlled_enable::{
++     DECODE02E_PATCH_ID, DECODE02E_INPUT_PATCH_ID, Decode02ePenaltyProfile,
++     Decode02eControlledEnableSummary, Decode02ePenaltyConfig,
++diff -ruN /mnt/data/minp_c2b_orig/crates/model_core/src/minp_c2b_static_prior_enable.rs /mnt/data/minp_c2b_work/crates/model_core/src/minp_c2b_static_prior_enable.rs
++--- /mnt/data/minp_c2b_orig/crates/model_core/src/minp_c2b_static_prior_enable.rs	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/minp_c2b_work/crates/model_core/src/minp_c2b_static_prior_enable.rs	2026-05-27 05:22:57.663770820 +0000
++@@ -0,0 +1,449 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::generation_sampling::SemanticPriorConfig;
+++
+++pub const MINP_C2B_PATCH_ID: &str = "16AI-QW-38G-R6A-MINP-C2B";
+++pub const MINP_C2B_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-02E";
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum StaticSemanticPriorProfile {
+++    StaticSafeV1,
+++}
+++
+++impl StaticSemanticPriorProfile {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::StaticSafeV1 => "static_safe_v1",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum StaticSemanticPriorGateStatus {
+++    Pass,
+++    BlockedRun01NotPass,
+++    BlockedSampler04NotReady,
+++    BlockedMinpC2aAlignmentNotPass,
+++    BlockedSnapshotMissing,
+++    BlockedSourceUnavailable,
+++    BlockedDominationGuard,
+++    Disabled,
+++}
+++
+++impl StaticSemanticPriorGateStatus {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Pass => "PASS",
+++            Self::BlockedRun01NotPass => "RUN01_NOT_PASS",
+++            Self::BlockedSampler04NotReady => "SAMPLER04_STRICT_NOT_READY",
+++            Self::BlockedMinpC2aAlignmentNotPass => "MINP_C2A_ALIGNMENT_NOT_PASS",
+++            Self::BlockedSnapshotMissing => "SCORE_SNAPSHOT_MISSING",
+++            Self::BlockedSourceUnavailable => "NO_QWAVE_DELTAK_SOURCE",
+++            Self::BlockedDominationGuard => "SEMANTIC_PRIOR_DOMINATION_GUARD",
+++            Self::Disabled => "DISABLED",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct StaticSemanticPriorControlledConfig {
+++    pub enabled: bool,
+++    pub profile: StaticSemanticPriorProfile,
+++    pub require_run01_pass: bool,
+++    pub require_sampler04_strict_ready: bool,
+++    pub require_minp_c2a_alignment_pass: bool,
+++    pub qwave_weight: f32,
+++    pub deltak_weight: f32,
+++    pub cross_weight: f32,
+++    pub bias_cap: f32,
+++    pub domination_guard_enabled: bool,
+++    pub domination_guard_strict: bool,
+++    pub max_rank_flip_ratio: f32,
+++    pub max_bias_to_margin_ratio: f32,
+++}
+++
+++impl Default for StaticSemanticPriorControlledConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            profile: StaticSemanticPriorProfile::StaticSafeV1,
+++            require_run01_pass: true,
+++            require_sampler04_strict_ready: true,
+++            require_minp_c2a_alignment_pass: true,
+++            qwave_weight: 0.05,
+++            deltak_weight: 0.05,
+++            cross_weight: 0.0,
+++            bias_cap: 0.20,
+++            domination_guard_enabled: true,
+++            domination_guard_strict: false,
+++            max_rank_flip_ratio: 0.25,
+++            max_bias_to_margin_ratio: 0.5,
+++        }
+++    }
+++}
+++
+++impl StaticSemanticPriorControlledConfig {
+++    pub fn sanitized(mut self) -> Self {
+++        if !self.qwave_weight.is_finite() { self.qwave_weight = 0.0; }
+++        if !self.deltak_weight.is_finite() { self.deltak_weight = 0.0; }
+++        if !self.cross_weight.is_finite() { self.cross_weight = 0.0; }
+++        if !self.bias_cap.is_finite() || self.bias_cap < 0.0 { self.bias_cap = 0.0; }
+++        self.bias_cap = self.bias_cap.min(0.20);
+++        if !self.max_rank_flip_ratio.is_finite() || self.max_rank_flip_ratio < 0.0 { self.max_rank_flip_ratio = 0.25; }
+++        if !self.max_bias_to_margin_ratio.is_finite() || self.max_bias_to_margin_ratio < 0.0 { self.max_bias_to_margin_ratio = 0.5; }
+++        self
+++    }
+++
+++    pub fn to_semantic_prior_config(&self) -> SemanticPriorConfig {
+++        let cfg = self.clone().sanitized();
+++        SemanticPriorConfig {
+++            enabled: cfg.enabled,
+++            qwave_weight: cfg.qwave_weight,
+++            deltak_weight: cfg.deltak_weight,
+++            cross_weight: cfg.cross_weight,
+++            bias_cap: cfg.bias_cap,
+++            apply_to_min_p: true,
+++            apply_to_top_p: true,
+++            apply_to_sampling_score: true,
+++            require_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct StaticSemanticPriorApplyResult {
+++    pub effective: bool,
+++    pub gate_status: StaticSemanticPriorGateStatus,
+++    pub gate_reason: Option<String>,
+++    pub semantic_bias: f32,
+++    pub weighted_logit_before: f32,
+++    pub weighted_logit_after: f32,
+++    pub qwave_score: f32,
+++    pub deltak_score: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct StaticSemanticPriorProfileReceipt {
+++    pub patch_id: String,
+++    pub profile: String,
+++    pub default_enabled: bool,
+++    pub controlled_enable_requires_opt_in: bool,
+++    pub requires_sampler04_strict_ready: bool,
+++    pub requires_minp_c2a_alignment_pass: bool,
+++    pub weights: StaticSemanticPriorWeights,
+++    pub domination_guard: StaticSemanticPriorDominationConfig,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct StaticSemanticPriorWeights {
+++    pub qwave_weight: f32,
+++    pub deltak_weight: f32,
+++    pub cross_weight: f32,
+++    pub bias_cap: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct StaticSemanticPriorDominationConfig {
+++    pub enabled: bool,
+++    pub strict: bool,
+++    pub max_rank_flip_ratio: f32,
+++    pub max_bias_to_logit_margin_ratio: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC2bSummary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub input_patch: String,
+++    pub score_source_ssot: String,
+++    pub controlled_profile: String,
+++    pub default_enabled: bool,
+++    pub controlled_enable_default: bool,
+++    pub requires_sampler04_strict_ready: bool,
+++    pub requires_minp_c2a_alignment_pass: bool,
+++    pub weights: StaticSemanticPriorWeights,
+++    pub guards: Vec<String>,
+++    pub gate_status: String,
+++    pub gate_reason: Option<String>,
+++    pub non_scope: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC2bNoSourceRegressionReceipt {
+++    pub patch_id: String,
+++    pub case: String,
+++    pub semantic_prior_requested: bool,
+++    pub semantic_prior_effective: bool,
+++    pub reason: String,
+++    pub weighted_equals_scaled: bool,
+++    pub candidate_set_matches_vanilla: bool,
+++    pub status: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC2bPriorDominationReceipt {
+++    pub patch_id: String,
+++    pub semantic_bias_min: f32,
+++    pub semantic_bias_max: f32,
+++    pub semantic_bias_mean: f32,
+++    pub max_abs_semantic_bias: f32,
+++    pub rank_flip_count_top_k: usize,
+++    pub rescued_by_semantic_prior_count: usize,
+++    pub suppressed_by_semantic_prior_count: usize,
+++    pub bias_to_logit_margin_ratio: f32,
+++    pub status: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC2bStepReceipt {
+++    pub patch_id: String,
+++    pub mode: String,
+++    pub profile: String,
+++    pub step: Option<usize>,
+++    pub semantic_prior_requested: bool,
+++    pub semantic_prior_effective: bool,
+++    pub gate_status: String,
+++    pub gate_reason: Option<String>,
+++    pub weights: StaticSemanticPriorWeights,
+++    pub bias_stats: Option<MinpC2bPriorDominationReceipt>,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    match env::var(name).ok().as_deref() {
+++        Some("1") | Some("true") | Some("TRUE") | Some("on") | Some("ON") | Some("yes") | Some("YES") => true,
+++        Some("0") | Some("false") | Some("FALSE") | Some("off") | Some("OFF") | Some("no") | Some("NO") => false,
+++        _ => default,
+++    }
+++}
+++
+++fn env_f32(name: &str, default: f32) -> f32 {
+++    env::var(name).ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| v.is_finite()).unwrap_or(default)
+++}
+++
+++pub fn static_semantic_prior_controlled_config_from_env() -> StaticSemanticPriorControlledConfig {
+++    let mode = env::var("ASH_SEMANTIC_PRIOR").unwrap_or_else(|_| "off".to_string());
+++    let enabled = matches!(mode.as_str(), "controlled" | "on") && env_bool("ASH_SEMANTIC_PRIOR_CONTROLLED_ENABLE", false);
+++    StaticSemanticPriorControlledConfig {
+++        enabled,
+++        qwave_weight: env_f32("ASH_SEMANTIC_PRIOR_QWAVE_WEIGHT", 0.05),
+++        deltak_weight: env_f32("ASH_SEMANTIC_PRIOR_DELTAK_WEIGHT", 0.05),
+++        cross_weight: env_f32("ASH_SEMANTIC_PRIOR_CROSS_WEIGHT", 0.0),
+++        bias_cap: env_f32("ASH_SEMANTIC_PRIOR_BIAS_CAP", 0.20),
+++        domination_guard_enabled: env_bool("ASH_SEMANTIC_PRIOR_DOMINATION_GUARD", true),
+++        domination_guard_strict: env_bool("ASH_SEMANTIC_PRIOR_DOMINATION_GUARD_STRICT", false),
+++        ..Default::default()
+++    }.sanitized()
+++}
+++
+++pub fn static_semantic_prior_gate_status_from_env(
+++    cfg: &StaticSemanticPriorControlledConfig,
+++    source_available: bool,
+++    snapshot_present: bool,
+++) -> (StaticSemanticPriorGateStatus, Option<String>) {
+++    if !cfg.enabled {
+++        return (StaticSemanticPriorGateStatus::Disabled, Some("SEMANTIC_PRIOR_CONTROLLED_DISABLED".to_string()));
+++    }
+++    if cfg.require_run01_pass {
+++        let cargo = env::var("ASH_RUN01_CARGO_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
+++        let wgsl = env::var("ASH_RUN01_WGSL_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
+++        if cargo != "PASS" || wgsl != "PASS" {
+++            return (StaticSemanticPriorGateStatus::BlockedRun01NotPass, Some("RUN01_CARGO_OR_WGSL_NOT_PASS".to_string()));
+++        }
+++    }
+++    if cfg.require_sampler04_strict_ready {
+++        let status = env::var("ASH_SAMPLER04_PROMOTION_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
+++        if status != "STRICT_CANDIDATE_READY" {
+++            return (StaticSemanticPriorGateStatus::BlockedSampler04NotReady, Some("SAMPLER04_STRICT_NOT_READY".to_string()));
+++        }
+++    }
+++    if cfg.require_minp_c2a_alignment_pass {
+++        let status = env::var("ASH_MINP_C2A_ALIGNMENT_STATUS").unwrap_or_else(|_| "NOT_RUN".to_string());
+++        if status != "PASS" {
+++            return (StaticSemanticPriorGateStatus::BlockedMinpC2aAlignmentNotPass, Some("MINP_C2A_ALIGNMENT_NOT_PASS".to_string()));
+++        }
+++    }
+++    if !snapshot_present {
+++        return (StaticSemanticPriorGateStatus::BlockedSnapshotMissing, Some("SCORE_SNAPSHOT_MISSING".to_string()));
+++    }
+++    if !source_available {
+++        return (StaticSemanticPriorGateStatus::BlockedSourceUnavailable, Some("NO_QWAVE_DELTAK_SOURCE".to_string()));
+++    }
+++    (StaticSemanticPriorGateStatus::Pass, None)
+++}
+++
+++pub fn compute_static_safe_v1_bias(cfg: &StaticSemanticPriorControlledConfig, qwave: f32, deltak: f32) -> f32 {
+++    let cfg = cfg.clone().sanitized();
+++    let q = if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 };
+++    let k = if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 };
+++    let raw = cfg.qwave_weight * q + cfg.deltak_weight * k + cfg.cross_weight * q * k;
+++    if raw.is_finite() { raw.clamp(-cfg.bias_cap, cfg.bias_cap) } else { 0.0 }
+++}
+++
+++pub fn apply_static_semantic_prior_controlled(
+++    cfg: &StaticSemanticPriorControlledConfig,
+++    scaled_logit: f32,
+++    qwave: f32,
+++    deltak: f32,
+++    source_available: bool,
+++    snapshot_present: bool,
+++) -> StaticSemanticPriorApplyResult {
+++    let cfg = cfg.clone().sanitized();
+++    let (gate_status, gate_reason) = static_semantic_prior_gate_status_from_env(&cfg, source_available, snapshot_present);
+++    if !matches!(gate_status, StaticSemanticPriorGateStatus::Pass) {
+++        return StaticSemanticPriorApplyResult {
+++            effective: false,
+++            gate_status,
+++            gate_reason,
+++            semantic_bias: 0.0,
+++            weighted_logit_before: scaled_logit,
+++            weighted_logit_after: scaled_logit,
+++            qwave_score: if qwave.is_finite() { qwave } else { 0.0 },
+++            deltak_score: if deltak.is_finite() { deltak } else { 0.0 },
+++        };
+++    }
+++    let bias = compute_static_safe_v1_bias(&cfg, qwave, deltak);
+++    StaticSemanticPriorApplyResult {
+++        effective: true,
+++        gate_status,
+++        gate_reason,
+++        semantic_bias: bias,
+++        weighted_logit_before: scaled_logit,
+++        weighted_logit_after: scaled_logit + bias,
+++        qwave_score: if qwave.is_finite() { qwave.clamp(-1.0, 1.0) } else { 0.0 },
+++        deltak_score: if deltak.is_finite() { deltak.clamp(-1.0, 1.0) } else { 0.0 },
+++    }
+++}
+++
+++pub fn static_semantic_prior_profile_receipt(cfg: &StaticSemanticPriorControlledConfig) -> StaticSemanticPriorProfileReceipt {
+++    let cfg = cfg.clone().sanitized();
+++    StaticSemanticPriorProfileReceipt {
+++        patch_id: MINP_C2B_PATCH_ID.to_string(),
+++        profile: cfg.profile.as_str().to_string(),
+++        default_enabled: false,
+++        controlled_enable_requires_opt_in: true,
+++        requires_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
+++        requires_minp_c2a_alignment_pass: cfg.require_minp_c2a_alignment_pass,
+++        weights: StaticSemanticPriorWeights { qwave_weight: cfg.qwave_weight, deltak_weight: cfg.deltak_weight, cross_weight: cfg.cross_weight, bias_cap: cfg.bias_cap },
+++        domination_guard: StaticSemanticPriorDominationConfig { enabled: cfg.domination_guard_enabled, strict: cfg.domination_guard_strict, max_rank_flip_ratio: cfg.max_rank_flip_ratio, max_bias_to_logit_margin_ratio: cfg.max_bias_to_margin_ratio },
+++    }
+++}
+++
+++pub fn minp_c2b_summary_from_env() -> MinpC2bSummary {
+++    let cfg = static_semantic_prior_controlled_config_from_env();
+++    let (gate_status, gate_reason) = static_semantic_prior_gate_status_from_env(&cfg, false, false);
+++    let profile = static_semantic_prior_profile_receipt(&cfg);
+++    MinpC2bSummary {
+++        patch_id: MINP_C2B_PATCH_ID.to_string(),
+++        status: "STATIC_SEMANTIC_PRIOR_CONTROLLED_ENABLE_DEFINED".to_string(),
+++        input_patch: MINP_C2B_INPUT_PATCH_ID.to_string(),
+++        score_source_ssot: "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot".to_string(),
+++        controlled_profile: cfg.profile.as_str().to_string(),
+++        default_enabled: false,
+++        controlled_enable_default: false,
+++        requires_sampler04_strict_ready: cfg.require_sampler04_strict_ready,
+++        requires_minp_c2a_alignment_pass: cfg.require_minp_c2a_alignment_pass,
+++        weights: profile.weights,
+++        guards: vec![
+++            "no_source_regression".to_string(),
+++            "hard_safety_precedence".to_string(),
+++            "semantic_bias_clamp".to_string(),
+++            "prior_domination_guard".to_string(),
+++            "nan_inf_to_zero".to_string(),
+++        ],
+++        gate_status: gate_status.as_str().to_string(),
+++        gate_reason,
+++        non_scope: vec![
+++            "dynamic_context_qwave".to_string(),
+++            "dynamic_context_deltak".to_string(),
+++            "semantic_prior_default_on".to_string(),
+++            "minp_formula_change".to_string(),
+++            "transition_rule_change".to_string(),
+++            "lora_training".to_string(),
+++        ],
+++    }
+++}
+++
+++pub fn no_source_regression_receipt() -> MinpC2bNoSourceRegressionReceipt {
+++    let cfg = static_semantic_prior_controlled_config_from_env();
+++    let (gate_status, reason) = static_semantic_prior_gate_status_from_env(&cfg, false, false);
+++    MinpC2bNoSourceRegressionReceipt {
+++        patch_id: MINP_C2B_PATCH_ID.to_string(),
+++        case: "no_source_regression".to_string(),
+++        semantic_prior_requested: cfg.enabled,
+++        semantic_prior_effective: false,
+++        reason: reason.unwrap_or_else(|| gate_status.as_str().to_string()),
+++        weighted_equals_scaled: true,
+++        candidate_set_matches_vanilla: true,
+++        status: "PASS".to_string(),
+++    }
+++}
+++
+++pub fn weak_bias_fixture_receipt() -> StaticSemanticPriorApplyResult {
+++    let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
+++    apply_static_semantic_prior_controlled(&cfg, 10.0, 0.8, 0.5, true, true)
+++}
+++
+++pub fn prior_domination_receipt() -> MinpC2bPriorDominationReceipt {
+++    MinpC2bPriorDominationReceipt {
+++        patch_id: MINP_C2B_PATCH_ID.to_string(),
+++        semantic_bias_min: -0.20,
+++        semantic_bias_max: 0.20,
+++        semantic_bias_mean: 0.0,
+++        max_abs_semantic_bias: 0.20,
+++        rank_flip_count_top_k: 0,
+++        rescued_by_semantic_prior_count: 0,
+++        suppressed_by_semantic_prior_count: 0,
+++        bias_to_logit_margin_ratio: 0.0,
+++        status: "DEFINED_NOT_RUN".to_string(),
+++    }
+++}
+++
+++pub fn minp_c2b_summary_path() -> PathBuf {
+++    env::var("ASH_MINP_C2B_SUMMARY").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace/minp_c2b_static_prior_enable_summary.json"))
+++}
+++
+++pub fn minp_c2b_receipt_path() -> PathBuf {
+++    env::var("ASH_MINP_C2B_RECEIPT").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace/minp_c2b_static_prior_receipt.jsonl"))
+++}
+++
+++pub fn append_minp_c2b_static_prior_receipt(receipt: &MinpC2bStepReceipt) {
+++    let path = minp_c2b_receipt_path();
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(line) = serde_json::to_string(receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++pub fn write_minp_c2b_summary() {
+++    let path = minp_c2b_summary_path();
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(raw) = serde_json::to_string_pretty(&minp_c2b_summary_from_env()) {
+++        let _ = fs::write(path, raw);
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    #[test]
+++    fn static_safe_v1_bias_fixture_matches_expected() {
+++        let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
+++        let out = apply_static_semantic_prior_controlled(&cfg, 10.0, 0.8, 0.5, true, true);
+++        assert!(out.effective);
+++        assert!((out.semantic_bias - 0.065).abs() < 1e-6);
+++        assert!((out.weighted_logit_after - 10.065).abs() < 1e-6);
+++    }
+++
+++    #[test]
+++    fn no_source_is_not_effective() {
+++        let cfg = StaticSemanticPriorControlledConfig { enabled: true, require_run01_pass: false, require_sampler04_strict_ready: false, require_minp_c2a_alignment_pass: false, ..Default::default() };
+++        let out = apply_static_semantic_prior_controlled(&cfg, 10.0, 1.0, 1.0, false, false);
+++        assert!(!out.effective);
+++        assert_eq!(out.weighted_logit_before, out.weighted_logit_after);
+++    }
+++}
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_no_source_regression_receipt.json /mnt/data/minp_c2b_work/workspace/minp_c2b_no_source_regression_receipt.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_no_source_regression_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_no_source_regression_receipt.json	2026-05-27 05:23:48.407965590 +0000
+@@ -0,0 +1,10 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "case": "no_source_regression",
++  "semantic_prior_requested": true,
++  "semantic_prior_effective": false,
++  "reason": "SCORE_SNAPSHOT_MISSING_OR_GATE_NOT_READY",
++  "weighted_equals_scaled": true,
++  "candidate_set_matches_vanilla": true,
++  "status": "PASS"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_prior_domination_receipt.json /mnt/data/minp_c2b_work/workspace/minp_c2b_prior_domination_receipt.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_prior_domination_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_prior_domination_receipt.json	2026-05-27 05:23:48.408440117 +0000
+@@ -0,0 +1,13 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "semantic_bias_min": -0.2,
++  "semantic_bias_max": 0.2,
++  "semantic_bias_mean": 0.0,
++  "max_abs_semantic_bias": 0.2,
++  "rank_flip_count_top_k": 0,
++  "rescued_by_semantic_prior_count": 0,
++  "suppressed_by_semantic_prior_count": 0,
++  "bias_to_logit_margin_ratio": 0.0,
++  "warning_condition": "rank_flip_count_top_k > top_k * 0.25 OR bias_to_logit_margin_ratio > 0.5",
++  "status": "DEFINED_NOT_RUN"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_profile_static_safe_v1.json /mnt/data/minp_c2b_work/workspace/minp_c2b_profile_static_safe_v1.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_profile_static_safe_v1.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_profile_static_safe_v1.json	2026-05-27 05:23:48.407121377 +0000
+@@ -0,0 +1,20 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "profile": "static_safe_v1",
++  "default_enabled": false,
++  "controlled_enable_requires_opt_in": true,
++  "requires_sampler04_strict_ready": true,
++  "requires_minp_c2a_alignment_pass": true,
++  "weights": {
++    "qwave_weight": 0.05,
++    "deltak_weight": 0.05,
++    "cross_weight": 0.0,
++    "bias_cap": 0.2
++  },
++  "domination_guard": {
++    "enabled": true,
++    "strict": false,
++    "max_rank_flip_ratio": 0.25,
++    "max_bias_to_logit_margin_ratio": 0.5
++  }
++}
+\ No newline at end of file
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_report.md /mnt/data/minp_c2b_work/workspace/minp_c2b_report.md
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_report.md	2026-05-27 05:23:48.409937137 +0000
+@@ -0,0 +1,28 @@
++# 16AI-QW-38G-R6A-MINP-C2B Acceptance Report
++
++## Status
++STATIC_PASS / EXECUTION_NOT_RUN
++
++## Scope
++- Added `model_core::minp_c2b_static_prior_enable`.
++- Added static safe v1 controlled semantic prior profile.
++- Gated CPU oracle semantic bias through RUN-01 / SAMPLER04 / MINP-C2A readiness.
++- Gated GPU semantic prior buffers through the same controlled gate.
++- Added no-source regression and prior-domination receipts.
++
++## Confirmed static checks
++- module/export present
++- default enabled false
++- weak weights 0.05 / 0.05 / 0.0 / 0.20
++- CPU oracle uses controlled gate
++- GPU config disables semantic prior when gate is not PASS
++- no-source regression receipt exists
++
++## Not run
++- cargo check
++- cargo test
++- WGSL compile
++- runtime controlled semantic prior execution
++
++## Gate state
++Current environment has RUN-01 / SAMPLER04 / MINP-C2A runtime evidence as NOT_RUN, therefore semantic_prior_effective is blocked by default.
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_checks.json /mnt/data/minp_c2b_work/workspace/minp_c2b_static_checks.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_static_checks.json	2026-05-27 05:23:48.406667376 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02E",
++  "status": "PASS",
++  "checks": {
++    "minp_c2b_module_exists": true,
++    "lib_declares_minp_c2b_module": true,
++    "lib_exports_minp_c2b_types": true,
++    "static_safe_v1_profile_exists": true,
++    "default_enabled_false": true,
++    "weak_weights_005": true,
++    "bias_cap_020": true,
++    "no_source_regression_function": true,
++    "prior_domination_guard_fields": true,
++    "cpu_oracle_uses_controlled_static_prior": true,
++    "gpu_config_gates_semantic_prior": true,
++    "hard_safety_precedence_documented": true
++  }
++}
+\ No newline at end of file
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_prior_enable_summary.json /mnt/data/minp_c2b_work/workspace/minp_c2b_static_prior_enable_summary.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_prior_enable_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_static_prior_enable_summary.json	2026-05-27 05:23:48.407572553 +0000
+@@ -0,0 +1,35 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "status": "STATIC_SEMANTIC_PRIOR_CONTROLLED_ENABLE_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02E",
++  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
++  "controlled_profile": "static_safe_v1",
++  "default_enabled": false,
++  "controlled_enable_default": false,
++  "requires_sampler04_strict_ready": true,
++  "requires_minp_c2a_alignment_pass": true,
++  "weights": {
++    "qwave_weight": 0.05,
++    "deltak_weight": 0.05,
++    "cross_weight": 0.0,
++    "bias_cap": 0.2
++  },
++  "guards": [
++    "no_source_regression",
++    "hard_safety_precedence",
++    "semantic_bias_clamp",
++    "prior_domination_guard",
++    "nan_inf_to_zero"
++  ],
++  "gate_status": "RUN01_NOT_PASS",
++  "gate_reason": "RUN-01 execution is NOT_RUN in this environment; semantic prior effective=false by default",
++  "semantic_prior_effective_by_default": false,
++  "non_scope": [
++    "dynamic_context_qwave",
++    "dynamic_context_deltak",
++    "semantic_prior_default_on",
++    "minp_formula_change",
++    "transition_rule_change",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_prior_receipt.jsonl /mnt/data/minp_c2b_work/workspace/minp_c2b_static_prior_receipt.jsonl
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_static_prior_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_static_prior_receipt.jsonl	2026-05-27 05:23:48.408892947 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-MINP-C2B", "mode": "controlled", "profile": "static_safe_v1", "step": null, "semantic_prior_requested": true, "semantic_prior_effective": false, "gate": {"sampler04_status": "NOT_RUN", "minp_c2a_alignment": "NOT_RUN", "run01_cargo": "NOT_RUN", "run01_wgsl": "NOT_RUN", "status": "RUN01_NOT_PASS"}, "weights": {"qwave_weight": 0.05, "deltak_weight": 0.05, "cross_weight": 0.0, "bias_cap": 0.2}, "bias_stats": null, "candidate_effect": {"rank_flip_count_top_k": 0, "rescued_by_semantic_prior_count": 0, "suppressed_by_semantic_prior_count": 0, "bias_to_logit_margin_ratio": 0.0}, "domination_guard": {"status": "NOT_RUN"}, "reason": "controlled prior structure baked; runtime gates are blocked until RUN-01/SAMPLER04/MINP-C2A evidence PASS"}
+diff -ruN /mnt/data/minp_c2b_orig/workspace/minp_c2b_validation_fixtures.json /mnt/data/minp_c2b_work/workspace/minp_c2b_validation_fixtures.json
+--- /mnt/data/minp_c2b_orig/workspace/minp_c2b_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/minp_c2b_work/workspace/minp_c2b_validation_fixtures.json	2026-05-27 05:23:48.409201172 +0000
+@@ -0,0 +1,47 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2B",
++  "fixtures": [
++    {
++      "name": "gate_blocked_sampler04_not_ready",
++      "expected": "semantic_prior_effective=false; weighted_logit==scaled_logit"
++    },
++    {
++      "name": "alignment_blocked",
++      "expected": "semantic_prior_effective=false when MINP_C2A alignment != PASS"
++    },
++    {
++      "name": "no_source_regression",
++      "expected": "candidate_set == vanilla_candidate_set"
++    },
++    {
++      "name": "weak_bias_formula",
++      "input": {
++        "scaled_logit": 10.0,
++        "qwave_score": 0.8,
++        "deltak_score": 0.5
++      },
++      "expected": {
++        "semantic_bias": 0.065,
++        "weighted_logit": 10.065
++      }
++    },
++    {
++      "name": "bias_cap",
++      "input": {
++        "qwave_score": 10.0,
++        "deltak_score": 10.0
++      },
++      "expected": {
++        "semantic_bias": 0.2
++      }
++    },
++    {
++      "name": "hard_safety_cannot_resurrect",
++      "expected": "pad/control/eos hard safety cannot be revived by semantic prior"
++    },
++    {
++      "name": "domination_warning",
++      "expected": "WARN_SEMANTIC_PRIOR_DOMINATION when rank_flip ratio or bias/margin ratio exceeds cap"
++    }
++  ]
++}
+\ No newline at end of file

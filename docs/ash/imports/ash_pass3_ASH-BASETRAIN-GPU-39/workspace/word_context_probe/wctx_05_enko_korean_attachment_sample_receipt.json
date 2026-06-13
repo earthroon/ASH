@@ -1,0 +1,85 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-05",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "center_cue_id": "WCTX02-C001",
+  "source_registry_receipt_key": "sha256:1f0b502bb95af893d1265e92c10a3d5de5a9f6456d4397c6358a9683e7c0b390",
+  "candidates": [
+    {
+      "candidate_id": "sha256:817ef1f165abae46a3e0b558bf510b51f0612e2cd5add20a358f3cfd886b653b",
+      "cue_id": "WCTX02-C001",
+      "source_node_id": null,
+      "target_node_id": "node:current_cue:WCTX02-C001:target_korean:11:13:6da2be489dc14177",
+      "full_surface": "없어",
+      "full_span": {
+        "span": {
+          "start_char": 4,
+          "end_char": 5,
+          "start_byte": 11,
+          "end_byte": 13
+        },
+        "coordinate_space": "target_korean"
+      },
+      "base_surface": "",
+      "base_span": {
+        "span": {
+          "start_char": 4,
+          "end_char": 4,
+          "start_byte": 11,
+          "end_byte": 11
+        },
+        "coordinate_space": "target_korean"
+      },
+      "tail_surface": "없어",
+      "tail_span": {
+        "span": {
+          "start_char": 4,
+          "end_char": 6,
+          "start_byte": 11,
+          "end_byte": 17
+        },
+        "coordinate_space": "target_korean"
+      },
+      "kind": "ending",
+      "function": "negation",
+      "confidence": 0.72,
+      "reason": "target Korean surface contains negative ending/cue; shadow-only",
+      "shadow_only": true
+    }
+  ],
+  "links": [
+    {
+      "link_id": "sha256:c9d2040eac6f3a5ad4ddca003709f2ae720b5b6e098bade413fbe23868f2c5e2",
+      "candidate_id": "sha256:817ef1f165abae46a3e0b558bf510b51f0612e2cd5add20a358f3cfd886b653b",
+      "target_node_id": "node:current_cue:WCTX02-C001:target_korean:11:13:6da2be489dc14177",
+      "related_typed_edge_id": null,
+      "attachment_kind": "ending",
+      "attachment_function": "negation",
+      "supports_relation": "negation_alignment",
+      "confidence": 0.72,
+      "reason": "Korean attachment candidate linked to typed relation when available; no correction or rerank applied"
+    }
+  ],
+  "risk": {
+    "token_id_mutated": false,
+    "generation_mutated": false,
+    "source_text_mutated": false,
+    "target_text_mutated": false,
+    "timing_mutated": false,
+    "target_surface_rewritten": false,
+    "spacing_auto_corrected": false,
+    "particle_auto_corrected": false,
+    "ending_auto_corrected": false,
+    "glossary_auto_applied": false,
+    "preserve_auto_applied": false,
+    "context_plan_created": false,
+    "rerank_applied": false,
+    "runtime_default_apply": false,
+    "byte_leak_observed": false,
+    "roundtrip_exact": true,
+    "invalid_span_count": 0,
+    "unresolved_attachment_count": 4
+  },
+  "created_by": "ash_core::word_context_korean_attachment",
+  "schema_version": 1,
+  "deterministic_receipt_key": "sha256:617d2e9faba7952a392d44ca784bc58497a819d6505892e49992d559d1cbba1d"
+}

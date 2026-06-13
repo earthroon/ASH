@@ -1,0 +1,17 @@
+SFT-FFN-INFRA-GPU-SAFETY-01 static validation
+
+PASS file creation check
+PASS ash_core lib.rs module/export connection
+PASS burn_webgpu_backend lib.rs module/export connection
+PASS burn_webgpu_backend profiling feature declared
+PASS gpu_penalty.rs readback timeout constant present
+PASS gpu_penalty.rs map_readback_bytes uses try_recv loop
+PASS gpu_penalty.rs map_readback_bytes uses device.poll(PollType::Poll)
+PASS gpu_sampling.rs readback timeout constant present
+PASS gpu_sampling.rs map_readback_bytes uses try_recv loop
+PASS gpu_sampling.rs map_readback_bytes uses device.poll(PollType::Poll)
+PASS gpu_sampling.rs us metrics helper is cfg(feature = "profiling") gated
+PASS generation_telemetry.rs strips us metrics when backend perf is disabled
+PASS braces balanced for touched files
+PENDING cargo/rustc unavailable in execution environment
+PENDING WGPU runtime deadlock probe

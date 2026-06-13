@@ -1,0 +1,22 @@
+SFT-FFN-LORA-14 STATIC VALIDATION
+Base: ash_pass3_SFT-FFN-LORA-13_rollback_drill_baked.zip
+
+OK file exists: crates/ash_core/src/sft_ffn_lora_slot_arbitration.rs
+OK file exists: crates/ash_core/tests/sft_ffn_lora_14_slot_arbitration.rs
+OK file exists: crates/burn_webgpu_backend/src/ffn_lora_slot_arbitration.rs
+OK file exists: crates/burn_webgpu_backend/tests/ffn_lora_slot_arbitration.rs
+OK file exists: acceptance_reports/SFT-FFN-LORA-14_slot_arbitration.md
+OK file exists: bake_artifacts/SFT-FFN-LORA-14_BAKE_REPORT.md
+
+OK ash_core lib.rs module export connected
+OK burn_webgpu_backend lib.rs module export connected
+OK current pointer update default closed
+OK demotion apply default closed
+OK quarantine apply default closed
+OK rollback execution default closed
+OK backend textureSample weight fetch closed
+
+Expected local verification:
+cargo test -p ash_core sft_ffn_lora_14 -- --nocapture
+cargo test -p ash_core sft_ffn_lora_13 -- --nocapture
+cargo test -p burn_webgpu_backend ffn_lora_slot_arbitration -- --nocapture

@@ -1,0 +1,72 @@
+{
+    "dataset_manifest_id":  "v4_guarded_readapt_run1024_v1",
+    "dataset_name":  "Ash V4 Guarded Readaptation",
+    "description":  "Generic JSONL manifest for V4 tokenizer re-adaptation / guarded_freeform full training.",
+    "created_at":  "2026-04-14T00:00:00+09:00",
+    "format":  "jsonl",
+    "schema_id":  "jsonl_sample_schema_v1",
+    "local_only":  true,
+    "splits":  {
+                   "train":  [
+                                 {
+                                     "path":  "D:\\1111113232\\DUST\\dust_build_v2\\30_splits_clean_v3_rawclean\\converted_guarded\\v4_guarded_freeform_train_part_01.jsonl",
+                                     "task":  "guarded_freeform",
+                                     "lang":  "ko",
+                                     "quality":  "high",
+                                     "estimated_samples":  0
+                                 },
+                                 {
+                                     "path":  "D:\\1111113232\\DUST\\dust_build_v2\\30_splits_clean_v3_rawclean\\converted_guarded\\v4_guarded_freeform_train_part_02.jsonl",
+                                     "task":  "guarded_freeform",
+                                     "lang":  "ko",
+                                     "quality":  "high",
+                                     "estimated_samples":  0
+                                 },
+                                 {
+                                     "path":  "D:\\1111113232\\DUST\\dust_build_v2\\30_splits_clean_v3_rawclean\\converted_guarded\\v4_guarded_freeform_train_part_03.jsonl",
+                                     "task":  "guarded_freeform",
+                                     "lang":  "ko",
+                                     "quality":  "high",
+                                     "estimated_samples":  0
+                                 }
+                             ],
+                   "eval":  [
+                                {
+                                    "path":  "D:\\1111113232\\DUST\\dust_build_v2\\30_splits_clean_v3_rawclean\\converted_guarded\\v4_guarded_freeform_valid.jsonl",
+                                    "task":  "guarded_freeform",
+                                    "lang":  "ko",
+                                    "quality":  "high",
+                                    "estimated_samples":  0
+                                }
+                            ],
+                   "test":  [
+
+                            ]
+               },
+    "mix":  {
+                "guarded_freeform":  1.0
+            },
+    "validation":  {
+                       "require_schema_validation":  true,
+                       "drop_invalid_samples":  true,
+                       "allow_missing_glossary":  true,
+                       "allow_missing_tm":  true,
+                       "max_sequence_length":  2048
+                   },
+    "lineage":  {
+                    "tokenizer_spec_id":  "tokenizer_v4",
+                    "model_spec_id":  "model_run1024_v4",
+                    "training_policy_id":  "training_policy_run1024_v4_guarded_readapt_v1"
+                },
+    "hashes":  {
+                   "manifest_hash":  "",
+                   "train_hash":  "",
+                   "eval_hash":  "",
+                   "test_hash":  ""
+               },
+    "security":  {
+                     "external_import_allowed":  false,
+                     "external_export_allowed":  false,
+                     "require_local_storage":  true
+                 }
+}

@@ -1,0 +1,56 @@
+SFT-FFN-INFRA-PERF-02 STATIC VALIDATION
+
+[Toolchain]
+cargo: unavailable
+rustc: unavailable
+rustfmt: unavailable
+
+[Files]
+OK crates/ash_core/src/infra_numeric.rs
+OK crates/ash_core/src/infra_report.rs
+OK crates/ash_core/src/infra_perf_02.rs
+OK crates/ash_core/tests/sft_ffn_infra_perf_02_serialization_hash_numeric_report.rs
+OK crates/burn_webgpu_backend/src/ffn_infra_perf_02_hygiene.rs
+OK acceptance_reports/SFT-FFN-INFRA-PERF-02_serialization_hash_numeric_report_hygiene.md
+OK bake_artifacts/SFT-FFN-INFRA-PERF-02_BAKE_REPORT.md
+
+[lib.rs exports]
+388:pub mod infra_numeric;
+389:pub use infra_numeric::*;
+390:pub mod infra_report;
+391:pub use infra_report::*;
+392:pub mod infra_perf_02;
+393:pub use infra_perf_02::*;
+228:pub mod ffn_infra_perf_02_hygiene;
+229:pub use ffn_infra_perf_02_hygiene::*;
+
+[Manual JSON escape removed from capability.rs]
+OK no escape_json/json_string_array
+
+[Target hash duplicate local impl removed]
+OK no target duplicated hash functions
+
+[Naive l2 norm removed from target files]
+OK no naive l2 target pattern
+
+[Markdown renderer boundary usage]
+crates/lora_train/src/lm_head_runtime_delta_verify.rs:use ash_core::{kv_line, render_markdown_report, stable_l2_norm_f32_finite_only, AshMarkdownReport};
+crates/lora_train/src/lm_head_runtime_delta_verify.rs:        let md = render_markdown_report(&AshMarkdownReport::new(
+crates/lora_train/src/lm_head_vocab_atlas_gpu_update.rs:use ash_core::{kv_debug_line, kv_line, render_markdown_report, stable_l2_norm_delta_f32, stable_l2_norm_f32, AshMarkdownReport};
+crates/lora_train/src/lm_head_vocab_atlas_gpu_update.rs:    let body = render_markdown_report(&AshMarkdownReport::new(
+crates/ash_core/src/infra_report.rs:pub struct AshMarkdownReport {
+crates/ash_core/src/infra_report.rs:impl AshMarkdownReport {
+crates/ash_core/src/infra_report.rs:pub fn render_markdown_report(report: &AshMarkdownReport) -> String {
+
+[Brace balance counts]
+OK crates/ash_core/src/infra_numeric.rs {'{': 26, '}': 26, '(': 29, ')': 29, '[': 11, ']': 11}
+OK crates/ash_core/src/infra_report.rs {'{': 17, '}': 17, '(': 30, ')': 30, '[': 2, ']': 2}
+OK crates/ash_core/src/infra_perf_02.rs {'{': 36, '}': 36, '(': 49, ')': 49, '[': 9, ']': 9}
+OK crates/ash_core/tests/sft_ffn_infra_perf_02_serialization_hash_numeric_report.rs {'{': 15, '}': 15, '(': 69, ')': 69, '[': 18, ']': 18}
+OK crates/burn_webgpu_backend/src/ffn_infra_perf_02_hygiene.rs {'{': 1, '}': 1, '(': 1, ')': 1, '[': 0, ']': 0}
+OK crates/ash_core/src/capability.rs {'{': 57, '}': 57, '(': 135, ')': 135, '[': 32, ']': 32}
+OK crates/ash_core/src/atlas_sft_native_smoke_artifact_binding.rs {'{': 179, '}': 179, '(': 412, ')': 412, '[': 11, ']': 11}
+OK crates/ash_core/src/atlas_sft_synapse_binding_candidate.rs {'{': 106, '}': 106, '(': 243, ')': 243, '[': 4, ']': 4}
+OK crates/ash_core/src/calibration_snapshot.rs {'{': 78, '}': 78, '(': 309, ')': 309, '[': 9, ']': 9}
+OK crates/lora_train/src/lm_head_runtime_delta_verify.rs {'{': 104, '}': 104, '(': 220, ')': 220, '[': 39, ']': 39}
+OK crates/lora_train/src/lm_head_vocab_atlas_gpu_update.rs {'{': 77, '}': 77, '(': 245, ')': 245, '[': 74, ']': 74}

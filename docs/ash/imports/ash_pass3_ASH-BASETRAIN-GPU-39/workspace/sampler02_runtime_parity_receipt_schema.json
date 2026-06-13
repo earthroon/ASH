@@ -1,0 +1,36 @@
+{
+  "path": "workspace/sampler02_runtime_parity_receipt.jsonl",
+  "jsonl_fields": [
+    "patch_id",
+    "step",
+    "mode",
+    "decode_config",
+    "cpu",
+    "gpu",
+    "parity"
+  ],
+  "parity_statuses": [
+    "PASS",
+    "WARN_SELECTED_ONLY",
+    "FAIL_CANDIDATE_PARITY_MISMATCH",
+    "PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE"
+  ],
+  "required_cpu_fields": [
+    "active_count",
+    "final_count",
+    "min_p_threshold",
+    "active_ids_head",
+    "final_ids_head",
+    "recovery_mode",
+    "selected_id"
+  ],
+  "required_gpu_fields": [
+    "selected_id",
+    "selected_logprob",
+    "recovery_mode",
+    "active_count",
+    "final_count",
+    "min_p_threshold",
+    "trace_completeness"
+  ]
+}

@@ -1,0 +1,33 @@
+QW-TOK-00-R7 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok00R7ReconciliationReplayConfig: PASS
+QwTok00R7EvidencePacketValidationReport: PASS
+QwTok00R7R5ReplayInputSnapshot: PASS
+QwTok00R7ReplayedR5ResultSummary: PASS
+QwTok00R7NoApplySeal: PASS
+QwTok00R7ReconciliationReplayReport: PASS
+build_qw_tok00_r7_reconciliation_replay_report: PASS
+build_qw_tok00_r7_default_reconciliation_replay_report: PASS
+R5 builder call present: PASS
+expected vocab const 48259: PASS
+default blocks allow_apply: false: PASS
+default blocks allow_runtime_spec_write: false: PASS
+default blocks allow_checkpoint_manifest_write: false: PASS
+default blocks allow_embedding_resize: false: PASS
+default blocks allow_lm_head_resize: false: PASS
+default blocks allow_runtime_decode_bind: false: PASS
+default blocks allow_sampler_mutation: false: PASS
+default blocks allow_qw_selector_mutation: false: PASS
+default blocks allow_mcts_mutation: false: PASS
+test qw_tok00_r7_reconciliation_replay.rs present: PASS
+test qw_tok00_r7_evidence_packet_schema.rs present: PASS
+test qw_tok00_r7_no_apply_no_mutation.rs present: PASS
+test qw_tok00_r7_replay_status_contract.rs present: PASS
+artifacts/qw_tok00_r7_runtime_model_spec_reconciliation_replay_report.json exists: PASS
+artifacts/qw_tok00_r7_replay_input_snapshot.json exists: PASS
+artifacts/qw_tok00_r7_replayed_r5_reconciliation_report.json exists: PASS
+workspace/runtime_traces/qw_tok00_r7_reconciliation_replay_trace.jsonl exists: PASS
+workspace/trace/qw_tok00_r7_reconciliation_replay_receipt.json exists: PASS
+no checkpoint/model weight files packaged by R7: PASS
+overall: PASS

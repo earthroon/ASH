@@ -1,0 +1,47 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12B",
+  "next_patch": "16AI-QW-38G-R6A-R12A-R12C_GUARD_POLICY_RECHECK",
+  "recheck_mode": "GUARD_POLICY_DRY_RUN_AND_BLOCKED_APPLY_AUDIT",
+  "candidate_id": "QW38G_R6A_R12A_R10_HEAD2_ORTHOGONAL_ONLY_LIMITED",
+  "cases": [
+    {
+      "case_id": "pv_001",
+      "case_group": "prompt_variant",
+      "expected_guard_action": "BLOCK_APPLY",
+      "expected_guard_reason": "BASELINE_MARGIN_NON_POSITIVE"
+    },
+    {
+      "case_id": "pv_002",
+      "case_group": "prompt_variant",
+      "expected_guard_action": "ALLOW_APPLY",
+      "expected_guard_reason": "TARGET_LIKE_MARGIN_ABOVE_THRESHOLD"
+    },
+    {
+      "case_id": "pv_003",
+      "case_group": "prompt_variant",
+      "expected_guard_action": "ALLOW_APPLY",
+      "expected_guard_reason": "TARGET_LIKE_MARGIN_ABOVE_THRESHOLD"
+    },
+    {
+      "case_id": "nc_001",
+      "case_group": "negative_control",
+      "expected_guard_action": "BLOCK_APPLY",
+      "expected_guard_reason": "NEGATIVE_CONTROL_ACTUAL_APPLY_BLOCKED",
+      "dry_run_allowed": true
+    },
+    {
+      "case_id": "nc_002",
+      "case_group": "negative_control",
+      "expected_guard_action": "BLOCK_APPLY",
+      "expected_guard_reason": "NEGATIVE_CONTROL_ACTUAL_APPLY_BLOCKED",
+      "dry_run_allowed": true
+    },
+    {
+      "case_id": "nc_003",
+      "case_group": "negative_control",
+      "expected_guard_action": "BLOCK_APPLY",
+      "expected_guard_reason": "NEGATIVE_CONTROL_ACTUAL_APPLY_BLOCKED",
+      "dry_run_allowed": true
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "patch_id": "ASH-REBASE-00",
+  "base_patch": "QW-50-R0V",
+  "status": "PASS",
+  "created_unix_ms": 1780212194767,
+  "runtime_mutation": false,
+  "model_weight_mutation": false,
+  "decode_policy_mutation": false,
+  "guard_policy_mutation": false,
+  "lora_scale_mutation": false,
+  "runtime_default_apply": false,
+  "legacy_rebind": {
+    "decode": {
+      "found": true,
+      "hit_count": 60,
+      "status": "candidate_only",
+      "default_apply": false,
+      "runtime_default_apply": false
+    },
+    "eval": {
+      "found": true,
+      "hit_count": 8,
+      "status": "calibration_reference",
+      "default_apply": false,
+      "runtime_default_apply": false
+    },
+    "wctx_mock": {
+      "found": true,
+      "hit_count": 28,
+      "status": "audit_reference",
+      "default_apply": false,
+      "runtime_default_apply": false
+    },
+    "lora_rt": {
+      "found": true,
+      "hit_count": 44,
+      "status": "runtime_support_reference",
+      "default_apply": false,
+      "runtime_default_apply": false
+    },
+    "r12": {
+      "found": true,
+      "hit_count": 59,
+      "status": "quarantined_low_confidence",
+      "default_apply": false,
+      "runtime_default_apply": false
+    },
+    "tcu": {
+      "found": true,
+      "hit_count": 111,
+      "status": "health_ledger_reference",
+      "default_apply": false,
+      "runtime_default_apply": false
+    }
+  },
+  "missing_legacy_artifacts": [],
+  "next_allowed_patch": "QW-50-R0W",
+  "blocked_actions": [
+    "enable_legacy_decode_guard_by_default",
+    "apply_r12_head_direction",
+    "change_lora_scale",
+    "change_guard_threshold",
+    "ban_attractor_tokens",
+    "enable_webgpu_inference_policy",
+    "enable_qwave_cheonjiin_detector"
+  ]
+}

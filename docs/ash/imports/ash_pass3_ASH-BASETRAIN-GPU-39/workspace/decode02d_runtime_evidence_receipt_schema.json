@@ -1,0 +1,33 @@
+{
+  "path": "workspace/decode02d_runtime_evidence_receipt.jsonl",
+  "jsonl_per": "decode_step_or_fixture",
+  "required_fields": [
+    "patch_id",
+    "step",
+    "mode",
+    "candidate_trace_version",
+    "probe_integrity",
+    "transition_parity",
+    "safety_cases",
+    "promotion"
+  ],
+  "probe_integrity_fields": [
+    "checked",
+    "weighted_logit_changed_count",
+    "active_mask_changed_count",
+    "final_mask_changed_count",
+    "selected_id_changed",
+    "mutation_detected",
+    "status"
+  ],
+  "promotion_status_values": [
+    "TRANSITION_ON_CANDIDATE_READY",
+    "TRANSITION_ON_BLOCKED"
+  ],
+  "ready_requires": [
+    "candidate_trace_version >= 4",
+    "probe_integrity.status == PASS",
+    "transition_parity.status == PASS or WARN_RISK_ONLY",
+    "no blocking_reasons"
+  ]
+}

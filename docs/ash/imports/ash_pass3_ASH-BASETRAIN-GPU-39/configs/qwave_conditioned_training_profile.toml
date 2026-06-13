@@ -1,0 +1,117 @@
+[profile]
+id = "qw50_qwave_conditioned_training_profile_v1"
+name = "QWave Conditioned Selected LoRA Training"
+version = "0.1.0"
+enabled = true
+mode = "mainline_candidate"
+status = "operator_override_open"
+forced_disabled = false
+hard_blocker_count = 0
+unsafe_override_required = true
+
+[requirements]
+require_qw35_auxiliary_loss = true
+require_qw36_geometry_loss = true
+require_qw37_trajectory_loss = true
+require_qw38_word_salad_corpus = true
+require_qw39_adapter_route_loss = true
+require_qw40_gradient_scope = true
+require_qw41_sandbox_backward = true
+require_qw42_adapter_delta = true
+require_qw43_minimal_pair_eval = true
+require_qw44_operator_queue = true
+require_qw45_runtime_shadow_eval = true
+require_qw46_canary_gate = true
+require_qw47_telemetry_feedback = true
+require_qw48_webgpu_route_scoring = true
+require_qw49_wgpu_sparse_lora_update = true
+require_qw49_r1_add_a_dynamic_parity_builder = true
+require_qw49_r1_native_wgpu_execution = true
+
+[loss]
+lm_loss_enabled = true
+qwave_auxiliary_loss_enabled = true
+hangul_geometry_loss_enabled = true
+qwave_trajectory_loss_enabled = true
+word_salad_loss_enabled = true
+adapter_route_loss_enabled = true
+qwave_auxiliary_weight = 0.10
+hangul_geometry_weight = 0.15
+qwave_trajectory_weight = 0.20
+word_salad_weight = 0.25
+adapter_route_weight = 0.30
+total_loss_apply_allowed = true
+
+[gradient]
+selected_lora_only = true
+base_model_frozen = true
+tokenizer_frozen = true
+embeddings_frozen = true
+sampler_frozen = true
+backend_frozen = true
+actual_gradient_allowed = true
+optimizer_step_allowed = true
+
+[adapter]
+selected_adapter_ids = ["ash_korean_morphology_lora_candidate"]
+adapter_delta_available = true
+rollback_available = true
+rollback_verified = false
+adapter_apply_allowed = true
+production_adapter_apply_allowed = false
+
+[runtime]
+runtime_shadow_eval_available = true
+native_runtime_eval_completed = false
+canary_candidate_created = true
+canary_apply_allowed = true
+canary_apply_executed = false
+telemetry_available = false
+runtime_pointer_mutation_allowed = false
+production_apply_allowed = false
+
+[accelerator]
+webgpu_route_scoring_available = true
+webgpu_route_scoring_gpu_executed = false
+wgpu_sparse_lora_update_available = true
+wgpu_sparse_lora_gpu_executed = false
+wgpu_sparse_lora_parity_pass = false
+native_wgpu_r1_runner_available = true
+native_wgpu_r1_executed = false
+native_wgpu_r1_pass = false
+cpu_fallback_allowed = false
+cpu_fallback_used = false
+accelerator_required_for_mainline = true
+
+[evidence]
+shader_manifest_config_available = true
+shader_paths_loaded_from_config = true
+hardcoded_shader_path_array_used = false
+native_parity_builder_available = true
+native_parity_builder_computes_pass = true
+static_parity_guard_available = true
+native_wgpu_execution_receipt_available = true
+native_wgpu_execution_passed = false
+evidence_sufficient_for_mainline = false
+unsafe_override_required = true
+
+[advisory_findings]
+items = [
+  "QW49_R1_NATIVE_WGPU_RUNTIME_UNAVAILABLE",
+  "QW49_R1_GPU_NOT_EXECUTED",
+  "QW49_R1_PARITY_NOT_PASSED",
+  "PENDING_NATIVE_RUNTIME",
+  "ROLLBACK_NOT_VERIFIED",
+  "OPERATOR_APPROVAL_BLOCKED",
+  "CANARY_NOT_EXECUTED",
+  "NO_TELEMETRY_AVAILABLE"
+]
+
+[promotion]
+profile_created = true
+profile_enabled = true
+sandbox_training_allowed = true
+mainline_training_allowed = true
+canary_allowed = true
+production_apply_allowed = false
+hard_blocker_count = 0

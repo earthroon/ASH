@@ -1,0 +1,19 @@
+SFT-FFN-TEX-ATLAS-07 static validation
+
+Checked:
+- ash_core hybrid timing module file exists
+- ash_core test file exists
+- burn_webgpu_backend hybrid timing shell exists
+- ash_core lib.rs module/export link added
+- burn_webgpu_backend lib.rs module/export link added
+- acceptance report exists
+- bake report exists
+
+Execution note:
+- cargo/rustc/rustfmt are unavailable in this environment, so compile/runtime validation was not executed here.
+- Local validation command:
+  cargo test -p ash_core sft_ffn_tex_atlas_07 -- --nocapture
+  cargo test -p ash_core sft_ffn_tex_atlas_06 -- --nocapture
+  cargo test -p ash_core sft_ffn_tex_atlas_05 -- --nocapture
+  cargo test -p ash_core sft_ffn_tex_atlas_04a -- --nocapture
+  cargo test -p burn_webgpu_backend ffn_texture_atlas_hybrid_timing -- --nocapture

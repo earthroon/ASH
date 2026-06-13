@@ -1,0 +1,18 @@
+ASH-BASETRAIN-GPU-35-R2A-R1 STATIC CHECKS
+PATCH: ASH-BASETRAIN-GPU-35-R2A
+REVISION: 35-R2A-R1
+FIX: serde_json::Value i128 serialization build fix
+
+CHECKS:
+- removed Value::from(i128) usage: PASS
+- byte_len_delta_from_shape_dtype serialized losslessly as string when present: PASS
+- no operator manifest creation introduced: PASS
+- no target manifest write introduced: PASS
+- no GPU buffer allocation introduced: PASS
+- no selected group weight load introduced: PASS
+- no backward introduced: PASS
+- no optimizer introduced: PASS
+- no safetensors mutation introduced: PASS
+
+CONTAINER_CARGO_BUILD: NOT_EXECUTED_IN_CONTAINER
+USER_LOCAL_BUILD_REQUIRED: true

@@ -1,0 +1,193 @@
+{
+  "asr_sidecar_direct_dependency_edges": [],
+  "default_member_count": 15,
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "generated_at_utc": "2026-05-29T07:06:32Z",
+  "members": [
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/artifact_store/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/artifact_store",
+      "missing_path_dependencies": [],
+      "package": "artifact_store"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/ash_core/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/ash_core",
+      "missing_path_dependencies": [],
+      "package": "ash_core"
+    },
+    {
+      "classification": "optional_sidecar_workspace_member_non_default",
+      "default_member": false,
+      "directly_required_by_ash_core": false,
+      "directly_required_by_model_core": false,
+      "directly_required_by_runtime": false,
+      "directly_required_by_tokenizer_core": false,
+      "manifest": "crates/asr_sidecar/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/asr_sidecar",
+      "missing_path_dependencies": [
+        {
+          "classification": "optional_sidecar_dependency_missing",
+          "confirmed_by_cargo": false,
+          "default_features": false,
+          "default_member": false,
+          "dependency": "sherpa-rs",
+          "directly_required_by_default_member": false,
+          "features": [
+            "download-binaries"
+          ],
+          "from_member": "crates/asr_sidecar",
+          "from_package": "asr_sidecar",
+          "optional": true,
+          "path": "../../vendor/sherpa-rs-main/crates/sherpa-rs",
+          "path_exists": false,
+          "recommended_action": "restore_vendor_for_speech_sherpa_or_keep_asr_sidecar_non_default_and_gate_explicit_sherpa_build",
+          "resolved_path": "/mnt/data/build00r1_work/vendor/sherpa-rs-main/crates/sherpa-rs",
+          "resolved_path_relative_to_root": "vendor/sherpa-rs-main/crates/sherpa-rs",
+          "section": "dependencies",
+          "vendor_expected_but_absent": true,
+          "workspace_member": true
+        }
+      ],
+      "package": "asr_sidecar",
+      "recommended_action": "do_not_silently_exclude; restore vendor for explicit speech_sherpa builds or keep ASR sidecar isolated from default product build with receipt",
+      "speech_sherpa_feature_expected": true
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/audio_kernel/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/audio_kernel",
+      "missing_path_dependencies": [],
+      "package": "audio_kernel"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/base_train/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/base_train",
+      "missing_path_dependencies": [],
+      "package": "base_train"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/burn_webgpu_backend/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/burn_webgpu_backend",
+      "missing_path_dependencies": [],
+      "package": "burn_webgpu_backend"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/lora_train/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/lora_train",
+      "missing_path_dependencies": [],
+      "package": "lora_train"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/model_core/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/model_core",
+      "missing_path_dependencies": [],
+      "package": "model_core"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/native_host/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/native_host",
+      "missing_path_dependencies": [],
+      "package": "native_host"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/orchestrator_local/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/orchestrator_local",
+      "missing_path_dependencies": [],
+      "package": "orchestrator_local"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/policy/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/policy",
+      "missing_path_dependencies": [],
+      "package": "policy"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/runtime/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/runtime",
+      "missing_path_dependencies": [],
+      "package": "runtime"
+    },
+    {
+      "classification": "legacy_workspace_member_non_default",
+      "default_member": false,
+      "manifest": "crates/runtime_unz/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/runtime_unz",
+      "missing_path_dependencies": [],
+      "package": "runtime_unz_legacy"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/text_kernel/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/text_kernel",
+      "missing_path_dependencies": [],
+      "package": "text_kernel"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/tokenizer_core/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/tokenizer_core",
+      "missing_path_dependencies": [],
+      "package": "tokenizer_core"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/tokenizer_import/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/tokenizer_import",
+      "missing_path_dependencies": [],
+      "package": "tokenizer_import"
+    },
+    {
+      "classification": "active_default_member",
+      "default_member": true,
+      "manifest": "crates/train_data/Cargo.toml",
+      "manifest_exists": true,
+      "member": "crates/train_data",
+      "missing_path_dependencies": [],
+      "package": "train_data"
+    }
+  ],
+  "non_default_member_count": 2,
+  "patch_id": "16AI-QW-38G-R6A-BUILD-00-R1",
+  "workspace_member_count": 17
+}

@@ -1,0 +1,43 @@
+{
+  "patch_id": "QW-52C-R1",
+  "base_patch": "QW-52C",
+  "entry_added": {
+    "entry_id": "shadow_rerank_top1_diff_audit",
+    "entry_family": "shadow_rerank_dataset_replay_audit"
+  },
+  "registry_entry_count_before": 19,
+  "registry_entry_count_after": 20,
+  "summary": {
+    "sample_count": 5,
+    "supervised_audit_eligible_count": 3,
+    "same_top1_count": 1,
+    "different_top1_count": 3,
+    "beneficial_diff_count": 1,
+    "risky_diff_count": 1,
+    "neutral_diff_count": 0,
+    "review_only_count": 1,
+    "unavailable_count": 1,
+    "hard_ban_count": 0,
+    "token_selection_change_count": 0,
+    "mean_shadow_improvement_score": 0.18000000000000002,
+    "mean_shadow_regression_score": 0.145,
+    "mean_shadow_net_benefit_score": 0.035000000000000024,
+    "audit_pass": true
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

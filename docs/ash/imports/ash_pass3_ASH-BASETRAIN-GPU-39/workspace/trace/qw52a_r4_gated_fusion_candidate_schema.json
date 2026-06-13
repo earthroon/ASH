@@ -1,0 +1,47 @@
+{
+  "patch_id": "QW-52A-R4",
+  "title": "Cheonjiin Adapter Gated Fusion Candidate / No Default Apply Seal",
+  "base_patch": "QW-52A-R3",
+  "candidate_field": "cheonjiin_gated_fusion_candidate",
+  "required_policy": {
+    "gate_default": 0.0,
+    "runtime_default_apply": false,
+    "hidden_state_fusion": false,
+    "residual_stream_mutation": false,
+    "lm_head_input_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_ban_added": false
+  },
+  "trace_shape": {
+    "fusion_candidate": [
+      "module",
+      "available",
+      "formula",
+      "alpha_default",
+      "gate_default",
+      "runtime_default_apply",
+      "controlled_apply_required",
+      "operator_approval_required"
+    ],
+    "candidate": [
+      "rank",
+      "token_id",
+      "piece",
+      "is_selected",
+      "projection_available",
+      "alignment_available",
+      "gate_policy",
+      "shadow_fusion",
+      "policy"
+    ],
+    "summary": [
+      "steps_inspected",
+      "candidates_inspected",
+      "fusion_candidate_available",
+      "gate_default_zero_count",
+      "runtime_default_apply_false_count",
+      "runtime_hidden_mutation_detected"
+    ]
+  }
+}

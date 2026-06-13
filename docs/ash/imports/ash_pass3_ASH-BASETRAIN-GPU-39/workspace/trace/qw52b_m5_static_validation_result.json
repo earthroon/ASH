@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-52B-M5",
+  "status": "PASS_STATIC_VALIDATION",
+  "json_files_valid": true,
+  "zip_integrity_checked": true,
+  "detector_count_before": 13,
+  "detector_count_after": 14,
+  "crate_added_files": [
+    "crates/model_core/src/qwave_signature_repeat_guard.rs",
+    "crates/model_core/src/bin/qw52b_m5_signature_repeat_validate.rs"
+  ],
+  "patch_added_crate_js_ts_files": [],
+  "crate_js_ts_policy_pass": true,
+  "runtime_apply": false,
+  "hidden_state_mutation": false,
+  "logit_mutation": false,
+  "sampler_mutation": false,
+  "token_rank_mutation": false,
+  "token_selection_mutation": false,
+  "token_ban": false,
+  "memory_mutation": false,
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE",
+  "runtime_probe": "NOT_RUN_CARGO_UNAVAILABLE",
+  "fixture_risk_levels": {
+    "normal_diverse_signature_window": "None",
+    "surface_piece_repeat_guard": "High",
+    "qwave_signature_repeat_without_piece_repeat": "Critical",
+    "transition_ping_pong_repeat": "Critical",
+    "missing_all_hash_inputs": "Unavailable"
+  }
+}

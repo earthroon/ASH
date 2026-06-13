@@ -1,0 +1,25 @@
+{
+  "patch_id": "ASH-FT-12",
+  "kind": "required_handle_lookup_receipt",
+  "required_handles": [
+    {
+      "tensor_key": "model.embed_tokens.weight",
+      "handle_found": true,
+      "handle_kind": "metadata_descriptor"
+    },
+    {
+      "tensor_key": "lm_head.weight",
+      "handle_found": true,
+      "handle_kind": "metadata_descriptor"
+    }
+  ],
+  "family_handle_coverage": {
+    "embedding": true,
+    "lm_head": true,
+    "attention": true,
+    "mlp": true,
+    "norm": true
+  },
+  "operator_review_required": false,
+  "lookup_status": "PASS"
+}

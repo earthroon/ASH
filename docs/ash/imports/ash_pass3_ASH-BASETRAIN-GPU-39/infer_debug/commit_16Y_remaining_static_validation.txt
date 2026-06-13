@@ -1,0 +1,57 @@
+## row_gather
+crates/model_core/src/native_wgpu.rs:485:    embedding_row_gather_enabled: bool,
+crates/model_core/src/native_wgpu.rs:487:    last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
+crates/model_core/src/native_wgpu.rs:1387:        use_embedding_row_gather: bool,
+crates/model_core/src/native_wgpu.rs:1432:        if use_embedding_row_gather {
+crates/model_core/src/native_wgpu.rs:1442:            !use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1453:            embedding_row_gather_enabled: use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1455:            last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
+crates/model_core/src/native_wgpu.rs:1496:            use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1620:            .expect("failed to materialize input ids for row_gather embedding");
+crates/model_core/src/native_wgpu.rs:1637:            .expect("row_gather embedding requires full checkpoint execution weights");
+crates/model_core/src/native_wgpu.rs:1646:                "row_gather token id out of vocab: {} >= {}",
+crates/model_core/src/native_wgpu.rs:1655:        if let Ok(mut slot) = self.last_embedding_row_gather_bytes.lock() {
+crates/model_core/src/native_wgpu.rs:1659:            "[native-embedding-row-gather] mode=row_gather prompt_len={} hidden={} bytes={} unique_tokens={} full_embedding_upload_skipped=true full_bytes={}",
+crates/model_core/src/native_wgpu.rs:1676:        if self.embedding_row_gather_enabled {
+crates/model_core/src/native_wgpu.rs:1727:        if self.embedding_row_gather_enabled {
+crates/model_core/src/reference_checkpoint.rs:1147:        // Commit 16Y-4: row_gather mode must not allocate the full [vocab, hidden]
+crates/model_core/src/reference_checkpoint.rs:1152:            "model.embed_tokens.weight.placeholder_row_gather",
+crates/runtime/src/infer.rs:462:            Self::RowGather => "row_gather",
+crates/runtime/src/infer.rs:469:            "row_gather" | "rowGather" | "gather" => Self::RowGather,
+crates/runtime/src/infer.rs:494:    pub embedding_row_gather_bytes: Option<usize>,
+crates/runtime/src/infer.rs:520:            embedding_row_gather_bytes: None,
+crates/runtime/src/infer.rs:579:            embedding_row_gather_bytes: None,
+crates/runtime/src/infer.rs:2317:            let native_use_embedding_row_gather = native_effective_embedding_mode == NativeEmbeddingMode::RowGather;
+crates/runtime/src/infer.rs:2319:                "[16Y-3/4][native-loader] vocab_projection_effective={} use_vocab_atlas={} embedding_effective={} use_row_gather={} tile_size={} full_vocab_bytes={} max_single_buffer={}",
+crates/runtime/src/infer.rs:2323:                native_use_embedding_row_gather,
+crates/runtime/src/infer.rs:2335:                native_use_embedding_row_gather,
+crates/runtime/src/infer.rs.bak_16Y_remaining:462:            Self::RowGather => "row_gather",
+crates/runtime/src/infer.rs.bak_16Y_remaining:469:            "row_gather" | "rowGather" | "gather" => Self::RowGather,
+crates/orchestrator_local/src/infer_entry.rs:395:    output_json.insert("native_embedding_row_gather_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+crates/orchestrator_local/src/infer_entry.rs:764:    response_json.insert("nativeEmbeddingRowGatherBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+
+
+## native-embedding-row-gather
+crates/model_core/src/native_wgpu.rs:1434:                "[native-embedding-row-gather] full_embedding_upload_skipped=true full_bytes={}",
+crates/model_core/src/native_wgpu.rs:1659:            "[native-embedding-row-gather] mode=row_gather prompt_len={} hidden={} bytes={} unique_tokens={} full_embedding_upload_skipped=true full_bytes={}",
+
+
+## native-vocab-atlas-cache
+crates/model_core/src/native_wgpu.rs:460:        "[native-vocab-atlas-cache] action=build tile_count={} vocab={} hidden={} tile_vocab={} full_vocab_bytes={}",
+
+
+## top_k_tile_candidates
+crates/model_core/src/native_wgpu.rs:368:fn top_k_tile_candidates(
+crates/model_core/src/native_wgpu.rs:1783:            atlas_top_k_candidates.extend(top_k_tile_candidates(
+
+
+## nativeSamplingMode
+crates/orchestrator_local/src/infer_entry.rs:766:    response_json.insert("nativeSamplingMode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+
+
+## load_full_checkpoint_into_model_with_upload_options
+crates/model_core/src/native_wgpu.rs:1438:        let model = load_full_checkpoint_into_model_with_upload_options::<NativeInferenceBackend>(
+crates/model_core/src/reference_checkpoint.rs:1100:pub fn load_full_checkpoint_into_model_with_upload_options<B: Backend>(
+crates/model_core/src/reference_checkpoint.rs:1175:    load_full_checkpoint_into_model_with_upload_options::<B>(spec, full, device, true, upload_full_lm_head)
+crates/model_core/src/reference_checkpoint.rs:1179:    load_full_checkpoint_into_model_with_upload_options::<B>(spec, full, device, true, true)
+

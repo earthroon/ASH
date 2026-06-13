@@ -1,0 +1,19 @@
+{
+  "schema_id": "qw52c_r13_s6_r0_r3_r1_runtime_composite_perf_guard_namespace_schema",
+  "schema_version": "1.0.0",
+  "patch_id": "QW-52C-R13-S6-R0-R3-R1",
+  "required_static_checks": [
+    "qualified_orchestrator_audit_call_present",
+    "targeted_e0659_static_count"
+  ],
+  "forbidden_true_fields": [
+    "runtime_apply_allowed",
+    "promotion_eligible",
+    "token_selection_mutation_allowed",
+    "token_rank_mutation_allowed",
+    "logit_mutation_allowed",
+    "sampler_mutation_allowed",
+    "real_trace_fabricated",
+    "fixture_as_real_runtime_trace"
+  ]
+}

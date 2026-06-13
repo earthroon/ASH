@@ -1,0 +1,28 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-01",
+  "prompt_suite": "workspace/eval00_prompt_suite.jsonl",
+  "profile_matrix": "workspace/eval00_matrix.json",
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "profiles": [
+    "M01_static_safe",
+    "M02_minp_c2b",
+    "M04_dynamic_controlled",
+    "M06_dynamic_controlled_salad04_overlay",
+    "M09_full_guard_with_safe_stop_surface"
+  ],
+  "canonical_backend": "B00_cpu_oracle",
+  "candidate_backends": [
+    "B01_standard_runtime",
+    "B02_burn_webgpu_runtime",
+    "B03_webgpu_gpu_sampler_trace",
+    "B04_fallback_runtime"
+  ],
+  "max_new_tokens": 96,
+  "step_trace_required": true,
+  "compare_top_k": 5,
+  "strict_replay": false
+}

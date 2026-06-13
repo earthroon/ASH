@@ -1,0 +1,53 @@
+{
+  "patch_id": "QW-53A",
+  "base_patch": "QW-52B-C3",
+  "entries_before": 18,
+  "entries_after": 19,
+  "added_entry": {
+    "entry_id": "salad_alignment_dataset_receipt",
+    "entry_family": "normal_collapse_alignment_dataset",
+    "available": true,
+    "input_sources": [
+      "QW-52B.DecodeDetectorRegistryTrace",
+      "QW-52B-M1.MirrorResonanceTrace",
+      "QW-52B-M2.SelfEchoDetectorTrace",
+      "QW-52B-M3.ResidualLoopEligibilityTrace",
+      "QW-52B-M4.QWavePhaseEscapeCandidateTrace",
+      "QW-52B-M5.QWaveSignatureRepeatGuardTrace",
+      "QW-52B-M6.StablePhraseQuarantineMemoryReceipt",
+      "QW-52B-C1.CheonjiinXyzTensorProjectionTrace",
+      "QW-52B-C2.CjiCairoCounterexampleTrace",
+      "QW-52B-C3.CjiPlosiveForceFixtureTrace"
+    ],
+    "risk_score": null,
+    "risk_level": "EvidenceOnly",
+    "evidence": {
+      "dataset_schema_version": "salad_alignment_dataset_v1",
+      "dataset_path": "artifacts/qw53a_salad_alignment_dataset.jsonl",
+      "manifest_path": "artifacts/qw53a_salad_alignment_dataset_manifest.json",
+      "sample_count": 5,
+      "normal_count": 1,
+      "salad_count": 1,
+      "collapse_count": 1,
+      "review_count": 1,
+      "unlabeled_count": 1,
+      "supervised_eval_eligible_count": 3
+    },
+    "action_allowed": false,
+    "mutation_allowed": false
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

@@ -1,0 +1,4 @@
+{"id": "P01_high_risk_repeat_tail", "prompt": "같은 어미가 반복되는 짧은 한국어 응답을 안전하게 복구한다.", "max_new_tokens": 96, "mode": "controlled_candidate"}
+{"id": "P02_josa_loop_probe", "prompt": "조사/어미 루프가 발생했을 때 verified snapshot rollback 후보를 확인한다.", "max_new_tokens": 96, "mode": "controlled_candidate"}
+{"id": "P03_byte_piece_panic", "prompt": "byte-piece leak 위험에서 safe resample 실패 시 safe stop 후보를 확인한다.", "max_new_tokens": 64, "mode": "strict_candidate"}
+{"id": "P04_low_risk_denied", "prompt": "정상 문장은 SALAD-03B gate에서 rollback이 deny되어야 한다.", "max_new_tokens": 64, "mode": "negative_control"}

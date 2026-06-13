@@ -1,0 +1,37 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R6",
+  "patch_name": "Layer21 Head Source Token Attribution / Head2 Position-Origin Seal",
+  "status": "STATIC_VALIDATION_PASS",
+  "compile_executed_in_container": false,
+  "checks": {
+    "native_r6_env_gate": true,
+    "native_r6_trace_path": true,
+    "native_r6_target_head": true,
+    "native_compare_positions": true,
+    "native_source_token_id_resolution": true,
+    "native_r6_append_jsonl": true,
+    "decode_prefill_passes_prompt_ids": true,
+    "decode_r5_signature_source_tokens": true,
+    "decode_decode_signature_optional_source_tokens": true,
+    "runner_exists": true,
+    "runner_token_piece_map": true,
+    "runner_position20_55": true,
+    "runner_split_written": true,
+    "runner_source_origin_written": true,
+    "runner_no_mutation_guard": true,
+    "static_validation_pass": true
+  },
+  "modified_files": [
+    "crates/model_core/src/native_wgpu.rs",
+    "crates/model_core/src/decode_state.rs",
+    "scripts/run_16AI_QW_38G_R6A_R12A_R6_layer21_head_source_token_attribution.ps1",
+    "patch_reports/16AI-QW-38G-R6A-R12A-R6_layer21_head_source_token_attribution.md",
+    "acceptance_reports/16AI-QW-38G-R6A-R12A-R6_layer21_head_source_token_attribution.md"
+  ],
+  "mutation_performed": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

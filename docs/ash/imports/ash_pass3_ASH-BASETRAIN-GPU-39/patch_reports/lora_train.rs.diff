@@ -1,0 +1,115 @@
+--- orig/crates/lora_train/src/bin/lora_train.rs	2026-04-20 00:53:22.000000000 +0000
++++ src/crates/lora_train/src/bin/lora_train.rs	2026-04-19 11:55:29.121147070 +0000
+@@ -52,45 +52,37 @@
+ 
+     let device = WgpuDevice::default();
+ 
+-    if plan.plan_kind.is_module_local() {
+-    if let Some(existing_manifest) = &config.dataset.feature_store_manifest {
+-        println!("[lora_train] using existing module-local feature store manifest: {existing_manifest}");
+-
+-        let report = run_module_lora_training_loop::<TrainBackend>(
++    if config.training.bridge_dump_only && plan.plan_kind.is_module_local() {
++        let (manifest, report, _stats) = extract_module_local_feature_store_from_jsonl_paths(
+             &config,
+             &plan,
+-            &device,
++            &train_paths,
++            config.dataset.max_samples,
++            config.dataset.max_seq_len,
+         )?;
+ 
++        let feature_manifest_path = PathBuf::from(&config.checkpoints.output_dir)
++            .join("module_local_feature_store_manifest.json");
++        manifest.save(&feature_manifest_path)?;
++
+         println!(
+-            "[lora_train] module_lora training complete targets={} feature_batches={}",
+-            report.targets.len(),
+-            report.feature_batches
++            "[lora_train] module-local bridge_dump_only complete rows={} total_tokens={} max_seq_len={} manifest={}",
++            manifest.num_rows,
++            manifest.total_tokens,
++            manifest.max_seq_len,
++            feature_manifest_path.display(),
++        );
++        println!(
++            "[lora_train] module-local bridge_dump_only stats samples_seen={} skipped={} selected_tokens_total={} feature_batches={}",
++            report.samples_seen,
++            report.samples_skipped,
++            report.selected_tokens_total,
++            report.feature_batches,
+         );
+-        for target in report.targets {
+-            println!(
+-                "[lora_train] target={} steps={} batches={} tokens={} final_loss={:.6} checkpoint_written={}",
+-                target.target_key,
+-                target.steps,
+-                target.batches_seen,
+-                target.tokens_seen,
+-                target.final_loss,
+-                target.checkpoint_written,
+-            );
+-        }
+ 
+         return Ok(());
+     }
+ 
+-    let report = run_module_lora_target_bundle(&config, &plan, &train_paths, &device)?;
+-    println!(
+-        "[lora_train] module_lora bundle complete targets={} feature_batches={}",
+-        report.targets.len(),
+-        report.feature_batches
+-    );
+-    return Ok(());
+-}
+-
+     if config.training.bridge_dump_only {
+         #[derive(Debug)]
+         struct PendingSample {
+@@ -376,6 +368,45 @@
+         return Ok(());
+     }
+ 
++    if plan.plan_kind.is_module_local() {
++        if let Some(existing_manifest) = &config.dataset.feature_store_manifest {
++            println!("[lora_train] using existing module-local feature store manifest: {existing_manifest}");
++
++            let report = run_module_lora_training_loop::<TrainBackend>(
++                &config,
++                &plan,
++                &device,
++            )?;
++
++            println!(
++                "[lora_train] module_lora training complete targets={} feature_batches={}",
++                report.targets.len(),
++                report.feature_batches
++            );
++            for target in report.targets {
++                println!(
++                    "[lora_train] target={} steps={} batches={} tokens={} final_loss={:.6} checkpoint_written={}",
++                    target.target_key,
++                    target.steps,
++                    target.batches_seen,
++                    target.tokens_seen,
++                    target.final_loss,
++                    target.checkpoint_written,
++                );
++            }
++
++            return Ok(());
++        }
++
++        let report = run_module_lora_target_bundle(&config, &plan, &train_paths, &device)?;
++        println!(
++            "[lora_train] module_lora bundle complete targets={} feature_batches={}",
++            report.targets.len(),
++            report.feature_batches
++        );
++        return Ok(());
++    }
++
+     if let Some(existing_manifest) = &config.dataset.feature_store_manifest {
+         println!("[lora_train] using existing feature store manifest: {existing_manifest}");
+ 

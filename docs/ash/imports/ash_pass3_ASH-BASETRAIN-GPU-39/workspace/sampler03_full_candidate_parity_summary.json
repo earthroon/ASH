@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-03",
+  "status": "GPU_CANDIDATE_TRACE_BUFFER_AND_FULL_CANDIDATE_SET_PARITY_BAKED_STATIC",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "base_artifact": "ash_pass3_16AI-QW-38G-R6A-SAMPLER-02_runtime_parity_receipt_baked.zip",
+  "parity_mode_default": "Off",
+  "trace_top_n_default": 64,
+  "candidate_trace_buffer": {
+    "enabled_modes": [
+      "ProbeOnly",
+      "Strict"
+    ],
+    "records_active_ids": true,
+    "records_final_ids": true,
+    "records_counts": true,
+    "records_overflow_flags": true,
+    "records_min_p_threshold": true,
+    "records_active_stats": true,
+    "trace_order": "shader_scan_order; receipt comparison sorts ids before parity",
+    "notes": "Trace buffer is attached to multistage topp_scan path; legacy-only path may not provide candidate_trace and will remain partial unless routed through multistage."
+  },
+  "gpu_bindings_added": {
+    "gpu_sampling_topp_scan.wgsl": {
+      "binding_7": "candidate_trace_header storage read_write",
+      "binding_8": "candidate_trace_entries storage read_write"
+    }
+  },
+  "rust_structs_added": [
+    "GpuCandidateTraceHeaderRaw",
+    "GpuCandidateTraceEntryRaw",
+    "GpuCandidateTraceEntry",
+    "GpuCandidateTrace"
+  ],
+  "parity_pass_requires": [
+    "active_ids_match",
+    "final_ids_match",
+    "active_count_match",
+    "final_count_match",
+    "threshold_match",
+    "recovery_mode_match"
+  ],
+  "selected_token_required_for_pass": false,
+  "strict_failure_policy": "demote_to_cpu_oracle_on_FAIL_status_for_CPU-row GPU sampling paths",
+  "receipt_path": "workspace/sampler03_full_candidate_parity_receipt.jsonl",
+  "execution_validation": "NOT_RUN_cargo_rustc_webgpu_unavailable",
+  "non_scope": [
+    "deltak_qwave_weighted_minp",
+    "tokenizer_decode_ssot",
+    "cpu_oracle_formula_change",
+    "context_router"
+  ],
+  "implemented_strict_demote_hook": true
+}

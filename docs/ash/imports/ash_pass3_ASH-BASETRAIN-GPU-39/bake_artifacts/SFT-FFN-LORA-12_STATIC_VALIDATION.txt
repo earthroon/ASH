@@ -1,0 +1,26 @@
+SFT-FFN-LORA-12 STATIC VALIDATION
+
+Checked:
+- ash_core post-switch health module exists
+- ash_core LORA-12 tests exist
+- burn_webgpu_backend post-switch health boundary exists
+- burn_webgpu_backend boundary test exists
+- ash_core lib.rs exports sft_ffn_lora_post_switch_health
+- burn_webgpu_backend lib.rs exports ffn_lora_post_switch_health
+- new Rust files have balanced braces/brackets/parentheses
+- default config keeps current_pointer_update, promotion_apply, rollback_execution closed
+- default config keeps SFT training, gradient write, optimizer step closed
+- acceptance report exists
+- bake report exists
+- file digests generated
+
+Runtime status:
+- cargo/rustc/rustfmt are unavailable in this environment
+- cargo test is pending on local Rust toolchain
+
+Suggested local commands:
+  cargo test -p ash_core sft_ffn_lora_12 -- --nocapture
+  cargo test -p ash_core sft_ffn_lora_11 -- --nocapture
+  cargo test -p ash_core sft_ffn_texture_load_guard -- --nocapture
+  cargo test -p ash_core sft_ffn_lora_10 -- --nocapture
+  cargo test -p burn_webgpu_backend ffn_lora_post_switch_health -- --nocapture

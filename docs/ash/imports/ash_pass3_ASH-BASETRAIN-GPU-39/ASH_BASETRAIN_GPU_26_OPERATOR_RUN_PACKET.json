@@ -1,0 +1,7 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-26",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_26_gpu_local_loss_promotion_gate --jobs 1",
+  "recommended_promotion_gate_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_26_gpu_local_loss_promotion_gate",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-27",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-26A"
+}

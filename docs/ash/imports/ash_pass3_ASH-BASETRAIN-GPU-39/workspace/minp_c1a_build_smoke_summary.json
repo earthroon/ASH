@@ -1,0 +1,29 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
+  "status": "WEIGHTED_MINP_BUILD_AND_WGSL_SMOKE_BAKED_STATIC_RECEIPTS",
+  "input_patch": "16AI-QW-38G-R6A-MINP-C1",
+  "cargo_check": "NOT_RUN",
+  "cargo_test": "NOT_RUN",
+  "rustfmt": "NOT_RUN",
+  "wgsl_compile": "NOT_RUN",
+  "static_checks": "PASS",
+  "semantic_prior_default_enabled": false,
+  "strict_ready_required": true,
+  "zero_source_fallback_required": true,
+  "not_run_policy": "NOT_RUN is not PASS; execution remains judgment-unavailable until run in Rust/WebGPU environment",
+  "receipts": [
+    "workspace/minp_c1a_wgsl_compile_receipt.json",
+    "workspace/minp_c1a_layout_receipt.json",
+    "workspace/minp_c1a_zero_source_fallback_receipt.json",
+    "workspace/minp_c1a_weighted_fixture_receipt.json",
+    "workspace/minp_c1a_strict_readiness_guard_receipt.json",
+    "workspace/minp_c1a_static_checks.json"
+  ],
+  "non_scope": [
+    "qwave_deltak_score_provider",
+    "semantic_prior_default_enable",
+    "shader_formula_change",
+    "context_router",
+    "lora_training"
+  ]
+}

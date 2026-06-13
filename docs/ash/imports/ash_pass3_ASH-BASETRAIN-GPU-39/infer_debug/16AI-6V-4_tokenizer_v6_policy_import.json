@@ -1,0 +1,118 @@
+{
+  "approved_cases": [
+    {
+      "branch_commit_allowed": true,
+      "case_id": "ko_descriptive_sentence",
+      "dpo_candidate": true,
+      "dpo_status": "provisional",
+      "fallback_if_not_matched": "v5-baseline",
+      "gpu_shadow_allowed": true,
+      "quality_decision": "AssembledImproved",
+      "quality_delta": 5.0,
+      "selected_tokenizer_mode": "AssembledShadow",
+      "source_commit_gate": "16AI-6I PASS_GATED_COMMIT_PROBE",
+      "source_gpu_gate": "16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8",
+      "source_quality_gate": "16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED",
+      "v6_runtime_modes_allowed": [
+        "v6-branch-local",
+        "v6-gpu-shadow"
+      ],
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "branch_commit_allowed": true,
+      "case_id": "ko_particle_short",
+      "dpo_candidate": true,
+      "dpo_status": "provisional",
+      "fallback_if_not_matched": "v5-baseline",
+      "gpu_shadow_allowed": true,
+      "quality_decision": "AssembledImproved",
+      "quality_delta": 5.0,
+      "selected_tokenizer_mode": "AssembledShadow",
+      "source_commit_gate": "16AI-6I PASS_GATED_COMMIT_PROBE",
+      "source_gpu_gate": "16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8",
+      "source_quality_gate": "16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED",
+      "v6_runtime_modes_allowed": [
+        "v6-branch-local",
+        "v6-gpu-shadow"
+      ],
+      "wrapper": "dialogue-ko"
+    }
+  ],
+  "inputs": {
+    "facade_json": "infer_debug/16AI-6V-3_tokenizer_v6_facade_probe.json",
+    "gated_commit_json": "infer_debug/16AI-6I_dialogue_ko_gated_commit_probe.json",
+    "gpu_replay_json": "infer_debug/16AI-6J-R2_gpu_shadow_replay8.json",
+    "quality_policy_json": "infer_debug/16AI-6H-R2_quality_policy.json",
+    "v6_manifest": "artifacts/tokenizer_manifest_v6_compat.json"
+  },
+  "policy_conflicts": [],
+  "run": {
+    "checkpoint_required": false,
+    "embedding_resize_required": false,
+    "generation": false,
+    "global_default_commit": false,
+    "gpu_default": false,
+    "gpu_execution": false,
+    "id": "16AI-6V-4",
+    "kind": "tokenizer_v6_policy_import",
+    "new_token_ids_created": false,
+    "registry_created": true,
+    "runtime_changed": false,
+    "token_ids_mutated": false,
+    "vocab_augmented": false
+  },
+  "source_gates": [
+    {
+      "diagnostics": [
+        "status_candidate:summary.acceptance_status=PASS_TOKENIZER_V6_FACADE"
+      ],
+      "expected_status": "PASS_TOKENIZER_V6_FACADE",
+      "name": "16AI-6V-3",
+      "passed": true,
+      "status": "PASS_TOKENIZER_V6_FACADE",
+      "status_source": "summary.acceptance_status"
+    },
+    {
+      "diagnostics": [
+        "status_candidate:summary.acceptance_status=PASS_POLICY_QUALITY_INTEGRATED"
+      ],
+      "expected_status": "PASS_POLICY_QUALITY_INTEGRATED",
+      "name": "16AI-6H-R2",
+      "passed": true,
+      "status": "PASS_POLICY_QUALITY_INTEGRATED",
+      "status_source": "summary.acceptance_status"
+    },
+    {
+      "diagnostics": [
+        "status_candidate:summary.acceptance_status=PASS_GATED_COMMIT_PROBE"
+      ],
+      "expected_status": "PASS_GATED_COMMIT_PROBE",
+      "name": "16AI-6I",
+      "passed": true,
+      "status": "PASS_GATED_COMMIT_PROBE",
+      "status_source": "summary.acceptance_status"
+    },
+    {
+      "diagnostics": [
+        "status_candidate:summary.acceptance_status=PASS_GPU_SHADOW_REPLAY8"
+      ],
+      "expected_status": "PASS_GPU_SHADOW_REPLAY8",
+      "name": "16AI-6J-R2",
+      "passed": true,
+      "status": "PASS_GPU_SHADOW_REPLAY8",
+      "status_source": "summary.acceptance_status"
+    }
+  ],
+  "summary": {
+    "acceptance_status": "PASS_TOKENIZER_V6_POLICY_IMPORT",
+    "approved_case_count": 2,
+    "branch_local_allowed_count": 2,
+    "dpo_candidate_count": 2,
+    "fallback_policy_count": 5,
+    "global_commit_allowed_count": 0,
+    "gpu_shadow_allowed_count": 2,
+    "policy_conflict_count": 0,
+    "source_gate_fail_count": 0
+  }
+}

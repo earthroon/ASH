@@ -1,0 +1,127 @@
+{
+  "patch_id": "QW-52C-R13",
+  "title": "Runtime Shadow Observation Soak / Long Horizon No Apply Seal",
+  "base_patch": "QW-52C-R12",
+  "status": "PASS_STATIC_RUNTIME_SHADOW_OBSERVATION_SOAK_LONG_HORIZON_NO_APPLY",
+  "soak_policy": {
+    "soak_policy_version": "runtime_shadow_observation_soak_v1",
+    "long_horizon_policy_version": "long_horizon_no_apply_v1",
+    "no_apply_policy_version": "runtime_shadow_soak_no_apply_v1",
+    "no_promotion_policy_version": "runtime_shadow_soak_no_promotion_v1",
+    "min_soak_windows": 5,
+    "min_total_observation_samples": 25,
+    "min_supervised_soak_eligible": 15,
+    "max_total_risky_diff_count": 0,
+    "max_total_stable_broken_count": 0
+  },
+  "summary": {
+    "soak_completed": true,
+    "soak_window_count": 5,
+    "total_observation_sample_count": 25,
+    "supervised_soak_eligible_count": 15,
+    "total_beneficial_diff_count": 8,
+    "total_risky_diff_count": 0,
+    "total_neutral_diff_count": 5,
+    "total_review_only_count": 5,
+    "total_unavailable_count": 0,
+    "total_stable_broken_count": 0,
+    "total_token_rank_mutation_count": 0,
+    "total_token_selection_mutation_count": 0,
+    "total_logit_mutation_count": 0,
+    "total_sampler_mutation_count": 0,
+    "total_shadow_result_applied_count": 0,
+    "mutation_invariant_pass": true,
+    "long_horizon_clean": true,
+    "no_apply_seal_active": true,
+    "no_promotion_seal_active": true,
+    "promotion_eligible": false,
+    "runtime_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "proceed_to_promotion_review_gate": true,
+    "recommended_next_patch": "QW-52C-R14"
+  },
+  "drift_report": {
+    "riskydiff_drift_detected": false,
+    "beneficial_decay_detected": false,
+    "stable_break_drift_detected": false,
+    "review_uncertainty_growth_detected": false,
+    "mutation_invariant_drift_detected": false,
+    "first_risky_diff_window_id": null,
+    "first_stable_broken_window_id": null,
+    "first_mutation_failure_window_id": null,
+    "drift_status": "Stable",
+    "drift_warnings": []
+  },
+  "fixture_results": [
+    {
+      "case_id": "clean_long_horizon_pass_no_apply",
+      "status": "PASS",
+      "soak_status": "PassNoApply"
+    },
+    {
+      "case_id": "late_risky_diff_warn_no_apply",
+      "status": "PASS",
+      "soak_status": "WarnNoApply"
+    },
+    {
+      "case_id": "beneficial_decay_warn_no_apply",
+      "status": "PASS",
+      "beneficial_decay_detected": true
+    },
+    {
+      "case_id": "long_horizon_token_mutation_fails",
+      "status": "PASS",
+      "soak_status": "FailInvariant"
+    },
+    {
+      "case_id": "missing_r12_audit_unavailable",
+      "status": "PASS",
+      "soak_status": "Unavailable"
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "runtime_default_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "long_horizon_soak": true,
+    "soak_result_applied": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_soak_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R14",
+    "QW-52C-R13-R1",
+    "QW-52D"
+  ],
+  "notes": [
+    "R13 performs long-horizon runtime shadow observation soak.",
+    "Clean soak does not grant promotion.",
+    "No runtime apply is allowed.",
+    "No weight profile is committed.",
+    "No shadow result is applied."
+  ]
+}

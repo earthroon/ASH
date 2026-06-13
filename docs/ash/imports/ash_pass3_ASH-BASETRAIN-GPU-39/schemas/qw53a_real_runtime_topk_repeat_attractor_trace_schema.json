@@ -1,0 +1,26 @@
+{
+  "schema_id": "qw53a_real_runtime_topk_repeat_attractor_trace",
+  "schema_version": "1.0.0",
+  "patch_id": "QW-53A",
+  "base_patch": "QW-52C-R13-S6",
+  "input_trace_format": "jsonl",
+  "trace_path": "workspace/runtime_traces/qw53a_real_runtime_topk_repeat_attractor_trace.jsonl",
+  "s6_compat_trace_path": "workspace/runtime_traces/qw52c_r13_s6_runtime_topk_trace_batch.jsonl",
+  "accepted_evidence_kinds": ["RealRuntimeTopKTrace"],
+  "forbidden_true_fields": [
+    "shadow_result_applied",
+    "runtime_apply_allowed",
+    "token_selection_mutated",
+    "token_rank_mutated",
+    "logit_mutated",
+    "sampler_mutated"
+  ],
+  "core_runtime_language_ssot": "Rust + WGPU/WGSL only",
+  "typescript_javascript_allowed_scope": "frontend display and command bridge only",
+  "runtime_apply_allowed": false,
+  "runtime_default_apply_allowed": false,
+  "promotion_eligible": false,
+  "weight_commit_allowed": false,
+  "safe_profile_apply_allowed": false,
+  "policy_promotion_allowed": false
+}

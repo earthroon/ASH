@@ -1,0 +1,36 @@
+QW-TOK-03 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok03RuntimeInputPacketReplayConfig: PASS
+QwTok03ReplaySourcePacket: PASS
+QwTok03PacketSchemaValidation: PASS
+QwTok03RunnerSchemaDescriptor: PASS
+QwTok03ReplayPacketResult: PASS
+QwTok03InferSmokeCandidateDescriptor: PASS
+QwTok03ReplayBatchReport: PASS
+QwTok03NoGenerationSeal: PASS
+QwTok03RuntimeInputPacketReplayReport: PASS
+build_qw_tok03_runtime_input_packet_replay_report: PASS
+build_qw_tok03_infer_smoke_candidate_descriptor: PASS
+build_qw_tok03_no_generation_seal: PASS
+build_qw_tok03_default_runtime_input_packet_replay_report: PASS
+expected vocab const 48259: PASS
+default blocks allow_model_inference: false: PASS
+default blocks allow_token_generation: false: PASS
+default blocks allow_sampler_execution: false: PASS
+default blocks allow_qw_selector_execution: false: PASS
+default blocks allow_mcts_execution: false: PASS
+default blocks allow_gpu_queue_submit: false: PASS
+default blocks allow_wgpu_dispatch: false: PASS
+default blocks allow_runtime_state_mutation: false: PASS
+test qw_tok03_runtime_input_packet_replay.rs present: PASS
+test qw_tok03_infer_smoke_candidate.rs present: PASS
+test qw_tok03_runner_schema_contract.rs present: PASS
+test qw_tok03_no_generation_no_sampler.rs present: PASS
+artifacts/qw_tok03_runtime_input_packet_replay_report.json exists: PASS
+artifacts/qw_tok03_infer_smoke_candidate.json exists: PASS
+artifacts/qw_tok03_runner_schema_receipt.json exists: PASS
+workspace/runtime_traces/qw_tok03_runtime_input_packet_replay_trace.jsonl exists: PASS
+workspace/trace/qw_tok03_runtime_input_packet_replay_receipt.json exists: PASS
+no checkpoint/model weight files packaged by QW-TOK-03 artifacts: PASS
+overall: PASS

@@ -1,0 +1,19 @@
+SFT-FFN-LORA-02 STATIC VALIDATION
+
+[OK] Added ash_core module: crates/ash_core/src/sft_ffn_lora_gradient.rs
+[OK] Added ash_core tests: crates/ash_core/tests/sft_ffn_lora_02_backward_gradient_receipt.rs
+[OK] Added backend shell: crates/burn_webgpu_backend/src/ffn_lora_gradient.rs
+[OK] Updated ash_core lib.rs module/export wiring
+[OK] Updated burn_webgpu_backend lib.rs module/export wiring
+[OK] Added acceptance report
+[OK] Added bake report
+[OK] Added static validation report
+[OK] Brace balance checked for added module/test/backend shell
+[WARN] cargo/rustc/rustfmt unavailable in current execution environment; compile validation pending local run
+
+LOCAL VALIDATION COMMANDS:
+  cargo test -p ash_core sft_ffn_lora_02 -- --nocapture
+  cargo test -p ash_core sft_ffn_lora_01 -- --nocapture
+  cargo test -p ash_core sft_ffn_tex_atlas_07 -- --nocapture
+  cargo test -p ash_core sft_ffn_tex_atlas_06 -- --nocapture
+  cargo test -p burn_webgpu_backend ffn_lora_gradient -- --nocapture

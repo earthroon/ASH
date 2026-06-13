@@ -1,0 +1,42 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R2",
+  "candidate_scores": {
+    "pre_final_hidden_direction": {
+      "score": 0.9,
+      "result": "SUPPORTED",
+      "evidence": [
+        "pre_target_cosine=0.18791888654232025 > pre_masked_cosine=0.1708703488111496",
+        "pre_target_dot=6.611507415771484 > pre_masked_dot=5.234622955322266",
+        "pre_target_minus_masked_cosine_delta=0.017048537731170654",
+        "pre_target_minus_masked_dot_delta=1.3768844604492188"
+      ]
+    },
+    "final_norm_direction_amplification": {
+      "score": 0.05,
+      "result": "NOT_SUPPORTED",
+      "evidence": [
+        "target_alignment_gain_pre_to_post=-0.020410731434822083",
+        "target_masked_delta_gain_pre_to_post=-0.00902557373046875",
+        "target cosine and target-minus-masked cosine delta both decreased after final_norm"
+      ]
+    },
+    "final_norm_norm_amplification": {
+      "score": 0.75,
+      "result": "SUPPORTED_AS_MAGNIFIER",
+      "evidence": [
+        "pre_to_post_norm_ratio=1.8101799488067627",
+        "target-minus-masked cosine delta decreased 0.017048537731170654 -> 0.008022964000701904",
+        "target-minus-masked dot delta increased 1.3768844604492188 -> 1.823871612548828"
+      ]
+    },
+    "projection_boundary_interaction": {
+      "score": 0.02,
+      "result": "WEAK_OR_NOT_PRIMARY",
+      "evidence": [
+        "post_to_projection_cosine=1.0",
+        "post_to_projection_l2_delta=0.0",
+        "post_to_projection_norm_ratio=1.0"
+      ]
+    }
+  }
+}

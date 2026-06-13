@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
+  "status": "PASS",
+  "checks": {
+    "smoke_module_exists": true,
+    "lib_declares_minp_c1a_smoke": true,
+    "lib_exports_minp_c1a_smoke": true,
+    "semantic_bias_formula_fixture": true,
+    "zero_source_fallback_fixture": true,
+    "prior_rescue_fixture": true,
+    "banned_token_cannot_resurrect_fixture": true,
+    "semantic_prior_config_exists": true,
+    "cpu_oracle_semantic_prior_path": true,
+    "gpu_uniform_semantic_fields": true,
+    "candidate_trace_v2_fields": true,
+    "topk_qwave_deltak_bindings": true,
+    "topp_qwave_deltak_bindings": true,
+    "select_qwave_deltak_bindings": true,
+    "legacy_zero_source_fallback": true,
+    "weighted_logit_in_topk": true,
+    "weighted_logit_in_topp": true,
+    "weighted_logit_in_select": true,
+    "bias_cap_clamp_cpu": true,
+    "nan_inf_score_guard": true,
+    "strict_ready_default_required": true
+  },
+  "tool_availability": {
+    "cargo": null,
+    "rustc": null,
+    "rustfmt": null
+  },
+  "cargo_check": {
+    "status": "NOT_RUN",
+    "reason": "cargo not available"
+  },
+  "cargo_test": {
+    "status": "NOT_RUN",
+    "reason": "cargo not available"
+  },
+  "rustfmt": {
+    "status": "NOT_RUN",
+    "reason": "rustfmt not available"
+  }
+}

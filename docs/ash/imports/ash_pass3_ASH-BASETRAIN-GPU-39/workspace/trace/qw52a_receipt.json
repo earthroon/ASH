@@ -1,0 +1,34 @@
+{
+  "patch_id": "QW-52A",
+  "base_patch": "QW-50-R0W-A",
+  "status": "STATIC_PASS_RUNTIME_NOT_RUN",
+  "rust_owned": true,
+  "python_injector_only": true,
+  "existing_asset_binding": true,
+  "new_math_rewrite_performed": false,
+  "trace_outputs": {
+    "schema": "workspace/trace/qw52a_candidate_awareness_schema.json",
+    "candidate_awareness_trace": "runtime-generated"
+  },
+  "observed": {
+    "model_core_binder_added": true,
+    "runtime_trace_builder_added": true,
+    "rust_probe_added": true,
+    "rust_validator_added": true,
+    "python_probe_added": false,
+    "python_validator_added": false
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "hidden_state_fusion": false,
+    "adapter_projection_applied": false,
+    "python_trace_mutation": false
+  },
+  "next_candidates": ["QW-52A-R0", "QW-52A-R1", "QW-52A-R2", "QW-52B"]
+}

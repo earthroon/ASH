@@ -1,0 +1,23 @@
+{
+  "candidate_pool_id": "candidate-pool-cps",
+  "candidate_pool_ready_for_rerank": true,
+  "candidates": [
+    {
+      "candidate_id": "candidate-too-long",
+      "candidate_ko": "네가 이런 짓을 했다는 게 정말로 도저히 믿기지 않아.",
+      "profile_id": "profile-low-temp-default"
+    },
+    {
+      "candidate_id": "candidate-readable",
+      "candidate_ko": "믿기지 않아.",
+      "profile_id": "profile-loop-risk-strict"
+    }
+  ],
+  "cue_id": "mock-cue-0003",
+  "decode_session_id": "mock-decode-session-cps",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "duration_ms": 1200,
+  "expected_cps_overflow_detected": true,
+  "expected_selected_candidate_id": "candidate-readable",
+  "patch_id": "16AI-QW-38G-R6A-DECODE-10"
+}

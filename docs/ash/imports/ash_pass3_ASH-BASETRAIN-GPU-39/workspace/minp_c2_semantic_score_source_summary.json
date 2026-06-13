@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2",
+  "status": "QWAVE_DELTAK_TOKEN_SCORE_SOURCE_PROVIDER_DEFINED",
+  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
+  "score_basis": "token_static_prior_v1",
+  "dynamic_context_scoring": false,
+  "qwave_available": true,
+  "deltak_available": true,
+  "score_range": [
+    -1.0,
+    1.0
+  ],
+  "vocab_alignment_required": true,
+  "semantic_prior_default_enabled": false,
+  "requires_sampler04_strict_ready_for_application": true,
+  "non_scope": [
+    "dynamic_context_qwave",
+    "dynamic_context_deltak",
+    "lora_training",
+    "context_router"
+  ]
+}

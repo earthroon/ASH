@@ -1,0 +1,143 @@
+{
+  "patch_id": "QW-52C-R2",
+  "title": "Shadow Rerank RiskyDiff Guard / No Promotion Seal",
+  "base_patch": "QW-52C-R1",
+  "status": "PASS_STATIC_RISKYDIFF_GUARD_NO_PROMOTION",
+  "guard_policy": {
+    "guard_policy_version": "shadow_rerank_riskydiff_guard_v1",
+    "promotion_policy_version": "no_promotion_until_risky_diff_cleared_v1",
+    "allow_promotion_with_risky_diff": false,
+    "max_allowed_risky_diff_count": 0,
+    "min_supervised_audit_eligible": 3,
+    "max_review_only_ratio": 0.4,
+    "max_unavailable_ratio": 0.3,
+    "require_hard_ban_zero": true,
+    "require_token_selection_change_zero": true,
+    "require_runtime_apply_false": true,
+    "required_next_patch_on_block": "QW-52C-R3"
+  },
+  "decision": {
+    "promotion_eligible": false,
+    "guard_triggered": true,
+    "primary_block_reason": "RiskyDiffPresent",
+    "block_reasons": [
+      "RiskyDiffPresent"
+    ],
+    "required_next_patch": "QW-52C-R3",
+    "decision_note": "Promotion is blocked because RiskyDiff or insufficient evidence exists."
+  },
+  "blocked_promotion_targets": [
+    "RuntimeSoftRerank",
+    "WeakLogitCorrection",
+    "EmergencyLoopBrakeDependency",
+    "ThresholdAutoTune",
+    "StablePolicyPromotion",
+    "MemoryWritePolicy"
+  ],
+  "fixture_results": [
+    {
+      "case_id": "risky_diff_blocks_promotion",
+      "status": "PASS",
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "promotion_status": "PromotionBlocked",
+      "block_reasons": [
+        "RiskyDiffPresent"
+      ],
+      "policy_promotion": false,
+      "threshold_autotune": false,
+      "runtime_apply": false
+    },
+    {
+      "case_id": "no_risky_diff_allows_further_shadow_sweep",
+      "status": "PASS",
+      "guard_status": "Guarded",
+      "promotion_eligible": false,
+      "promotion_status": "EligibleForFurtherShadowSweep",
+      "block_reasons": [],
+      "policy_promotion": false,
+      "threshold_autotune": false,
+      "runtime_apply": false
+    },
+    {
+      "case_id": "hard_ban_detected_blocks_promotion",
+      "status": "PASS",
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "promotion_status": "PromotionBlocked",
+      "block_reasons": [
+        "HardBanDetected"
+      ],
+      "policy_promotion": false,
+      "threshold_autotune": false,
+      "runtime_apply": false
+    },
+    {
+      "case_id": "insufficient_supervised_audit_blocks_promotion",
+      "status": "PASS",
+      "guard_status": "Blocked",
+      "promotion_eligible": false,
+      "promotion_status": "PromotionBlocked",
+      "block_reasons": [
+        "SupervisedAuditInsufficient"
+      ],
+      "policy_promotion": false,
+      "threshold_autotune": false,
+      "runtime_apply": false
+    },
+    {
+      "case_id": "missing_audit_manifest_unavailable",
+      "status": "PASS",
+      "guard_status": "Unavailable",
+      "promotion_eligible": false,
+      "promotion_status": "PromotionBlocked",
+      "block_reasons": [
+        "MissingAuditManifest",
+        "MissingAuditJsonl"
+      ],
+      "policy_promotion": false,
+      "threshold_autotune": false,
+      "runtime_apply": false
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_guard_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R3",
+    "QW-52C-R4",
+    "QW-52D"
+  ],
+  "notes": [
+    "RiskyDiff blocks promotion even when BeneficialDiff exists.",
+    "No runtime soft rerank promotion is allowed.",
+    "No threshold autotune is allowed.",
+    "No hard ban or blacklist is introduced.",
+    "Next patch should inspect risky diff causes before any promotion."
+  ]
+}

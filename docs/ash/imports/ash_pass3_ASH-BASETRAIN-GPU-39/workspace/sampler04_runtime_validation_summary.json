@@ -1,0 +1,37 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-04",
+  "status": "RUNTIME_CANDIDATE_TRACE_VALIDATION_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-03",
+  "semantic_reference": "model_core::cpu_oracle_sampler",
+  "validation_module": "model_core::sampler_parity_validation",
+  "validation_mode_default": "Off",
+  "strict_default_changed": false,
+  "env": {
+    "ASH_SAMPLER_PARITY_VALIDATE": "0|1",
+    "ASH_SAMPLER_PARITY_PROMOTE_STRICT": "0|1",
+    "ASH_SAMPLER_PARITY_VALIDATE_RECEIPT": "workspace/sampler04_runtime_validation_receipt.jsonl",
+    "ASH_SAMPLER_PARITY_VALIDATE_SUMMARY": "workspace/sampler04_runtime_validation_summary.json",
+    "ASH_SAMPLER_PARITY_FIXTURE": "optional fixture label"
+  },
+  "probe_to_strict_promotion_gate": {
+    "required_pass_fixtures": [
+      "basic_min_p",
+      "active_top_p",
+      "top_k_min_p",
+      "final_mask_recovery"
+    ],
+    "warn_allowed": [
+      "trace_overflow"
+    ],
+    "fail_allowed": []
+  },
+  "promotion_status": "NOT_RUN",
+  "runtime_execution": "NOT_RUN_IN_CONTAINER",
+  "static_validation": "STATIC_PASS",
+  "non_scope": [
+    "deltak_qwave_weighted_minp",
+    "shader_formula_change",
+    "cpu_oracle_formula_change",
+    "tokenizer_decode_change"
+  ]
+}

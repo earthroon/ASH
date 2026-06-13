@@ -1,0 +1,27 @@
+QW-MCTS-06 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwMcts06AtlasBackendBridgeConfig: PASS
+QwMcts06AtlasBackendGroupPayload: PASS
+QwMcts06AtlasBackendBridgePayloadBatch: PASS
+QwMcts06Logical16ValidationReceipt: PASS
+QwMcts06BackendBridgeReceipt: PASS
+QwMcts06AtlasBackendBridgeReport: PASS
+build_qw_mcts06_backend_bridge_payload_batch: PASS
+build_qw_mcts06_atlas_backend_bridge_report: PASS
+build_qw_mcts06_default_atlas_backend_bridge_report: PASS
+Tile16LogicalFromTile8: PASS
+no dispatch default: PASS
+no queue write default: PASS
+no command encoder default: PASS
+no compute pass default: PASS
+no backend mutation default: PASS
+no QW-MCTS-06 marker in generation_sampling.rs: PASS
+test bridge present: PASS
+test no gpu dispatch present: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+cargo check model_core: NOT_RUN (cargo unavailable in container)
+cargo test qw_mcts06: NOT_RUN (cargo unavailable in container)
+overall: PASS

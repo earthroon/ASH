@@ -1,0 +1,32 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02C",
+  "fixtures": [
+    {
+      "name": "probe_no_mutation",
+      "mode": "probe",
+      "expected": "PASS"
+    },
+    {
+      "name": "probe_weighted_logit_mutation_fail",
+      "mode": "probe",
+      "expected": "FAIL_WEIGHTED_LOGIT_MUTATED"
+    },
+    {
+      "name": "probe_hardblock_no_mask_mutation",
+      "mode": "probe",
+      "candidate": "<pad>",
+      "expected": "PASS"
+    },
+    {
+      "name": "on_mode_mutation_allowed",
+      "mode": "on",
+      "candidate": "<pad>",
+      "expected": "MUTATION_ALLOWED"
+    },
+    {
+      "name": "selected_id_unchanged",
+      "mode": "probe",
+      "expected": "selected_id_before == selected_id_after"
+    }
+  ]
+}

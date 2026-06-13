@@ -1,0 +1,58 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
+  "status": "TRANSITION_GUARD_CONTROLLED_ENABLE_DEFINED",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-02D",
+  "baked_from": "16AI-QW-38G-R6A-RUN-01_runtime_receipt_execution_baked",
+  "transition_guard_ssot": "model_core::decode_transition_guard",
+  "controlled_profile": "safe_v1",
+  "default_mode_changed": false,
+  "default_mode": "off",
+  "controlled_enable_default": false,
+  "requires_decode02d_ready": true,
+  "effective_by_default": false,
+  "gate_status": "BLOCKED",
+  "gate_reason": "RUNTIME_EVIDENCE_NOT_RUN",
+  "hard_block_scope": [
+    "pad",
+    "invalid_control",
+    "mojibake",
+    "invalid_byte",
+    "eos_before_min_new_tokens"
+  ],
+  "hard_block_forbidden": [
+    "normal_korean_transition",
+    "emotional_repeat",
+    "particle_like_ambiguous_transition",
+    "repeated_punctuation",
+    "generic_continuation_immediate_eos"
+  ],
+  "soft_penalty_scope": [
+    "generic_continuation_immediate_eos",
+    "byte_text_boundary_risk",
+    "double_particle_like",
+    "double_ending_like",
+    "repeated_punctuation"
+  ],
+  "observe_only_scope": [
+    "emotional_repeat",
+    "korean_ambiguous_transition"
+  ],
+  "penalty": {
+    "soft_penalty_scale": 0.5,
+    "max_soft_penalty": 0.75
+  },
+  "execution": {
+    "cargo_check": "NOT_RUN",
+    "cargo_test": "NOT_RUN",
+    "wgsl_compile": "NOT_RUN",
+    "runtime_controlled_enable": "NOT_RUN"
+  },
+  "non_scope": [
+    "transition_rule_redesign",
+    "transition_default_on",
+    "dynamic_context_qwave",
+    "semantic_prior_default_enable",
+    "minp_formula_change",
+    "lora_training"
+  ]
+}

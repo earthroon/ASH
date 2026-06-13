@@ -1,0 +1,39 @@
+diff -ru salad02_orig/crates/model_core/src/lib.rs salad02_work/crates/model_core/src/lib.rs
+--- salad02_orig/crates/model_core/src/lib.rs	2026-05-27 06:38:19.000000000 +0000
++++ salad02_work/crates/model_core/src/lib.rs	2026-05-27 06:46:04.719685744 +0000
+@@ -20,6 +20,7 @@
+ mod decode03b_pci;
+ mod decode03c_shadow_policy;
+ mod decode03d_controlled_enable;
++mod salad02_detector;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -117,6 +118,15 @@
+     decide_decode03d_gate, apply_decode03d_controlled_config, receipt_from_decode03c,
+     append_decode03d_receipt_from_sampler03, write_decode03d_summary_from_receipt_file,
+ };
++pub use salad02_detector::{
++    SALAD02_PATCH_ID, SALAD02_INPUT_PATCH_ID, SaladTokenClass, SaladRiskLevel,
++    Salad02TokenObservation, Salad02WindowMetrics, Salad02ScoreComponents, Salad02Input,
++    Salad02Detection, Salad02StepReceipt, Salad02Summary, classify_token_piece,
++    compute_window_metrics as salad02_compute_window_metrics,
++    compute_salad_score, risk_from_score as salad02_risk_from_score,
++    apply_salad_hysteresis, detect_word_salad, append_salad02_receipt_from_sampler03,
++    write_salad02_summary_from_receipt_file,
++};
+ 
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+Only in salad02_work/crates/model_core/src: salad02_detector.rs
+diff -ru salad02_orig/crates/model_core/src/sampler_parity.rs salad02_work/crates/model_core/src/sampler_parity.rs
+--- salad02_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:38:19.000000000 +0000
++++ salad02_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:46:04.720566283 +0000
+@@ -453,5 +453,6 @@
+     crate::decode03b_pci::append_decode03b_receipt_from_sampler03(receipt);
+     crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
+     crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
++    crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+Only in salad02_work/workspace: salad02.patch

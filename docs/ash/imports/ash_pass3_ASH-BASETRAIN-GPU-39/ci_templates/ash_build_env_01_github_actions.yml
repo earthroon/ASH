@@ -1,0 +1,54 @@
+name: ASH Build Environment Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-env-probe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Probe Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+          python3 tools/provision_rust_toolchain.py --verify --emit-receipt
+          python3 tools/provision_rust_toolchain.py --local-provision-check
+
+      - name: Re-run BUILD-00-R1
+        run: |
+          python3 tools/run_build_00_r1_cargo_environment_rerun.py
+
+      - name: Run decode guard tests
+        run: |
+          cargo test -p tokenizer_core --test decode_qa_05_control_token_guard
+          cargo test -p tokenizer_core --test decode_qa_06_byte_utf8_guard
+          cargo test -p tokenizer_core --test decode_qa_07_linebreak_guard
+          cargo test -p tokenizer_core --test decode_qa_08_degeneration_guard
+          cargo test -p tokenizer_core --test decode_qa_09_termination_guard
+          cargo test -p tokenizer_core --test decode_qa_10_subtitle_smoke
+          cargo test -p tokenizer_core --test decode_qa_11_regression_matrix
+          cargo test -p tokenizer_core --test decode_qa_12_quality_closure
+          cargo test -p tokenizer_core --test decode_run_00_runtime_guard_chain
+
+      - name: Run runtime guard chain bin
+        run: |
+          cargo run -p tokenizer_core --bin decode_run_00_runtime_guard_chain
+
+      - name: Upload build environment receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ash-build-env-01-receipts
+          path: |
+            workspace/build_env_*.json
+            workspace/build_00_r1_*.json
+            workspace/decode_run_00_*.json
+            workspace/decode_qa_*.json
+            workspace/*.log

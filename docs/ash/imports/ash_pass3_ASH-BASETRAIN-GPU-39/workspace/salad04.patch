@@ -1,0 +1,2416 @@
+diff -ruN salad04_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md salad04_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md
+--- salad04_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md	2026-05-27 07:43:29.833294979 +0000
+@@ -0,0 +1,30 @@
++# 16AI-QW-38G-R6A-SALAD-04 acceptance
++
++## Status
++
++`PASS_STATIC / NOT_RUN_RUNTIME`
++
++## Confirmed static contract
++
++- `behavior_change=false` is fixed in SALAD-04 detection receipts.
++- `guard_overlay_only=true` is fixed in SALAD-04 detection receipts.
++- SALAD-04 provides overlay recommendations only.
++- SALAD-04 does not execute rollback, stop, EOS, ledger mutation, or sampler mutation.
++- SALAD-04 is hooked after SALAD-02-derived detector state in `sampler_parity::append_receipt()`.
++
++## Not run
++
++- `cargo check` not run because cargo/rustc are unavailable in this container.
++- Runtime receipt generation not run.
++- UI/desktop checks not required for this patch.
++
++## Acceptance gates for runtime environment
++
++```txt
++1. behavior_change_count == 0
++2. guard_execution_count == 0
++3. rollback_execution_count == 0
++4. stop_execution_count == 0
++5. morph_score in 0.0..=1.0 for all receipts
++6. summary generated at workspace/salad04_summary.json
++```
+diff -ruN salad04_orig/crates/model_core/src/lib.rs salad04_work/crates/model_core/src/lib.rs
+--- salad04_orig/crates/model_core/src/lib.rs	2026-05-27 07:34:43.000000000 +0000
++++ salad04_work/crates/model_core/src/lib.rs	2026-05-27 07:42:39.971026350 +0000
+@@ -27,6 +27,7 @@
+ mod salad03b_controlled_execute;
+ mod stop01_safe_stop;
+ mod stop02_finalization;
++mod salad04_korean_morph_guard;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -192,6 +193,18 @@
+     append_stop02_receipt_from_sampler03, write_stop02_summary_from_receipt_file,
+ };
+ 
++pub use salad04_korean_morph_guard::{
++    SALAD04_PATCH_ID, SALAD04_INPUT_PATCH_ID, SALAD04_SSOT, Salad04Mode,
++    KoreanMorphClass, KoreanMorphLoopKind, Salad04MorphObservation, Salad04WindowMetrics,
++    Salad04RiskComponents, Salad04Input, Salad04Detection, Salad04OverlayRecommendation,
++    Salad04StepReceipt, Salad04Summary, classify_korean_morph_piece, detect_korean_loop_kind,
++    compute_salad04_window_metrics, compute_salad04_score, compute_salad04_overlay,
++    detect_korean_morph_loop, input_from_salad02 as salad04_input_from_salad02,
++    receipt_from_salad02 as salad04_receipt_from_salad02, append_salad04_receipt_from_sampler03,
++    write_salad04_summary_from_receipt_file,
++};
++
++
+ 
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+diff -ruN salad04_orig/crates/model_core/src/salad04_korean_morph_guard.rs salad04_work/crates/model_core/src/salad04_korean_morph_guard.rs
+--- salad04_orig/crates/model_core/src/salad04_korean_morph_guard.rs	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/crates/model_core/src/salad04_korean_morph_guard.rs	2026-05-27 07:42:38.133077999 +0000
+@@ -0,0 +1,988 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::{HashMap, HashSet, VecDeque}, env, fs, hash::Hash, path::PathBuf, sync::{Mutex, OnceLock}};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::salad02_detector::{receipt_from_decode03d, Salad02StepReceipt, SaladRiskLevel, SaladTokenClass};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const SALAD04_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-04";
++pub const SALAD04_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-02";
++pub const SALAD04_SSOT: &str = "generated_token_stream+piece_preview+salad02_detection_state";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Salad04Mode {
++    Off,
++    ObserveOnly,
++    RiskOverlay,
++    StrictRiskOverlay,
++}
++
++impl Salad04Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_SALAD04_MODE")
++            .or_else(|_| env::var("ASH_SALAD04_GUARD"))
++            .unwrap_or_else(|_| "observe_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "risk" | "risk_overlay" | "overlay" | "true" | "1" | "on" => Self::RiskOverlay,
++            "strict" | "strict_risk_overlay" => Self::StrictRiskOverlay,
++            _ => Self::ObserveOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ObserveOnly => "ObserveOnly",
++            Self::RiskOverlay => "RiskOverlay",
++            Self::StrictRiskOverlay => "StrictRiskOverlay",
++        }
++    }
++
++    pub fn enabled(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum KoreanMorphClass {
++    Unknown,
++    HangulSyllable,
++    HangulJamo,
++    NounLike,
++    VerbStemLike,
++    AdjectiveStemLike,
++    JosaLike,
++    EomiLike,
++    PreFinalEndingLike,
++    Punctuation,
++    Whitespace,
++    Symbol,
++    BytePiece,
++    Mixed,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum KoreanMorphLoopKind {
++    None,
++    JosaRepeat,
++    JosaChain,
++    EomiRepeat,
++    EomiPunctuationLoop,
++    JamoLeak,
++    ByteJamoMixedLeak,
++    SyllableFragmentLoop,
++    EojeolBoundaryCollapse,
++    PunctuationGlueLoop,
++    MixedMorphLoop,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04MorphObservation {
++    pub token_id: u32,
++    pub piece_preview: Option<String>,
++    pub morph_class: KoreanMorphClass,
++    pub morph_loop_kind: KoreanMorphLoopKind,
++    pub salad02_token_class: Option<String>,
++    pub selected_rank: Option<usize>,
++    pub selected_logprob: Option<f32>,
++    pub pci_raw: Option<f32>,
++    pub pci_bucket: Option<String>,
++    pub h_final_norm: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04WindowMetrics {
++    pub window_size_short: usize,
++    pub window_size_mid: usize,
++    pub window_size_long: usize,
++    pub josa_count_short: usize,
++    pub josa_count_mid: usize,
++    pub josa_chain_len: usize,
++    pub same_josa_streak: usize,
++    pub eomi_count_short: usize,
++    pub eomi_count_mid: usize,
++    pub eomi_chain_len: usize,
++    pub same_eomi_streak: usize,
++    pub jamo_count_short: usize,
++    pub jamo_count_mid: usize,
++    pub byte_jamo_mixed_count: usize,
++    pub punctuation_glue_count: usize,
++    pub syllable_fragment_repeat_count: usize,
++    pub eojeol_boundary_collapse_count: usize,
++    pub morph_distinct_ratio: Option<f32>,
++    pub morph_bigram_repeat_count: usize,
++    pub morph_trigram_repeat_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04RiskComponents {
++    pub josa_loop_score: f32,
++    pub eomi_loop_score: f32,
++    pub jamo_leak_score: f32,
++    pub byte_jamo_score: f32,
++    pub syllable_fragment_score: f32,
++    pub eojeol_boundary_score: f32,
++    pub punctuation_glue_score: f32,
++    pub pci_amplifier: f32,
++    pub entropy_amplifier: f32,
++    pub raw_score: f32,
++    pub capped_score: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04Input {
++    pub mode: Salad04Mode,
++    pub current: Salad04MorphObservation,
++    pub recent: Vec<Salad04MorphObservation>,
++    pub salad02_score: Option<f32>,
++    pub salad02_risk_stable: Option<String>,
++    pub pci_raw: Option<f32>,
++    pub pci_bucket: Option<String>,
++    pub entropy_spike: bool,
++    pub fallback_risk: bool,
++    pub numeric_risk: bool,
++    pub global_finite_fallback_seen: bool,
++    pub decode03d_guard_strength: Option<String>,
++    pub stop01_executed: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04OverlayRecommendation {
++    pub raise_salad02_risk_candidate: bool,
++    pub rollback_candidate_boost: bool,
++    pub safe_stop_candidate_boost: bool,
++    pub suggested_min_p_floor: Option<f32>,
++    pub suggested_top_p_ceiling: Option<f32>,
++    pub suggested_guard_strength: Option<String>,
++    pub no_repeat_ngram_hint: Option<usize>,
++    pub overlay_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04Detection {
++    pub behavior_change: bool,
++    pub guard_overlay_only: bool,
++    pub morph_score: f32,
++    pub morph_risk_raw: String,
++    pub morph_risk_stable: String,
++    pub dominant_loop_kind: KoreanMorphLoopKind,
++    pub window_metrics: Salad04WindowMetrics,
++    pub components: Salad04RiskComponents,
++    pub overlay_recommendation: Salad04OverlayRecommendation,
++    pub morph_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Salad04Mode,
++    pub behavior_change: bool,
++    pub guard_overlay_only: bool,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub stop02_status_seen: Option<String>,
++    pub input: Salad04Input,
++    pub detection: Salad04Detection,
++    pub selected_id: u32,
++    pub selected_piece_preview: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad04RiskCounts {
++    pub low: usize,
++    pub medium: usize,
++    pub high: usize,
++    pub critical: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad04LoopKindCounts {
++    pub josa_repeat_count: usize,
++    pub josa_chain_count: usize,
++    pub eomi_repeat_count: usize,
++    pub eomi_punctuation_loop_count: usize,
++    pub jamo_leak_count: usize,
++    pub byte_jamo_mixed_leak_count: usize,
++    pub syllable_fragment_loop_count: usize,
++    pub eojeol_boundary_collapse_count: usize,
++    pub punctuation_glue_loop_count: usize,
++    pub mixed_morph_loop_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad04OverlayCounts {
++    pub raise_salad02_risk_candidate_count: usize,
++    pub rollback_candidate_boost_count: usize,
++    pub safe_stop_candidate_boost_count: usize,
++    pub panic_guard_hint_count: usize,
++    pub no_repeat_ngram_hint_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad04SafetyCounts {
++    pub behavior_change_count: usize,
++    pub guard_execution_count: usize,
++    pub rollback_execution_count: usize,
++    pub stop_execution_count: usize,
++    pub score_out_of_range_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad04Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub behavior_change: bool,
++    pub guard_overlay_only: bool,
++    pub steps_observed: usize,
++    pub risk_counts: Salad04RiskCounts,
++    pub loop_kinds: Salad04LoopKindCounts,
++    pub overlay: Salad04OverlayCounts,
++    pub safety: Salad04SafetyCounts,
++    pub ready_for_eval00_decode_regression: bool,
++    pub ready_for_decode03e_guard_overlay_apply: bool,
++    pub reason: String,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn clamp01(value: f32) -> f32 {
++    if value.is_finite() { value.clamp(0.0, 1.0) } else { 1.0 }
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_SALAD04_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "salad04_sampler03_bridge".to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_SALAD04_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad04_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_SALAD04_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad04_summary.json"))
++}
++
++fn normalize_piece(piece: &str) -> String {
++    piece.trim().trim_start_matches('▁').trim().to_string()
++}
++
++fn is_hangul_syllable(c: char) -> bool {
++    ('가'..='힣').contains(&c)
++}
++
++fn is_hangul_jamo(c: char) -> bool {
++    ('ㄱ'..='ㅎ').contains(&c) || ('ㅏ'..='ㅣ').contains(&c) || ('ᄀ'..='ᇿ').contains(&c)
++}
++
++fn is_common_punctuation(c: char) -> bool {
++    matches!(c, '.' | ',' | '?' | '!' | ';' | ':' | '…' | '·' | '“' | '”' | '‘' | '’' | '(' | ')' | '[' | ']' | '。' | '、')
++}
++
++fn is_symbol(c: char) -> bool {
++    c.is_ascii_punctuation() || matches!(c, '~' | '`' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '_' | '+' | '=' | '|' | '\\' | '/' | '<' | '>' | '★' | '☆' | '※' | '■' | '□')
++}
++
++fn josa_like(piece: &str) -> bool {
++    matches!(piece,
++        "은" | "는" | "이" | "가" | "을" | "를" | "의" | "에" | "에서" | "에게" | "께" |
++        "으로" | "로" | "와" | "과" | "랑" | "도" | "만" | "부터" | "까지" | "보다" |
++        "처럼" | "마다" | "조차" | "마저")
++}
++
++fn eomi_like(piece: &str) -> bool {
++    let endings = [
++        "다", "요", "죠", "네", "며", "고", "서", "면", "지만", "는데", "니까", "습니다", "합니다", "했다", "된다", "있다", "없다", "것이다", "겁니다", "습니다.", "합니다.",
++    ];
++    endings.iter().any(|ending| piece == *ending || piece.ends_with(ending))
++}
++
++pub fn classify_korean_morph_piece(piece: Option<&str>) -> KoreanMorphClass {
++    let Some(piece) = piece else { return KoreanMorphClass::Unknown; };
++    let normalized = normalize_piece(piece);
++    if normalized.is_empty() {
++        return KoreanMorphClass::Whitespace;
++    }
++    if normalized.contains('�') || normalized.contains("<0x") || normalized.contains("0x") || normalized.starts_with("<U+") {
++        return KoreanMorphClass::BytePiece;
++    }
++    if normalized.chars().count() == 1 && normalized.chars().all(is_hangul_jamo) {
++        return KoreanMorphClass::HangulJamo;
++    }
++    if josa_like(&normalized) {
++        return KoreanMorphClass::JosaLike;
++    }
++    if eomi_like(&normalized) && normalized.chars().any(is_hangul_syllable) {
++        return KoreanMorphClass::EomiLike;
++    }
++    if normalized.chars().all(is_hangul_syllable) {
++        return KoreanMorphClass::HangulSyllable;
++    }
++    if normalized.chars().all(|c| c.is_whitespace()) {
++        return KoreanMorphClass::Whitespace;
++    }
++    if normalized.chars().all(is_common_punctuation) {
++        return KoreanMorphClass::Punctuation;
++    }
++    if normalized.chars().all(is_symbol) {
++        return KoreanMorphClass::Symbol;
++    }
++    if normalized.chars().any(is_hangul_syllable) || normalized.chars().any(is_hangul_jamo) {
++        KoreanMorphClass::Mixed
++    } else {
++        KoreanMorphClass::Unknown
++    }
++}
++
++fn tail_slice<T>(items: &[T], len: usize) -> &[T] {
++    if items.len() <= len { items } else { &items[items.len() - len..] }
++}
++
++fn ngram_repeat_count<T: Eq + Hash + Clone>(items: &[T], n: usize) -> usize {
++    if items.len() < n * 2 || n == 0 { return 0; }
++    let mut counts: HashMap<Vec<T>, usize> = HashMap::new();
++    for window in items.windows(n) {
++        *counts.entry(window.to_vec()).or_insert(0) += 1;
++    }
++    counts.values().map(|count| count.saturating_sub(1)).sum()
++}
++
++fn distinct_ratio<T: Eq + Hash + Clone>(items: &[T]) -> Option<f32> {
++    if items.is_empty() { return None; }
++    let mut set = HashSet::new();
++    for item in items {
++        set.insert(item.clone());
++    }
++    Some(set.len() as f32 / items.len() as f32)
++}
++
++fn class_streak(recent: &[Salad04MorphObservation], class: KoreanMorphClass) -> usize {
++    let mut count = 0;
++    for item in recent.iter().rev() {
++        if item.morph_class == class { count += 1; } else { break; }
++    }
++    count
++}
++
++fn same_piece_streak_for_class(recent: &[Salad04MorphObservation], class: KoreanMorphClass) -> usize {
++    let Some(last) = recent.last() else { return 0; };
++    if last.morph_class != class { return 0; }
++    let last_piece = last.piece_preview.as_deref().unwrap_or("");
++    let mut count = 0;
++    for item in recent.iter().rev() {
++        if item.morph_class == class && item.piece_preview.as_deref().unwrap_or("") == last_piece {
++            count += 1;
++        } else {
++            break;
++        }
++    }
++    count
++}
++
++fn punctuation_after_eomi(recent: &[Salad04MorphObservation]) -> usize {
++    recent.windows(2).filter(|pair| {
++        pair[0].morph_class == KoreanMorphClass::EomiLike
++            && pair[1].morph_class == KoreanMorphClass::Punctuation
++    }).count()
++}
++
++fn boundary_collapse_count(recent: &[Salad04MorphObservation]) -> usize {
++    recent.windows(2).filter(|pair| {
++        matches!(pair[0].morph_class, KoreanMorphClass::JosaLike | KoreanMorphClass::EomiLike)
++            && matches!(pair[1].morph_class, KoreanMorphClass::JosaLike | KoreanMorphClass::EomiLike)
++    }).count()
++}
++
++pub fn detect_korean_loop_kind(
++    current: &Salad04MorphObservation,
++    recent: &[Salad04MorphObservation],
++) -> KoreanMorphLoopKind {
++    let short = tail_slice(recent, env_usize("ASH_SALAD04_WINDOW_SHORT", 8));
++    let same_josa = same_piece_streak_for_class(short, KoreanMorphClass::JosaLike);
++    let same_eomi = same_piece_streak_for_class(short, KoreanMorphClass::EomiLike);
++    let josa_chain = class_streak(short, KoreanMorphClass::JosaLike);
++    let eomi_chain = class_streak(short, KoreanMorphClass::EomiLike);
++    let jamo_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count();
++    let byte_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::BytePiece).count();
++    let punctuation_glue = punctuation_after_eomi(short);
++    let morph_classes: Vec<KoreanMorphClass> = short.iter().map(|t| t.morph_class).collect();
++    let trigram_repeat = ngram_repeat_count(&morph_classes, 3);
++    if byte_count > 0 && jamo_count > 0 {
++        KoreanMorphLoopKind::ByteJamoMixedLeak
++    } else if jamo_count >= 2 || current.morph_class == KoreanMorphClass::HangulJamo {
++        KoreanMorphLoopKind::JamoLeak
++    } else if same_josa >= 2 {
++        KoreanMorphLoopKind::JosaRepeat
++    } else if josa_chain >= 3 {
++        KoreanMorphLoopKind::JosaChain
++    } else if same_eomi >= 2 {
++        KoreanMorphLoopKind::EomiRepeat
++    } else if eomi_chain >= 2 && punctuation_glue > 0 {
++        KoreanMorphLoopKind::EomiPunctuationLoop
++    } else if boundary_collapse_count(short) >= 2 {
++        KoreanMorphLoopKind::EojeolBoundaryCollapse
++    } else if trigram_repeat >= 2 {
++        KoreanMorphLoopKind::SyllableFragmentLoop
++    } else if current.morph_class == KoreanMorphClass::Punctuation && class_streak(short, KoreanMorphClass::Punctuation) >= 3 {
++        KoreanMorphLoopKind::PunctuationGlueLoop
++    } else if current.morph_class == KoreanMorphClass::Mixed {
++        KoreanMorphLoopKind::MixedMorphLoop
++    } else {
++        KoreanMorphLoopKind::None
++    }
++}
++
++pub fn compute_salad04_window_metrics(recent: &[Salad04MorphObservation]) -> Salad04WindowMetrics {
++    let short_len = env_usize("ASH_SALAD04_WINDOW_SHORT", 8);
++    let mid_len = env_usize("ASH_SALAD04_WINDOW_MID", 32);
++    let long_len = env_usize("ASH_SALAD04_WINDOW_LONG", 96);
++    let short = tail_slice(recent, short_len);
++    let mid = tail_slice(recent, mid_len);
++    let long = tail_slice(recent, long_len);
++    let long_classes: Vec<KoreanMorphClass> = long.iter().map(|t| t.morph_class).collect();
++    let mid_classes: Vec<KoreanMorphClass> = mid.iter().map(|t| t.morph_class).collect();
++    let mid_pieces: Vec<String> = mid.iter().map(|t| t.piece_preview.clone().unwrap_or_default()).collect();
++    let byte_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::BytePiece).count();
++    let jamo_count_short = short.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count();
++    Salad04WindowMetrics {
++        window_size_short: short_len,
++        window_size_mid: mid_len,
++        window_size_long: long_len,
++        josa_count_short: short.iter().filter(|t| t.morph_class == KoreanMorphClass::JosaLike).count(),
++        josa_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::JosaLike).count(),
++        josa_chain_len: class_streak(short, KoreanMorphClass::JosaLike),
++        same_josa_streak: same_piece_streak_for_class(short, KoreanMorphClass::JosaLike),
++        eomi_count_short: short.iter().filter(|t| t.morph_class == KoreanMorphClass::EomiLike).count(),
++        eomi_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::EomiLike).count(),
++        eomi_chain_len: class_streak(short, KoreanMorphClass::EomiLike),
++        same_eomi_streak: same_piece_streak_for_class(short, KoreanMorphClass::EomiLike),
++        jamo_count_short,
++        jamo_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count(),
++        byte_jamo_mixed_count: if byte_count > 0 && jamo_count_short > 0 { byte_count + jamo_count_short } else { 0 },
++        punctuation_glue_count: punctuation_after_eomi(short),
++        syllable_fragment_repeat_count: ngram_repeat_count(&mid_pieces, 3),
++        eojeol_boundary_collapse_count: boundary_collapse_count(mid),
++        morph_distinct_ratio: distinct_ratio(&long_classes),
++        morph_bigram_repeat_count: ngram_repeat_count(&mid_classes, 2),
++        morph_trigram_repeat_count: ngram_repeat_count(&mid_classes, 3),
++    }
++}
++
++fn pci_amplifier(bucket: Option<&str>, pci_raw: Option<f32>) -> f32 {
++    let bucket_score = match bucket.unwrap_or("") {
++        "Collapsing" => 1.0,
++        "Unstable" => 0.75,
++        "Uncertain" => 0.45,
++        "Stable" => 0.15,
++        "Confident" => 0.0,
++        _ => 0.35,
++    };
++    bucket_score.max(pci_raw.map(|v| 1.0 - v).unwrap_or(0.0)).clamp(0.0, 1.0)
++}
++
++fn risk_from_score(score: f32) -> &'static str {
++    let score = clamp01(score);
++    if score >= 0.80 { "Critical" }
++    else if score >= 0.55 { "High" }
++    else if score >= 0.30 { "Medium" }
++    else { "Low" }
++}
++
++pub fn compute_salad04_score(
++    input: &Salad04Input,
++    metrics: &Salad04WindowMetrics,
++) -> Salad04RiskComponents {
++    let josa_loop_score = clamp01(
++        metrics.same_josa_streak.saturating_sub(1) as f32 / 4.0
++            + metrics.josa_chain_len.saturating_sub(1) as f32 / 5.0
++            + metrics.josa_count_short as f32 / 8.0,
++    );
++    let eomi_loop_score = clamp01(
++        metrics.same_eomi_streak.saturating_sub(1) as f32 / 4.0
++            + metrics.eomi_chain_len.saturating_sub(1) as f32 / 5.0
++            + metrics.punctuation_glue_count as f32 / 4.0,
++    );
++    let jamo_leak_score = clamp01(metrics.jamo_count_short as f32 / 3.0 + metrics.jamo_count_mid as f32 / 8.0);
++    let byte_jamo_score = clamp01(metrics.byte_jamo_mixed_count as f32 / 3.0);
++    let syllable_fragment_score = clamp01(metrics.syllable_fragment_repeat_count as f32 / 4.0 + metrics.morph_trigram_repeat_count as f32 / 5.0);
++    let eojeol_boundary_score = clamp01(metrics.eojeol_boundary_collapse_count as f32 / 4.0);
++    let punctuation_glue_score = clamp01(metrics.punctuation_glue_count as f32 / 4.0);
++    let pci_amplifier = pci_amplifier(input.pci_bucket.as_deref(), input.pci_raw);
++    let entropy_amplifier = clamp01(input.current.h_final_norm.unwrap_or(0.0) + if input.entropy_spike { 0.25 } else { 0.0 });
++    let raw_score = clamp01(
++        0.22 * josa_loop_score
++            + 0.22 * eomi_loop_score
++            + 0.18 * jamo_leak_score
++            + 0.10 * byte_jamo_score
++            + 0.10 * syllable_fragment_score
++            + 0.08 * eojeol_boundary_score
++            + 0.06 * punctuation_glue_score
++            + 0.02 * pci_amplifier
++            + 0.02 * entropy_amplifier,
++    );
++    let mut capped_score = raw_score;
++    if metrics.same_josa_streak >= 4 { capped_score = capped_score.max(0.55); }
++    if metrics.same_eomi_streak >= 4 { capped_score = capped_score.max(0.55); }
++    if metrics.jamo_count_short >= 3 { capped_score = capped_score.max(0.70); }
++    if metrics.byte_jamo_mixed_count >= 2 { capped_score = capped_score.max(0.80); }
++    if metrics.morph_trigram_repeat_count >= 2 && matches!(input.pci_bucket.as_deref(), Some("Unstable") | Some("Collapsing")) {
++        capped_score = capped_score.max(0.75);
++    }
++    if input.numeric_risk { capped_score = capped_score.max(0.85); }
++    if input.global_finite_fallback_seen { capped_score = capped_score.max(0.85); }
++    if matches!(input.pci_bucket.as_deref(), Some("Stable") | Some("Confident"))
++        && metrics.morph_trigram_repeat_count == 0
++        && metrics.jamo_count_short == 0
++        && metrics.byte_jamo_mixed_count == 0
++    {
++        capped_score = capped_score.min(0.35);
++    }
++    Salad04RiskComponents {
++        josa_loop_score,
++        eomi_loop_score,
++        jamo_leak_score,
++        byte_jamo_score,
++        syllable_fragment_score,
++        eojeol_boundary_score,
++        punctuation_glue_score,
++        pci_amplifier,
++        entropy_amplifier,
++        raw_score,
++        capped_score: clamp01(capped_score),
++    }
++}
++
++pub fn compute_salad04_overlay(
++    input: &Salad04Input,
++    detection: &Salad04Detection,
++) -> Salad04OverlayRecommendation {
++    let mut overlay_reasons = Vec::new();
++    let high_or_critical = matches!(detection.morph_risk_stable.as_str(), "High" | "Critical");
++    let critical = detection.morph_risk_stable == "Critical";
++    let mut suggested_min_p_floor = None;
++    let mut suggested_top_p_ceiling = None;
++    let mut suggested_guard_strength = None;
++    let mut no_repeat_ngram_hint = None;
++
++    if high_or_critical {
++        overlay_reasons.push("morph_risk_high_or_critical".to_string());
++        suggested_guard_strength = Some("Panic".to_string());
++        no_repeat_ngram_hint = Some(3);
++    }
++    if critical {
++        overlay_reasons.push("morph_risk_critical".to_string());
++        suggested_min_p_floor = Some(0.12);
++        suggested_top_p_ceiling = Some(0.82);
++    }
++    if matches!(detection.dominant_loop_kind, KoreanMorphLoopKind::JamoLeak | KoreanMorphLoopKind::ByteJamoMixedLeak) {
++        overlay_reasons.push("jamo_or_byte_leak".to_string());
++        suggested_guard_strength = Some("Panic".to_string());
++        suggested_min_p_floor = Some(suggested_min_p_floor.unwrap_or(0.14).max(0.14));
++    }
++    if input.fallback_risk {
++        overlay_reasons.push("fallback_risk_amplifier".to_string());
++    }
++
++    Salad04OverlayRecommendation {
++        raise_salad02_risk_candidate: high_or_critical,
++        rollback_candidate_boost: high_or_critical,
++        safe_stop_candidate_boost: critical || input.numeric_risk || input.global_finite_fallback_seen,
++        suggested_min_p_floor,
++        suggested_top_p_ceiling,
++        suggested_guard_strength,
++        no_repeat_ngram_hint,
++        overlay_reasons,
++    }
++}
++
++fn morph_reasons(metrics: &Salad04WindowMetrics, input: &Salad04Input, kind: KoreanMorphLoopKind) -> Vec<String> {
++    let mut reasons = Vec::new();
++    if metrics.same_josa_streak >= 2 { reasons.push(format!("same_josa_streak_{}", metrics.same_josa_streak)); }
++    if metrics.same_eomi_streak >= 2 { reasons.push(format!("same_eomi_streak_{}", metrics.same_eomi_streak)); }
++    if metrics.jamo_count_short > 0 { reasons.push(format!("jamo_count_short_{}", metrics.jamo_count_short)); }
++    if metrics.byte_jamo_mixed_count > 0 { reasons.push(format!("byte_jamo_mixed_count_{}", metrics.byte_jamo_mixed_count)); }
++    if metrics.morph_trigram_repeat_count > 0 { reasons.push(format!("morph_trigram_repeat_count_{}", metrics.morph_trigram_repeat_count)); }
++    if input.entropy_spike { reasons.push("entropy_spike_amplifier".to_string()); }
++    if input.fallback_risk { reasons.push("fallback_risk".to_string()); }
++    if input.numeric_risk { reasons.push("numeric_risk".to_string()); }
++    if kind != KoreanMorphLoopKind::None { reasons.push(format!("dominant_loop_{:?}", kind)); }
++    reasons
++}
++
++pub fn detect_korean_morph_loop(input: &Salad04Input) -> Salad04Detection {
++    let metrics = compute_salad04_window_metrics(&input.recent);
++    let components = compute_salad04_score(input, &metrics);
++    let morph_risk_raw = risk_from_score(components.capped_score).to_string();
++    let morph_risk_stable = morph_risk_raw.clone();
++    let dominant_loop_kind = detect_korean_loop_kind(&input.current, &input.recent);
++    let mut preliminary = Salad04Detection {
++        behavior_change: false,
++        guard_overlay_only: true,
++        morph_score: components.capped_score,
++        morph_risk_raw,
++        morph_risk_stable,
++        dominant_loop_kind,
++        window_metrics: metrics,
++        components,
++        overlay_recommendation: Salad04OverlayRecommendation {
++            raise_salad02_risk_candidate: false,
++            rollback_candidate_boost: false,
++            safe_stop_candidate_boost: false,
++            suggested_min_p_floor: None,
++            suggested_top_p_ceiling: None,
++            suggested_guard_strength: None,
++            no_repeat_ngram_hint: None,
++            overlay_reasons: Vec::new(),
++        },
++        morph_reasons: Vec::new(),
++    };
++    preliminary.morph_reasons = morph_reasons(&preliminary.window_metrics, input, preliminary.dominant_loop_kind);
++    preliminary.overlay_recommendation = compute_salad04_overlay(input, &preliminary);
++    preliminary
++}
++
++static SALAD04_WINDOW: OnceLock<Mutex<VecDeque<Salad04MorphObservation>>> = OnceLock::new();
++
++fn window_store() -> &'static Mutex<VecDeque<Salad04MorphObservation>> {
++    SALAD04_WINDOW.get_or_init(|| Mutex::new(VecDeque::new()))
++}
++
++fn observe_window(current: Salad04MorphObservation) -> Vec<Salad04MorphObservation> {
++    let mut guard = window_store().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
++    guard.push_back(current);
++    let max_len = env_usize("ASH_SALAD04_WINDOW_STORE", env_usize("ASH_SALAD04_WINDOW_LONG", 96).max(96));
++    while guard.len() > max_len {
++        guard.pop_front();
++    }
++    guard.iter().cloned().collect()
++}
++
++fn observation_from_salad02(receipt: &Salad02StepReceipt) -> Salad04MorphObservation {
++    let piece = receipt.selected_piece_preview.clone();
++    let morph_class = classify_korean_morph_piece(piece.as_deref());
++    let salad02_token_class = Some(format!("{:?}", receipt.input.current.token_class));
++    let mut observation = Salad04MorphObservation {
++        token_id: receipt.selected_id,
++        piece_preview: piece,
++        morph_class,
++        morph_loop_kind: KoreanMorphLoopKind::None,
++        salad02_token_class,
++        selected_rank: receipt.input.current.selected_rank,
++        selected_logprob: receipt.input.current.selected_logprob,
++        pci_raw: receipt.input.current.pci_raw,
++        pci_bucket: receipt.input.current.pci_bucket.clone(),
++        h_final_norm: receipt.input.current.h_final_norm,
++    };
++    observation.morph_loop_kind = detect_korean_loop_kind(&observation, std::slice::from_ref(&observation));
++    observation
++}
++
++pub fn input_from_salad02(receipt: &Salad02StepReceipt, mode: Salad04Mode) -> Salad04Input {
++    let current = observation_from_salad02(receipt);
++    let recent = observe_window(current.clone());
++    Salad04Input {
++        mode,
++        current,
++        recent,
++        salad02_score: Some(receipt.detection.score),
++        salad02_risk_stable: Some(receipt.detection.risk_stable.as_str().to_string()),
++        pci_raw: receipt.input.current.pci_raw,
++        pci_bucket: receipt.input.current.pci_bucket.clone(),
++        entropy_spike: receipt.input.entropy_spike,
++        fallback_risk: receipt.input.fallback_risk,
++        numeric_risk: receipt.input.numeric_risk,
++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
++        decode03d_guard_strength: receipt.input.current.guard_strength.clone(),
++        stop01_executed: false,
++    }
++}
++
++pub fn receipt_from_salad02(mode: Salad04Mode, receipt: &Salad02StepReceipt) -> Salad04StepReceipt {
++    let input = input_from_salad02(receipt, mode);
++    let detection = detect_korean_morph_loop(&input);
++    let selected_id = input.current.token_id;
++    let selected_piece_preview = input.current.piece_preview.clone();
++    Salad04StepReceipt {
++        patch_id: SALAD04_PATCH_ID.to_string(),
++        input_patch: SALAD04_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: receipt.prompt_hash.clone(),
++        seed: receipt.seed,
++        step: receipt.step,
++        backend: receipt.backend.clone(),
++        sampler_ssot: SALAD04_SSOT.to_string(),
++        mode,
++        behavior_change: false,
++        guard_overlay_only: true,
++        salad02_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()),
++        decode03d_status_seen: receipt.decode03d_status_seen.clone(),
++        stop02_status_seen: env::var("ASH_STOP02_STATUS_SEEN").ok(),
++        input,
++        detection,
++        selected_id,
++        selected_piece_preview,
++    }
++}
++
++pub fn append_salad04_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Salad04Mode::from_env();
++    if !mode.enabled() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = receipt_from_decode03d(&decode03d_receipt);
++    let receipt = receipt_from_salad02(mode, &salad02_receipt);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<Salad04StepReceipt> {
++    let Ok(content) = fs::read_to_string(path) else { return Vec::new(); };
++    content
++        .lines()
++        .filter_map(|line| serde_json::from_str::<Salad04StepReceipt>(line).ok())
++        .collect()
++}
++
++pub fn summary_from_receipts(receipts: &[Salad04StepReceipt]) -> Salad04Summary {
++    let mut risk_counts = Salad04RiskCounts::default();
++    let mut loop_kinds = Salad04LoopKindCounts::default();
++    let mut overlay = Salad04OverlayCounts::default();
++    let mut safety = Salad04SafetyCounts::default();
++
++    for receipt in receipts {
++        if receipt.behavior_change || receipt.detection.behavior_change { safety.behavior_change_count += 1; }
++        if !receipt.guard_overlay_only || !receipt.detection.guard_overlay_only { safety.guard_execution_count += 1; }
++        if !(0.0..=1.0).contains(&receipt.detection.morph_score) { safety.score_out_of_range_count += 1; }
++        match receipt.detection.morph_risk_stable.as_str() {
++            "Critical" => risk_counts.critical += 1,
++            "High" => risk_counts.high += 1,
++            "Medium" => risk_counts.medium += 1,
++            _ => risk_counts.low += 1,
++        }
++        match receipt.detection.dominant_loop_kind {
++            KoreanMorphLoopKind::JosaRepeat => loop_kinds.josa_repeat_count += 1,
++            KoreanMorphLoopKind::JosaChain => loop_kinds.josa_chain_count += 1,
++            KoreanMorphLoopKind::EomiRepeat => loop_kinds.eomi_repeat_count += 1,
++            KoreanMorphLoopKind::EomiPunctuationLoop => loop_kinds.eomi_punctuation_loop_count += 1,
++            KoreanMorphLoopKind::JamoLeak => loop_kinds.jamo_leak_count += 1,
++            KoreanMorphLoopKind::ByteJamoMixedLeak => loop_kinds.byte_jamo_mixed_leak_count += 1,
++            KoreanMorphLoopKind::SyllableFragmentLoop => loop_kinds.syllable_fragment_loop_count += 1,
++            KoreanMorphLoopKind::EojeolBoundaryCollapse => loop_kinds.eojeol_boundary_collapse_count += 1,
++            KoreanMorphLoopKind::PunctuationGlueLoop => loop_kinds.punctuation_glue_loop_count += 1,
++            KoreanMorphLoopKind::MixedMorphLoop => loop_kinds.mixed_morph_loop_count += 1,
++            KoreanMorphLoopKind::None => {}
++        }
++        let rec = &receipt.detection.overlay_recommendation;
++        if rec.raise_salad02_risk_candidate { overlay.raise_salad02_risk_candidate_count += 1; }
++        if rec.rollback_candidate_boost { overlay.rollback_candidate_boost_count += 1; }
++        if rec.safe_stop_candidate_boost { overlay.safe_stop_candidate_boost_count += 1; }
++        if rec.suggested_guard_strength.as_deref() == Some("Panic") { overlay.panic_guard_hint_count += 1; }
++        if rec.no_repeat_ngram_hint.is_some() { overlay.no_repeat_ngram_hint_count += 1; }
++    }
++
++    let steps_observed = receipts.len();
++    let contract_fail = safety.behavior_change_count > 0
++        || safety.guard_execution_count > 0
++        || safety.rollback_execution_count > 0
++        || safety.stop_execution_count > 0
++        || safety.score_out_of_range_count > 0;
++    Salad04Summary {
++        patch_id: SALAD04_PATCH_ID.to_string(),
++        input_patch: SALAD04_INPUT_PATCH_ID.to_string(),
++        status: if contract_fail { "FAIL_STATIC_CONTRACT" } else if steps_observed > 0 { "PASS_WITH_WARNINGS" } else { "STATIC_BAKE_DEFINED_NOT_RUN" }.to_string(),
++        mode: Salad04Mode::from_env().as_str().to_string(),
++        behavior_change: false,
++        guard_overlay_only: true,
++        steps_observed,
++        risk_counts,
++        loop_kinds,
++        overlay,
++        safety,
++        ready_for_eval00_decode_regression: !contract_fail,
++        ready_for_decode03e_guard_overlay_apply: false,
++        reason: if contract_fail {
++            "SALAD-04 contract violation detected; morph guard must remain overlay-only".to_string()
++        } else if steps_observed == 0 {
++            "Korean morph loop guard schema baked; run SALAD-02 fixtures before overlay promotion".to_string()
++        } else {
++            "korean morph loop guard sealed as risk overlay; no direct behavior change".to_string()
++        },
++    }
++}
++
++pub fn write_salad04_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, format!("{}\n", json));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn obs(piece: &str) -> Salad04MorphObservation {
++        let class = classify_korean_morph_piece(Some(piece));
++        Salad04MorphObservation {
++            token_id: 1,
++            piece_preview: Some(piece.to_string()),
++            morph_class: class,
++            morph_loop_kind: KoreanMorphLoopKind::None,
++            salad02_token_class: None,
++            selected_rank: Some(1),
++            selected_logprob: Some(-1.0),
++            pci_raw: Some(0.3),
++            pci_bucket: Some("Unstable".to_string()),
++            h_final_norm: Some(0.7),
++        }
++    }
++
++    #[test]
++    fn salad04_classify_josa_like() {
++        assert_eq!(classify_korean_morph_piece(Some("은")), KoreanMorphClass::JosaLike);
++    }
++
++    #[test]
++    fn salad04_classify_eomi_like() {
++        assert_eq!(classify_korean_morph_piece(Some("합니다")), KoreanMorphClass::EomiLike);
++    }
++
++    #[test]
++    fn salad04_classify_hangul_jamo() {
++        assert_eq!(classify_korean_morph_piece(Some("ㄱ")), KoreanMorphClass::HangulJamo);
++    }
++
++    #[test]
++    fn salad04_detect_josa_repeat() {
++        let recent = vec![obs("은"), obs("은"), obs("은")];
++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::JosaRepeat);
++    }
++
++    #[test]
++    fn salad04_detect_eomi_repeat() {
++        let recent = vec![obs("합니다"), obs("합니다"), obs("합니다")];
++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::EomiRepeat);
++    }
++
++    #[test]
++    fn salad04_detect_byte_jamo_mixed() {
++        let recent = vec![obs("<0xEA>"), obs("ㄱ")];
++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::ByteJamoMixedLeak);
++    }
++
++    #[test]
++    fn salad04_score_clamped() {
++        let current = obs("합니다");
++        let input = Salad04Input {
++            mode: Salad04Mode::RiskOverlay,
++            current: current.clone(),
++            recent: vec![current; 8],
++            salad02_score: Some(0.6),
++            salad02_risk_stable: Some("High".to_string()),
++            pci_raw: Some(0.2),
++            pci_bucket: Some("Unstable".to_string()),
++            entropy_spike: true,
++            fallback_risk: false,
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++            decode03d_guard_strength: Some("Panic".to_string()),
++            stop01_executed: false,
++        };
++        let detection = detect_korean_morph_loop(&input);
++        assert!((0.0..=1.0).contains(&detection.morph_score));
++    }
++
++    #[test]
++    fn salad04_stable_pci_caps_false_positive() {
++        let current = obs("은");
++        let input = Salad04Input {
++            mode: Salad04Mode::RiskOverlay,
++            current: current.clone(),
++            recent: vec![current],
++            salad02_score: Some(0.1),
++            salad02_risk_stable: Some("Low".to_string()),
++            pci_raw: Some(0.9),
++            pci_bucket: Some("Confident".to_string()),
++            entropy_spike: false,
++            fallback_risk: false,
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++            decode03d_guard_strength: Some("Normal".to_string()),
++            stop01_executed: false,
++        };
++        let detection = detect_korean_morph_loop(&input);
++        assert!(detection.morph_score <= 0.35);
++    }
++
++    #[test]
++    fn salad04_overlay_never_executes_action() {
++        let current = obs("ㄱ");
++        let input = Salad04Input {
++            mode: Salad04Mode::StrictRiskOverlay,
++            current: current.clone(),
++            recent: vec![current; 4],
++            salad02_score: Some(0.8),
++            salad02_risk_stable: Some("Critical".to_string()),
++            pci_raw: Some(0.1),
++            pci_bucket: Some("Collapsing".to_string()),
++            entropy_spike: true,
++            fallback_risk: true,
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++            decode03d_guard_strength: Some("Panic".to_string()),
++            stop01_executed: false,
++        };
++        let detection = detect_korean_morph_loop(&input);
++        assert!(!detection.behavior_change);
++        assert!(detection.guard_overlay_only);
++    }
++}
+diff -ruN salad04_orig/crates/model_core/src/sampler_parity.rs salad04_work/crates/model_core/src/sampler_parity.rs
+--- salad04_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:34:43.000000000 +0000
++++ salad04_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:42:39.971721670 +0000
+@@ -460,5 +460,6 @@
+     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
+     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
+     crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
++    crate::salad04_korean_morph_guard::append_salad04_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN salad04_orig/workspace/salad04.patch salad04_work/workspace/salad04.patch
+--- salad04_orig/workspace/salad04.patch	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04.patch	2026-05-27 07:43:31.722799626 +0000
+@@ -0,0 +1,1066 @@
++diff -ruN salad04_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md salad04_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md
++--- salad04_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ salad04_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md	2026-05-27 07:43:29.833294979 +0000
++@@ -0,0 +1,30 @@
+++# 16AI-QW-38G-R6A-SALAD-04 acceptance
+++
+++## Status
+++
+++`PASS_STATIC / NOT_RUN_RUNTIME`
+++
+++## Confirmed static contract
+++
+++- `behavior_change=false` is fixed in SALAD-04 detection receipts.
+++- `guard_overlay_only=true` is fixed in SALAD-04 detection receipts.
+++- SALAD-04 provides overlay recommendations only.
+++- SALAD-04 does not execute rollback, stop, EOS, ledger mutation, or sampler mutation.
+++- SALAD-04 is hooked after SALAD-02-derived detector state in `sampler_parity::append_receipt()`.
+++
+++## Not run
+++
+++- `cargo check` not run because cargo/rustc are unavailable in this container.
+++- Runtime receipt generation not run.
+++- UI/desktop checks not required for this patch.
+++
+++## Acceptance gates for runtime environment
+++
+++```txt
+++1. behavior_change_count == 0
+++2. guard_execution_count == 0
+++3. rollback_execution_count == 0
+++4. stop_execution_count == 0
+++5. morph_score in 0.0..=1.0 for all receipts
+++6. summary generated at workspace/salad04_summary.json
+++```
++diff -ruN salad04_orig/crates/model_core/src/lib.rs salad04_work/crates/model_core/src/lib.rs
++--- salad04_orig/crates/model_core/src/lib.rs	2026-05-27 07:34:43.000000000 +0000
+++++ salad04_work/crates/model_core/src/lib.rs	2026-05-27 07:42:39.971026350 +0000
++@@ -27,6 +27,7 @@
++ mod salad03b_controlled_execute;
++ mod stop01_safe_stop;
++ mod stop02_finalization;
+++mod salad04_korean_morph_guard;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -192,6 +193,18 @@
++     append_stop02_receipt_from_sampler03, write_stop02_summary_from_receipt_file,
++ };
++ 
+++pub use salad04_korean_morph_guard::{
+++    SALAD04_PATCH_ID, SALAD04_INPUT_PATCH_ID, SALAD04_SSOT, Salad04Mode,
+++    KoreanMorphClass, KoreanMorphLoopKind, Salad04MorphObservation, Salad04WindowMetrics,
+++    Salad04RiskComponents, Salad04Input, Salad04Detection, Salad04OverlayRecommendation,
+++    Salad04StepReceipt, Salad04Summary, classify_korean_morph_piece, detect_korean_loop_kind,
+++    compute_salad04_window_metrics, compute_salad04_score, compute_salad04_overlay,
+++    detect_korean_morph_loop, input_from_salad02 as salad04_input_from_salad02,
+++    receipt_from_salad02 as salad04_receipt_from_salad02, append_salad04_receipt_from_sampler03,
+++    write_salad04_summary_from_receipt_file,
+++};
+++
+++
++ 
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++diff -ruN salad04_orig/crates/model_core/src/salad04_korean_morph_guard.rs salad04_work/crates/model_core/src/salad04_korean_morph_guard.rs
++--- salad04_orig/crates/model_core/src/salad04_korean_morph_guard.rs	1970-01-01 00:00:00.000000000 +0000
+++++ salad04_work/crates/model_core/src/salad04_korean_morph_guard.rs	2026-05-27 07:42:38.133077999 +0000
++@@ -0,0 +1,988 @@
+++use serde::{Deserialize, Serialize};
+++use std::{collections::{HashMap, HashSet, VecDeque}, env, fs, hash::Hash, path::PathBuf, sync::{Mutex, OnceLock}};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::salad02_detector::{receipt_from_decode03d, Salad02StepReceipt, SaladRiskLevel, SaladTokenClass};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const SALAD04_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-04";
+++pub const SALAD04_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-02";
+++pub const SALAD04_SSOT: &str = "generated_token_stream+piece_preview+salad02_detection_state";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Salad04Mode {
+++    Off,
+++    ObserveOnly,
+++    RiskOverlay,
+++    StrictRiskOverlay,
+++}
+++
+++impl Salad04Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_SALAD04_MODE")
+++            .or_else(|_| env::var("ASH_SALAD04_GUARD"))
+++            .unwrap_or_else(|_| "observe_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "risk" | "risk_overlay" | "overlay" | "true" | "1" | "on" => Self::RiskOverlay,
+++            "strict" | "strict_risk_overlay" => Self::StrictRiskOverlay,
+++            _ => Self::ObserveOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ObserveOnly => "ObserveOnly",
+++            Self::RiskOverlay => "RiskOverlay",
+++            Self::StrictRiskOverlay => "StrictRiskOverlay",
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum KoreanMorphClass {
+++    Unknown,
+++    HangulSyllable,
+++    HangulJamo,
+++    NounLike,
+++    VerbStemLike,
+++    AdjectiveStemLike,
+++    JosaLike,
+++    EomiLike,
+++    PreFinalEndingLike,
+++    Punctuation,
+++    Whitespace,
+++    Symbol,
+++    BytePiece,
+++    Mixed,
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum KoreanMorphLoopKind {
+++    None,
+++    JosaRepeat,
+++    JosaChain,
+++    EomiRepeat,
+++    EomiPunctuationLoop,
+++    JamoLeak,
+++    ByteJamoMixedLeak,
+++    SyllableFragmentLoop,
+++    EojeolBoundaryCollapse,
+++    PunctuationGlueLoop,
+++    MixedMorphLoop,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04MorphObservation {
+++    pub token_id: u32,
+++    pub piece_preview: Option<String>,
+++    pub morph_class: KoreanMorphClass,
+++    pub morph_loop_kind: KoreanMorphLoopKind,
+++    pub salad02_token_class: Option<String>,
+++    pub selected_rank: Option<usize>,
+++    pub selected_logprob: Option<f32>,
+++    pub pci_raw: Option<f32>,
+++    pub pci_bucket: Option<String>,
+++    pub h_final_norm: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04WindowMetrics {
+++    pub window_size_short: usize,
+++    pub window_size_mid: usize,
+++    pub window_size_long: usize,
+++    pub josa_count_short: usize,
+++    pub josa_count_mid: usize,
+++    pub josa_chain_len: usize,
+++    pub same_josa_streak: usize,
+++    pub eomi_count_short: usize,
+++    pub eomi_count_mid: usize,
+++    pub eomi_chain_len: usize,
+++    pub same_eomi_streak: usize,
+++    pub jamo_count_short: usize,
+++    pub jamo_count_mid: usize,
+++    pub byte_jamo_mixed_count: usize,
+++    pub punctuation_glue_count: usize,
+++    pub syllable_fragment_repeat_count: usize,
+++    pub eojeol_boundary_collapse_count: usize,
+++    pub morph_distinct_ratio: Option<f32>,
+++    pub morph_bigram_repeat_count: usize,
+++    pub morph_trigram_repeat_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04RiskComponents {
+++    pub josa_loop_score: f32,
+++    pub eomi_loop_score: f32,
+++    pub jamo_leak_score: f32,
+++    pub byte_jamo_score: f32,
+++    pub syllable_fragment_score: f32,
+++    pub eojeol_boundary_score: f32,
+++    pub punctuation_glue_score: f32,
+++    pub pci_amplifier: f32,
+++    pub entropy_amplifier: f32,
+++    pub raw_score: f32,
+++    pub capped_score: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04Input {
+++    pub mode: Salad04Mode,
+++    pub current: Salad04MorphObservation,
+++    pub recent: Vec<Salad04MorphObservation>,
+++    pub salad02_score: Option<f32>,
+++    pub salad02_risk_stable: Option<String>,
+++    pub pci_raw: Option<f32>,
+++    pub pci_bucket: Option<String>,
+++    pub entropy_spike: bool,
+++    pub fallback_risk: bool,
+++    pub numeric_risk: bool,
+++    pub global_finite_fallback_seen: bool,
+++    pub decode03d_guard_strength: Option<String>,
+++    pub stop01_executed: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04OverlayRecommendation {
+++    pub raise_salad02_risk_candidate: bool,
+++    pub rollback_candidate_boost: bool,
+++    pub safe_stop_candidate_boost: bool,
+++    pub suggested_min_p_floor: Option<f32>,
+++    pub suggested_top_p_ceiling: Option<f32>,
+++    pub suggested_guard_strength: Option<String>,
+++    pub no_repeat_ngram_hint: Option<usize>,
+++    pub overlay_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04Detection {
+++    pub behavior_change: bool,
+++    pub guard_overlay_only: bool,
+++    pub morph_score: f32,
+++    pub morph_risk_raw: String,
+++    pub morph_risk_stable: String,
+++    pub dominant_loop_kind: KoreanMorphLoopKind,
+++    pub window_metrics: Salad04WindowMetrics,
+++    pub components: Salad04RiskComponents,
+++    pub overlay_recommendation: Salad04OverlayRecommendation,
+++    pub morph_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: Salad04Mode,
+++    pub behavior_change: bool,
+++    pub guard_overlay_only: bool,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub stop02_status_seen: Option<String>,
+++    pub input: Salad04Input,
+++    pub detection: Salad04Detection,
+++    pub selected_id: u32,
+++    pub selected_piece_preview: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad04RiskCounts {
+++    pub low: usize,
+++    pub medium: usize,
+++    pub high: usize,
+++    pub critical: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad04LoopKindCounts {
+++    pub josa_repeat_count: usize,
+++    pub josa_chain_count: usize,
+++    pub eomi_repeat_count: usize,
+++    pub eomi_punctuation_loop_count: usize,
+++    pub jamo_leak_count: usize,
+++    pub byte_jamo_mixed_leak_count: usize,
+++    pub syllable_fragment_loop_count: usize,
+++    pub eojeol_boundary_collapse_count: usize,
+++    pub punctuation_glue_loop_count: usize,
+++    pub mixed_morph_loop_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad04OverlayCounts {
+++    pub raise_salad02_risk_candidate_count: usize,
+++    pub rollback_candidate_boost_count: usize,
+++    pub safe_stop_candidate_boost_count: usize,
+++    pub panic_guard_hint_count: usize,
+++    pub no_repeat_ngram_hint_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad04SafetyCounts {
+++    pub behavior_change_count: usize,
+++    pub guard_execution_count: usize,
+++    pub rollback_execution_count: usize,
+++    pub stop_execution_count: usize,
+++    pub score_out_of_range_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad04Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub behavior_change: bool,
+++    pub guard_overlay_only: bool,
+++    pub steps_observed: usize,
+++    pub risk_counts: Salad04RiskCounts,
+++    pub loop_kinds: Salad04LoopKindCounts,
+++    pub overlay: Salad04OverlayCounts,
+++    pub safety: Salad04SafetyCounts,
+++    pub ready_for_eval00_decode_regression: bool,
+++    pub ready_for_decode03e_guard_overlay_apply: bool,
+++    pub reason: String,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn clamp01(value: f32) -> f32 {
+++    if value.is_finite() { value.clamp(0.0, 1.0) } else { 1.0 }
+++}
+++
+++fn run_id_from_env() -> String {
+++    env::var("ASH_SALAD04_RUN_ID")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "salad04_sampler03_bridge".to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_SALAD04_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/salad04_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_SALAD04_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/salad04_summary.json"))
+++}
+++
+++fn normalize_piece(piece: &str) -> String {
+++    piece.trim().trim_start_matches('▁').trim().to_string()
+++}
+++
+++fn is_hangul_syllable(c: char) -> bool {
+++    ('가'..='힣').contains(&c)
+++}
+++
+++fn is_hangul_jamo(c: char) -> bool {
+++    ('ㄱ'..='ㅎ').contains(&c) || ('ㅏ'..='ㅣ').contains(&c) || ('ᄀ'..='ᇿ').contains(&c)
+++}
+++
+++fn is_common_punctuation(c: char) -> bool {
+++    matches!(c, '.' | ',' | '?' | '!' | ';' | ':' | '…' | '·' | '“' | '”' | '‘' | '’' | '(' | ')' | '[' | ']' | '。' | '、')
+++}
+++
+++fn is_symbol(c: char) -> bool {
+++    c.is_ascii_punctuation() || matches!(c, '~' | '`' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '_' | '+' | '=' | '|' | '\\' | '/' | '<' | '>' | '★' | '☆' | '※' | '■' | '□')
+++}
+++
+++fn josa_like(piece: &str) -> bool {
+++    matches!(piece,
+++        "은" | "는" | "이" | "가" | "을" | "를" | "의" | "에" | "에서" | "에게" | "께" |
+++        "으로" | "로" | "와" | "과" | "랑" | "도" | "만" | "부터" | "까지" | "보다" |
+++        "처럼" | "마다" | "조차" | "마저")
+++}
+++
+++fn eomi_like(piece: &str) -> bool {
+++    let endings = [
+++        "다", "요", "죠", "네", "며", "고", "서", "면", "지만", "는데", "니까", "습니다", "합니다", "했다", "된다", "있다", "없다", "것이다", "겁니다", "습니다.", "합니다.",
+++    ];
+++    endings.iter().any(|ending| piece == *ending || piece.ends_with(ending))
+++}
+++
+++pub fn classify_korean_morph_piece(piece: Option<&str>) -> KoreanMorphClass {
+++    let Some(piece) = piece else { return KoreanMorphClass::Unknown; };
+++    let normalized = normalize_piece(piece);
+++    if normalized.is_empty() {
+++        return KoreanMorphClass::Whitespace;
+++    }
+++    if normalized.contains('�') || normalized.contains("<0x") || normalized.contains("0x") || normalized.starts_with("<U+") {
+++        return KoreanMorphClass::BytePiece;
+++    }
+++    if normalized.chars().count() == 1 && normalized.chars().all(is_hangul_jamo) {
+++        return KoreanMorphClass::HangulJamo;
+++    }
+++    if josa_like(&normalized) {
+++        return KoreanMorphClass::JosaLike;
+++    }
+++    if eomi_like(&normalized) && normalized.chars().any(is_hangul_syllable) {
+++        return KoreanMorphClass::EomiLike;
+++    }
+++    if normalized.chars().all(is_hangul_syllable) {
+++        return KoreanMorphClass::HangulSyllable;
+++    }
+++    if normalized.chars().all(|c| c.is_whitespace()) {
+++        return KoreanMorphClass::Whitespace;
+++    }
+++    if normalized.chars().all(is_common_punctuation) {
+++        return KoreanMorphClass::Punctuation;
+++    }
+++    if normalized.chars().all(is_symbol) {
+++        return KoreanMorphClass::Symbol;
+++    }
+++    if normalized.chars().any(is_hangul_syllable) || normalized.chars().any(is_hangul_jamo) {
+++        KoreanMorphClass::Mixed
+++    } else {
+++        KoreanMorphClass::Unknown
+++    }
+++}
+++
+++fn tail_slice<T>(items: &[T], len: usize) -> &[T] {
+++    if items.len() <= len { items } else { &items[items.len() - len..] }
+++}
+++
+++fn ngram_repeat_count<T: Eq + Hash + Clone>(items: &[T], n: usize) -> usize {
+++    if items.len() < n * 2 || n == 0 { return 0; }
+++    let mut counts: HashMap<Vec<T>, usize> = HashMap::new();
+++    for window in items.windows(n) {
+++        *counts.entry(window.to_vec()).or_insert(0) += 1;
+++    }
+++    counts.values().map(|count| count.saturating_sub(1)).sum()
+++}
+++
+++fn distinct_ratio<T: Eq + Hash + Clone>(items: &[T]) -> Option<f32> {
+++    if items.is_empty() { return None; }
+++    let mut set = HashSet::new();
+++    for item in items {
+++        set.insert(item.clone());
+++    }
+++    Some(set.len() as f32 / items.len() as f32)
+++}
+++
+++fn class_streak(recent: &[Salad04MorphObservation], class: KoreanMorphClass) -> usize {
+++    let mut count = 0;
+++    for item in recent.iter().rev() {
+++        if item.morph_class == class { count += 1; } else { break; }
+++    }
+++    count
+++}
+++
+++fn same_piece_streak_for_class(recent: &[Salad04MorphObservation], class: KoreanMorphClass) -> usize {
+++    let Some(last) = recent.last() else { return 0; };
+++    if last.morph_class != class { return 0; }
+++    let last_piece = last.piece_preview.as_deref().unwrap_or("");
+++    let mut count = 0;
+++    for item in recent.iter().rev() {
+++        if item.morph_class == class && item.piece_preview.as_deref().unwrap_or("") == last_piece {
+++            count += 1;
+++        } else {
+++            break;
+++        }
+++    }
+++    count
+++}
+++
+++fn punctuation_after_eomi(recent: &[Salad04MorphObservation]) -> usize {
+++    recent.windows(2).filter(|pair| {
+++        pair[0].morph_class == KoreanMorphClass::EomiLike
+++            && pair[1].morph_class == KoreanMorphClass::Punctuation
+++    }).count()
+++}
+++
+++fn boundary_collapse_count(recent: &[Salad04MorphObservation]) -> usize {
+++    recent.windows(2).filter(|pair| {
+++        matches!(pair[0].morph_class, KoreanMorphClass::JosaLike | KoreanMorphClass::EomiLike)
+++            && matches!(pair[1].morph_class, KoreanMorphClass::JosaLike | KoreanMorphClass::EomiLike)
+++    }).count()
+++}
+++
+++pub fn detect_korean_loop_kind(
+++    current: &Salad04MorphObservation,
+++    recent: &[Salad04MorphObservation],
+++) -> KoreanMorphLoopKind {
+++    let short = tail_slice(recent, env_usize("ASH_SALAD04_WINDOW_SHORT", 8));
+++    let same_josa = same_piece_streak_for_class(short, KoreanMorphClass::JosaLike);
+++    let same_eomi = same_piece_streak_for_class(short, KoreanMorphClass::EomiLike);
+++    let josa_chain = class_streak(short, KoreanMorphClass::JosaLike);
+++    let eomi_chain = class_streak(short, KoreanMorphClass::EomiLike);
+++    let jamo_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count();
+++    let byte_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::BytePiece).count();
+++    let punctuation_glue = punctuation_after_eomi(short);
+++    let morph_classes: Vec<KoreanMorphClass> = short.iter().map(|t| t.morph_class).collect();
+++    let trigram_repeat = ngram_repeat_count(&morph_classes, 3);
+++    if byte_count > 0 && jamo_count > 0 {
+++        KoreanMorphLoopKind::ByteJamoMixedLeak
+++    } else if jamo_count >= 2 || current.morph_class == KoreanMorphClass::HangulJamo {
+++        KoreanMorphLoopKind::JamoLeak
+++    } else if same_josa >= 2 {
+++        KoreanMorphLoopKind::JosaRepeat
+++    } else if josa_chain >= 3 {
+++        KoreanMorphLoopKind::JosaChain
+++    } else if same_eomi >= 2 {
+++        KoreanMorphLoopKind::EomiRepeat
+++    } else if eomi_chain >= 2 && punctuation_glue > 0 {
+++        KoreanMorphLoopKind::EomiPunctuationLoop
+++    } else if boundary_collapse_count(short) >= 2 {
+++        KoreanMorphLoopKind::EojeolBoundaryCollapse
+++    } else if trigram_repeat >= 2 {
+++        KoreanMorphLoopKind::SyllableFragmentLoop
+++    } else if current.morph_class == KoreanMorphClass::Punctuation && class_streak(short, KoreanMorphClass::Punctuation) >= 3 {
+++        KoreanMorphLoopKind::PunctuationGlueLoop
+++    } else if current.morph_class == KoreanMorphClass::Mixed {
+++        KoreanMorphLoopKind::MixedMorphLoop
+++    } else {
+++        KoreanMorphLoopKind::None
+++    }
+++}
+++
+++pub fn compute_salad04_window_metrics(recent: &[Salad04MorphObservation]) -> Salad04WindowMetrics {
+++    let short_len = env_usize("ASH_SALAD04_WINDOW_SHORT", 8);
+++    let mid_len = env_usize("ASH_SALAD04_WINDOW_MID", 32);
+++    let long_len = env_usize("ASH_SALAD04_WINDOW_LONG", 96);
+++    let short = tail_slice(recent, short_len);
+++    let mid = tail_slice(recent, mid_len);
+++    let long = tail_slice(recent, long_len);
+++    let long_classes: Vec<KoreanMorphClass> = long.iter().map(|t| t.morph_class).collect();
+++    let mid_classes: Vec<KoreanMorphClass> = mid.iter().map(|t| t.morph_class).collect();
+++    let mid_pieces: Vec<String> = mid.iter().map(|t| t.piece_preview.clone().unwrap_or_default()).collect();
+++    let byte_count = short.iter().filter(|t| t.morph_class == KoreanMorphClass::BytePiece).count();
+++    let jamo_count_short = short.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count();
+++    Salad04WindowMetrics {
+++        window_size_short: short_len,
+++        window_size_mid: mid_len,
+++        window_size_long: long_len,
+++        josa_count_short: short.iter().filter(|t| t.morph_class == KoreanMorphClass::JosaLike).count(),
+++        josa_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::JosaLike).count(),
+++        josa_chain_len: class_streak(short, KoreanMorphClass::JosaLike),
+++        same_josa_streak: same_piece_streak_for_class(short, KoreanMorphClass::JosaLike),
+++        eomi_count_short: short.iter().filter(|t| t.morph_class == KoreanMorphClass::EomiLike).count(),
+++        eomi_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::EomiLike).count(),
+++        eomi_chain_len: class_streak(short, KoreanMorphClass::EomiLike),
+++        same_eomi_streak: same_piece_streak_for_class(short, KoreanMorphClass::EomiLike),
+++        jamo_count_short,
+++        jamo_count_mid: mid.iter().filter(|t| t.morph_class == KoreanMorphClass::HangulJamo).count(),
+++        byte_jamo_mixed_count: if byte_count > 0 && jamo_count_short > 0 { byte_count + jamo_count_short } else { 0 },
+++        punctuation_glue_count: punctuation_after_eomi(short),
+++        syllable_fragment_repeat_count: ngram_repeat_count(&mid_pieces, 3),
+++        eojeol_boundary_collapse_count: boundary_collapse_count(mid),
+++        morph_distinct_ratio: distinct_ratio(&long_classes),
+++        morph_bigram_repeat_count: ngram_repeat_count(&mid_classes, 2),
+++        morph_trigram_repeat_count: ngram_repeat_count(&mid_classes, 3),
+++    }
+++}
+++
+++fn pci_amplifier(bucket: Option<&str>, pci_raw: Option<f32>) -> f32 {
+++    let bucket_score = match bucket.unwrap_or("") {
+++        "Collapsing" => 1.0,
+++        "Unstable" => 0.75,
+++        "Uncertain" => 0.45,
+++        "Stable" => 0.15,
+++        "Confident" => 0.0,
+++        _ => 0.35,
+++    };
+++    bucket_score.max(pci_raw.map(|v| 1.0 - v).unwrap_or(0.0)).clamp(0.0, 1.0)
+++}
+++
+++fn risk_from_score(score: f32) -> &'static str {
+++    let score = clamp01(score);
+++    if score >= 0.80 { "Critical" }
+++    else if score >= 0.55 { "High" }
+++    else if score >= 0.30 { "Medium" }
+++    else { "Low" }
+++}
+++
+++pub fn compute_salad04_score(
+++    input: &Salad04Input,
+++    metrics: &Salad04WindowMetrics,
+++) -> Salad04RiskComponents {
+++    let josa_loop_score = clamp01(
+++        metrics.same_josa_streak.saturating_sub(1) as f32 / 4.0
+++            + metrics.josa_chain_len.saturating_sub(1) as f32 / 5.0
+++            + metrics.josa_count_short as f32 / 8.0,
+++    );
+++    let eomi_loop_score = clamp01(
+++        metrics.same_eomi_streak.saturating_sub(1) as f32 / 4.0
+++            + metrics.eomi_chain_len.saturating_sub(1) as f32 / 5.0
+++            + metrics.punctuation_glue_count as f32 / 4.0,
+++    );
+++    let jamo_leak_score = clamp01(metrics.jamo_count_short as f32 / 3.0 + metrics.jamo_count_mid as f32 / 8.0);
+++    let byte_jamo_score = clamp01(metrics.byte_jamo_mixed_count as f32 / 3.0);
+++    let syllable_fragment_score = clamp01(metrics.syllable_fragment_repeat_count as f32 / 4.0 + metrics.morph_trigram_repeat_count as f32 / 5.0);
+++    let eojeol_boundary_score = clamp01(metrics.eojeol_boundary_collapse_count as f32 / 4.0);
+++    let punctuation_glue_score = clamp01(metrics.punctuation_glue_count as f32 / 4.0);
+++    let pci_amplifier = pci_amplifier(input.pci_bucket.as_deref(), input.pci_raw);
+++    let entropy_amplifier = clamp01(input.current.h_final_norm.unwrap_or(0.0) + if input.entropy_spike { 0.25 } else { 0.0 });
+++    let raw_score = clamp01(
+++        0.22 * josa_loop_score
+++            + 0.22 * eomi_loop_score
+++            + 0.18 * jamo_leak_score
+++            + 0.10 * byte_jamo_score
+++            + 0.10 * syllable_fragment_score
+++            + 0.08 * eojeol_boundary_score
+++            + 0.06 * punctuation_glue_score
+++            + 0.02 * pci_amplifier
+++            + 0.02 * entropy_amplifier,
+++    );
+++    let mut capped_score = raw_score;
+++    if metrics.same_josa_streak >= 4 { capped_score = capped_score.max(0.55); }
+++    if metrics.same_eomi_streak >= 4 { capped_score = capped_score.max(0.55); }
+++    if metrics.jamo_count_short >= 3 { capped_score = capped_score.max(0.70); }
+++    if metrics.byte_jamo_mixed_count >= 2 { capped_score = capped_score.max(0.80); }
+++    if metrics.morph_trigram_repeat_count >= 2 && matches!(input.pci_bucket.as_deref(), Some("Unstable") | Some("Collapsing")) {
+++        capped_score = capped_score.max(0.75);
+++    }
+++    if input.numeric_risk { capped_score = capped_score.max(0.85); }
+++    if input.global_finite_fallback_seen { capped_score = capped_score.max(0.85); }
+++    if matches!(input.pci_bucket.as_deref(), Some("Stable") | Some("Confident"))
+++        && metrics.morph_trigram_repeat_count == 0
+++        && metrics.jamo_count_short == 0
+++        && metrics.byte_jamo_mixed_count == 0
+++    {
+++        capped_score = capped_score.min(0.35);
+++    }
+++    Salad04RiskComponents {
+++        josa_loop_score,
+++        eomi_loop_score,
+++        jamo_leak_score,
+++        byte_jamo_score,
+++        syllable_fragment_score,
+++        eojeol_boundary_score,
+++        punctuation_glue_score,
+++        pci_amplifier,
+++        entropy_amplifier,
+++        raw_score,
+++        capped_score: clamp01(capped_score),
+++    }
+++}
+++
+++pub fn compute_salad04_overlay(
+++    input: &Salad04Input,
+++    detection: &Salad04Detection,
+++) -> Salad04OverlayRecommendation {
+++    let mut overlay_reasons = Vec::new();
+++    let high_or_critical = matches!(detection.morph_risk_stable.as_str(), "High" | "Critical");
+++    let critical = detection.morph_risk_stable == "Critical";
+++    let mut suggested_min_p_floor = None;
+++    let mut suggested_top_p_ceiling = None;
+++    let mut suggested_guard_strength = None;
+++    let mut no_repeat_ngram_hint = None;
+++
+++    if high_or_critical {
+++        overlay_reasons.push("morph_risk_high_or_critical".to_string());
+++        suggested_guard_strength = Some("Panic".to_string());
+++        no_repeat_ngram_hint = Some(3);
+++    }
+++    if critical {
+++        overlay_reasons.push("morph_risk_critical".to_string());
+++        suggested_min_p_floor = Some(0.12);
+++        suggested_top_p_ceiling = Some(0.82);
+++    }
+++    if matches!(detection.dominant_loop_kind, KoreanMorphLoopKind::JamoLeak | KoreanMorphLoopKind::ByteJamoMixedLeak) {
+++        overlay_reasons.push("jamo_or_byte_leak".to_string());
+++        suggested_guard_strength = Some("Panic".to_string());
+++        suggested_min_p_floor = Some(suggested_min_p_floor.unwrap_or(0.14).max(0.14));
+++    }
+++    if input.fallback_risk {
+++        overlay_reasons.push("fallback_risk_amplifier".to_string());
+++    }
+++
+++    Salad04OverlayRecommendation {
+++        raise_salad02_risk_candidate: high_or_critical,
+++        rollback_candidate_boost: high_or_critical,
+++        safe_stop_candidate_boost: critical || input.numeric_risk || input.global_finite_fallback_seen,
+++        suggested_min_p_floor,
+++        suggested_top_p_ceiling,
+++        suggested_guard_strength,
+++        no_repeat_ngram_hint,
+++        overlay_reasons,
+++    }
+++}
+++
+++fn morph_reasons(metrics: &Salad04WindowMetrics, input: &Salad04Input, kind: KoreanMorphLoopKind) -> Vec<String> {
+++    let mut reasons = Vec::new();
+++    if metrics.same_josa_streak >= 2 { reasons.push(format!("same_josa_streak_{}", metrics.same_josa_streak)); }
+++    if metrics.same_eomi_streak >= 2 { reasons.push(format!("same_eomi_streak_{}", metrics.same_eomi_streak)); }
+++    if metrics.jamo_count_short > 0 { reasons.push(format!("jamo_count_short_{}", metrics.jamo_count_short)); }
+++    if metrics.byte_jamo_mixed_count > 0 { reasons.push(format!("byte_jamo_mixed_count_{}", metrics.byte_jamo_mixed_count)); }
+++    if metrics.morph_trigram_repeat_count > 0 { reasons.push(format!("morph_trigram_repeat_count_{}", metrics.morph_trigram_repeat_count)); }
+++    if input.entropy_spike { reasons.push("entropy_spike_amplifier".to_string()); }
+++    if input.fallback_risk { reasons.push("fallback_risk".to_string()); }
+++    if input.numeric_risk { reasons.push("numeric_risk".to_string()); }
+++    if kind != KoreanMorphLoopKind::None { reasons.push(format!("dominant_loop_{:?}", kind)); }
+++    reasons
+++}
+++
+++pub fn detect_korean_morph_loop(input: &Salad04Input) -> Salad04Detection {
+++    let metrics = compute_salad04_window_metrics(&input.recent);
+++    let components = compute_salad04_score(input, &metrics);
+++    let morph_risk_raw = risk_from_score(components.capped_score).to_string();
+++    let morph_risk_stable = morph_risk_raw.clone();
+++    let dominant_loop_kind = detect_korean_loop_kind(&input.current, &input.recent);
+++    let mut preliminary = Salad04Detection {
+++        behavior_change: false,
+++        guard_overlay_only: true,
+++        morph_score: components.capped_score,
+++        morph_risk_raw,
+++        morph_risk_stable,
+++        dominant_loop_kind,
+++        window_metrics: metrics,
+++        components,
+++        overlay_recommendation: Salad04OverlayRecommendation {
+++            raise_salad02_risk_candidate: false,
+++            rollback_candidate_boost: false,
+++            safe_stop_candidate_boost: false,
+++            suggested_min_p_floor: None,
+++            suggested_top_p_ceiling: None,
+++            suggested_guard_strength: None,
+++            no_repeat_ngram_hint: None,
+++            overlay_reasons: Vec::new(),
+++        },
+++        morph_reasons: Vec::new(),
+++    };
+++    preliminary.morph_reasons = morph_reasons(&preliminary.window_metrics, input, preliminary.dominant_loop_kind);
+++    preliminary.overlay_recommendation = compute_salad04_overlay(input, &preliminary);
+++    preliminary
+++}
+++
+++static SALAD04_WINDOW: OnceLock<Mutex<VecDeque<Salad04MorphObservation>>> = OnceLock::new();
+++
+++fn window_store() -> &'static Mutex<VecDeque<Salad04MorphObservation>> {
+++    SALAD04_WINDOW.get_or_init(|| Mutex::new(VecDeque::new()))
+++}
+++
+++fn observe_window(current: Salad04MorphObservation) -> Vec<Salad04MorphObservation> {
+++    let mut guard = window_store().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+++    guard.push_back(current);
+++    let max_len = env_usize("ASH_SALAD04_WINDOW_STORE", env_usize("ASH_SALAD04_WINDOW_LONG", 96).max(96));
+++    while guard.len() > max_len {
+++        guard.pop_front();
+++    }
+++    guard.iter().cloned().collect()
+++}
+++
+++fn observation_from_salad02(receipt: &Salad02StepReceipt) -> Salad04MorphObservation {
+++    let piece = receipt.selected_piece_preview.clone();
+++    let morph_class = classify_korean_morph_piece(piece.as_deref());
+++    let salad02_token_class = Some(format!("{:?}", receipt.input.current.token_class));
+++    let mut observation = Salad04MorphObservation {
+++        token_id: receipt.selected_id,
+++        piece_preview: piece,
+++        morph_class,
+++        morph_loop_kind: KoreanMorphLoopKind::None,
+++        salad02_token_class,
+++        selected_rank: receipt.input.current.selected_rank,
+++        selected_logprob: receipt.input.current.selected_logprob,
+++        pci_raw: receipt.input.current.pci_raw,
+++        pci_bucket: receipt.input.current.pci_bucket.clone(),
+++        h_final_norm: receipt.input.current.h_final_norm,
+++    };
+++    observation.morph_loop_kind = detect_korean_loop_kind(&observation, std::slice::from_ref(&observation));
+++    observation
+++}
+++
+++pub fn input_from_salad02(receipt: &Salad02StepReceipt, mode: Salad04Mode) -> Salad04Input {
+++    let current = observation_from_salad02(receipt);
+++    let recent = observe_window(current.clone());
+++    Salad04Input {
+++        mode,
+++        current,
+++        recent,
+++        salad02_score: Some(receipt.detection.score),
+++        salad02_risk_stable: Some(receipt.detection.risk_stable.as_str().to_string()),
+++        pci_raw: receipt.input.current.pci_raw,
+++        pci_bucket: receipt.input.current.pci_bucket.clone(),
+++        entropy_spike: receipt.input.entropy_spike,
+++        fallback_risk: receipt.input.fallback_risk,
+++        numeric_risk: receipt.input.numeric_risk,
+++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
+++        decode03d_guard_strength: receipt.input.current.guard_strength.clone(),
+++        stop01_executed: false,
+++    }
+++}
+++
+++pub fn receipt_from_salad02(mode: Salad04Mode, receipt: &Salad02StepReceipt) -> Salad04StepReceipt {
+++    let input = input_from_salad02(receipt, mode);
+++    let detection = detect_korean_morph_loop(&input);
+++    let selected_id = input.current.token_id;
+++    let selected_piece_preview = input.current.piece_preview.clone();
+++    Salad04StepReceipt {
+++        patch_id: SALAD04_PATCH_ID.to_string(),
+++        input_patch: SALAD04_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_hash: receipt.prompt_hash.clone(),
+++        seed: receipt.seed,
+++        step: receipt.step,
+++        backend: receipt.backend.clone(),
+++        sampler_ssot: SALAD04_SSOT.to_string(),
+++        mode,
+++        behavior_change: false,
+++        guard_overlay_only: true,
+++        salad02_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()),
+++        decode03d_status_seen: receipt.decode03d_status_seen.clone(),
+++        stop02_status_seen: env::var("ASH_STOP02_STATUS_SEEN").ok(),
+++        input,
+++        detection,
+++        selected_id,
+++        selected_piece_preview,
+++    }
+++}
+++
+++pub fn append_salad04_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Salad04Mode::from_env();
+++    if !mode.enabled() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = receipt_from_decode03d(&decode03d_receipt);
+++    let receipt = receipt_from_salad02(mode, &salad02_receipt);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn read_receipts(path: PathBuf) -> Vec<Salad04StepReceipt> {
+++    let Ok(content) = fs::read_to_string(path) else { return Vec::new(); };
+++    content
+++        .lines()
+++        .filter_map(|line| serde_json::from_str::<Salad04StepReceipt>(line).ok())
+++        .collect()
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Salad04StepReceipt]) -> Salad04Summary {
+++    let mut risk_counts = Salad04RiskCounts::default();
+++    let mut loop_kinds = Salad04LoopKindCounts::default();
+++    let mut overlay = Salad04OverlayCounts::default();
+++    let mut safety = Salad04SafetyCounts::default();
+++
+++    for receipt in receipts {
+++        if receipt.behavior_change || receipt.detection.behavior_change { safety.behavior_change_count += 1; }
+++        if !receipt.guard_overlay_only || !receipt.detection.guard_overlay_only { safety.guard_execution_count += 1; }
+++        if !(0.0..=1.0).contains(&receipt.detection.morph_score) { safety.score_out_of_range_count += 1; }
+++        match receipt.detection.morph_risk_stable.as_str() {
+++            "Critical" => risk_counts.critical += 1,
+++            "High" => risk_counts.high += 1,
+++            "Medium" => risk_counts.medium += 1,
+++            _ => risk_counts.low += 1,
+++        }
+++        match receipt.detection.dominant_loop_kind {
+++            KoreanMorphLoopKind::JosaRepeat => loop_kinds.josa_repeat_count += 1,
+++            KoreanMorphLoopKind::JosaChain => loop_kinds.josa_chain_count += 1,
+++            KoreanMorphLoopKind::EomiRepeat => loop_kinds.eomi_repeat_count += 1,
+++            KoreanMorphLoopKind::EomiPunctuationLoop => loop_kinds.eomi_punctuation_loop_count += 1,
+++            KoreanMorphLoopKind::JamoLeak => loop_kinds.jamo_leak_count += 1,
+++            KoreanMorphLoopKind::ByteJamoMixedLeak => loop_kinds.byte_jamo_mixed_leak_count += 1,
+++            KoreanMorphLoopKind::SyllableFragmentLoop => loop_kinds.syllable_fragment_loop_count += 1,
+++            KoreanMorphLoopKind::EojeolBoundaryCollapse => loop_kinds.eojeol_boundary_collapse_count += 1,
+++            KoreanMorphLoopKind::PunctuationGlueLoop => loop_kinds.punctuation_glue_loop_count += 1,
+++            KoreanMorphLoopKind::MixedMorphLoop => loop_kinds.mixed_morph_loop_count += 1,
+++            KoreanMorphLoopKind::None => {}
+++        }
+++        let rec = &receipt.detection.overlay_recommendation;
+++        if rec.raise_salad02_risk_candidate { overlay.raise_salad02_risk_candidate_count += 1; }
+++        if rec.rollback_candidate_boost { overlay.rollback_candidate_boost_count += 1; }
+++        if rec.safe_stop_candidate_boost { overlay.safe_stop_candidate_boost_count += 1; }
+++        if rec.suggested_guard_strength.as_deref() == Some("Panic") { overlay.panic_guard_hint_count += 1; }
+++        if rec.no_repeat_ngram_hint.is_some() { overlay.no_repeat_ngram_hint_count += 1; }
+++    }
+++
+++    let steps_observed = receipts.len();
+++    let contract_fail = safety.behavior_change_count > 0
+++        || safety.guard_execution_count > 0
+++        || safety.rollback_execution_count > 0
+++        || safety.stop_execution_count > 0
+++        || safety.score_out_of_range_count > 0;
+++    Salad04Summary {
+++        patch_id: SALAD04_PATCH_ID.to_string(),
+++        input_patch: SALAD04_INPUT_PATCH_ID.to_string(),
+++        status: if contract_fail { "FAIL_STATIC_CONTRACT" } else if steps_observed > 0 { "PASS_WITH_WARNINGS" } else { "STATIC_BAKE_DEFINED_NOT_RUN" }.to_string(),
+++        mode: Salad04Mode::from_env().as_str().to_string(),
+++        behavior_change: false,
+++        guard_overlay_only: true,
+++        steps_observed,
+++        risk_counts,
+++        loop_kinds,
+++        overlay,
+++        safety,
+++        ready_for_eval00_decode_regression: !contract_fail,
+++        ready_for_decode03e_guard_overlay_apply: false,
+++        reason: if contract_fail {
+++            "SALAD-04 contract violation detected; morph guard must remain overlay-only".to_string()
+++        } else if steps_observed == 0 {
+++            "Korean morph loop guard schema baked; run SALAD-02 fixtures before overlay promotion".to_string()
+++        } else {
+++            "korean morph loop guard sealed as risk overlay; no direct behavior change".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_salad04_summary_from_receipt_file() {
+++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(path, format!("{}\n", json));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn obs(piece: &str) -> Salad04MorphObservation {
+++        let class = classify_korean_morph_piece(Some(piece));
+++        Salad04MorphObservation {
+++            token_id: 1,
+++            piece_preview: Some(piece.to_string()),
+++            morph_class: class,
+++            morph_loop_kind: KoreanMorphLoopKind::None,
+++            salad02_token_class: None,
+++            selected_rank: Some(1),
+++            selected_logprob: Some(-1.0),
+++            pci_raw: Some(0.3),
+++            pci_bucket: Some("Unstable".to_string()),
+++            h_final_norm: Some(0.7),
+++        }
+++    }
+++
+++    #[test]
+++    fn salad04_classify_josa_like() {
+++        assert_eq!(classify_korean_morph_piece(Some("은")), KoreanMorphClass::JosaLike);
+++    }
+++
+++    #[test]
+++    fn salad04_classify_eomi_like() {
+++        assert_eq!(classify_korean_morph_piece(Some("합니다")), KoreanMorphClass::EomiLike);
+++    }
+++
+++    #[test]
+++    fn salad04_classify_hangul_jamo() {
+++        assert_eq!(classify_korean_morph_piece(Some("ㄱ")), KoreanMorphClass::HangulJamo);
+++    }
+++
+++    #[test]
+++    fn salad04_detect_josa_repeat() {
+++        let recent = vec![obs("은"), obs("은"), obs("은")];
+++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::JosaRepeat);
+++    }
+++
+++    #[test]
+++    fn salad04_detect_eomi_repeat() {
+++        let recent = vec![obs("합니다"), obs("합니다"), obs("합니다")];
+++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::EomiRepeat);
+++    }
+++
+++    #[test]
+++    fn salad04_detect_byte_jamo_mixed() {
+++        let recent = vec![obs("<0xEA>"), obs("ㄱ")];
+++        assert_eq!(detect_korean_loop_kind(recent.last().unwrap(), &recent), KoreanMorphLoopKind::ByteJamoMixedLeak);
+++    }
+++
+++    #[test]
+++    fn salad04_score_clamped() {
+++        let current = obs("합니다");
+++        let input = Salad04Input {
+++            mode: Salad04Mode::RiskOverlay,
+++            current: current.clone(),
+++            recent: vec![current; 8],
+++            salad02_score: Some(0.6),
+++            salad02_risk_stable: Some("High".to_string()),
+++            pci_raw: Some(0.2),
+++            pci_bucket: Some("Unstable".to_string()),
+++            entropy_spike: true,
+++            fallback_risk: false,
+++            numeric_risk: false,
+++            global_finite_fallback_seen: false,
+++            decode03d_guard_strength: Some("Panic".to_string()),
+++            stop01_executed: false,
+++        };
+++        let detection = detect_korean_morph_loop(&input);
+++        assert!((0.0..=1.0).contains(&detection.morph_score));
+++    }
+++
+++    #[test]
+++    fn salad04_stable_pci_caps_false_positive() {
+++        let current = obs("은");
+++        let input = Salad04Input {
+++            mode: Salad04Mode::RiskOverlay,
+++            current: current.clone(),
+++            recent: vec![current],
+++            salad02_score: Some(0.1),
+++            salad02_risk_stable: Some("Low".to_string()),
+++            pci_raw: Some(0.9),
+++            pci_bucket: Some("Confident".to_string()),
+++            entropy_spike: false,
+++            fallback_risk: false,
+++            numeric_risk: false,
+++            global_finite_fallback_seen: false,
+++            decode03d_guard_strength: Some("Normal".to_string()),
+++            stop01_executed: false,
+++        };
+++        let detection = detect_korean_morph_loop(&input);
+++        assert!(detection.morph_score <= 0.35);
+++    }
+++
+++    #[test]
+++    fn salad04_overlay_never_executes_action() {
+++        let current = obs("ㄱ");
+++        let input = Salad04Input {
+++            mode: Salad04Mode::StrictRiskOverlay,
+++            current: current.clone(),
+++            recent: vec![current; 4],
+++            salad02_score: Some(0.8),
+++            salad02_risk_stable: Some("Critical".to_string()),
+++            pci_raw: Some(0.1),
+++            pci_bucket: Some("Collapsing".to_string()),
+++            entropy_spike: true,
+++            fallback_risk: true,
+++            numeric_risk: false,
+++            global_finite_fallback_seen: false,
+++            decode03d_guard_strength: Some("Panic".to_string()),
+++            stop01_executed: false,
+++        };
+++        let detection = detect_korean_morph_loop(&input);
+++        assert!(!detection.behavior_change);
+++        assert!(detection.guard_overlay_only);
+++    }
+++}
++diff -ruN salad04_orig/crates/model_core/src/sampler_parity.rs salad04_work/crates/model_core/src/sampler_parity.rs
++--- salad04_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:34:43.000000000 +0000
+++++ salad04_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:42:39.971721670 +0000
++@@ -460,5 +460,6 @@
++     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
++     crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
++     crate::stop02_finalization::append_stop02_receipt_from_sampler03(receipt);
+++    crate::salad04_korean_morph_guard::append_salad04_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN salad04_orig/workspace/salad04_korean_morph_guard_schema.json salad04_work/workspace/salad04_korean_morph_guard_schema.json
+--- salad04_orig/workspace/salad04_korean_morph_guard_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_korean_morph_guard_schema.json	2026-05-27 07:43:29.830121844 +0000
+@@ -0,0 +1,74 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
++  "title": "Korean Morph Loop Guard Seal",
++  "schema_version": 1,
++  "ssot": "generated_token_stream+piece_preview+salad02_detection_state",
++  "contracts": {
++    "behavior_change": false,
++    "guard_overlay_only": true,
++    "no_morph_autocorrect": true,
++    "no_direct_rollback": true,
++    "no_direct_stop": true
++  },
++  "step_receipt": {
++    "required_fields": [
++      "patch_id",
++      "input_patch",
++      "schema_version",
++      "run_id",
++      "step",
++      "backend",
++      "mode",
++      "behavior_change",
++      "guard_overlay_only",
++      "input",
++      "detection",
++      "selected_id"
++    ],
++    "input": [
++      "current",
++      "recent",
++      "salad02_score",
++      "salad02_risk_stable",
++      "pci_raw",
++      "pci_bucket",
++      "entropy_spike",
++      "fallback_risk",
++      "numeric_risk",
++      "global_finite_fallback_seen",
++      "decode03d_guard_strength",
++      "stop01_executed"
++    ],
++    "detection": [
++      "morph_score",
++      "morph_risk_raw",
++      "morph_risk_stable",
++      "dominant_loop_kind",
++      "window_metrics",
++      "components",
++      "overlay_recommendation",
++      "morph_reasons"
++    ]
++  },
++  "risk_levels": {
++    "low": "0.00-0.30",
++    "medium": "0.30-0.55",
++    "high": "0.55-0.80",
++    "critical": "0.80-1.00"
++  },
++  "loop_kinds": [
++    "JosaRepeat",
++    "JosaChain",
++    "EomiRepeat",
++    "EomiPunctuationLoop",
++    "JamoLeak",
++    "ByteJamoMixedLeak",
++    "SyllableFragmentLoop",
++    "EojeolBoundaryCollapse",
++    "PunctuationGlueLoop",
++    "MixedMorphLoop"
++  ],
++  "ready_next": [
++    "16AI-QW-38G-R6A-EVAL-00 Fixed Prompt Suite / Decode Regression Bench Seal"
++  ]
++}
+diff -ruN salad04_orig/workspace/salad04_probe_prompts.jsonl salad04_work/workspace/salad04_probe_prompts.jsonl
+--- salad04_orig/workspace/salad04_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_probe_prompts.jsonl	2026-05-27 07:43:29.832813438 +0000
+@@ -0,0 +1,6 @@
++{"id": "P01_josa_repeat_probe", "prompt": "은 는 은 는 같은 조사 반복을 유도하는 짧은 한국어 생성 검사", "expected": "JosaRepeat/JosaChain risk overlay only"}
++{"id": "P02_eomi_repeat_probe", "prompt": "합니다 합니다 합니다 식의 어미 루프 감지 검사", "expected": "EomiRepeat risk overlay only"}
++{"id": "P03_jamo_leak_probe", "prompt": "ㄱ ㄴ ㅏ 같은 자모 누출 검사", "expected": "JamoLeak high candidate"}
++{"id": "P04_byte_jamo_mixed_probe", "prompt": "byte fallback + 자모 조각 혼합 검사", "expected": "ByteJamoMixedLeak critical candidate"}
++{"id": "P05_normal_korean_sentence", "prompt": "정상 한국어 문장에서 조사와 어미가 자연스럽게 나오는 경우", "expected": "false positive cap under stable/confident PCI"}
++{"id": "P06_eojeol_boundary_collapse", "prompt": "조사/어미가 명사·용언 없이 이어지는 어절 경계 붕괴 검사", "expected": "EojeolBoundaryCollapse candidate"}
+diff -ruN salad04_orig/workspace/salad04_report.md salad04_work/workspace/salad04_report.md
+--- salad04_orig/workspace/salad04_report.md	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_report.md	2026-05-27 07:43:29.833020015 +0000
+@@ -0,0 +1,58 @@
++# 16AI-QW-38G-R6A-SALAD-04 — Korean Morph Loop Guard Seal
++
++## Baked scope
++
++- Added `crates/model_core/src/salad04_korean_morph_guard.rs`
++- Registered `mod salad04_korean_morph_guard` in `model_core/src/lib.rs`
++- Exported SALAD-04 public types and helpers from `model_core`
++- Added `sampler_parity::append_receipt()` hook for SALAD-04 receipt generation
++- Added workspace schema, empty JSONL receipt, summary, probe prompts, static checks, source hash manifest, and acceptance report
++
++## Contract
++
++```txt
++behavior_change = false
++guard_overlay_only = true
++rollback_execution = false
++stop_execution = false
++no_morph_autocorrect = true
++```
++
++## Implemented guard overlay
++
++SALAD-04 classifies lightweight Korean morph-risk pieces into:
++
++```txt
++HangulSyllable / HangulJamo / JosaLike / EomiLike / Punctuation / Whitespace / Symbol / BytePiece / Mixed / Unknown
++```
++
++It detects dominant loop kinds:
++
++```txt
++JosaRepeat / JosaChain / EomiRepeat / EomiPunctuationLoop / JamoLeak / ByteJamoMixedLeak / SyllableFragmentLoop / EojeolBoundaryCollapse / PunctuationGlueLoop / MixedMorphLoop
++```
++
++## Runtime flags
++
++```bash
++ASH_SALAD04_MODE=risk_overlay \
++ASH_SALAD04_GUARD_OVERLAY_ONLY=true \
++ASH_SALAD04_REQUIRE_SALAD02=true \
++ASH_SALAD04_RECEIPT=workspace/salad04_steps.jsonl \
++ASH_SALAD04_SUMMARY=workspace/salad04_summary.json
++```
++
++## Validation status
++
++```txt
++cargo_check: NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER
++runtime_smoke: NOT_RUN
++static_text_checks: PASS
++```
++
++## Next recommended patch
++
++```txt
++16AI-QW-38G-R6A-EVAL-00
++Fixed Prompt Suite / Decode Regression Bench Seal
++```
+diff -ruN salad04_orig/workspace/salad04_source_hash_manifest.json salad04_work/workspace/salad04_source_hash_manifest.json
+--- salad04_orig/workspace/salad04_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_source_hash_manifest.json	2026-05-27 07:43:29.835950223 +0000
+@@ -0,0 +1,45 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
++  "files": [
++    {
++      "path": "crates/model_core/src/salad04_korean_morph_guard.rs",
++      "sha256": "69c76a9b4304cedab187a4538a4d868177fd0e6627fc780801fdb4f01952465e",
++      "bytes": 39953
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "03f4dc5c2f2c886e4ba03aee3bbaf49ad9e596767c3c0c1938802cb7fe9939cc",
++      "bytes": 18142
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "6cc1bf12affe4f611cacb971f029b95d59a01ed6078e01b624e45e85b0eef4ef",
++      "bytes": 20705
++    },
++    {
++      "path": "workspace/salad04_korean_morph_guard_schema.json",
++      "sha256": "e9d7eae0b925204f957c8326a8ea9c4a6bf69c1c02cfbacf5131f6152144cc89",
++      "bytes": 1661
++    },
++    {
++      "path": "workspace/salad04_summary.json",
++      "sha256": "3e7711188e163689c7d48ef35591cd02fc7bc630f68a331ff76a2c7cd78b483f",
++      "bytes": 1282
++    },
++    {
++      "path": "workspace/salad04_static_checks.json",
++      "sha256": "e5488f35aca6afd5d9b614de93a0a75b1e12f4f34b533c2371f5a78894a58094",
++      "bytes": 918
++    },
++    {
++      "path": "workspace/salad04_report.md",
++      "sha256": "f541d628974d337418fa66cfcf33bd02c9c2f5cb0781030d4fa2a19434a93d65",
++      "bytes": 1567
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-SALAD-04_acceptance.md",
++      "sha256": "2fb13808e0dc8fb734ebd81ff7a12ae0250d5f2916c3f1ba0c96e41f981f34e7",
++      "bytes": 942
++    }
++  ]
++}
+diff -ruN salad04_orig/workspace/salad04_static_checks.json salad04_work/workspace/salad04_static_checks.json
+--- salad04_orig/workspace/salad04_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_static_checks.json	2026-05-27 07:43:29.832593163 +0000
+@@ -0,0 +1,29 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "behavior_change_contract": false,
++  "guard_overlay_only_contract": true,
++  "files_checked": [
++    "crates/model_core/src/salad04_korean_morph_guard.rs",
++    "crates/model_core/src/lib.rs",
++    "crates/model_core/src/sampler_parity.rs",
++    "workspace/salad04_korean_morph_guard_schema.json",
++    "workspace/salad04_summary.json"
++  ],
++  "static_assertions": [
++    "SALAD04_PATCH_ID present",
++    "KoreanMorphClass present",
++    "KoreanMorphLoopKind present",
++    "Salad04Detection.behavior_change=false by construction",
++    "Salad04Detection.guard_overlay_only=true by construction",
++    "append_salad04_receipt_from_sampler03 hook present"
++  ],
++  "text_checks": {
++    "patch_id": true,
++    "hook": true,
++    "lib_mod": true,
++    "lib_export": true
++  }
++}
+diff -ruN salad04_orig/workspace/salad04_summary.json salad04_work/workspace/salad04_summary.json
+--- salad04_orig/workspace/salad04_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ salad04_work/workspace/salad04_summary.json	2026-05-27 07:43:29.830767118 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-02",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "ObserveOnly",
++  "behavior_change": false,
++  "guard_overlay_only": true,
++  "steps_observed": 0,
++  "risk_counts": {
++    "low": 0,
++    "medium": 0,
++    "high": 0,
++    "critical": 0
++  },
++  "loop_kinds": {
++    "josa_repeat_count": 0,
++    "josa_chain_count": 0,
++    "eomi_repeat_count": 0,
++    "eomi_punctuation_loop_count": 0,
++    "jamo_leak_count": 0,
++    "byte_jamo_mixed_leak_count": 0,
++    "syllable_fragment_loop_count": 0,
++    "eojeol_boundary_collapse_count": 0,
++    "punctuation_glue_loop_count": 0,
++    "mixed_morph_loop_count": 0
++  },
++  "overlay": {
++    "raise_salad02_risk_candidate_count": 0,
++    "rollback_candidate_boost_count": 0,
++    "safe_stop_candidate_boost_count": 0,
++    "panic_guard_hint_count": 0,
++    "no_repeat_ngram_hint_count": 0
++  },
++  "safety": {
++    "behavior_change_count": 0,
++    "guard_execution_count": 0,
++    "rollback_execution_count": 0,
++    "stop_execution_count": 0,
++    "score_out_of_range_count": 0
++  },
++  "ready_for_eval00_decode_regression": true,
++  "ready_for_decode03e_guard_overlay_apply": false,
++  "reason": "Korean morph loop guard schema baked; run SALAD-02 fixtures before overlay promotion"
++}

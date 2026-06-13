@@ -1,0 +1,32 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02",
+  "status": "TOKEN_TRANSITION_CONTEXT_GUARD_BAKED_STATIC",
+  "decode_ssot": "tokenizer_core::decode_ssot",
+  "transition_guard_ssot": "model_core::decode_transition_guard",
+  "default_mode": "off",
+  "recommended_validation_mode": "probe",
+  "hard_block_targets": [
+    "pad",
+    "invalid_control",
+    "invalid_byte",
+    "mojibake",
+    "eos_before_min_new_tokens"
+  ],
+  "soft_penalty_targets": [
+    "generic_continuation_immediate_eos",
+    "double_particle_like",
+    "repeated_punctuation",
+    "byte_text_boundary_risk"
+  ],
+  "gpu_transition_shader_parity": "non_scope_decode02_deferred_to_decode02a",
+  "notes": [
+    "piece-based transition requires TransitionRuntimeContext piece hints; id-only EOS/pad guard works without hints",
+    "probe_only leaves logits unchanged and records transition risk"
+  ],
+  "non_scope": [
+    "gpu_transition_shader_parity",
+    "dynamic_context_qwave",
+    "tokenizer_vocab_change",
+    "lora_training"
+  ]
+}

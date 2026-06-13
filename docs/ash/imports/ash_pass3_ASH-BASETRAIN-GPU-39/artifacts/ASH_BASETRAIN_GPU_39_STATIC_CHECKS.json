@@ -1,0 +1,27 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-39",
+  "status": "PASS_STATIC_CHECKS",
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "files": {
+    "crates/base_train/src/ash_basetrain_gpu_39_atlas_upload_ring_buffer_slot_lease_release.rs": true,
+    "crates/base_train/src/bin/ash_basetrain_gpu_39_atlas_upload_ring_buffer_slot_lease_release.rs": true,
+    "specs/ASH_BASETRAIN_GPU_39_SPEC.md": true
+  },
+  "string_checks": {
+    "patch_id_constant": true,
+    "runtime_receipt_path": true,
+    "forward_candidate_38_gate": true,
+    "slot_lifecycle": true,
+    "ring_buffer": true,
+    "reuse_before_release_guard": true,
+    "overwrite_guard": true,
+    "payload_digest_match": true,
+    "bounded_matvec_reused": true,
+    "full_tensor_load_false": true,
+    "no_weight_mutation_guard": true,
+    "next_patch_40": true
+  },
+  "line_count": 925,
+  "pass": true
+}

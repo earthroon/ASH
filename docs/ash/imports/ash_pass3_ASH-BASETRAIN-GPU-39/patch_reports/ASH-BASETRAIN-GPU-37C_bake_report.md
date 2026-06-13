@@ -1,0 +1,45 @@
+# ASH-BASETRAIN-GPU-37C Bake Report
+
+## Result
+Baked static sealed output: `BLOCKED_37B_RECEIPT_NOT_FOUND`.
+
+## Implemented
+- Added 37C source/bin runner.
+- Added explicit 37B receipt intake.
+- Added representative block target validation for `block_000000`, `block_000094`, `block_000188_tail`.
+- Added bounded decode cap: `5,267,456` bytes / `1,316,864` F32 samples.
+- Added re-read byte digest verification against 37B block digests.
+- Added F32 little-endian decode stats: finite, NaN, Inf, zero signs, subnormal, min, max, mean, abs_mean, RMS.
+- Excluded live 37B receipt path from the ZIP.
+
+## Static checks
+```json
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37C",
+  "source_file": "crates/base_train/src/ash_basetrain_gpu_37c_selected_group_row_block_f32_decode_smoke.rs",
+  "bin_file": "crates/base_train/src/bin/ash_basetrain_gpu_37c_selected_group_row_block_f32_decode_smoke.rs",
+  "hex_crate_reference_present": false,
+  "source_safetensors_file_open_call_present": true,
+  "seek_call_present": true,
+  "read_exact_call_present": true,
+  "f32_from_le_bytes_present": true,
+  "read_to_end_call_present": false,
+  "mmap_runtime_call_present": false,
+  "wgpu_guard_field_present": true,
+  "wgpu_runtime_call_present": false,
+  "live_37b_receipt_same_path_included": false,
+  "rust_if_keyword_count": 0,
+  "rust_match_keyword_count": 10,
+  "selected_block_ids": [
+    "block_000000",
+    "block_000094",
+    "block_000188_tail"
+  ],
+  "max_bounded_row_block_decode_bytes": 5267456,
+  "max_bounded_row_block_decode_f32_samples": 1316864,
+  "logic_boundary": "bounded representative row-block F32 decode stats only; no gpu upload; no full selected group read"
+}
+```
+
+## Build note
+Cargo/rustc were not available in this container, so local cargo build/run must be performed by operator.

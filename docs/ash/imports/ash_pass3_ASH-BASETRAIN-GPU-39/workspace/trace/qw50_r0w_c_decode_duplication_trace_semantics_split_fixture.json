@@ -1,0 +1,25 @@
+{
+  "patch_id": "QW-50-R0W-C",
+  "input_case": "R0W-B applied but generated token 417 repeats by greedy top1",
+  "step_example": {
+    "last_token_push": {
+      "attempted": true,
+      "pushed": false,
+      "last_token": 417,
+      "push_policy_source": "qw50_r0w_b_double_last_token_block"
+    },
+    "duplication_before_c": {
+      "detected": true,
+      "kind": "double_last_token_tail",
+      "prefix_len_delta": 0,
+      "recommended_next_patch": "QW-50-R0W-B"
+    },
+    "duplication_after_c": {
+      "legacy_detected": true,
+      "prefix_push_duplication": false,
+      "generated_history_repeat": true,
+      "kind": "generated_history_repeat_tail",
+      "attribution": "generated_sequence_self_repeat_after_qw50_r0w_b"
+    }
+  }
+}

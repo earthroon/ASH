@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-01",
+  "status": "PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "domain_ssot_statement": "Ash is an EN-to-KO translation subtitle-machine domain system. WCTX smoke cases prioritize English source cue preservation, Korean target subtitle wording, timing/cue invariants, compression, line breaks, speaker/register continuity, terminology consistency, and no-hallucinated translation.",
+  "prior_bake_invalidated_reason": "Previous WCTX-01 bake used broad subtitle_machine domain; user-corrected SSOT is EN-to-KO translation subtitle-machine domain.",
+  "rust_toolchain_available": false,
+  "static_checks": {
+    "word_context_smoke_rs_exists": true,
+    "smoke_binary_exists": true,
+    "lib_exports_word_context_smoke": true,
+    "domain_ssot_embedded": true,
+    "case_count": 36,
+    "pass_cases": 36,
+    "fail_cases": 0
+  },
+  "non_mutation_contract": {
+    "token_id_mutation_count": 0,
+    "generation_mutation_count": 0,
+    "roundtrip_failure_count": 0
+  }
+}

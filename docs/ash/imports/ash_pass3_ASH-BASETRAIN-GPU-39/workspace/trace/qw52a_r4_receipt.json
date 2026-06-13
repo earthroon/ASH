@@ -1,0 +1,51 @@
+{
+  "patch_id": "QW-52A-R4",
+  "title": "Cheonjiin Adapter Gated Fusion Candidate / No Default Apply Seal",
+  "base_patch": "QW-52A-R3",
+  "status": "PASS",
+  "gated_fusion_candidate": {
+    "module": "model_core::cheonjiin_adapter_gated_fusion_candidate",
+    "available": true,
+    "formula": "h_candidate = h + alpha * gate * latent_delta",
+    "alpha_candidate": 0.01,
+    "gate_default": 0.0,
+    "runtime_default_apply": false,
+    "controlled_enable_required": true,
+    "operator_approval_required": true,
+    "shadow_dry_run_optional": true
+  },
+  "safety": {
+    "hidden_snapshot_read_only": true,
+    "shadow_uses_cloned_hidden_only": true,
+    "applied_to_runtime_hidden": false,
+    "hidden_state_fusion": false,
+    "residual_stream_mutation": false,
+    "lm_head_input_mutation": false
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "hidden_state_fusion": false,
+    "residual_stream_mutation": false,
+    "lm_head_input_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "adapter_projection_applied": false,
+    "runtime_default_apply": false,
+    "webgpu_shader_added": false,
+    "python_trace_mutation": false,
+    "python_receipt_mutation": false
+  },
+  "trace_outputs": {
+    "schema": "workspace/trace/qw52a_r4_gated_fusion_candidate_schema.json",
+    "fixture": "workspace/trace/qw52a_r4_gated_fusion_candidate_fixture.json",
+    "validation": "workspace/trace/qw52a_r4_gated_fusion_candidate_validation_result.json"
+  },
+  "next_candidates": [
+    "QW-52B",
+    "QW-52A-R5"
+  ]
+}

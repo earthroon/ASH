@@ -1,0 +1,117 @@
+{
+  "patch_id": "QW-52C-R12",
+  "title": "Runtime Shadow Observation Audit / No Promotion Seal",
+  "base_patch": "QW-52C-R11",
+  "status": "PASS_STATIC_RUNTIME_SHADOW_OBSERVATION_AUDIT_NO_PROMOTION",
+  "audit_policy": {
+    "audit_policy_version": "runtime_shadow_observation_audit_v1",
+    "no_promotion_policy_version": "runtime_shadow_no_promotion_v1",
+    "no_runtime_apply_policy_version": "runtime_shadow_audit_no_apply_v1",
+    "min_observation_samples": 5,
+    "max_review_only_ratio": 0.4,
+    "max_unavailable_ratio": 0.3,
+    "require_risky_diff_zero_for_clean_pass": true,
+    "require_stable_broken_zero": true
+  },
+  "summary": {
+    "audit_completed": true,
+    "observation_sample_count": 5,
+    "beneficial_diff_count": 2,
+    "risky_diff_count": 0,
+    "mutation_invariant_pass": true,
+    "no_promotion_guard_active": true,
+    "promotion_eligible": false,
+    "runtime_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "proceed_to_long_horizon_soak": true,
+    "recommended_next_patch": "QW-52C-R13"
+  },
+  "fixture_results": [
+    {
+      "case_id": "clean_observation_pass_no_promotion",
+      "status": "PASS",
+      "audit_status": "PassNoPromotion"
+    },
+    {
+      "case_id": "risky_diff_warn_no_promotion",
+      "status": "PASS",
+      "audit_status": "WarnNoPromotion"
+    },
+    {
+      "case_id": "token_selection_mutation_fails_invariant",
+      "status": "PASS",
+      "audit_status": "FailInvariant"
+    },
+    {
+      "case_id": "review_unavailable_ratio_warn",
+      "status": "PASS",
+      "audit_status": "WarnNoPromotion"
+    },
+    {
+      "case_id": "missing_r11_observation_unavailable",
+      "status": "PASS",
+      "audit_status": "Unavailable"
+    }
+  ],
+  "promotion_guard": {
+    "promotion_eligible": false,
+    "policy_promotion_allowed": false,
+    "runtime_apply_allowed": false,
+    "runtime_default_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "safe_profile_apply_allowed": false,
+    "no_promotion_policy_version": "runtime_shadow_no_promotion_v1",
+    "promotion_block_reasons": [
+      "NoPromotionSealActive",
+      "LongHorizonSoakRequired",
+      "HumanLabelRequired",
+      "RuntimeProbeRequired",
+      "OperatorReApprovalRequired"
+    ]
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "runtime_default_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "weight_commit": false,
+    "safe_profile_apply": false,
+    "observation_audit": true,
+    "no_promotion_seal": true,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_audit_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R13",
+    "QW-52C-R12-R1",
+    "QW-52D"
+  ],
+  "notes": [
+    "R12 audits runtime shadow observation only.",
+    "Clean observation does not grant promotion.",
+    "No runtime apply is allowed.",
+    "No weight profile is committed.",
+    "Long-horizon soak is required before any further review."
+  ]
+}

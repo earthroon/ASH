@@ -1,0 +1,31 @@
+{
+  "patch_id": "QW-53C",
+  "title": "Dream Collapse Simulation / QWave Mirror Resonance Replay Seal",
+  "base_patch": "QW-53B",
+  "schema": "DreamCollapseSimulationTrace",
+  "replay_policy_version": "dream_collapse_replay_v1",
+  "collapse_prediction_policy_version": "dream_collapse_prediction_v1",
+  "outputs": {
+    "replay_jsonl": "artifacts/qw53c_dream_collapse_replay_samples.jsonl",
+    "manifest": "artifacts/qw53c_dream_collapse_simulation_manifest.json"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "live_decode_intervention": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "stable_phrase_memory_write": false,
+    "quarantine_memory_write": false,
+    "dream_insight_apply": false,
+    "simulation_result_apply": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

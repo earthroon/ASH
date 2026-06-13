@@ -1,0 +1,13 @@
+ASH-BODYTRAIN-ATLAS-00 LOCAL VALIDATION
+
+container_cargo_available = false
+local_cargo_build = NOT_EXECUTED_IN_CONTAINER
+local_runtime_pass = USER_LOCAL_SSOT_REQUIRED
+zip_integrity = CHECKED_DURING_BAKE
+
+Expected operator commands:
+  cargo build -p base_train --bin ash_bodytrain_atlas_00_umbrella_ssot --jobs 1
+  cargo run --jobs 1 -p base_train --bin ash_bodytrain_atlas_00_umbrella_ssot
+
+Expected verdict:
+  PASS_ASH_BODYTRAIN_ATLAS_00_UMBRELLA_SSOT_TOK_TENSOR_BASETRAIN_GPU_FT_ROUTE_BINDING_NO_RUNTIME_TRAINING_CLAIM

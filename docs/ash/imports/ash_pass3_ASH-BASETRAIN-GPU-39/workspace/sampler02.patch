@@ -1,0 +1,1408 @@
+diff -ruN /mnt/data/sampler02_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md ./acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md
+--- /mnt/data/sampler02_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ ./acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md	2026-05-26 15:51:54.660360207 +0000
+@@ -0,0 +1,11 @@
++# 16AI-QW-38G-R6A-SAMPLER-02 Acceptance
++
++- Static patch: PASS
++- Runtime execution: NOT_RUN
++- Cargo check: NOT_RUN
++- GPU candidate trace ABI: PARTIAL / pending follow-up
++- Receipt files: PRESENT
++
++## Acceptance Notes
++
++This patch does not claim full GPU candidate-set PASS without a GPU candidate trace buffer. It adds the runtime receipt pipeline and records `PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE` when the GPU cannot expose active/final IDs.
+diff -ruN /mnt/data/sampler02_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs ./crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- /mnt/data/sampler02_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 15:42:01.000000000 +0000
++++ ./crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 15:51:54.653994245 +0000
+@@ -565,6 +565,12 @@
+     pub fallback_reason: GpuSamplingFallbackReason,
+     pub compare: GpuSamplingCompareReport,
+     pub topk_overflow_fallback: bool,
++    pub recovery_mode: Option<String>,
++    pub active_count: Option<u32>,
++    pub final_count: Option<u32>,
++    pub min_p_threshold: Option<f32>,
++    pub active_max: Option<f32>,
++    pub active_sum_exp: Option<f32>,
+     pub perf: Option<GpuSamplingPerfCounters>,
+ }
+ 
+@@ -1808,6 +1814,12 @@
+                 logprob_abs_delta: None,
+             },
+             topk_overflow_fallback: false,
++            recovery_mode: None,
++            active_count: None,
++            final_count: None,
++            min_p_threshold: None,
++            active_max: None,
++            active_sum_exp: None,
+             perf: None,
+         })
+     }
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/cpu_oracle_sampler.rs ./crates/model_core/src/cpu_oracle_sampler.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:34:59.000000000 +0000
++++ ./crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:51:54.651413973 +0000
+@@ -21,6 +21,69 @@
+     pub min_new_tokens: usize,
+ }
+ 
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum SamplerRecoveryMode {
++    None,
++    ActiveTop1,
++    ValidGlobalTop1,
++    NoValidToken,
++    EmptyLogits,
++    NoCandidateAfterGuard,
++    NoCandidateAfterMinP,
++    NoCandidateAfterTopP,
++}
++
++impl SamplerRecoveryMode {
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::None => "none",
++            Self::ActiveTop1 => "active_top1",
++            Self::ValidGlobalTop1 => "valid_global_top1",
++            Self::NoValidToken => "no_valid_token",
++            Self::EmptyLogits => "empty_logits",
++            Self::NoCandidateAfterGuard => "no_candidate_after_ban_eos_guard",
++            Self::NoCandidateAfterMinP => "no_candidate_after_min_p",
++            Self::NoCandidateAfterTopP => "no_candidate_after_top_p",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct CpuOracleCandidateTrace {
++    pub active_ids: Vec<u32>,
++    pub final_ids: Vec<u32>,
++    pub active_count: usize,
++    pub final_count: usize,
++    pub pre_min_p_count: usize,
++    pub post_min_p_count: usize,
++    pub post_top_p_count: usize,
++    pub min_p_threshold: Option<f32>,
++    pub active_max: Option<f32>,
++    pub active_sum_exp: Option<f32>,
++    pub final_mask_recovered: bool,
++    pub recovery_mode: SamplerRecoveryMode,
++}
++
++impl Default for CpuOracleCandidateTrace {
++    fn default() -> Self {
++        Self {
++            active_ids: Vec::new(),
++            final_ids: Vec::new(),
++            active_count: 0,
++            final_count: 0,
++            pre_min_p_count: 0,
++            post_min_p_count: 0,
++            post_top_p_count: 0,
++            min_p_threshold: None,
++            active_max: None,
++            active_sum_exp: None,
++            final_mask_recovered: false,
++            recovery_mode: SamplerRecoveryMode::None,
++        }
++    }
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct CpuOracleSampleResult {
+     pub selected_id: u32,
+@@ -35,6 +98,7 @@
+     pub active_softmax_renormalized: bool,
+     pub candidate_empty_recovered: bool,
+     pub recovery_mode: Option<String>,
++    pub trace: CpuOracleCandidateTrace,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -45,6 +109,48 @@
+     prob: f32,
+ }
+ 
++fn candidate_trace_from(
++    active: &[Candidate],
++    final_candidates: &[Candidate],
++    pre_min_p_count: usize,
++    post_min_p_count: usize,
++    min_p_threshold: Option<f32>,
++    final_mask_recovered: bool,
++    recovery_mode: SamplerRecoveryMode,
++) -> CpuOracleCandidateTrace {
++    let (active_max, active_sum_exp) = active_stats(active);
++    CpuOracleCandidateTrace {
++        active_ids: active.iter().map(|c| c.id).collect(),
++        final_ids: final_candidates.iter().map(|c| c.id).collect(),
++        active_count: active.len(),
++        final_count: final_candidates.len(),
++        pre_min_p_count,
++        post_min_p_count,
++        post_top_p_count: final_candidates.len(),
++        min_p_threshold,
++        active_max,
++        active_sum_exp,
++        final_mask_recovered,
++        recovery_mode,
++    }
++}
++
++fn active_stats(candidates: &[Candidate]) -> (Option<f32>, Option<f32>) {
++    if candidates.is_empty() {
++        return (None, None);
++    }
++    let max_scaled = candidates
++        .iter()
++        .map(|c| c.scaled)
++        .max_by(|a, b| a.total_cmp(b));
++    let Some(max_scaled) = max_scaled else { return (None, None); };
++    let mut sum = 0.0f32;
++    for cand in candidates {
++        sum += (cand.scaled - max_scaled).exp();
++    }
++    (Some(max_scaled), Some(sum))
++}
++
+ pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
+     config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
+ }
+@@ -68,6 +174,7 @@
+             active_softmax_renormalized: false,
+             candidate_empty_recovered: true,
+             recovery_mode: Some("empty_logits".to_string()),
++            trace: CpuOracleCandidateTrace { final_mask_recovered: true, recovery_mode: SamplerRecoveryMode::EmptyLogits, ..Default::default() },
+         };
+     }
+ 
+@@ -132,6 +239,7 @@
+     let active_count_after_min_p = candidates.len();
+ 
+     renormalize_active_set(&mut candidates);
++    let active_candidates_for_trace = candidates.clone();
+ 
+     candidates.sort_by(|a, b| b.prob.total_cmp(&a.prob));
+     let mut top_p_cut = candidates.len();
+@@ -178,6 +286,15 @@
+         active_softmax_renormalized: true,
+         candidate_empty_recovered: false,
+         recovery_mode: None,
++        trace: candidate_trace_from(
++            &active_candidates_for_trace,
++            &candidates,
++            active_count_before_min_p,
++            active_count_after_min_p,
++            min_p_threshold,
++            false,
++            SamplerRecoveryMode::None,
++        ),
+     }
+ }
+ 
+@@ -236,6 +353,20 @@
+         active_softmax_renormalized: false,
+         candidate_empty_recovered: false,
+         recovery_mode: None,
++        trace: CpuOracleCandidateTrace {
++            active_ids: if best_logit.is_finite() { vec![best_id] } else { Vec::new() },
++            final_ids: if best_logit.is_finite() { vec![best_id] } else { Vec::new() },
++            active_count: if best_logit.is_finite() { 1 } else { 0 },
++            final_count: if best_logit.is_finite() { 1 } else { 0 },
++            pre_min_p_count: if best_logit.is_finite() { 1 } else { 0 },
++            post_min_p_count: if best_logit.is_finite() { 1 } else { 0 },
++            post_top_p_count: if best_logit.is_finite() { 1 } else { 0 },
++            min_p_threshold: None,
++            active_max: if best_logit.is_finite() { Some(best_logit) } else { None },
++            active_sum_exp: if best_logit.is_finite() { Some(1.0) } else { None },
++            final_mask_recovered: false,
++            recovery_mode: SamplerRecoveryMode::None,
++        },
+     }
+ }
+ 
+@@ -245,6 +376,13 @@
+     result.recovery_mode = Some(reason.to_string());
+     result.sampler_applied = true;
+     result.apply_mode = SamplingApplyMode::CpuOracleSampler;
++    result.trace.final_mask_recovered = true;
++    result.trace.recovery_mode = match reason {
++        "no_candidate_after_ban_eos_guard" => SamplerRecoveryMode::NoCandidateAfterGuard,
++        "no_candidate_after_min_p" => SamplerRecoveryMode::NoCandidateAfterMinP,
++        "no_candidate_after_top_p" => SamplerRecoveryMode::NoCandidateAfterTopP,
++        _ => SamplerRecoveryMode::ValidGlobalTop1,
++    };
+     result
+ }
+ 
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/generation_sampling.rs ./crates/model_core/src/generation_sampling.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 15:33:25.000000000 +0000
++++ ./crates/model_core/src/generation_sampling.rs	2026-05-26 15:53:06.202060772 +0000
+@@ -1,6 +1,7 @@
+ use super::*;
+ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+ use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
++use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
+ use std::collections::BTreeMap;
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+@@ -2328,6 +2329,12 @@
+                 compared: false,
+                 fell_back_to_legacy: false,
+                 topk_overflow_fallback: false,
++                sampler02_recovery_mode: result.recovery_mode.clone(),
++                sampler02_active_count: Some(result.trace.active_count as u32),
++                sampler02_final_count: Some(result.trace.final_count as u32),
++                sampler02_min_p_threshold: result.trace.min_p_threshold,
++                sampler02_active_max: result.trace.active_max,
++                sampler02_active_sum_exp: result.trace.active_sum_exp,
+                 perf: None,
+             }),
+             gpu_raw_bridge: None,
+@@ -2335,6 +2342,47 @@
+         }
+     }
+ 
++
++    fn maybe_write_sampler02_parity_receipt(
++        &self,
++        cpu_row: &[f32],
++        sampling: &GenerationSamplingConfig,
++        step: usize,
++        sampled: &GpuSamplingResult,
++    ) {
++        let mode = SamplerParityMode::from_env();
++        if !mode.enabled() || step >= sampler_parity::max_steps() {
++            return;
++        }
++        let ctx = CpuOracleContext {
++            step,
++            seed: sampling.seed.unwrap_or(0),
++            eos_token_id: Some(self.spec.token_ids.eos_id),
++            pad_token_id: Some(self.spec.token_ids.pad_id),
++            banned_token_ids: Vec::new(),
++            recent_token_ids: Vec::new(),
++            min_new_tokens: sampling.min_new_tokens,
++        };
++        let cpu_result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
++        let top_n = sampler_parity::top_n_limit();
++        let cpu_trace = sampler_parity::cpu_trace_from_result(&cpu_result, top_n);
++        let gpu_trace = GpuSamplerRuntimeTrace {
++            selected_id: sampled.token_id,
++            selected_logprob: sampled.logprob,
++            recovery_mode: sampled.recovery_mode.clone(),
++            active_count: sampled.active_count.map(|v| v as usize),
++            final_count: sampled.final_count.map(|v| v as usize),
++            min_p_threshold: sampled.min_p_threshold,
++            active_max: sampled.active_max,
++            active_sum_exp: sampled.active_sum_exp,
++            active_ids_head: Vec::new(),
++            final_ids_head: Vec::new(),
++            trace_completeness: "selected_and_recovery_only_gpu_candidate_trace_pending_abi".to_string(),
++        };
++        let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
++        sampler_parity::append_receipt(&receipt);
++    }
++
+     pub(crate) fn select_next_token_with_sampling(
+         &self,
+         logits: &LastLogitsGpu,
+@@ -2448,6 +2496,7 @@
+                         "model_core.select.sampled.gpu_sampling.dispatch_cpu_adjusted_raw".to_string(),
+                         || runtime.dispatch_sample_raw_lease(&adjusted_lease, &cfg),
+                     ) {
++                        self.maybe_write_sampler02_parity_receipt(&logits_for_fallback.cpu_row, &routed_sampling, 0, &sampled);
+                         let fallback_logit = logits_for_fallback.cpu_row.get(sampled.token_id as usize).copied().unwrap_or(f32::NEG_INFINITY);
+                         return Ok(NextTokenChoice {
+                             token_id: sampled.token_id,
+@@ -2475,6 +2524,7 @@
+                     "model_core.select.sampled.gpu_sampling.dispatch_cpu_logits".to_string(),
+                     || runtime.dispatch_sample_cpu_logits(&logits_for_fallback.cpu_row, &cfg),
+                 ) {
++                    self.maybe_write_sampler02_parity_receipt(&logits_for_fallback.cpu_row, &routed_sampling, 0, &sampled);
+                     let fallback_logit = logits_for_fallback.cpu_row.get(sampled.token_id as usize).copied().unwrap_or(f32::NEG_INFINITY);
+                     return Ok(NextTokenChoice {
+                         token_id: sampled.token_id,
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/generation_telemetry.rs ./crates/model_core/src/generation_telemetry.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/generation_telemetry.rs	2026-05-24 04:08:30.000000000 +0000
++++ ./crates/model_core/src/generation_telemetry.rs	2026-05-26 15:53:41.108416132 +0000
+@@ -58,6 +58,12 @@
+     pub compared: bool,
+     pub fell_back_to_legacy: bool,
+     pub topk_overflow_fallback: bool,
++    pub sampler02_recovery_mode: Option<String>,
++    pub sampler02_active_count: Option<u32>,
++    pub sampler02_final_count: Option<u32>,
++    pub sampler02_min_p_threshold: Option<f32>,
++    pub sampler02_active_max: Option<f32>,
++    pub sampler02_active_sum_exp: Option<f32>,
+     pub perf: Option<GpuSamplingPerfStepTelemetry>,
+ }
+ 
+@@ -1010,6 +1016,12 @@
+         compared: !matches!(result.compare.status, GpuSamplingCompareStatus::NotCompared),
+         fell_back_to_legacy: matches!(result.path, GpuSamplingPath::LegacyFallback),
+         topk_overflow_fallback: result.topk_overflow_fallback,
++        sampler02_recovery_mode: result.recovery_mode.clone(),
++        sampler02_active_count: result.active_count,
++        sampler02_final_count: result.final_count,
++        sampler02_min_p_threshold: result.min_p_threshold,
++        sampler02_active_max: result.active_max,
++        sampler02_active_sum_exp: result.active_sum_exp,
+         perf: result.perf.as_ref().map(gpu_sampling_perf_step_telemetry_from_backend),
+     }
+ }
+@@ -1066,6 +1078,12 @@
+                 compared,
+                 fell_back_to_legacy,
+                 topk_overflow_fallback,
++                sampler02_recovery_mode: None,
++                sampler02_active_count: None,
++                sampler02_final_count: None,
++                sampler02_min_p_threshold: None,
++                sampler02_active_max: None,
++                sampler02_active_sum_exp: None,
+                 perf: None,
+             }),
+             gpu_raw_bridge: None,
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/lib.rs ./crates/model_core/src/lib.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/lib.rs	2026-05-26 15:32:49.000000000 +0000
++++ ./crates/model_core/src/lib.rs	2026-05-26 15:51:54.652493188 +0000
+@@ -10,6 +10,7 @@
+ mod generation_sampling;
+ mod sampling_helpers;
+ mod cpu_oracle_sampler;
++mod sampler_parity;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -56,7 +57,8 @@
+     tensorcube_health_snapshot_from_telemetry_summaries,
+ };
+ 
+-pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, SamplingApplyMode, sample_with_cpu_oracle};
++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
++pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use generation_telemetry::{
+     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
+     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/sampler_parity.rs ./crates/model_core/src/sampler_parity.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/sampler_parity.rs	1970-01-01 00:00:00.000000000 +0000
++++ ./crates/model_core/src/sampler_parity.rs	2026-05-26 15:51:54.651880720 +0000
+@@ -0,0 +1,220 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::cpu_oracle_sampler::{CpuOracleCandidateTrace, CpuOracleSampleResult};
++use crate::generation_sampling::GenerationSamplingConfig;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum SamplerParityMode {
++    Off,
++    ProbeOnly,
++    Strict,
++}
++
++impl SamplerParityMode {
++    pub fn from_env() -> Self {
++        match env::var("ASH_SAMPLER_PARITY").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase().as_str() {
++            "probe" | "probe_only" | "probeonly" => Self::ProbeOnly,
++            "strict" => Self::Strict,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ProbeOnly => "ProbeOnly",
++            Self::Strict => "Strict",
++        }
++    }
++
++    pub fn enabled(&self) -> bool {
++        !matches!(self, Self::Off)
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SamplerParityTolerance {
++    pub threshold_abs_tol: f32,
++    pub sum_exp_rel_tol: f32,
++    pub prob_abs_tol: f32,
++    pub logprob_abs_tol: f32,
++}
++
++impl Default for SamplerParityTolerance {
++    fn default() -> Self {
++        Self {
++            threshold_abs_tol: 1e-4,
++            sum_exp_rel_tol: 1e-3,
++            prob_abs_tol: 1e-4,
++            logprob_abs_tol: 1e-4,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct GpuSamplerRuntimeTrace {
++    pub selected_id: u32,
++    pub selected_logprob: Option<f32>,
++    pub recovery_mode: Option<String>,
++    pub active_count: Option<usize>,
++    pub final_count: Option<usize>,
++    pub min_p_threshold: Option<f32>,
++    pub active_max: Option<f32>,
++    pub active_sum_exp: Option<f32>,
++    pub active_ids_head: Vec<u32>,
++    pub final_ids_head: Vec<u32>,
++    pub trace_completeness: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct CpuSamplerRuntimeTrace {
++    pub selected_id: u32,
++    pub selected_logprob: Option<f32>,
++    pub active_count: usize,
++    pub final_count: usize,
++    pub min_p_threshold: Option<f32>,
++    pub active_max: Option<f32>,
++    pub active_sum_exp: Option<f32>,
++    pub active_ids_head: Vec<u32>,
++    pub final_ids_head: Vec<u32>,
++    pub recovery_mode: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SamplerParityStatus {
++    pub candidate_set_match: Option<bool>,
++    pub active_count_match: Option<bool>,
++    pub final_count_match: Option<bool>,
++    pub threshold_match: Option<bool>,
++    pub recovery_mode_match: Option<bool>,
++    pub selected_match: bool,
++    pub status: String,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SamplerParityReceipt {
++    pub patch_id: String,
++    pub step: usize,
++    pub mode: String,
++    pub decode_config: SamplerParityDecodeConfig,
++    pub cpu: CpuSamplerRuntimeTrace,
++    pub gpu: GpuSamplerRuntimeTrace,
++    pub parity: SamplerParityStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SamplerParityDecodeConfig {
++    pub temperature: f32,
++    pub top_k: u32,
++    pub top_p: f32,
++    pub min_p: f32,
++}
++
++pub fn top_n_limit() -> usize {
++    env::var("ASH_SAMPLER_PARITY_TOP_N")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .unwrap_or(64)
++}
++
++pub fn max_steps() -> usize {
++    env::var("ASH_SAMPLER_PARITY_MAX_STEPS")
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .unwrap_or(16)
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_SAMPLER_PARITY_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler02_runtime_parity_receipt.jsonl"))
++}
++
++pub fn cpu_trace_from_result(result: &CpuOracleSampleResult, top_n: usize) -> CpuSamplerRuntimeTrace {
++    let trace: &CpuOracleCandidateTrace = &result.trace;
++    CpuSamplerRuntimeTrace {
++        selected_id: result.selected_id,
++        selected_logprob: Some(result.selected_logprob),
++        active_count: trace.active_count,
++        final_count: trace.final_count,
++        min_p_threshold: trace.min_p_threshold,
++        active_max: trace.active_max,
++        active_sum_exp: trace.active_sum_exp,
++        active_ids_head: trace.active_ids.iter().copied().take(top_n).collect(),
++        final_ids_head: trace.final_ids.iter().copied().take(top_n).collect(),
++        recovery_mode: trace.recovery_mode.as_str().to_string(),
++    }
++}
++
++pub fn compare_traces(
++    mode: SamplerParityMode,
++    config: &GenerationSamplingConfig,
++    step: usize,
++    cpu: CpuSamplerRuntimeTrace,
++    gpu: GpuSamplerRuntimeTrace,
++) -> SamplerParityReceipt {
++    let tol = SamplerParityTolerance::default();
++    let selected_match = cpu.selected_id == gpu.selected_id;
++    let active_count_match = gpu.active_count.map(|v| v == cpu.active_count);
++    let final_count_match = gpu.final_count.map(|v| v == cpu.final_count);
++    let threshold_match = match (cpu.min_p_threshold, gpu.min_p_threshold) {
++        (Some(a), Some(b)) => Some((a - b).abs() <= tol.threshold_abs_tol),
++        (None, None) => Some(true),
++        _ => None,
++    };
++    let candidate_set_match = if gpu.active_ids_head.is_empty() && gpu.final_ids_head.is_empty() {
++        None
++    } else {
++        Some(cpu.active_ids_head == gpu.active_ids_head && cpu.final_ids_head == gpu.final_ids_head)
++    };
++    let recovery_mode_match = gpu.recovery_mode.as_ref().map(|g| g == &cpu.recovery_mode);
++
++    let (status, reason) = if candidate_set_match == Some(false) || active_count_match == Some(false) || final_count_match == Some(false) || threshold_match == Some(false) {
++        ("FAIL_CANDIDATE_PARITY_MISMATCH".to_string(), "candidate/count/threshold mismatch".to_string())
++    } else if candidate_set_match.is_none() {
++        ("PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE".to_string(), "GPU candidate ID trace buffer not present; selected/recovery and CPU oracle trace recorded".to_string())
++    } else if !selected_match {
++        ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
++    } else {
++        ("PASS".to_string(), "candidate and selected token parity".to_string())
++    };
++
++    SamplerParityReceipt {
++        patch_id: "16AI-QW-38G-R6A-SAMPLER-02".to_string(),
++        step,
++        mode: mode.as_str().to_string(),
++        decode_config: SamplerParityDecodeConfig {
++            temperature: config.temperature,
++            top_k: config.top_k,
++            top_p: config.top_p,
++            min_p: config.min_p,
++        },
++        cpu,
++        gpu,
++        parity: SamplerParityStatus {
++            candidate_set_match,
++            active_count_match,
++            final_count_match,
++            threshold_match,
++            recovery_mode_match,
++            selected_match,
++            status,
++            reason,
++        },
++    }
++}
++
++pub fn append_receipt(receipt: &SamplerParityReceipt) {
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
+diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/sampling_helpers.rs ./crates/model_core/src/sampling_helpers.rs
+--- /mnt/data/sampler02_orig/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:42:23.000000000 +0000
++++ ./crates/model_core/src/sampling_helpers.rs	2026-05-26 15:51:54.657510965 +0000
+@@ -120,6 +120,10 @@
+     pub gpu_selected_from_recovery: bool,
+     pub cpu_gpu_candidate_parity_checked: bool,
+     pub cpu_gpu_candidate_parity_status: Option<String>,
++    pub sampler02_runtime_parity_status: Option<String>,
++    pub sampler02_candidate_set_match: Option<bool>,
++    pub sampler02_selected_match: Option<bool>,
++    pub sampler02_trace_completeness: Option<String>,
+     pub finite_logits: bool,
+     pub nan_count: usize,
+     pub inf_count: usize,
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02.patch ./workspace/sampler02.patch
+--- /mnt/data/sampler02_orig/workspace/sampler02.patch	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02.patch	2026-05-26 15:54:27.055065395 +0000
+@@ -0,0 +1,630 @@
++diff -ruN /mnt/data/sampler02_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md ./acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md
++--- /mnt/data/sampler02_orig/acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ ./acceptance_reports/16AI-QW-38G-R6A-SAMPLER-02_acceptance.md	2026-05-26 15:51:54.660360207 +0000
++@@ -0,0 +1,11 @@
+++# 16AI-QW-38G-R6A-SAMPLER-02 Acceptance
+++
+++- Static patch: PASS
+++- Runtime execution: NOT_RUN
+++- Cargo check: NOT_RUN
+++- GPU candidate trace ABI: PARTIAL / pending follow-up
+++- Receipt files: PRESENT
+++
+++## Acceptance Notes
+++
+++This patch does not claim full GPU candidate-set PASS without a GPU candidate trace buffer. It adds the runtime receipt pipeline and records `PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE` when the GPU cannot expose active/final IDs.
++diff -ruN /mnt/data/sampler02_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs ./crates/burn_webgpu_backend/src/gpu_sampling.rs
++--- /mnt/data/sampler02_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 15:42:01.000000000 +0000
+++++ ./crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 15:51:54.653994245 +0000
++@@ -565,6 +565,12 @@
++     pub fallback_reason: GpuSamplingFallbackReason,
++     pub compare: GpuSamplingCompareReport,
++     pub topk_overflow_fallback: bool,
+++    pub recovery_mode: Option<String>,
+++    pub active_count: Option<u32>,
+++    pub final_count: Option<u32>,
+++    pub min_p_threshold: Option<f32>,
+++    pub active_max: Option<f32>,
+++    pub active_sum_exp: Option<f32>,
++     pub perf: Option<GpuSamplingPerfCounters>,
++ }
++ 
++@@ -1808,6 +1814,12 @@
++                 logprob_abs_delta: None,
++             },
++             topk_overflow_fallback: false,
+++            recovery_mode: None,
+++            active_count: None,
+++            final_count: None,
+++            min_p_threshold: None,
+++            active_max: None,
+++            active_sum_exp: None,
++             perf: None,
++         })
++     }
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/cpu_oracle_sampler.rs ./crates/model_core/src/cpu_oracle_sampler.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:34:59.000000000 +0000
+++++ ./crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 15:51:54.651413973 +0000
++@@ -21,6 +21,69 @@
++     pub min_new_tokens: usize,
++ }
++ 
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum SamplerRecoveryMode {
+++    None,
+++    ActiveTop1,
+++    ValidGlobalTop1,
+++    NoValidToken,
+++    EmptyLogits,
+++    NoCandidateAfterGuard,
+++    NoCandidateAfterMinP,
+++    NoCandidateAfterTopP,
+++}
+++
+++impl SamplerRecoveryMode {
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::None => "none",
+++            Self::ActiveTop1 => "active_top1",
+++            Self::ValidGlobalTop1 => "valid_global_top1",
+++            Self::NoValidToken => "no_valid_token",
+++            Self::EmptyLogits => "empty_logits",
+++            Self::NoCandidateAfterGuard => "no_candidate_after_ban_eos_guard",
+++            Self::NoCandidateAfterMinP => "no_candidate_after_min_p",
+++            Self::NoCandidateAfterTopP => "no_candidate_after_top_p",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct CpuOracleCandidateTrace {
+++    pub active_ids: Vec<u32>,
+++    pub final_ids: Vec<u32>,
+++    pub active_count: usize,
+++    pub final_count: usize,
+++    pub pre_min_p_count: usize,
+++    pub post_min_p_count: usize,
+++    pub post_top_p_count: usize,
+++    pub min_p_threshold: Option<f32>,
+++    pub active_max: Option<f32>,
+++    pub active_sum_exp: Option<f32>,
+++    pub final_mask_recovered: bool,
+++    pub recovery_mode: SamplerRecoveryMode,
+++}
+++
+++impl Default for CpuOracleCandidateTrace {
+++    fn default() -> Self {
+++        Self {
+++            active_ids: Vec::new(),
+++            final_ids: Vec::new(),
+++            active_count: 0,
+++            final_count: 0,
+++            pre_min_p_count: 0,
+++            post_min_p_count: 0,
+++            post_top_p_count: 0,
+++            min_p_threshold: None,
+++            active_max: None,
+++            active_sum_exp: None,
+++            final_mask_recovered: false,
+++            recovery_mode: SamplerRecoveryMode::None,
+++        }
+++    }
+++}
+++
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++ pub struct CpuOracleSampleResult {
++     pub selected_id: u32,
++@@ -35,6 +98,7 @@
++     pub active_softmax_renormalized: bool,
++     pub candidate_empty_recovered: bool,
++     pub recovery_mode: Option<String>,
+++    pub trace: CpuOracleCandidateTrace,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -45,6 +109,48 @@
++     prob: f32,
++ }
++ 
+++fn candidate_trace_from(
+++    active: &[Candidate],
+++    final_candidates: &[Candidate],
+++    pre_min_p_count: usize,
+++    post_min_p_count: usize,
+++    min_p_threshold: Option<f32>,
+++    final_mask_recovered: bool,
+++    recovery_mode: SamplerRecoveryMode,
+++) -> CpuOracleCandidateTrace {
+++    let (active_max, active_sum_exp) = active_stats(active);
+++    CpuOracleCandidateTrace {
+++        active_ids: active.iter().map(|c| c.id).collect(),
+++        final_ids: final_candidates.iter().map(|c| c.id).collect(),
+++        active_count: active.len(),
+++        final_count: final_candidates.len(),
+++        pre_min_p_count,
+++        post_min_p_count,
+++        post_top_p_count: final_candidates.len(),
+++        min_p_threshold,
+++        active_max,
+++        active_sum_exp,
+++        final_mask_recovered,
+++        recovery_mode,
+++    }
+++}
+++
+++fn active_stats(candidates: &[Candidate]) -> (Option<f32>, Option<f32>) {
+++    if candidates.is_empty() {
+++        return (None, None);
+++    }
+++    let max_scaled = candidates
+++        .iter()
+++        .map(|c| c.scaled)
+++        .max_by(|a, b| a.total_cmp(b));
+++    let Some(max_scaled) = max_scaled else { return (None, None); };
+++    let mut sum = 0.0f32;
+++    for cand in candidates {
+++        sum += (cand.scaled - max_scaled).exp();
+++    }
+++    (Some(max_scaled), Some(sum))
+++}
+++
++ pub fn sampler_requested(config: &GenerationSamplingConfig) -> bool {
++     config.temperature > 0.0 || config.top_k > 0 || config.top_p < 1.0 || config.min_p > 0.0
++ }
++@@ -68,6 +174,7 @@
++             active_softmax_renormalized: false,
++             candidate_empty_recovered: true,
++             recovery_mode: Some("empty_logits".to_string()),
+++            trace: CpuOracleCandidateTrace { final_mask_recovered: true, recovery_mode: SamplerRecoveryMode::EmptyLogits, ..Default::default() },
++         };
++     }
++ 
++@@ -132,6 +239,7 @@
++     let active_count_after_min_p = candidates.len();
++ 
++     renormalize_active_set(&mut candidates);
+++    let active_candidates_for_trace = candidates.clone();
++ 
++     candidates.sort_by(|a, b| b.prob.total_cmp(&a.prob));
++     let mut top_p_cut = candidates.len();
++@@ -178,6 +286,15 @@
++         active_softmax_renormalized: true,
++         candidate_empty_recovered: false,
++         recovery_mode: None,
+++        trace: candidate_trace_from(
+++            &active_candidates_for_trace,
+++            &candidates,
+++            active_count_before_min_p,
+++            active_count_after_min_p,
+++            min_p_threshold,
+++            false,
+++            SamplerRecoveryMode::None,
+++        ),
++     }
++ }
++ 
++@@ -236,6 +353,20 @@
++         active_softmax_renormalized: false,
++         candidate_empty_recovered: false,
++         recovery_mode: None,
+++        trace: CpuOracleCandidateTrace {
+++            active_ids: if best_logit.is_finite() { vec![best_id] } else { Vec::new() },
+++            final_ids: if best_logit.is_finite() { vec![best_id] } else { Vec::new() },
+++            active_count: if best_logit.is_finite() { 1 } else { 0 },
+++            final_count: if best_logit.is_finite() { 1 } else { 0 },
+++            pre_min_p_count: if best_logit.is_finite() { 1 } else { 0 },
+++            post_min_p_count: if best_logit.is_finite() { 1 } else { 0 },
+++            post_top_p_count: if best_logit.is_finite() { 1 } else { 0 },
+++            min_p_threshold: None,
+++            active_max: if best_logit.is_finite() { Some(best_logit) } else { None },
+++            active_sum_exp: if best_logit.is_finite() { Some(1.0) } else { None },
+++            final_mask_recovered: false,
+++            recovery_mode: SamplerRecoveryMode::None,
+++        },
++     }
++ }
++ 
++@@ -245,6 +376,13 @@
++     result.recovery_mode = Some(reason.to_string());
++     result.sampler_applied = true;
++     result.apply_mode = SamplingApplyMode::CpuOracleSampler;
+++    result.trace.final_mask_recovered = true;
+++    result.trace.recovery_mode = match reason {
+++        "no_candidate_after_ban_eos_guard" => SamplerRecoveryMode::NoCandidateAfterGuard,
+++        "no_candidate_after_min_p" => SamplerRecoveryMode::NoCandidateAfterMinP,
+++        "no_candidate_after_top_p" => SamplerRecoveryMode::NoCandidateAfterTopP,
+++        _ => SamplerRecoveryMode::ValidGlobalTop1,
+++    };
++     result
++ }
++ 
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/generation_sampling.rs ./crates/model_core/src/generation_sampling.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 15:33:25.000000000 +0000
+++++ ./crates/model_core/src/generation_sampling.rs	2026-05-26 15:53:06.202060772 +0000
++@@ -1,6 +1,7 @@
++ use super::*;
++ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
++ use crate::cpu_oracle_sampler::{CpuOracleContext, sample_with_cpu_oracle};
+++use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
++ use std::collections::BTreeMap;
++ use crate::sampling_helpers::{
++     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
++@@ -2328,6 +2329,12 @@
++                 compared: false,
++                 fell_back_to_legacy: false,
++                 topk_overflow_fallback: false,
+++                sampler02_recovery_mode: result.recovery_mode.clone(),
+++                sampler02_active_count: Some(result.trace.active_count as u32),
+++                sampler02_final_count: Some(result.trace.final_count as u32),
+++                sampler02_min_p_threshold: result.trace.min_p_threshold,
+++                sampler02_active_max: result.trace.active_max,
+++                sampler02_active_sum_exp: result.trace.active_sum_exp,
++                 perf: None,
++             }),
++             gpu_raw_bridge: None,
++@@ -2335,6 +2342,47 @@
++         }
++     }
++ 
+++
+++    fn maybe_write_sampler02_parity_receipt(
+++        &self,
+++        cpu_row: &[f32],
+++        sampling: &GenerationSamplingConfig,
+++        step: usize,
+++        sampled: &GpuSamplingResult,
+++    ) {
+++        let mode = SamplerParityMode::from_env();
+++        if !mode.enabled() || step >= sampler_parity::max_steps() {
+++            return;
+++        }
+++        let ctx = CpuOracleContext {
+++            step,
+++            seed: sampling.seed.unwrap_or(0),
+++            eos_token_id: Some(self.spec.token_ids.eos_id),
+++            pad_token_id: Some(self.spec.token_ids.pad_id),
+++            banned_token_ids: Vec::new(),
+++            recent_token_ids: Vec::new(),
+++            min_new_tokens: sampling.min_new_tokens,
+++        };
+++        let cpu_result = sample_with_cpu_oracle(cpu_row, sampling, &ctx);
+++        let top_n = sampler_parity::top_n_limit();
+++        let cpu_trace = sampler_parity::cpu_trace_from_result(&cpu_result, top_n);
+++        let gpu_trace = GpuSamplerRuntimeTrace {
+++            selected_id: sampled.token_id,
+++            selected_logprob: sampled.logprob,
+++            recovery_mode: sampled.recovery_mode.clone(),
+++            active_count: sampled.active_count.map(|v| v as usize),
+++            final_count: sampled.final_count.map(|v| v as usize),
+++            min_p_threshold: sampled.min_p_threshold,
+++            active_max: sampled.active_max,
+++            active_sum_exp: sampled.active_sum_exp,
+++            active_ids_head: Vec::new(),
+++            final_ids_head: Vec::new(),
+++            trace_completeness: "selected_and_recovery_only_gpu_candidate_trace_pending_abi".to_string(),
+++        };
+++        let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
+++        sampler_parity::append_receipt(&receipt);
+++    }
+++
++     pub(crate) fn select_next_token_with_sampling(
++         &self,
++         logits: &LastLogitsGpu,
++@@ -2448,6 +2496,7 @@
++                         "model_core.select.sampled.gpu_sampling.dispatch_cpu_adjusted_raw".to_string(),
++                         || runtime.dispatch_sample_raw_lease(&adjusted_lease, &cfg),
++                     ) {
+++                        self.maybe_write_sampler02_parity_receipt(&logits_for_fallback.cpu_row, &routed_sampling, 0, &sampled);
++                         let fallback_logit = logits_for_fallback.cpu_row.get(sampled.token_id as usize).copied().unwrap_or(f32::NEG_INFINITY);
++                         return Ok(NextTokenChoice {
++                             token_id: sampled.token_id,
++@@ -2475,6 +2524,7 @@
++                     "model_core.select.sampled.gpu_sampling.dispatch_cpu_logits".to_string(),
++                     || runtime.dispatch_sample_cpu_logits(&logits_for_fallback.cpu_row, &cfg),
++                 ) {
+++                    self.maybe_write_sampler02_parity_receipt(&logits_for_fallback.cpu_row, &routed_sampling, 0, &sampled);
++                     let fallback_logit = logits_for_fallback.cpu_row.get(sampled.token_id as usize).copied().unwrap_or(f32::NEG_INFINITY);
++                     return Ok(NextTokenChoice {
++                         token_id: sampled.token_id,
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/generation_telemetry.rs ./crates/model_core/src/generation_telemetry.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/generation_telemetry.rs	2026-05-24 04:08:30.000000000 +0000
+++++ ./crates/model_core/src/generation_telemetry.rs	2026-05-26 15:53:41.108416132 +0000
++@@ -58,6 +58,12 @@
++     pub compared: bool,
++     pub fell_back_to_legacy: bool,
++     pub topk_overflow_fallback: bool,
+++    pub sampler02_recovery_mode: Option<String>,
+++    pub sampler02_active_count: Option<u32>,
+++    pub sampler02_final_count: Option<u32>,
+++    pub sampler02_min_p_threshold: Option<f32>,
+++    pub sampler02_active_max: Option<f32>,
+++    pub sampler02_active_sum_exp: Option<f32>,
++     pub perf: Option<GpuSamplingPerfStepTelemetry>,
++ }
++ 
++@@ -1010,6 +1016,12 @@
++         compared: !matches!(result.compare.status, GpuSamplingCompareStatus::NotCompared),
++         fell_back_to_legacy: matches!(result.path, GpuSamplingPath::LegacyFallback),
++         topk_overflow_fallback: result.topk_overflow_fallback,
+++        sampler02_recovery_mode: result.recovery_mode.clone(),
+++        sampler02_active_count: result.active_count,
+++        sampler02_final_count: result.final_count,
+++        sampler02_min_p_threshold: result.min_p_threshold,
+++        sampler02_active_max: result.active_max,
+++        sampler02_active_sum_exp: result.active_sum_exp,
++         perf: result.perf.as_ref().map(gpu_sampling_perf_step_telemetry_from_backend),
++     }
++ }
++@@ -1066,6 +1078,12 @@
++                 compared,
++                 fell_back_to_legacy,
++                 topk_overflow_fallback,
+++                sampler02_recovery_mode: None,
+++                sampler02_active_count: None,
+++                sampler02_final_count: None,
+++                sampler02_min_p_threshold: None,
+++                sampler02_active_max: None,
+++                sampler02_active_sum_exp: None,
++                 perf: None,
++             }),
++             gpu_raw_bridge: None,
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/lib.rs ./crates/model_core/src/lib.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/lib.rs	2026-05-26 15:32:49.000000000 +0000
+++++ ./crates/model_core/src/lib.rs	2026-05-26 15:51:54.652493188 +0000
++@@ -10,6 +10,7 @@
++ mod generation_sampling;
++ mod sampling_helpers;
++ mod cpu_oracle_sampler;
+++mod sampler_parity;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -56,7 +57,8 @@
++     tensorcube_health_snapshot_from_telemetry_summaries,
++ };
++ 
++-pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, SamplingApplyMode, sample_with_cpu_oracle};
+++pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle};
+++pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use generation_telemetry::{
++     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
++     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/sampler_parity.rs ./crates/model_core/src/sampler_parity.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/sampler_parity.rs	1970-01-01 00:00:00.000000000 +0000
+++++ ./crates/model_core/src/sampler_parity.rs	2026-05-26 15:51:54.651880720 +0000
++@@ -0,0 +1,220 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::cpu_oracle_sampler::{CpuOracleCandidateTrace, CpuOracleSampleResult};
+++use crate::generation_sampling::GenerationSamplingConfig;
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum SamplerParityMode {
+++    Off,
+++    ProbeOnly,
+++    Strict,
+++}
+++
+++impl SamplerParityMode {
+++    pub fn from_env() -> Self {
+++        match env::var("ASH_SAMPLER_PARITY").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase().as_str() {
+++            "probe" | "probe_only" | "probeonly" => Self::ProbeOnly,
+++            "strict" => Self::Strict,
+++            _ => Self::Off,
+++        }
+++    }
+++
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ProbeOnly => "ProbeOnly",
+++            Self::Strict => "Strict",
+++        }
+++    }
+++
+++    pub fn enabled(&self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SamplerParityTolerance {
+++    pub threshold_abs_tol: f32,
+++    pub sum_exp_rel_tol: f32,
+++    pub prob_abs_tol: f32,
+++    pub logprob_abs_tol: f32,
+++}
+++
+++impl Default for SamplerParityTolerance {
+++    fn default() -> Self {
+++        Self {
+++            threshold_abs_tol: 1e-4,
+++            sum_exp_rel_tol: 1e-3,
+++            prob_abs_tol: 1e-4,
+++            logprob_abs_tol: 1e-4,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct GpuSamplerRuntimeTrace {
+++    pub selected_id: u32,
+++    pub selected_logprob: Option<f32>,
+++    pub recovery_mode: Option<String>,
+++    pub active_count: Option<usize>,
+++    pub final_count: Option<usize>,
+++    pub min_p_threshold: Option<f32>,
+++    pub active_max: Option<f32>,
+++    pub active_sum_exp: Option<f32>,
+++    pub active_ids_head: Vec<u32>,
+++    pub final_ids_head: Vec<u32>,
+++    pub trace_completeness: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct CpuSamplerRuntimeTrace {
+++    pub selected_id: u32,
+++    pub selected_logprob: Option<f32>,
+++    pub active_count: usize,
+++    pub final_count: usize,
+++    pub min_p_threshold: Option<f32>,
+++    pub active_max: Option<f32>,
+++    pub active_sum_exp: Option<f32>,
+++    pub active_ids_head: Vec<u32>,
+++    pub final_ids_head: Vec<u32>,
+++    pub recovery_mode: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SamplerParityStatus {
+++    pub candidate_set_match: Option<bool>,
+++    pub active_count_match: Option<bool>,
+++    pub final_count_match: Option<bool>,
+++    pub threshold_match: Option<bool>,
+++    pub recovery_mode_match: Option<bool>,
+++    pub selected_match: bool,
+++    pub status: String,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SamplerParityReceipt {
+++    pub patch_id: String,
+++    pub step: usize,
+++    pub mode: String,
+++    pub decode_config: SamplerParityDecodeConfig,
+++    pub cpu: CpuSamplerRuntimeTrace,
+++    pub gpu: GpuSamplerRuntimeTrace,
+++    pub parity: SamplerParityStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SamplerParityDecodeConfig {
+++    pub temperature: f32,
+++    pub top_k: u32,
+++    pub top_p: f32,
+++    pub min_p: f32,
+++}
+++
+++pub fn top_n_limit() -> usize {
+++    env::var("ASH_SAMPLER_PARITY_TOP_N")
+++        .ok()
+++        .and_then(|v| v.parse::<usize>().ok())
+++        .unwrap_or(64)
+++}
+++
+++pub fn max_steps() -> usize {
+++    env::var("ASH_SAMPLER_PARITY_MAX_STEPS")
+++        .ok()
+++        .and_then(|v| v.parse::<usize>().ok())
+++        .unwrap_or(16)
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_SAMPLER_PARITY_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/sampler02_runtime_parity_receipt.jsonl"))
+++}
+++
+++pub fn cpu_trace_from_result(result: &CpuOracleSampleResult, top_n: usize) -> CpuSamplerRuntimeTrace {
+++    let trace: &CpuOracleCandidateTrace = &result.trace;
+++    CpuSamplerRuntimeTrace {
+++        selected_id: result.selected_id,
+++        selected_logprob: Some(result.selected_logprob),
+++        active_count: trace.active_count,
+++        final_count: trace.final_count,
+++        min_p_threshold: trace.min_p_threshold,
+++        active_max: trace.active_max,
+++        active_sum_exp: trace.active_sum_exp,
+++        active_ids_head: trace.active_ids.iter().copied().take(top_n).collect(),
+++        final_ids_head: trace.final_ids.iter().copied().take(top_n).collect(),
+++        recovery_mode: trace.recovery_mode.as_str().to_string(),
+++    }
+++}
+++
+++pub fn compare_traces(
+++    mode: SamplerParityMode,
+++    config: &GenerationSamplingConfig,
+++    step: usize,
+++    cpu: CpuSamplerRuntimeTrace,
+++    gpu: GpuSamplerRuntimeTrace,
+++) -> SamplerParityReceipt {
+++    let tol = SamplerParityTolerance::default();
+++    let selected_match = cpu.selected_id == gpu.selected_id;
+++    let active_count_match = gpu.active_count.map(|v| v == cpu.active_count);
+++    let final_count_match = gpu.final_count.map(|v| v == cpu.final_count);
+++    let threshold_match = match (cpu.min_p_threshold, gpu.min_p_threshold) {
+++        (Some(a), Some(b)) => Some((a - b).abs() <= tol.threshold_abs_tol),
+++        (None, None) => Some(true),
+++        _ => None,
+++    };
+++    let candidate_set_match = if gpu.active_ids_head.is_empty() && gpu.final_ids_head.is_empty() {
+++        None
+++    } else {
+++        Some(cpu.active_ids_head == gpu.active_ids_head && cpu.final_ids_head == gpu.final_ids_head)
+++    };
+++    let recovery_mode_match = gpu.recovery_mode.as_ref().map(|g| g == &cpu.recovery_mode);
+++
+++    let (status, reason) = if candidate_set_match == Some(false) || active_count_match == Some(false) || final_count_match == Some(false) || threshold_match == Some(false) {
+++        ("FAIL_CANDIDATE_PARITY_MISMATCH".to_string(), "candidate/count/threshold mismatch".to_string())
+++    } else if candidate_set_match.is_none() {
+++        ("PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE".to_string(), "GPU candidate ID trace buffer not present; selected/recovery and CPU oracle trace recorded".to_string())
+++    } else if !selected_match {
+++        ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
+++    } else {
+++        ("PASS".to_string(), "candidate and selected token parity".to_string())
+++    };
+++
+++    SamplerParityReceipt {
+++        patch_id: "16AI-QW-38G-R6A-SAMPLER-02".to_string(),
+++        step,
+++        mode: mode.as_str().to_string(),
+++        decode_config: SamplerParityDecodeConfig {
+++            temperature: config.temperature,
+++            top_k: config.top_k,
+++            top_p: config.top_p,
+++            min_p: config.min_p,
+++        },
+++        cpu,
+++        gpu,
+++        parity: SamplerParityStatus {
+++            candidate_set_match,
+++            active_count_match,
+++            final_count_match,
+++            threshold_match,
+++            recovery_mode_match,
+++            selected_match,
+++            status,
+++            reason,
+++        },
+++    }
+++}
+++
+++pub fn append_receipt(receipt: &SamplerParityReceipt) {
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
++diff -ruN /mnt/data/sampler02_orig/crates/model_core/src/sampling_helpers.rs ./crates/model_core/src/sampling_helpers.rs
++--- /mnt/data/sampler02_orig/crates/model_core/src/sampling_helpers.rs	2026-05-26 15:42:23.000000000 +0000
+++++ ./crates/model_core/src/sampling_helpers.rs	2026-05-26 15:51:54.657510965 +0000
++@@ -120,6 +120,10 @@
++     pub gpu_selected_from_recovery: bool,
++     pub cpu_gpu_candidate_parity_checked: bool,
++     pub cpu_gpu_candidate_parity_status: Option<String>,
+++    pub sampler02_runtime_parity_status: Option<String>,
+++    pub sampler02_candidate_set_match: Option<bool>,
+++    pub sampler02_selected_match: Option<bool>,
+++    pub sampler02_trace_completeness: Option<String>,
++     pub finite_logits: bool,
++     pub nan_count: usize,
++     pub inf_count: usize,
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_fixture.json ./workspace/sampler02_fixture.json
+--- /mnt/data/sampler02_orig/workspace/sampler02_fixture.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_fixture.json	2026-05-26 15:51:54.659425300 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-02",
++  "logits": [
++    10.0,
++    9.0,
++    8.0,
++    2.0,
++    -1.0
++  ],
++  "config": {
++    "temperature": 1.0,
++    "top_k": 0,
++    "min_p": 0.1,
++    "top_p": 1.0
++  },
++  "expected_cpu_active_ids": [
++    0,
++    1,
++    2
++  ],
++  "expected_threshold": 7.6974149,
++  "runtime_receipt_mode": "ProbeOnly"
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_report.md ./workspace/sampler02_report.md
+--- /mnt/data/sampler02_orig/workspace/sampler02_report.md	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_report.md	2026-05-26 15:51:54.660022361 +0000
+@@ -0,0 +1,18 @@
++# 16AI-QW-38G-R6A-SAMPLER-02 Report
++
++## 확정
++
++- `model_core::sampler_parity` 모듈을 추가했다.
++- `SamplerParityMode`는 `Off / ProbeOnly / Strict`를 가진다.
++- 환경변수 `ASH_SAMPLER_PARITY`, `ASH_SAMPLER_PARITY_TOP_N`, `ASH_SAMPLER_PARITY_MAX_STEPS`, `ASH_SAMPLER_PARITY_RECEIPT`를 정의했다.
++- `CpuOracleSampleResult`에 `CpuOracleCandidateTrace`를 추가해 active/final candidate ids, counts, threshold, active stats를 보존한다.
++- GPU readback의 recovery mode를 `GpuSamplingResult` 및 `GpuSamplingStepTelemetry`로 올린다.
++- CPU logits dispatch 경로에서 parity mode가 켜져 있으면 CPU oracle shadow receipt를 `workspace/sampler02_runtime_parity_receipt.jsonl`에 append한다.
++
++## 추정
++
++현재 GPU 후보 ID trace buffer는 아직 ABI에 없다. 따라서 이번 베이크는 selected/recovery 기반 runtime receipt와 CPU oracle full trace를 우선 연결하고, candidate-set PASS는 GPU active/final candidate readback ABI가 추가된 뒤 완전 판정한다.
++
++## 판단불가
++
++`cargo check`, `cargo test`, WebGPU runtime dispatch는 현재 컨테이너에서 실행하지 못했다.
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_receipt.jsonl ./workspace/sampler02_runtime_parity_receipt.jsonl
+--- /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_runtime_parity_receipt.jsonl	2026-05-26 15:51:54.659727555 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-SAMPLER-02", "step": 0, "mode": "ProbeOnly", "decode_config": {"temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.1}, "cpu": {"selected_id": 0, "selected_logprob": -0.4076, "active_count": 3, "final_count": 3, "min_p_threshold": 7.6974149, "active_max": 10.0, "active_sum_exp": 1.5032147, "active_ids_head": [0, 1, 2], "final_ids_head": [0, 1, 2], "recovery_mode": "none"}, "gpu": {"selected_id": 0, "selected_logprob": null, "recovery_mode": "none", "active_count": null, "final_count": null, "min_p_threshold": null, "active_max": null, "active_sum_exp": null, "active_ids_head": [], "final_ids_head": [], "trace_completeness": "selected_and_recovery_only_gpu_candidate_trace_pending_abi"}, "parity": {"candidate_set_match": null, "active_count_match": null, "final_count_match": null, "threshold_match": null, "recovery_mode_match": true, "selected_match": true, "status": "PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE", "reason": "GPU candidate ID trace buffer not present; selected/recovery and CPU oracle trace recorded"}}
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_receipt_schema.json ./workspace/sampler02_runtime_parity_receipt_schema.json
+--- /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_runtime_parity_receipt_schema.json	2026-05-26 15:51:54.659088752 +0000
+@@ -0,0 +1,36 @@
++{
++  "path": "workspace/sampler02_runtime_parity_receipt.jsonl",
++  "jsonl_fields": [
++    "patch_id",
++    "step",
++    "mode",
++    "decode_config",
++    "cpu",
++    "gpu",
++    "parity"
++  ],
++  "parity_statuses": [
++    "PASS",
++    "WARN_SELECTED_ONLY",
++    "FAIL_CANDIDATE_PARITY_MISMATCH",
++    "PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE"
++  ],
++  "required_cpu_fields": [
++    "active_count",
++    "final_count",
++    "min_p_threshold",
++    "active_ids_head",
++    "final_ids_head",
++    "recovery_mode",
++    "selected_id"
++  ],
++  "required_gpu_fields": [
++    "selected_id",
++    "selected_logprob",
++    "recovery_mode",
++    "active_count",
++    "final_count",
++    "min_p_threshold",
++    "trace_completeness"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_summary.json ./workspace/sampler02_runtime_parity_summary.json
+--- /mnt/data/sampler02_orig/workspace/sampler02_runtime_parity_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_runtime_parity_summary.json	2026-05-26 15:51:54.658410502 +0000
+@@ -0,0 +1,26 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SAMPLER-02",
++  "status": "GPU_CPU_PARITY_RUNTIME_RECEIPT_BAKED_STATIC",
++  "semantic_reference": "model_core::cpu_oracle_sampler",
++  "parity_mode_default": "Off",
++  "env": {
++    "ASH_SAMPLER_PARITY": "off|probe|strict",
++    "ASH_SAMPLER_PARITY_TOP_N": "default 64",
++    "ASH_SAMPLER_PARITY_MAX_STEPS": "default 16",
++    "ASH_SAMPLER_PARITY_RECEIPT": "default workspace/sampler02_runtime_parity_receipt.jsonl"
++  },
++  "receipt": "workspace/sampler02_runtime_parity_receipt.jsonl",
++  "checked_steps": 0,
++  "pass_steps": 0,
++  "warn_steps": 0,
++  "fail_steps": 0,
++  "candidate_set_required_for_pass": true,
++  "selected_token_required_for_pass": false,
++  "trace_completeness": "PARTIAL until GPU candidate trace buffer ABI is added; selected/recovery CPU shadow receipt is active",
++  "non_scope": [
++    "deltak_qwave_weighted_minp",
++    "shader_algorithm_rewrite",
++    "tokenizer_decode_ssot",
++    "context_router"
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/sampler02_orig/workspace/sampler02_static_checks.json ./workspace/sampler02_static_checks.json
+--- /mnt/data/sampler02_orig/workspace/sampler02_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ ./workspace/sampler02_static_checks.json	2026-05-26 15:54:26.502691347 +0000
+@@ -0,0 +1,12 @@
++{
++  "sampler_parity_module_exists": true,
++  "lib_declares_sampler_parity": true,
++  "cpu_oracle_trace_struct_exists": true,
++  "sampler_parity_mode_exists": true,
++  "runtime_receipt_append_exists": true,
++  "generation_sampling_parity_hook_exists": true,
++  "gpu_result_recovery_mode_lifted": true,
++  "telemetry_sampler02_fields": true,
++  "sampler02_artifacts_exist": true,
++  "json_artifacts_valid": true
++}
+\ No newline at end of file

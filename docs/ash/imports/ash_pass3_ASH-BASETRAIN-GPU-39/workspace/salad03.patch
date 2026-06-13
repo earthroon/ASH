@@ -1,0 +1,1878 @@
+diff -ruN salad03_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md salad03_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md
+--- salad03_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md	2026-05-27 06:55:17.604846505 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-SALAD-03 Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## PASS_STATIC 확인
++- module file exists
++- lib.rs registration exists
++- sampler_parity hook exists
++- PlanOnly default exists
++- TokenLedger/KV Snapshot SSOT fields exist
++- PlanOnly execution is locked to false
++- safe resample config exists
++
++## Not Run
++- cargo_check: NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER
++- runtime_smoke: NOT_RUN
++
++## Gate
++SALAD-03 controlled execute는 KV snapshot restore verification receipt가 나오기 전까지 default blocked입니다.
+diff -ruN salad03_orig/crates/model_core/src/lib.rs salad03_work/crates/model_core/src/lib.rs
+--- salad03_orig/crates/model_core/src/lib.rs	2026-05-27 06:46:04.000000000 +0000
++++ salad03_work/crates/model_core/src/lib.rs	2026-05-27 06:54:11.495743265 +0000
+@@ -21,6 +21,7 @@
+ mod decode03c_shadow_policy;
+ mod decode03d_controlled_enable;
+ mod salad02_detector;
++mod salad03_rollback;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -128,6 +129,16 @@
+     write_salad02_summary_from_receipt_file,
+ };
+ 
++pub use salad03_rollback::{
++    SALAD03_PATCH_ID, SALAD03_INPUT_PATCH_ID, SALAD03_ROLLBACK_SSOT,
++    Salad03Mode, Salad03DecisionKind, Salad03TokenLedgerEntry, Salad03KvSnapshotRef,
++    Salad03RollbackInput, Salad03RollbackPlan, Salad03SafeResampleConfig,
++    Salad03ExecutionReceipt, Salad03StepReceipt, Salad03Summary, Salad03RollbackRuntime,
++    compute_rollback_depth, build_safe_resample_config, build_salad03_plan,
++    execution_receipt_for_plan, receipt_from_salad02, append_salad03_receipt_from_sampler03,
++    write_salad03_summary_from_receipt_file,
++};
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN salad03_orig/crates/model_core/src/salad03_rollback.rs salad03_work/crates/model_core/src/salad03_rollback.rs
+--- salad03_orig/crates/model_core/src/salad03_rollback.rs	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/crates/model_core/src/salad03_rollback.rs	2026-05-27 06:54:26.531669376 +0000
+@@ -0,0 +1,748 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::salad02_detector::{
++    receipt_from_decode03d as salad02_receipt_from_decode03d, Salad02StepReceipt, SaladRiskLevel,
++};
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const SALAD03_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03";
++pub const SALAD03_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-02";
++pub const SALAD03_ROLLBACK_SSOT: &str = "TokenLedger+KvSnapshotLedger+SALAD02Detection";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Salad03Mode {
++    Off,
++    PlanOnly,
++    ControlledExecute,
++    StrictControlledExecute,
++}
++
++impl Salad03Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_SALAD03_MODE")
++            .or_else(|_| env::var("ASH_SALAD03_ROLLBACK"))
++            .unwrap_or_else(|_| "plan_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "0" | "false" | "disabled" => Self::Off,
++            "controlled" | "controlled_execute" | "execute" | "true" | "1" => Self::ControlledExecute,
++            "strict" | "strict_controlled" | "strict_controlled_execute" => Self::StrictControlledExecute,
++            _ => Self::PlanOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::PlanOnly => "PlanOnly",
++            Self::ControlledExecute => "ControlledExecute",
++            Self::StrictControlledExecute => "StrictControlledExecute",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Salad03DecisionKind {
++    NoAction,
++    PlanRollback,
++    ExecuteRollbackResample,
++    SafeStopCandidate,
++    Denied,
++    StrictFail,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03TokenLedgerEntry {
++    pub step: usize,
++    pub token_id: u32,
++    pub piece_preview: Option<String>,
++    pub selected_rank: Option<usize>,
++    pub selected_logprob: Option<f32>,
++    pub pci_raw: Option<f32>,
++    pub pci_bucket: Option<String>,
++    pub salad_risk: Option<String>,
++    pub decode_config_hash: Option<String>,
++    pub kv_snapshot_id: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03KvSnapshotRef {
++    pub snapshot_id: String,
++    pub step: usize,
++    pub available: bool,
++    pub backend: String,
++    pub kv_cache_shape_hash: Option<String>,
++    pub position_index: usize,
++    pub restore_supported: bool,
++    pub restore_verified: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03RollbackInput {
++    pub mode: Salad03Mode,
++    pub behavior_change_allowed: bool,
++    pub risk_raw: SaladRiskLevel,
++    pub risk_stable: SaladRiskLevel,
++    pub salad_score: f32,
++    pub rollback_candidate: bool,
++    pub safe_stop_candidate: bool,
++    pub eos_bias_candidate: bool,
++    pub same_token_streak: usize,
++    pub same_piece_streak: usize,
++    pub repeat_3gram_count: usize,
++    pub repeat_4gram_count: usize,
++    pub byte_piece_count: usize,
++    pub jamo_leak_count: usize,
++    pub symbol_noise_count: usize,
++    pub pci_raw: Option<f32>,
++    pub pci_bucket: Option<String>,
++    pub global_finite_fallback_seen: bool,
++    pub numeric_risk: bool,
++    pub empty_active_set_seen: bool,
++    pub current_temperature: f32,
++    pub current_top_p: f32,
++    pub current_top_k: usize,
++    pub current_min_p: f32,
++    pub current_repeat_penalty: Option<f32>,
++    pub token_ledger_len: usize,
++    pub kv_snapshot_available: bool,
++    pub kv_restore_supported: bool,
++    pub kv_restore_verified: bool,
++    pub rollback_count_window: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03SafeResampleConfig {
++    pub temperature: f32,
++    pub top_p: f32,
++    pub top_k: usize,
++    pub min_p: f32,
++    pub guard_strength: String,
++    pub repeat_penalty: Option<f32>,
++    pub no_repeat_ngram: Option<usize>,
++    pub max_resample_attempts: usize,
++    pub safe_stop_if_resample_fails: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03RollbackPlan {
++    pub decision: Salad03DecisionKind,
++    pub behavior_change: bool,
++    pub plan_only: bool,
++    pub rollback_depth: usize,
++    pub rollback_target_step: Option<usize>,
++    pub required_token_ledger: bool,
++    pub required_kv_snapshot: bool,
++    pub kv_restore_required: bool,
++    pub kv_restore_available: bool,
++    pub kv_restore_supported: bool,
++    pub kv_restore_verified: bool,
++    pub safe_resample_config: Salad03SafeResampleConfig,
++    pub safe_stop_candidate: bool,
++    pub eos_bias_candidate: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub plan_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03ExecutionReceipt {
++    pub executed: bool,
++    pub rollback_executed: bool,
++    pub kv_restore_executed: bool,
++    pub resample_executed: bool,
++    pub original_tail_tokens: Vec<u32>,
++    pub replacement_tokens: Vec<u32>,
++    pub rollback_depth: usize,
++    pub rollback_target_step: Option<usize>,
++    pub kv_snapshot_id: Option<String>,
++    pub resample_attempts: usize,
++    pub resample_success: bool,
++    pub post_resample_risk: Option<String>,
++    pub safe_stop_executed: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Salad03Mode,
++    pub behavior_change: bool,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub decode03c_status_seen: Option<String>,
++    pub decode03b_status_seen: Option<String>,
++    pub decode03a_status_seen: Option<String>,
++    pub sampler05_status_seen: Option<String>,
++    pub input: Salad03RollbackInput,
++    pub plan: Salad03RollbackPlan,
++    pub execution: Salad03ExecutionReceipt,
++    pub selected_id_before: Option<u32>,
++    pub selected_piece_before: Option<String>,
++    pub selected_id_after: Option<u32>,
++    pub selected_piece_after: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03DecisionCounts {
++    pub no_action_count: usize,
++    pub plan_rollback_count: usize,
++    pub execute_rollback_resample_count: usize,
++    pub safe_stop_candidate_count: usize,
++    pub denied_count: usize,
++    pub strict_fail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03RollbackStats {
++    pub max_rollback_depth: usize,
++    pub mean_rollback_depth: Option<f32>,
++    pub kv_snapshot_required_count: usize,
++    pub kv_snapshot_available_count: usize,
++    pub kv_restore_verified_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03ExecutionStats {
++    pub executed_count: usize,
++    pub rollback_executed_count: usize,
++    pub kv_restore_executed_count: usize,
++    pub resample_executed_count: usize,
++    pub safe_stop_executed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Salad03SafeResampleStats {
++    pub temperature_min: Option<f32>,
++    pub temperature_mean: Option<f32>,
++    pub min_p_max: Option<f32>,
++    pub top_p_min: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Salad03Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub behavior_change: bool,
++    pub requires_salad02: bool,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub decisions: Salad03DecisionCounts,
++    pub rollback: Salad03RollbackStats,
++    pub execution: Salad03ExecutionStats,
++    pub safe_resample: Salad03SafeResampleStats,
++    pub ready_for_controlled_execute_trial: bool,
++    pub ready_for_salad04_korean_morph_loop_guard: bool,
++    pub reason: String,
++}
++
++pub trait Salad03RollbackRuntime {
++    fn restore_kv_snapshot(&mut self, snapshot_id: &str) -> Result<(), String>;
++    fn truncate_token_ledger(&mut self, target_step: usize) -> Result<(), String>;
++    fn resample_once(&mut self, config: &Salad03SafeResampleConfig) -> Result<u32, String>;
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_f32(name: &str, default: f32) -> f32 {
++    env::var(name).ok().and_then(|v| v.trim().parse::<f32>().ok()).unwrap_or(default)
++}
++
++fn clamp_finite(value: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
++    if value.is_finite() { value.clamp(lo, hi) } else { fallback.clamp(lo, hi) }
++}
++
++fn run_id_from_env() -> String {
++    env::var("ASH_SALAD03_RUN_ID")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++        .unwrap_or_else(|| "salad03_sampler03_bridge".to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_SALAD03_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_SALAD03_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03_summary.json"))
++}
++
++pub fn compute_rollback_depth(input: &Salad03RollbackInput) -> usize {
++    let mut depth = match input.risk_stable {
++        SaladRiskLevel::Low | SaladRiskLevel::Medium => 0,
++        SaladRiskLevel::High => 3,
++        SaladRiskLevel::Critical => 5,
++    };
++    if input.repeat_3gram_count >= 2 { depth = depth.max(4); }
++    if input.same_token_streak >= 6 || input.same_piece_streak >= 6 { depth = depth.max(5); }
++    if input.byte_piece_count >= 2 { depth = depth.max(5); }
++    if input.jamo_leak_count >= 3 { depth = depth.max(4); }
++    if input.pci_bucket.as_deref() == Some("Collapsing") { depth = depth.max(6); }
++    let max_depth = env_usize("ASH_SALAD03_MAX_ROLLBACK_DEPTH", 8).min(32);
++    depth.clamp(0, max_depth)
++}
++
++pub fn build_safe_resample_config(input: &Salad03RollbackInput) -> Salad03SafeResampleConfig {
++    let critical = matches!(input.risk_stable, SaladRiskLevel::Critical) || input.numeric_risk;
++    let base_temperature = if critical { 0.08 } else { 0.14 };
++    let base_min_p = if critical { 0.16 } else { 0.12 };
++    let base_top_p = if critical { 0.76 } else { 0.82 };
++    Salad03SafeResampleConfig {
++        temperature: clamp_finite(input.current_temperature.min(base_temperature), 0.03, 1.20, base_temperature),
++        top_p: clamp_finite(input.current_top_p.min(base_top_p), 0.50, 1.00, base_top_p),
++        top_k: if env_bool("ASH_SALAD03_KEEP_TRANSITION_AWARE_TOPK", false) { input.current_top_k.min(1024) } else { 0 },
++        min_p: clamp_finite(input.current_min_p.max(base_min_p), 0.00, 0.25, base_min_p),
++        guard_strength: "Panic".to_string(),
++        repeat_penalty: Some(input.current_repeat_penalty.unwrap_or(1.0).max(1.12).min(1.30)),
++        no_repeat_ngram: Some(if critical { 4 } else { 3 }),
++        max_resample_attempts: env_usize("ASH_SALAD03_MAX_RESAMPLE_ATTEMPTS", 1).clamp(0, 4),
++        safe_stop_if_resample_fails: true,
++    }
++}
++
++pub fn build_salad03_plan(input: &Salad03RollbackInput) -> Salad03RollbackPlan {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    let mut plan_reasons = Vec::new();
++    let rollback_depth = compute_rollback_depth(input);
++    let rollback_target_step = if rollback_depth > 0 && input.token_ledger_len >= rollback_depth {
++        Some(input.token_ledger_len.saturating_sub(rollback_depth))
++    } else {
++        None
++    };
++
++    if matches!(input.mode, Salad03Mode::Off) {
++        denied_reasons.push("mode_off".to_string());
++    }
++    if !input.rollback_candidate && !matches!(input.risk_stable, SaladRiskLevel::High | SaladRiskLevel::Critical) {
++        plan_reasons.push("risk_below_high_no_rollback".to_string());
++    }
++    if input.rollback_candidate { plan_reasons.push("rollback_candidate_from_salad02".to_string()); }
++    if matches!(input.risk_stable, SaladRiskLevel::High) { plan_reasons.push("risk_high".to_string()); }
++    if matches!(input.risk_stable, SaladRiskLevel::Critical) { plan_reasons.push("risk_critical".to_string()); }
++    if input.repeat_3gram_count >= 2 { plan_reasons.push("repeat_3gram_detected".to_string()); }
++    if input.pci_bucket.as_deref() == Some("Unstable") { plan_reasons.push("pci_unstable".to_string()); }
++    if input.pci_bucket.as_deref() == Some("Collapsing") { plan_reasons.push("pci_collapsing".to_string()); }
++
++    let rollback_wanted = matches!(input.risk_stable, SaladRiskLevel::High | SaladRiskLevel::Critical)
++        && input.rollback_candidate
++        && rollback_depth > 0;
++
++    let safe_stop_candidate = input.safe_stop_candidate
++        || input.global_finite_fallback_seen
++        || input.numeric_risk
++        || input.empty_active_set_seen
++        || input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1);
++
++    if rollback_wanted && input.token_ledger_len < rollback_depth {
++        denied_reasons.push("token_ledger_too_short".to_string());
++    }
++    if rollback_wanted && !input.kv_snapshot_available {
++        denied_reasons.push("kv_snapshot_missing".to_string());
++    }
++    if rollback_wanted && !input.kv_restore_supported {
++        denied_reasons.push("kv_restore_unsupported".to_string());
++    }
++    if rollback_wanted && input.kv_snapshot_available && input.kv_restore_supported && !input.kv_restore_verified {
++        warning_reasons.push("kv_restore_not_verified_plan_only".to_string());
++        if matches!(input.mode, Salad03Mode::StrictControlledExecute) && env_bool("ASH_SALAD03_FAIL_ON_UNVERIFIED_RESTORE", true) {
++            denied_reasons.push("kv_restore_unverified_strict".to_string());
++        }
++    }
++    if matches!(input.mode, Salad03Mode::ControlledExecute | Salad03Mode::StrictControlledExecute) && !input.behavior_change_allowed {
++        denied_reasons.push("behavior_change_not_allowed".to_string());
++    }
++    if input.global_finite_fallback_seen { warning_reasons.push("global_finite_fallback_prefers_safe_stop".to_string()); }
++    if input.numeric_risk { warning_reasons.push("numeric_risk_prefers_safe_stop".to_string()); }
++    if input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1) {
++        warning_reasons.push("rollback_window_limit_reached".to_string());
++    }
++
++    let decision = if matches!(input.mode, Salad03Mode::Off) {
++        Salad03DecisionKind::NoAction
++    } else if matches!(input.mode, Salad03Mode::StrictControlledExecute) && !denied_reasons.is_empty() {
++        Salad03DecisionKind::StrictFail
++    } else if safe_stop_candidate && (!rollback_wanted || input.global_finite_fallback_seen || input.numeric_risk || input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1)) {
++        Salad03DecisionKind::SafeStopCandidate
++    } else if !rollback_wanted {
++        Salad03DecisionKind::NoAction
++    } else if matches!(input.mode, Salad03Mode::PlanOnly) {
++        Salad03DecisionKind::PlanRollback
++    } else if !denied_reasons.is_empty() {
++        Salad03DecisionKind::Denied
++    } else {
++        Salad03DecisionKind::ExecuteRollbackResample
++    };
++
++    let behavior_change = matches!(decision, Salad03DecisionKind::ExecuteRollbackResample)
++        && matches!(input.mode, Salad03Mode::ControlledExecute | Salad03Mode::StrictControlledExecute)
++        && input.behavior_change_allowed;
++    let plan_only = !behavior_change;
++
++    Salad03RollbackPlan {
++        decision,
++        behavior_change,
++        plan_only,
++        rollback_depth: if rollback_wanted { rollback_depth } else { 0 },
++        rollback_target_step,
++        required_token_ledger: rollback_wanted,
++        required_kv_snapshot: rollback_wanted,
++        kv_restore_required: rollback_wanted,
++        kv_restore_available: input.kv_snapshot_available,
++        kv_restore_supported: input.kv_restore_supported,
++        kv_restore_verified: input.kv_restore_verified,
++        safe_resample_config: build_safe_resample_config(input),
++        safe_stop_candidate,
++        eos_bias_candidate: input.eos_bias_candidate,
++        denied_reasons,
++        warning_reasons,
++        plan_reasons,
++    }
++}
++
++pub fn execution_receipt_for_plan(plan: &Salad03RollbackPlan) -> Salad03ExecutionReceipt {
++    // The static baked SALAD-03 line deliberately does not mutate token/KV state.
++    // Runtime backends may implement Salad03RollbackRuntime in a later controlled-execute patch.
++    Salad03ExecutionReceipt {
++        executed: false,
++        rollback_executed: false,
++        kv_restore_executed: false,
++        resample_executed: false,
++        original_tail_tokens: Vec::new(),
++        replacement_tokens: Vec::new(),
++        rollback_depth: plan.rollback_depth,
++        rollback_target_step: plan.rollback_target_step,
++        kv_snapshot_id: None,
++        resample_attempts: 0,
++        resample_success: false,
++        post_resample_risk: None,
++        safe_stop_executed: false,
++    }
++}
++
++fn risk_name(level: SaladRiskLevel) -> String {
++    level.as_str().to_string()
++}
++
++pub fn input_from_salad02(receipt: &Salad02StepReceipt, mode: Salad03Mode) -> Salad03RollbackInput {
++    let metrics = &receipt.detection.window_metrics;
++    Salad03RollbackInput {
++        mode,
++        behavior_change_allowed: env_bool("ASH_SALAD03_BEHAVIOR_CHANGE_ALLOWED", false),
++        risk_raw: receipt.detection.risk_raw,
++        risk_stable: receipt.detection.risk_stable,
++        salad_score: receipt.detection.score,
++        rollback_candidate: receipt.detection.rollback_candidate,
++        safe_stop_candidate: receipt.detection.safe_stop_candidate,
++        eos_bias_candidate: receipt.detection.eos_bias_candidate,
++        same_token_streak: metrics.same_token_streak,
++        same_piece_streak: metrics.same_piece_streak,
++        repeat_3gram_count: metrics.repeat_3gram_count,
++        repeat_4gram_count: metrics.repeat_4gram_count,
++        byte_piece_count: metrics.byte_piece_count,
++        jamo_leak_count: metrics.jamo_leak_count,
++        symbol_noise_count: metrics.symbol_noise_count,
++        pci_raw: receipt.input.current.pci_raw,
++        pci_bucket: receipt.input.current.pci_bucket.clone(),
++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
++        numeric_risk: receipt.input.numeric_risk,
++        empty_active_set_seen: receipt.input.empty_active_set_seen,
++        current_temperature: env_f32("ASH_SALAD03_CURRENT_TEMPERATURE", 0.18),
++        current_top_p: env_f32("ASH_SALAD03_CURRENT_TOP_P", 0.86),
++        current_top_k: env_usize("ASH_SALAD03_CURRENT_TOP_K", 0),
++        current_min_p: env_f32("ASH_SALAD03_CURRENT_MIN_P", 0.08),
++        current_repeat_penalty: Some(env_f32("ASH_SALAD03_CURRENT_REPEAT_PENALTY", 1.0)),
++        token_ledger_len: env_usize("ASH_SALAD03_TOKEN_LEDGER_LEN", receipt.step.max(receipt.input.recent_tokens.len())),
++        kv_snapshot_available: env_bool("ASH_SALAD03_KV_SNAPSHOT_AVAILABLE", false),
++        kv_restore_supported: env_bool("ASH_SALAD03_KV_RESTORE_SUPPORTED", false),
++        kv_restore_verified: env_bool("ASH_SALAD03_KV_RESTORE_VERIFIED", false),
++        rollback_count_window: env_usize("ASH_SALAD03_ROLLBACK_COUNT_WINDOW", 0),
++    }
++}
++
++pub fn receipt_from_salad02(mode: Salad03Mode, receipt: &Salad02StepReceipt) -> Salad03StepReceipt {
++    let input = input_from_salad02(receipt, mode);
++    let plan = build_salad03_plan(&input);
++    let execution = execution_receipt_for_plan(&plan);
++    Salad03StepReceipt {
++        patch_id: SALAD03_PATCH_ID.to_string(),
++        input_patch: SALAD03_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: run_id_from_env(),
++        prompt_hash: receipt.prompt_hash.clone(),
++        seed: receipt.seed,
++        step: receipt.step,
++        backend: receipt.backend.clone(),
++        sampler_ssot: SALAD03_ROLLBACK_SSOT.to_string(),
++        mode,
++        behavior_change: plan.behavior_change,
++        salad02_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()),
++        decode03d_status_seen: receipt.decode03d_status_seen.clone(),
++        decode03c_status_seen: receipt.decode03c_status_seen.clone(),
++        decode03b_status_seen: receipt.decode03b_status_seen.clone(),
++        decode03a_status_seen: receipt.decode03a_status_seen.clone(),
++        sampler05_status_seen: receipt.sampler05_status_seen.clone(),
++        input,
++        plan,
++        execution,
++        selected_id_before: Some(receipt.selected_id),
++        selected_piece_before: receipt.selected_piece_preview.clone(),
++        selected_id_after: None,
++        selected_piece_after: None,
++    }
++}
++
++pub fn append_salad03_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Salad03Mode::from_env();
++    if matches!(mode, Salad03Mode::Off) {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let receipt = receipt_from_salad02(mode, &salad02_receipt);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn mean(values: &[f32]) -> Option<f32> {
++    if values.is_empty() { None } else { Some(values.iter().sum::<f32>() / values.len() as f32) }
++}
++
++pub fn summary_from_receipts(receipts: &[Salad03StepReceipt]) -> Salad03Summary {
++    let mut decisions = Salad03DecisionCounts::default();
++    let mut rollback = Salad03RollbackStats::default();
++    let mut execution = Salad03ExecutionStats::default();
++    let mut temps = Vec::new();
++    let mut min_ps = Vec::new();
++    let mut top_ps = Vec::new();
++    let mut depths = Vec::new();
++    let mut contract_violation = false;
++    let mut mode_seen = "PlanOnly".to_string();
++
++    for receipt in receipts {
++        mode_seen = receipt.mode.as_str().to_string();
++        contract_violation |= receipt.execution.rollback_executed && !receipt.plan.kv_restore_available;
++        contract_violation |= receipt.execution.rollback_executed && receipt.input.token_ledger_len == 0;
++        contract_violation |= receipt.execution.safe_stop_executed && matches!(receipt.mode, Salad03Mode::PlanOnly);
++        match receipt.plan.decision {
++            Salad03DecisionKind::NoAction => decisions.no_action_count += 1,
++            Salad03DecisionKind::PlanRollback => decisions.plan_rollback_count += 1,
++            Salad03DecisionKind::ExecuteRollbackResample => decisions.execute_rollback_resample_count += 1,
++            Salad03DecisionKind::SafeStopCandidate => decisions.safe_stop_candidate_count += 1,
++            Salad03DecisionKind::Denied => decisions.denied_count += 1,
++            Salad03DecisionKind::StrictFail => decisions.strict_fail_count += 1,
++        }
++        if receipt.plan.rollback_depth > 0 {
++            depths.push(receipt.plan.rollback_depth as f32);
++        }
++        rollback.max_rollback_depth = rollback.max_rollback_depth.max(receipt.plan.rollback_depth);
++        if receipt.plan.required_kv_snapshot { rollback.kv_snapshot_required_count += 1; }
++        if receipt.plan.kv_restore_available { rollback.kv_snapshot_available_count += 1; }
++        if receipt.plan.kv_restore_verified { rollback.kv_restore_verified_count += 1; }
++        if receipt.execution.executed { execution.executed_count += 1; }
++        if receipt.execution.rollback_executed { execution.rollback_executed_count += 1; }
++        if receipt.execution.kv_restore_executed { execution.kv_restore_executed_count += 1; }
++        if receipt.execution.resample_executed { execution.resample_executed_count += 1; }
++        if receipt.execution.safe_stop_executed { execution.safe_stop_executed_count += 1; }
++        temps.push(receipt.plan.safe_resample_config.temperature);
++        min_ps.push(receipt.plan.safe_resample_config.min_p);
++        top_ps.push(receipt.plan.safe_resample_config.top_p);
++    }
++    rollback.mean_rollback_depth = mean(&depths);
++    let safe_resample = Salad03SafeResampleStats {
++        temperature_min: temps.iter().copied().reduce(f32::min),
++        temperature_mean: mean(&temps),
++        min_p_max: min_ps.iter().copied().reduce(f32::max),
++        top_p_min: top_ps.iter().copied().reduce(f32::min),
++    };
++    let steps_observed = receipts.len();
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if contract_violation {
++        "FAIL_CONTRACT_VIOLATION"
++    } else if decisions.strict_fail_count > 0 || decisions.denied_count > 0 || decisions.safe_stop_candidate_count > 0 || decisions.plan_rollback_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }.to_string();
++    let ready_for_controlled = steps_observed > 0
++        && !contract_violation
++        && rollback.kv_snapshot_required_count > 0
++        && rollback.kv_snapshot_required_count == rollback.kv_snapshot_available_count
++        && rollback.kv_restore_verified_count == rollback.kv_snapshot_required_count;
++    Salad03Summary {
++        patch_id: SALAD03_PATCH_ID.to_string(),
++        input_patch: SALAD03_INPUT_PATCH_ID.to_string(),
++        status,
++        mode: mode_seen,
++        behavior_change: execution.executed_count > 0,
++        requires_salad02: env_bool("ASH_SALAD03_REQUIRE_SALAD02", true),
++        salad02_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()) } else { None },
++        decode03d_status_seen: if steps_observed > 0 { Some("OBSERVED_OR_DERIVED".to_string()) } else { None },
++        steps_observed,
++        decisions,
++        rollback,
++        execution,
++        safe_resample,
++        ready_for_controlled_execute_trial: ready_for_controlled,
++        ready_for_salad04_korean_morph_loop_guard: steps_observed > 0 && !contract_violation,
++        reason: if steps_observed == 0 {
++            "static bake only; run ASH_SALAD03_MODE=plan_only after SALAD-02 detector evidence".to_string()
++        } else if ready_for_controlled {
++            "rollback plans sealed and KV restore verified; controlled execute trial may be considered".to_string()
++        } else {
++            "rollback plans sealed; KV restore verification not yet proven, so execute remains blocked".to_string()
++        },
++    }
++}
++
++pub fn write_salad03_summary_from_receipt_file() {
++    let path = receipt_path();
++    let mut receipts = Vec::new();
++    if let Ok(text) = fs::read_to_string(&path) {
++        for line in text.lines() {
++            if line.trim().is_empty() { continue; }
++            if let Ok(receipt) = serde_json::from_str::<Salad03StepReceipt>(line) {
++                receipts.push(receipt);
++            }
++        }
++    }
++    let summary = summary_from_receipts(&receipts);
++    let out = summary_path();
++    if let Some(parent) = out.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(out, format!("{}\n", text));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn base_input(risk: SaladRiskLevel) -> Salad03RollbackInput {
++        Salad03RollbackInput {
++            mode: Salad03Mode::PlanOnly,
++            behavior_change_allowed: false,
++            risk_raw: risk,
++            risk_stable: risk,
++            salad_score: 0.70,
++            rollback_candidate: matches!(risk, SaladRiskLevel::High | SaladRiskLevel::Critical),
++            safe_stop_candidate: false,
++            eos_bias_candidate: false,
++            same_token_streak: 1,
++            same_piece_streak: 1,
++            repeat_3gram_count: 0,
++            repeat_4gram_count: 0,
++            byte_piece_count: 0,
++            jamo_leak_count: 0,
++            symbol_noise_count: 0,
++            pci_raw: Some(0.30),
++            pci_bucket: Some("Unstable".to_string()),
++            global_finite_fallback_seen: false,
++            numeric_risk: false,
++            empty_active_set_seen: false,
++            current_temperature: 0.18,
++            current_top_p: 0.86,
++            current_top_k: 0,
++            current_min_p: 0.08,
++            current_repeat_penalty: Some(1.0),
++            token_ledger_len: 16,
++            kv_snapshot_available: true,
++            kv_restore_supported: true,
++            kv_restore_verified: false,
++            rollback_count_window: 0,
++        }
++    }
++
++    #[test]
++    fn salad03_plan_only_never_executes() {
++        let input = base_input(SaladRiskLevel::High);
++        let plan = build_salad03_plan(&input);
++        let exec = execution_receipt_for_plan(&plan);
++        assert_eq!(plan.decision, Salad03DecisionKind::PlanRollback);
++        assert!(!plan.behavior_change);
++        assert!(!exec.executed);
++        assert!(!exec.rollback_executed);
++    }
++
++    #[test]
++    fn salad03_high_risk_plans_rollback() {
++        let mut input = base_input(SaladRiskLevel::High);
++        input.repeat_3gram_count = 2;
++        let plan = build_salad03_plan(&input);
++        assert_eq!(plan.decision, Salad03DecisionKind::PlanRollback);
++        assert!(plan.rollback_depth >= 4);
++    }
++
++    #[test]
++    fn salad03_critical_risk_depth_increases() {
++        let mut input = base_input(SaladRiskLevel::Critical);
++        input.pci_bucket = Some("Collapsing".to_string());
++        let plan = build_salad03_plan(&input);
++        assert!(plan.rollback_depth >= 6);
++    }
++
++    #[test]
++    fn salad03_global_fallback_prefers_safe_stop() {
++        let mut input = base_input(SaladRiskLevel::Critical);
++        input.global_finite_fallback_seen = true;
++        let plan = build_salad03_plan(&input);
++        assert_eq!(plan.decision, Salad03DecisionKind::SafeStopCandidate);
++    }
++
++    #[test]
++    fn salad03_resample_config_clamped() {
++        let mut input = base_input(SaladRiskLevel::Critical);
++        input.current_temperature = f32::NAN;
++        input.current_top_p = 9.0;
++        input.current_min_p = -9.0;
++        let config = build_safe_resample_config(&input);
++        assert!((0.03..=1.20).contains(&config.temperature));
++        assert!((0.50..=1.00).contains(&config.top_p));
++        assert!((0.00..=0.25).contains(&config.min_p));
++    }
++}
+diff -ruN salad03_orig/crates/model_core/src/sampler_parity.rs salad03_work/crates/model_core/src/sampler_parity.rs
+--- salad03_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:46:04.000000000 +0000
++++ salad03_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:54:11.511725194 +0000
+@@ -454,5 +454,6 @@
+     crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
+     crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
+     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
++    crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN salad03_orig/workspace/salad03.patch salad03_work/workspace/salad03.patch
+--- salad03_orig/workspace/salad03.patch	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03.patch	2026-05-27 06:55:26.841273925 +0000
+@@ -0,0 +1,814 @@
++diff -ruN salad03_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md salad03_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md
++--- salad03_orig/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ salad03_work/acceptance_reports/16AI-QW-38G-R6A-SALAD-03_acceptance.md	2026-05-27 06:55:17.604846505 +0000
++@@ -0,0 +1,20 @@
+++# 16AI-QW-38G-R6A-SALAD-03 Acceptance
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN
+++
+++## PASS_STATIC 확인
+++- module file exists
+++- lib.rs registration exists
+++- sampler_parity hook exists
+++- PlanOnly default exists
+++- TokenLedger/KV Snapshot SSOT fields exist
+++- PlanOnly execution is locked to false
+++- safe resample config exists
+++
+++## Not Run
+++- cargo_check: NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER
+++- runtime_smoke: NOT_RUN
+++
+++## Gate
+++SALAD-03 controlled execute는 KV snapshot restore verification receipt가 나오기 전까지 default blocked입니다.
++diff -ruN salad03_orig/crates/model_core/src/lib.rs salad03_work/crates/model_core/src/lib.rs
++--- salad03_orig/crates/model_core/src/lib.rs	2026-05-27 06:46:04.000000000 +0000
+++++ salad03_work/crates/model_core/src/lib.rs	2026-05-27 06:54:11.495743265 +0000
++@@ -21,6 +21,7 @@
++ mod decode03c_shadow_policy;
++ mod decode03d_controlled_enable;
++ mod salad02_detector;
+++mod salad03_rollback;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -128,6 +129,16 @@
++     write_salad02_summary_from_receipt_file,
++ };
++ 
+++pub use salad03_rollback::{
+++    SALAD03_PATCH_ID, SALAD03_INPUT_PATCH_ID, SALAD03_ROLLBACK_SSOT,
+++    Salad03Mode, Salad03DecisionKind, Salad03TokenLedgerEntry, Salad03KvSnapshotRef,
+++    Salad03RollbackInput, Salad03RollbackPlan, Salad03SafeResampleConfig,
+++    Salad03ExecutionReceipt, Salad03StepReceipt, Salad03Summary, Salad03RollbackRuntime,
+++    compute_rollback_depth, build_safe_resample_config, build_salad03_plan,
+++    execution_receipt_for_plan, receipt_from_salad02, append_salad03_receipt_from_sampler03,
+++    write_salad03_summary_from_receipt_file,
+++};
+++
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN salad03_orig/crates/model_core/src/salad03_rollback.rs salad03_work/crates/model_core/src/salad03_rollback.rs
++--- salad03_orig/crates/model_core/src/salad03_rollback.rs	1970-01-01 00:00:00.000000000 +0000
+++++ salad03_work/crates/model_core/src/salad03_rollback.rs	2026-05-27 06:54:26.531669376 +0000
++@@ -0,0 +1,748 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::salad02_detector::{
+++    receipt_from_decode03d as salad02_receipt_from_decode03d, Salad02StepReceipt, SaladRiskLevel,
+++};
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const SALAD03_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03";
+++pub const SALAD03_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-02";
+++pub const SALAD03_ROLLBACK_SSOT: &str = "TokenLedger+KvSnapshotLedger+SALAD02Detection";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Salad03Mode {
+++    Off,
+++    PlanOnly,
+++    ControlledExecute,
+++    StrictControlledExecute,
+++}
+++
+++impl Salad03Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_SALAD03_MODE")
+++            .or_else(|_| env::var("ASH_SALAD03_ROLLBACK"))
+++            .unwrap_or_else(|_| "plan_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "0" | "false" | "disabled" => Self::Off,
+++            "controlled" | "controlled_execute" | "execute" | "true" | "1" => Self::ControlledExecute,
+++            "strict" | "strict_controlled" | "strict_controlled_execute" => Self::StrictControlledExecute,
+++            _ => Self::PlanOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::PlanOnly => "PlanOnly",
+++            Self::ControlledExecute => "ControlledExecute",
+++            Self::StrictControlledExecute => "StrictControlledExecute",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Salad03DecisionKind {
+++    NoAction,
+++    PlanRollback,
+++    ExecuteRollbackResample,
+++    SafeStopCandidate,
+++    Denied,
+++    StrictFail,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03TokenLedgerEntry {
+++    pub step: usize,
+++    pub token_id: u32,
+++    pub piece_preview: Option<String>,
+++    pub selected_rank: Option<usize>,
+++    pub selected_logprob: Option<f32>,
+++    pub pci_raw: Option<f32>,
+++    pub pci_bucket: Option<String>,
+++    pub salad_risk: Option<String>,
+++    pub decode_config_hash: Option<String>,
+++    pub kv_snapshot_id: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03KvSnapshotRef {
+++    pub snapshot_id: String,
+++    pub step: usize,
+++    pub available: bool,
+++    pub backend: String,
+++    pub kv_cache_shape_hash: Option<String>,
+++    pub position_index: usize,
+++    pub restore_supported: bool,
+++    pub restore_verified: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03RollbackInput {
+++    pub mode: Salad03Mode,
+++    pub behavior_change_allowed: bool,
+++    pub risk_raw: SaladRiskLevel,
+++    pub risk_stable: SaladRiskLevel,
+++    pub salad_score: f32,
+++    pub rollback_candidate: bool,
+++    pub safe_stop_candidate: bool,
+++    pub eos_bias_candidate: bool,
+++    pub same_token_streak: usize,
+++    pub same_piece_streak: usize,
+++    pub repeat_3gram_count: usize,
+++    pub repeat_4gram_count: usize,
+++    pub byte_piece_count: usize,
+++    pub jamo_leak_count: usize,
+++    pub symbol_noise_count: usize,
+++    pub pci_raw: Option<f32>,
+++    pub pci_bucket: Option<String>,
+++    pub global_finite_fallback_seen: bool,
+++    pub numeric_risk: bool,
+++    pub empty_active_set_seen: bool,
+++    pub current_temperature: f32,
+++    pub current_top_p: f32,
+++    pub current_top_k: usize,
+++    pub current_min_p: f32,
+++    pub current_repeat_penalty: Option<f32>,
+++    pub token_ledger_len: usize,
+++    pub kv_snapshot_available: bool,
+++    pub kv_restore_supported: bool,
+++    pub kv_restore_verified: bool,
+++    pub rollback_count_window: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03SafeResampleConfig {
+++    pub temperature: f32,
+++    pub top_p: f32,
+++    pub top_k: usize,
+++    pub min_p: f32,
+++    pub guard_strength: String,
+++    pub repeat_penalty: Option<f32>,
+++    pub no_repeat_ngram: Option<usize>,
+++    pub max_resample_attempts: usize,
+++    pub safe_stop_if_resample_fails: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03RollbackPlan {
+++    pub decision: Salad03DecisionKind,
+++    pub behavior_change: bool,
+++    pub plan_only: bool,
+++    pub rollback_depth: usize,
+++    pub rollback_target_step: Option<usize>,
+++    pub required_token_ledger: bool,
+++    pub required_kv_snapshot: bool,
+++    pub kv_restore_required: bool,
+++    pub kv_restore_available: bool,
+++    pub kv_restore_supported: bool,
+++    pub kv_restore_verified: bool,
+++    pub safe_resample_config: Salad03SafeResampleConfig,
+++    pub safe_stop_candidate: bool,
+++    pub eos_bias_candidate: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub plan_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03ExecutionReceipt {
+++    pub executed: bool,
+++    pub rollback_executed: bool,
+++    pub kv_restore_executed: bool,
+++    pub resample_executed: bool,
+++    pub original_tail_tokens: Vec<u32>,
+++    pub replacement_tokens: Vec<u32>,
+++    pub rollback_depth: usize,
+++    pub rollback_target_step: Option<usize>,
+++    pub kv_snapshot_id: Option<String>,
+++    pub resample_attempts: usize,
+++    pub resample_success: bool,
+++    pub post_resample_risk: Option<String>,
+++    pub safe_stop_executed: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: Salad03Mode,
+++    pub behavior_change: bool,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub decode03c_status_seen: Option<String>,
+++    pub decode03b_status_seen: Option<String>,
+++    pub decode03a_status_seen: Option<String>,
+++    pub sampler05_status_seen: Option<String>,
+++    pub input: Salad03RollbackInput,
+++    pub plan: Salad03RollbackPlan,
+++    pub execution: Salad03ExecutionReceipt,
+++    pub selected_id_before: Option<u32>,
+++    pub selected_piece_before: Option<String>,
+++    pub selected_id_after: Option<u32>,
+++    pub selected_piece_after: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad03DecisionCounts {
+++    pub no_action_count: usize,
+++    pub plan_rollback_count: usize,
+++    pub execute_rollback_resample_count: usize,
+++    pub safe_stop_candidate_count: usize,
+++    pub denied_count: usize,
+++    pub strict_fail_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad03RollbackStats {
+++    pub max_rollback_depth: usize,
+++    pub mean_rollback_depth: Option<f32>,
+++    pub kv_snapshot_required_count: usize,
+++    pub kv_snapshot_available_count: usize,
+++    pub kv_restore_verified_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad03ExecutionStats {
+++    pub executed_count: usize,
+++    pub rollback_executed_count: usize,
+++    pub kv_restore_executed_count: usize,
+++    pub resample_executed_count: usize,
+++    pub safe_stop_executed_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Salad03SafeResampleStats {
+++    pub temperature_min: Option<f32>,
+++    pub temperature_mean: Option<f32>,
+++    pub min_p_max: Option<f32>,
+++    pub top_p_min: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Salad03Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub behavior_change: bool,
+++    pub requires_salad02: bool,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub decisions: Salad03DecisionCounts,
+++    pub rollback: Salad03RollbackStats,
+++    pub execution: Salad03ExecutionStats,
+++    pub safe_resample: Salad03SafeResampleStats,
+++    pub ready_for_controlled_execute_trial: bool,
+++    pub ready_for_salad04_korean_morph_loop_guard: bool,
+++    pub reason: String,
+++}
+++
+++pub trait Salad03RollbackRuntime {
+++    fn restore_kv_snapshot(&mut self, snapshot_id: &str) -> Result<(), String>;
+++    fn truncate_token_ledger(&mut self, target_step: usize) -> Result<(), String>;
+++    fn resample_once(&mut self, config: &Salad03SafeResampleConfig) -> Result<u32, String>;
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_f32(name: &str, default: f32) -> f32 {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<f32>().ok()).unwrap_or(default)
+++}
+++
+++fn clamp_finite(value: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
+++    if value.is_finite() { value.clamp(lo, hi) } else { fallback.clamp(lo, hi) }
+++}
+++
+++fn run_id_from_env() -> String {
+++    env::var("ASH_SALAD03_RUN_ID")
+++        .ok()
+++        .filter(|v| !v.trim().is_empty())
+++        .unwrap_or_else(|| "salad03_sampler03_bridge".to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_SALAD03_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_SALAD03_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/salad03_summary.json"))
+++}
+++
+++pub fn compute_rollback_depth(input: &Salad03RollbackInput) -> usize {
+++    let mut depth = match input.risk_stable {
+++        SaladRiskLevel::Low | SaladRiskLevel::Medium => 0,
+++        SaladRiskLevel::High => 3,
+++        SaladRiskLevel::Critical => 5,
+++    };
+++    if input.repeat_3gram_count >= 2 { depth = depth.max(4); }
+++    if input.same_token_streak >= 6 || input.same_piece_streak >= 6 { depth = depth.max(5); }
+++    if input.byte_piece_count >= 2 { depth = depth.max(5); }
+++    if input.jamo_leak_count >= 3 { depth = depth.max(4); }
+++    if input.pci_bucket.as_deref() == Some("Collapsing") { depth = depth.max(6); }
+++    let max_depth = env_usize("ASH_SALAD03_MAX_ROLLBACK_DEPTH", 8).min(32);
+++    depth.clamp(0, max_depth)
+++}
+++
+++pub fn build_safe_resample_config(input: &Salad03RollbackInput) -> Salad03SafeResampleConfig {
+++    let critical = matches!(input.risk_stable, SaladRiskLevel::Critical) || input.numeric_risk;
+++    let base_temperature = if critical { 0.08 } else { 0.14 };
+++    let base_min_p = if critical { 0.16 } else { 0.12 };
+++    let base_top_p = if critical { 0.76 } else { 0.82 };
+++    Salad03SafeResampleConfig {
+++        temperature: clamp_finite(input.current_temperature.min(base_temperature), 0.03, 1.20, base_temperature),
+++        top_p: clamp_finite(input.current_top_p.min(base_top_p), 0.50, 1.00, base_top_p),
+++        top_k: if env_bool("ASH_SALAD03_KEEP_TRANSITION_AWARE_TOPK", false) { input.current_top_k.min(1024) } else { 0 },
+++        min_p: clamp_finite(input.current_min_p.max(base_min_p), 0.00, 0.25, base_min_p),
+++        guard_strength: "Panic".to_string(),
+++        repeat_penalty: Some(input.current_repeat_penalty.unwrap_or(1.0).max(1.12).min(1.30)),
+++        no_repeat_ngram: Some(if critical { 4 } else { 3 }),
+++        max_resample_attempts: env_usize("ASH_SALAD03_MAX_RESAMPLE_ATTEMPTS", 1).clamp(0, 4),
+++        safe_stop_if_resample_fails: true,
+++    }
+++}
+++
+++pub fn build_salad03_plan(input: &Salad03RollbackInput) -> Salad03RollbackPlan {
+++    let mut denied_reasons = Vec::new();
+++    let mut warning_reasons = Vec::new();
+++    let mut plan_reasons = Vec::new();
+++    let rollback_depth = compute_rollback_depth(input);
+++    let rollback_target_step = if rollback_depth > 0 && input.token_ledger_len >= rollback_depth {
+++        Some(input.token_ledger_len.saturating_sub(rollback_depth))
+++    } else {
+++        None
+++    };
+++
+++    if matches!(input.mode, Salad03Mode::Off) {
+++        denied_reasons.push("mode_off".to_string());
+++    }
+++    if !input.rollback_candidate && !matches!(input.risk_stable, SaladRiskLevel::High | SaladRiskLevel::Critical) {
+++        plan_reasons.push("risk_below_high_no_rollback".to_string());
+++    }
+++    if input.rollback_candidate { plan_reasons.push("rollback_candidate_from_salad02".to_string()); }
+++    if matches!(input.risk_stable, SaladRiskLevel::High) { plan_reasons.push("risk_high".to_string()); }
+++    if matches!(input.risk_stable, SaladRiskLevel::Critical) { plan_reasons.push("risk_critical".to_string()); }
+++    if input.repeat_3gram_count >= 2 { plan_reasons.push("repeat_3gram_detected".to_string()); }
+++    if input.pci_bucket.as_deref() == Some("Unstable") { plan_reasons.push("pci_unstable".to_string()); }
+++    if input.pci_bucket.as_deref() == Some("Collapsing") { plan_reasons.push("pci_collapsing".to_string()); }
+++
+++    let rollback_wanted = matches!(input.risk_stable, SaladRiskLevel::High | SaladRiskLevel::Critical)
+++        && input.rollback_candidate
+++        && rollback_depth > 0;
+++
+++    let safe_stop_candidate = input.safe_stop_candidate
+++        || input.global_finite_fallback_seen
+++        || input.numeric_risk
+++        || input.empty_active_set_seen
+++        || input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1);
+++
+++    if rollback_wanted && input.token_ledger_len < rollback_depth {
+++        denied_reasons.push("token_ledger_too_short".to_string());
+++    }
+++    if rollback_wanted && !input.kv_snapshot_available {
+++        denied_reasons.push("kv_snapshot_missing".to_string());
+++    }
+++    if rollback_wanted && !input.kv_restore_supported {
+++        denied_reasons.push("kv_restore_unsupported".to_string());
+++    }
+++    if rollback_wanted && input.kv_snapshot_available && input.kv_restore_supported && !input.kv_restore_verified {
+++        warning_reasons.push("kv_restore_not_verified_plan_only".to_string());
+++        if matches!(input.mode, Salad03Mode::StrictControlledExecute) && env_bool("ASH_SALAD03_FAIL_ON_UNVERIFIED_RESTORE", true) {
+++            denied_reasons.push("kv_restore_unverified_strict".to_string());
+++        }
+++    }
+++    if matches!(input.mode, Salad03Mode::ControlledExecute | Salad03Mode::StrictControlledExecute) && !input.behavior_change_allowed {
+++        denied_reasons.push("behavior_change_not_allowed".to_string());
+++    }
+++    if input.global_finite_fallback_seen { warning_reasons.push("global_finite_fallback_prefers_safe_stop".to_string()); }
+++    if input.numeric_risk { warning_reasons.push("numeric_risk_prefers_safe_stop".to_string()); }
+++    if input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1) {
+++        warning_reasons.push("rollback_window_limit_reached".to_string());
+++    }
+++
+++    let decision = if matches!(input.mode, Salad03Mode::Off) {
+++        Salad03DecisionKind::NoAction
+++    } else if matches!(input.mode, Salad03Mode::StrictControlledExecute) && !denied_reasons.is_empty() {
+++        Salad03DecisionKind::StrictFail
+++    } else if safe_stop_candidate && (!rollback_wanted || input.global_finite_fallback_seen || input.numeric_risk || input.rollback_count_window >= env_usize("ASH_SALAD03_MAX_ROLLBACKS_PER_WINDOW", 1)) {
+++        Salad03DecisionKind::SafeStopCandidate
+++    } else if !rollback_wanted {
+++        Salad03DecisionKind::NoAction
+++    } else if matches!(input.mode, Salad03Mode::PlanOnly) {
+++        Salad03DecisionKind::PlanRollback
+++    } else if !denied_reasons.is_empty() {
+++        Salad03DecisionKind::Denied
+++    } else {
+++        Salad03DecisionKind::ExecuteRollbackResample
+++    };
+++
+++    let behavior_change = matches!(decision, Salad03DecisionKind::ExecuteRollbackResample)
+++        && matches!(input.mode, Salad03Mode::ControlledExecute | Salad03Mode::StrictControlledExecute)
+++        && input.behavior_change_allowed;
+++    let plan_only = !behavior_change;
+++
+++    Salad03RollbackPlan {
+++        decision,
+++        behavior_change,
+++        plan_only,
+++        rollback_depth: if rollback_wanted { rollback_depth } else { 0 },
+++        rollback_target_step,
+++        required_token_ledger: rollback_wanted,
+++        required_kv_snapshot: rollback_wanted,
+++        kv_restore_required: rollback_wanted,
+++        kv_restore_available: input.kv_snapshot_available,
+++        kv_restore_supported: input.kv_restore_supported,
+++        kv_restore_verified: input.kv_restore_verified,
+++        safe_resample_config: build_safe_resample_config(input),
+++        safe_stop_candidate,
+++        eos_bias_candidate: input.eos_bias_candidate,
+++        denied_reasons,
+++        warning_reasons,
+++        plan_reasons,
+++    }
+++}
+++
+++pub fn execution_receipt_for_plan(plan: &Salad03RollbackPlan) -> Salad03ExecutionReceipt {
+++    // The static baked SALAD-03 line deliberately does not mutate token/KV state.
+++    // Runtime backends may implement Salad03RollbackRuntime in a later controlled-execute patch.
+++    Salad03ExecutionReceipt {
+++        executed: false,
+++        rollback_executed: false,
+++        kv_restore_executed: false,
+++        resample_executed: false,
+++        original_tail_tokens: Vec::new(),
+++        replacement_tokens: Vec::new(),
+++        rollback_depth: plan.rollback_depth,
+++        rollback_target_step: plan.rollback_target_step,
+++        kv_snapshot_id: None,
+++        resample_attempts: 0,
+++        resample_success: false,
+++        post_resample_risk: None,
+++        safe_stop_executed: false,
+++    }
+++}
+++
+++fn risk_name(level: SaladRiskLevel) -> String {
+++    level.as_str().to_string()
+++}
+++
+++pub fn input_from_salad02(receipt: &Salad02StepReceipt, mode: Salad03Mode) -> Salad03RollbackInput {
+++    let metrics = &receipt.detection.window_metrics;
+++    Salad03RollbackInput {
+++        mode,
+++        behavior_change_allowed: env_bool("ASH_SALAD03_BEHAVIOR_CHANGE_ALLOWED", false),
+++        risk_raw: receipt.detection.risk_raw,
+++        risk_stable: receipt.detection.risk_stable,
+++        salad_score: receipt.detection.score,
+++        rollback_candidate: receipt.detection.rollback_candidate,
+++        safe_stop_candidate: receipt.detection.safe_stop_candidate,
+++        eos_bias_candidate: receipt.detection.eos_bias_candidate,
+++        same_token_streak: metrics.same_token_streak,
+++        same_piece_streak: metrics.same_piece_streak,
+++        repeat_3gram_count: metrics.repeat_3gram_count,
+++        repeat_4gram_count: metrics.repeat_4gram_count,
+++        byte_piece_count: metrics.byte_piece_count,
+++        jamo_leak_count: metrics.jamo_leak_count,
+++        symbol_noise_count: metrics.symbol_noise_count,
+++        pci_raw: receipt.input.current.pci_raw,
+++        pci_bucket: receipt.input.current.pci_bucket.clone(),
+++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
+++        numeric_risk: receipt.input.numeric_risk,
+++        empty_active_set_seen: receipt.input.empty_active_set_seen,
+++        current_temperature: env_f32("ASH_SALAD03_CURRENT_TEMPERATURE", 0.18),
+++        current_top_p: env_f32("ASH_SALAD03_CURRENT_TOP_P", 0.86),
+++        current_top_k: env_usize("ASH_SALAD03_CURRENT_TOP_K", 0),
+++        current_min_p: env_f32("ASH_SALAD03_CURRENT_MIN_P", 0.08),
+++        current_repeat_penalty: Some(env_f32("ASH_SALAD03_CURRENT_REPEAT_PENALTY", 1.0)),
+++        token_ledger_len: env_usize("ASH_SALAD03_TOKEN_LEDGER_LEN", receipt.step.max(receipt.input.recent_tokens.len())),
+++        kv_snapshot_available: env_bool("ASH_SALAD03_KV_SNAPSHOT_AVAILABLE", false),
+++        kv_restore_supported: env_bool("ASH_SALAD03_KV_RESTORE_SUPPORTED", false),
+++        kv_restore_verified: env_bool("ASH_SALAD03_KV_RESTORE_VERIFIED", false),
+++        rollback_count_window: env_usize("ASH_SALAD03_ROLLBACK_COUNT_WINDOW", 0),
+++    }
+++}
+++
+++pub fn receipt_from_salad02(mode: Salad03Mode, receipt: &Salad02StepReceipt) -> Salad03StepReceipt {
+++    let input = input_from_salad02(receipt, mode);
+++    let plan = build_salad03_plan(&input);
+++    let execution = execution_receipt_for_plan(&plan);
+++    Salad03StepReceipt {
+++        patch_id: SALAD03_PATCH_ID.to_string(),
+++        input_patch: SALAD03_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: run_id_from_env(),
+++        prompt_hash: receipt.prompt_hash.clone(),
+++        seed: receipt.seed,
+++        step: receipt.step,
+++        backend: receipt.backend.clone(),
+++        sampler_ssot: SALAD03_ROLLBACK_SSOT.to_string(),
+++        mode,
+++        behavior_change: plan.behavior_change,
+++        salad02_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()),
+++        decode03d_status_seen: receipt.decode03d_status_seen.clone(),
+++        decode03c_status_seen: receipt.decode03c_status_seen.clone(),
+++        decode03b_status_seen: receipt.decode03b_status_seen.clone(),
+++        decode03a_status_seen: receipt.decode03a_status_seen.clone(),
+++        sampler05_status_seen: receipt.sampler05_status_seen.clone(),
+++        input,
+++        plan,
+++        execution,
+++        selected_id_before: Some(receipt.selected_id),
+++        selected_piece_before: receipt.selected_piece_preview.clone(),
+++        selected_id_after: None,
+++        selected_piece_after: None,
+++    }
+++}
+++
+++pub fn append_salad03_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Salad03Mode::from_env();
+++    if matches!(mode, Salad03Mode::Off) {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
+++    let receipt = receipt_from_salad02(mode, &salad02_receipt);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn mean(values: &[f32]) -> Option<f32> {
+++    if values.is_empty() { None } else { Some(values.iter().sum::<f32>() / values.len() as f32) }
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Salad03StepReceipt]) -> Salad03Summary {
+++    let mut decisions = Salad03DecisionCounts::default();
+++    let mut rollback = Salad03RollbackStats::default();
+++    let mut execution = Salad03ExecutionStats::default();
+++    let mut temps = Vec::new();
+++    let mut min_ps = Vec::new();
+++    let mut top_ps = Vec::new();
+++    let mut depths = Vec::new();
+++    let mut contract_violation = false;
+++    let mut mode_seen = "PlanOnly".to_string();
+++
+++    for receipt in receipts {
+++        mode_seen = receipt.mode.as_str().to_string();
+++        contract_violation |= receipt.execution.rollback_executed && !receipt.plan.kv_restore_available;
+++        contract_violation |= receipt.execution.rollback_executed && receipt.input.token_ledger_len == 0;
+++        contract_violation |= receipt.execution.safe_stop_executed && matches!(receipt.mode, Salad03Mode::PlanOnly);
+++        match receipt.plan.decision {
+++            Salad03DecisionKind::NoAction => decisions.no_action_count += 1,
+++            Salad03DecisionKind::PlanRollback => decisions.plan_rollback_count += 1,
+++            Salad03DecisionKind::ExecuteRollbackResample => decisions.execute_rollback_resample_count += 1,
+++            Salad03DecisionKind::SafeStopCandidate => decisions.safe_stop_candidate_count += 1,
+++            Salad03DecisionKind::Denied => decisions.denied_count += 1,
+++            Salad03DecisionKind::StrictFail => decisions.strict_fail_count += 1,
+++        }
+++        if receipt.plan.rollback_depth > 0 {
+++            depths.push(receipt.plan.rollback_depth as f32);
+++        }
+++        rollback.max_rollback_depth = rollback.max_rollback_depth.max(receipt.plan.rollback_depth);
+++        if receipt.plan.required_kv_snapshot { rollback.kv_snapshot_required_count += 1; }
+++        if receipt.plan.kv_restore_available { rollback.kv_snapshot_available_count += 1; }
+++        if receipt.plan.kv_restore_verified { rollback.kv_restore_verified_count += 1; }
+++        if receipt.execution.executed { execution.executed_count += 1; }
+++        if receipt.execution.rollback_executed { execution.rollback_executed_count += 1; }
+++        if receipt.execution.kv_restore_executed { execution.kv_restore_executed_count += 1; }
+++        if receipt.execution.resample_executed { execution.resample_executed_count += 1; }
+++        if receipt.execution.safe_stop_executed { execution.safe_stop_executed_count += 1; }
+++        temps.push(receipt.plan.safe_resample_config.temperature);
+++        min_ps.push(receipt.plan.safe_resample_config.min_p);
+++        top_ps.push(receipt.plan.safe_resample_config.top_p);
+++    }
+++    rollback.mean_rollback_depth = mean(&depths);
+++    let safe_resample = Salad03SafeResampleStats {
+++        temperature_min: temps.iter().copied().reduce(f32::min),
+++        temperature_mean: mean(&temps),
+++        min_p_max: min_ps.iter().copied().reduce(f32::max),
+++        top_p_min: top_ps.iter().copied().reduce(f32::min),
+++    };
+++    let steps_observed = receipts.len();
+++    let status = if steps_observed == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if contract_violation {
+++        "FAIL_CONTRACT_VIOLATION"
+++    } else if decisions.strict_fail_count > 0 || decisions.denied_count > 0 || decisions.safe_stop_candidate_count > 0 || decisions.plan_rollback_count > 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }.to_string();
+++    let ready_for_controlled = steps_observed > 0
+++        && !contract_violation
+++        && rollback.kv_snapshot_required_count > 0
+++        && rollback.kv_snapshot_required_count == rollback.kv_snapshot_available_count
+++        && rollback.kv_restore_verified_count == rollback.kv_snapshot_required_count;
+++    Salad03Summary {
+++        patch_id: SALAD03_PATCH_ID.to_string(),
+++        input_patch: SALAD03_INPUT_PATCH_ID.to_string(),
+++        status,
+++        mode: mode_seen,
+++        behavior_change: execution.executed_count > 0,
+++        requires_salad02: env_bool("ASH_SALAD03_REQUIRE_SALAD02", true),
+++        salad02_status_seen: if steps_observed > 0 { Some("DERIVED_IN_MEMORY_FROM_SALAD02_RECEIPT".to_string()) } else { None },
+++        decode03d_status_seen: if steps_observed > 0 { Some("OBSERVED_OR_DERIVED".to_string()) } else { None },
+++        steps_observed,
+++        decisions,
+++        rollback,
+++        execution,
+++        safe_resample,
+++        ready_for_controlled_execute_trial: ready_for_controlled,
+++        ready_for_salad04_korean_morph_loop_guard: steps_observed > 0 && !contract_violation,
+++        reason: if steps_observed == 0 {
+++            "static bake only; run ASH_SALAD03_MODE=plan_only after SALAD-02 detector evidence".to_string()
+++        } else if ready_for_controlled {
+++            "rollback plans sealed and KV restore verified; controlled execute trial may be considered".to_string()
+++        } else {
+++            "rollback plans sealed; KV restore verification not yet proven, so execute remains blocked".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_salad03_summary_from_receipt_file() {
+++    let path = receipt_path();
+++    let mut receipts = Vec::new();
+++    if let Ok(text) = fs::read_to_string(&path) {
+++        for line in text.lines() {
+++            if line.trim().is_empty() { continue; }
+++            if let Ok(receipt) = serde_json::from_str::<Salad03StepReceipt>(line) {
+++                receipts.push(receipt);
+++            }
+++        }
+++    }
+++    let summary = summary_from_receipts(&receipts);
+++    let out = summary_path();
+++    if let Some(parent) = out.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(out, format!("{}\n", text));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn base_input(risk: SaladRiskLevel) -> Salad03RollbackInput {
+++        Salad03RollbackInput {
+++            mode: Salad03Mode::PlanOnly,
+++            behavior_change_allowed: false,
+++            risk_raw: risk,
+++            risk_stable: risk,
+++            salad_score: 0.70,
+++            rollback_candidate: matches!(risk, SaladRiskLevel::High | SaladRiskLevel::Critical),
+++            safe_stop_candidate: false,
+++            eos_bias_candidate: false,
+++            same_token_streak: 1,
+++            same_piece_streak: 1,
+++            repeat_3gram_count: 0,
+++            repeat_4gram_count: 0,
+++            byte_piece_count: 0,
+++            jamo_leak_count: 0,
+++            symbol_noise_count: 0,
+++            pci_raw: Some(0.30),
+++            pci_bucket: Some("Unstable".to_string()),
+++            global_finite_fallback_seen: false,
+++            numeric_risk: false,
+++            empty_active_set_seen: false,
+++            current_temperature: 0.18,
+++            current_top_p: 0.86,
+++            current_top_k: 0,
+++            current_min_p: 0.08,
+++            current_repeat_penalty: Some(1.0),
+++            token_ledger_len: 16,
+++            kv_snapshot_available: true,
+++            kv_restore_supported: true,
+++            kv_restore_verified: false,
+++            rollback_count_window: 0,
+++        }
+++    }
+++
+++    #[test]
+++    fn salad03_plan_only_never_executes() {
+++        let input = base_input(SaladRiskLevel::High);
+++        let plan = build_salad03_plan(&input);
+++        let exec = execution_receipt_for_plan(&plan);
+++        assert_eq!(plan.decision, Salad03DecisionKind::PlanRollback);
+++        assert!(!plan.behavior_change);
+++        assert!(!exec.executed);
+++        assert!(!exec.rollback_executed);
+++    }
+++
+++    #[test]
+++    fn salad03_high_risk_plans_rollback() {
+++        let mut input = base_input(SaladRiskLevel::High);
+++        input.repeat_3gram_count = 2;
+++        let plan = build_salad03_plan(&input);
+++        assert_eq!(plan.decision, Salad03DecisionKind::PlanRollback);
+++        assert!(plan.rollback_depth >= 4);
+++    }
+++
+++    #[test]
+++    fn salad03_critical_risk_depth_increases() {
+++        let mut input = base_input(SaladRiskLevel::Critical);
+++        input.pci_bucket = Some("Collapsing".to_string());
+++        let plan = build_salad03_plan(&input);
+++        assert!(plan.rollback_depth >= 6);
+++    }
+++
+++    #[test]
+++    fn salad03_global_fallback_prefers_safe_stop() {
+++        let mut input = base_input(SaladRiskLevel::Critical);
+++        input.global_finite_fallback_seen = true;
+++        let plan = build_salad03_plan(&input);
+++        assert_eq!(plan.decision, Salad03DecisionKind::SafeStopCandidate);
+++    }
+++
+++    #[test]
+++    fn salad03_resample_config_clamped() {
+++        let mut input = base_input(SaladRiskLevel::Critical);
+++        input.current_temperature = f32::NAN;
+++        input.current_top_p = 9.0;
+++        input.current_min_p = -9.0;
+++        let config = build_safe_resample_config(&input);
+++        assert!((0.03..=1.20).contains(&config.temperature));
+++        assert!((0.50..=1.00).contains(&config.top_p));
+++        assert!((0.00..=0.25).contains(&config.min_p));
+++    }
+++}
++diff -ruN salad03_orig/crates/model_core/src/sampler_parity.rs salad03_work/crates/model_core/src/sampler_parity.rs
++--- salad03_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 06:46:04.000000000 +0000
+++++ salad03_work/crates/model_core/src/sampler_parity.rs	2026-05-27 06:54:11.511725194 +0000
++@@ -454,5 +454,6 @@
++     crate::decode03c_shadow_policy::append_decode03c_receipt_from_sampler03(receipt);
++     crate::decode03d_controlled_enable::append_decode03d_receipt_from_sampler03(receipt);
++     crate::salad02_detector::append_salad02_receipt_from_sampler03(receipt);
+++    crate::salad03_rollback::append_salad03_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN salad03_orig/workspace/salad03_probe_prompts.jsonl salad03_work/workspace/salad03_probe_prompts.jsonl
+--- salad03_orig/workspace/salad03_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_probe_prompts.jsonl	2026-05-27 06:55:17.604398737 +0000
+@@ -0,0 +1,6 @@
++{"id": "P01_short_korean_qa", "max_new_tokens": 96, "mode": "plan_only"}
++{"id": "P02_hangul_completion", "max_new_tokens": 96, "mode": "plan_only"}
++{"id": "P03_repetition_trap", "max_new_tokens": 96, "mode": "plan_only"}
++{"id": "P04_josa_eomi_loop_probe", "max_new_tokens": 96, "mode": "plan_only"}
++{"id": "P05_byte_piece_leak_probe", "max_new_tokens": 96, "mode": "plan_only"}
++{"id": "P06_critical_salad_safe_stop_candidate", "max_new_tokens": 96, "mode": "plan_only"}
+diff -ruN salad03_orig/workspace/salad03_report.md salad03_work/workspace/salad03_report.md
+--- salad03_orig/workspace/salad03_report.md	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_report.md	2026-05-27 06:55:17.604646477 +0000
+@@ -0,0 +1,26 @@
++# 16AI-QW-38G-R6A-SALAD-03 베이크 리포트
++
++## 확정
++- `crates/model_core/src/salad03_rollback.rs` 추가.
++- `lib.rs` module/pub use 등록.
++- `sampler_parity::append_receipt()`에 SALAD-03 observe/plan hook 연결.
++- 기본 모드 `PlanOnly`.
++- 문자열-only rollback 금지 기준을 `TokenLedger + KvSnapshotLedger + SALAD02Detection` SSOT로 명시.
++- PlanOnly에서는 `rollback_executed=false`, `kv_restore_executed=false`, `resample_executed=false`, `safe_stop_executed=false` 고정.
++
++## 추정
++- SALAD-02 HIGH/CRITICAL 위험이 감지되면 rollback depth와 safe resample config가 산출됩니다.
++- KV snapshot 또는 token ledger 조건이 없으면 controlled execute로 넘어가지 않고 Denied/SafeStopCandidate로 떨어집니다.
++
++## 판단불가
++- 현재 컨테이너에는 cargo/rustc가 없어 실제 `cargo check`와 runtime smoke는 수행하지 못했습니다.
++- 실제 KV restore 가능 여부는 backend runtime에서 `Salad03RollbackRuntime`을 구현하고 별도 probe로 확인해야 합니다.
++
++## 실행 플래그
++```bash
++ASH_SALAD02_DETECTOR=receipt \
++ASH_SALAD03_MODE=plan_only \
++ASH_SALAD03_BEHAVIOR_CHANGE_ALLOWED=false \
++ASH_SALAD03_RECEIPT=workspace/salad03_steps.jsonl \
++ASH_SALAD03_SUMMARY=workspace/salad03_summary.json
++```
+diff -ruN salad03_orig/workspace/salad03_rollback_schema.json salad03_work/workspace/salad03_rollback_schema.json
+--- salad03_orig/workspace/salad03_rollback_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_rollback_schema.json	2026-05-27 06:55:17.602336638 +0000
+@@ -0,0 +1,68 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "SALAD-03 Rollback Candidate / Safe Resample Step Receipt",
++  "type": "object",
++  "required": [
++    "patch_id",
++    "input_patch",
++    "schema_version",
++    "step",
++    "mode",
++    "input",
++    "plan",
++    "execution"
++  ],
++  "properties": {
++    "patch_id": {
++      "const": "16AI-QW-38G-R6A-SALAD-03"
++    },
++    "input_patch": {
++      "const": "16AI-QW-38G-R6A-SALAD-02"
++    },
++    "schema_version": {
++      "type": "integer",
++      "const": 1
++    },
++    "mode": {
++      "enum": [
++        "Off",
++        "PlanOnly",
++        "ControlledExecute",
++        "StrictControlledExecute"
++      ]
++    },
++    "input": {
++      "type": "object",
++      "required": [
++        "risk_stable",
++        "rollback_candidate",
++        "token_ledger_len",
++        "kv_snapshot_available",
++        "kv_restore_supported"
++      ]
++    },
++    "plan": {
++      "type": "object",
++      "required": [
++        "decision",
++        "behavior_change",
++        "plan_only",
++        "rollback_depth",
++        "safe_resample_config",
++        "denied_reasons",
++        "warning_reasons",
++        "plan_reasons"
++      ]
++    },
++    "execution": {
++      "type": "object",
++      "required": [
++        "executed",
++        "rollback_executed",
++        "kv_restore_executed",
++        "resample_executed",
++        "safe_stop_executed"
++      ]
++    }
++  }
++}
+diff -ruN salad03_orig/workspace/salad03_source_hash_manifest.json salad03_work/workspace/salad03_source_hash_manifest.json
+--- salad03_orig/workspace/salad03_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_source_hash_manifest.json	2026-05-27 06:55:17.607610334 +0000
+@@ -0,0 +1,25 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03",
++  "files": [
++    {
++      "path": "crates/model_core/src/salad03_rollback.rs",
++      "sha256": "2c639f89217ae286c1361b5eeb5b82bcd4a5dd6b7b7cb7a5969bbe0d5a83cd90",
++      "bytes": 31279
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "d23e28c031d5c71c99de057654549f6361f00688f4682ff8b1b64fabdb4077eb",
++      "bytes": 14602
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "8f81fedf9962c0c9ee325e7fc221047f58b3cecda6924a361d1285f0da65100e",
++      "bytes": 20194
++    },
++    {
++      "path": "workspace/salad03.patch",
++      "sha256": "2da12ff09b412ef59c89aa4d802beb32c0cc03ba6ac7c4f4a83dcc2263fefb27",
++      "bytes": 69958
++    }
++  ]
++}
+diff -ruN salad03_orig/workspace/salad03_static_checks.json salad03_work/workspace/salad03_static_checks.json
+--- salad03_orig/workspace/salad03_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_static_checks.json	2026-05-27 06:55:17.604070327 +0000
+@@ -0,0 +1,53 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": [
++    {
++      "name": "module_file_exists",
++      "ok": true,
++      "detail": "crates/model_core/src/salad03_rollback.rs"
++    },
++    {
++      "name": "lib_mod_registered",
++      "ok": true,
++      "detail": "lib.rs module registration"
++    },
++    {
++      "name": "lib_exports_registered",
++      "ok": true,
++      "detail": "lib.rs pub use"
++    },
++    {
++      "name": "sampler_hook_registered",
++      "ok": true,
++      "detail": "sampler_parity append hook"
++    },
++    {
++      "name": "plan_only_default",
++      "ok": true,
++      "detail": "PlanOnly mode present"
++    },
++    {
++      "name": "string_only_rollback_forbidden",
++      "ok": true,
++      "detail": "token/KV ledger SSOT"
++    },
++    {
++      "name": "kv_snapshot_gate_present",
++      "ok": true,
++      "detail": "KV restore gate fields"
++    },
++    {
++      "name": "execution_default_false",
++      "ok": true,
++      "detail": "plan-only execution false"
++    },
++    {
++      "name": "safe_resample_config_present",
++      "ok": true,
++      "detail": "safe resample config"
++    }
++  ]
++}
+diff -ruN salad03_orig/workspace/salad03_summary.json salad03_work/workspace/salad03_summary.json
+--- salad03_orig/workspace/salad03_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ salad03_work/workspace/salad03_summary.json	2026-05-27 06:55:17.602824972 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-SALAD-03",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-02",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "PlanOnly",
++  "behavior_change": false,
++  "requires_salad02": true,
++  "salad02_status_seen": null,
++  "decode03d_status_seen": null,
++  "steps_observed": 0,
++  "decisions": {
++    "no_action_count": 0,
++    "plan_rollback_count": 0,
++    "execute_rollback_resample_count": 0,
++    "safe_stop_candidate_count": 0,
++    "denied_count": 0,
++    "strict_fail_count": 0
++  },
++  "rollback": {
++    "max_rollback_depth": 0,
++    "mean_rollback_depth": null,
++    "kv_snapshot_required_count": 0,
++    "kv_snapshot_available_count": 0,
++    "kv_restore_verified_count": 0
++  },
++  "execution": {
++    "executed_count": 0,
++    "rollback_executed_count": 0,
++    "kv_restore_executed_count": 0,
++    "resample_executed_count": 0,
++    "safe_stop_executed_count": 0
++  },
++  "safe_resample": {
++    "temperature_min": null,
++    "temperature_mean": null,
++    "min_p_max": null,
++    "top_p_min": null
++  },
++  "acceptance": {
++    "ready_for_controlled_execute_trial": false,
++    "ready_for_salad04_korean_morph_loop_guard": false,
++    "reason": "static bake only; run ASH_SALAD03_MODE=plan_only after SALAD-02 detector evidence"
++  }
++}

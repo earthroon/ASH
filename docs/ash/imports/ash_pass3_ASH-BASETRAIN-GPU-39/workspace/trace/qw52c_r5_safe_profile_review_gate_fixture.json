@@ -1,0 +1,37 @@
+[
+  {
+    "case_id": "queue_created_from_safe_profile_candidates",
+    "expected_status": "PASS",
+    "expected_queue_entry_count": 3,
+    "expected_operator_decision": null,
+    "expected_review_gate_status": "Queued"
+  },
+  {
+    "case_id": "best_candidate_pending_operator_review",
+    "expected_status": "PASS",
+    "expected_queue_entry_count": null,
+    "expected_operator_decision": "Pending",
+    "expected_review_gate_status": null
+  },
+  {
+    "case_id": "review_requirements_preserved",
+    "expected_status": "PASS",
+    "expected_queue_entry_count": null,
+    "expected_operator_decision": null,
+    "expected_review_gate_status": null
+  },
+  {
+    "case_id": "operator_queue_no_apply",
+    "expected_status": "PASS",
+    "expected_queue_entry_count": 3,
+    "expected_operator_decision": null,
+    "expected_review_gate_status": null
+  },
+  {
+    "case_id": "missing_r4_safe_profile_manifest_unavailable",
+    "expected_status": "Unavailable",
+    "expected_queue_entry_count": 0,
+    "expected_operator_decision": null,
+    "expected_review_gate_status": "Unavailable"
+  }
+]

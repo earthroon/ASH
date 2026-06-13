@@ -1,0 +1,18 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01C",
+  "title": "Minimum Continuation Guard / Single-Token Collapse Repair Seal",
+  "static_validation": "PASS_STATIC_BAKE_PENDING_LOCAL_CARGO_BUILD",
+  "cargo_executed": false,
+  "cargo_error": "cargo not available in bake container",
+  "guard_location": "crates/orchestrator_local/src/infer_entry.rs",
+  "strategy": "one-shot retry through StandardInferDecodeOverride(min_new_tokens=8) when freeform collapse is detected",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "changed_files": [
+    "crates/orchestrator_local/src/infer_entry.rs"
+  ]
+}

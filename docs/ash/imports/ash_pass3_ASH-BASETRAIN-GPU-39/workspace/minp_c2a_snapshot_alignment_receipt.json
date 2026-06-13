@@ -1,0 +1,16 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C2A",
+  "status": "NOT_RUN",
+  "reason": "NO_RUNTIME_VOCAB_MANIFEST_OR_CARGO",
+  "static_validator_added": true,
+  "required_runtime_checks": [
+    "qwave_scores.len == vocab_size",
+    "deltak_scores.len == vocab_size",
+    "max_token_id < vocab_size",
+    "finite scores only",
+    "scores within [-1,1]",
+    "lm_head_vocab_match if available",
+    "tokenizer_hash_match if available",
+    "fixture pass or explicit skipped"
+  ]
+}

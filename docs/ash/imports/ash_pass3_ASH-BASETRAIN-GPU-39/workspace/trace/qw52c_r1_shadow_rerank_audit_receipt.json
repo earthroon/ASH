@@ -1,0 +1,101 @@
+{
+  "patch_id": "QW-52C-R1",
+  "title": "Shadow Rerank Dataset Replay / Top1 Diff Audit Seal",
+  "base_patch": "QW-52C",
+  "status": "PASS_STATIC_SHADOW_RERANK_TOP1_DIFF_AUDIT",
+  "audit_policy": {
+    "audit_policy_version": "shadow_top1_diff_audit_v1",
+    "top1_diff_policy_version": "actual_vs_shadow_top1_v1",
+    "stable_risk_max": 0.3,
+    "review_risk_max": 0.5,
+    "salad_risk_min": 0.65,
+    "collapse_risk_min": 0.85,
+    "beneficial_min_net_score": 0.2,
+    "risky_min_regression_score": 0.2,
+    "min_supervised_audit_eligible": 3
+  },
+  "summary": {
+    "sample_count": 5,
+    "supervised_audit_eligible_count": 3,
+    "same_top1_count": 1,
+    "different_top1_count": 3,
+    "beneficial_diff_count": 1,
+    "risky_diff_count": 1,
+    "neutral_diff_count": 0,
+    "review_only_count": 1,
+    "unavailable_count": 1,
+    "hard_ban_count": 0,
+    "token_selection_change_count": 0,
+    "mean_shadow_improvement_score": 0.18000000000000002,
+    "mean_shadow_regression_score": 0.145,
+    "mean_shadow_net_benefit_score": 0.035000000000000024,
+    "audit_pass": true
+  },
+  "fixture_results": [
+    {
+      "case_id": "beneficial_salad_top1_demoted",
+      "status": "PASS",
+      "top1_diff_class": "BeneficialDiff"
+    },
+    {
+      "case_id": "stable_top1_preserved",
+      "status": "PASS",
+      "top1_diff_class": "NoDiff"
+    },
+    {
+      "case_id": "risky_shadow_promotes_loop_candidate",
+      "status": "PASS",
+      "top1_diff_class": "RiskyDiff",
+      "runtime_apply": false
+    },
+    {
+      "case_id": "review_sample_not_supervised_audit",
+      "status": "PASS",
+      "top1_diff_class": "ReviewOnly"
+    },
+    {
+      "case_id": "missing_shadow_candidates_unavailable",
+      "status": "PASS",
+      "audit_status": "Unavailable"
+    }
+  ],
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_audit_language": "Rust",
+    "replay_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  },
+  "next_candidates": [
+    "QW-52C-R2",
+    "QW-52D",
+    "QW-55"
+  ],
+  "notes": [
+    "QW-52C-R1 audits shadow rerank top1 differences only.",
+    "No actual token rank is changed.",
+    "No actual token selection is changed.",
+    "RiskyDiff is recorded but not applied.",
+    "Review and unlabeled samples are excluded from supervised audit evidence."
+  ]
+}

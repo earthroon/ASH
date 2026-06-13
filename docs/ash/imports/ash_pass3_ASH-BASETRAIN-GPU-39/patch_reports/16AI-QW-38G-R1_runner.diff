@@ -1,0 +1,113 @@
+--- ash38g_orig/scripts/run_16AI_QW_38G_layerwise_reserved_direction.ps1	2026-05-22 09:27:35.000000000 +0000
++++ ash38g_r1/scripts/run_16AI_QW_38G_layerwise_reserved_direction.ps1	2026-05-22 09:41:22.694304971 +0000
+@@ -30,11 +30,13 @@
+ $hiddenJsonlPath = Join-Path $OutDir "qw38d_hidden_projection_trace.jsonl"
+ $layerJsonlPath = Join-Path $OutDir "qw38g_layerwise_reserved_direction_trace.jsonl"
+ $summaryPath = Join-Path $OutDir "qw38g_layerwise_reserved_direction_summary.json"
++$receiptPath = Join-Path $OutDir "qw38g_runtime_receipt.json"
+ 
+ Remove-Item $rawJsonlPath -ErrorAction SilentlyContinue
+ Remove-Item $hiddenJsonlPath -ErrorAction SilentlyContinue
+ Remove-Item $layerJsonlPath -ErrorAction SilentlyContinue
+ Remove-Item $summaryPath -ErrorAction SilentlyContinue
++Remove-Item $receiptPath -ErrorAction SilentlyContinue
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
+@@ -51,12 +53,18 @@
+ $env:ASH_LAYERWISE_RESERVED_TRACE_LAYERS = $Layers
+ $env:ASH_LAYERWISE_RESERVED_TRACE_STAGES = $Stages
+ $env:ASH_LAYERWISE_RESERVED_TRACE_JSONL = $layerJsonlPath
++$env:ASH_LAYERWISE_RESERVED_SUMMARY_JSON = $summaryPath
++$env:ASH_LAYERWISE_RESERVED_RECEIPT_JSON = $receiptPath
+ $env:ASH_LAYERWISE_RESERVED_TARGET_ID = "13"
+ $env:ASH_TOKENIZER_MANIFEST_PATH = $Tokenizer
+ $env:ASH_GENERATION_BANLIST_PATH = $Banlist
+ 
+-$argsList = @(
+-  "run", "--manifest-path", ".\crates\runtime\Cargo.toml", "--example", "infer_only", "--",
++$buildArgsList = @(
++  "build", "--release", "--manifest-path", ".\crates\runtime\Cargo.toml", "--example", "infer_only"
++)
++
++$exePath = ".\target\release\examples\infer_only.exe"
++$runArgsList = @(
+   "--model-spec", $ModelSpec,
+   "--tokenizer", $Tokenizer,
+   "--checkpoint", $Checkpoint,
+@@ -72,9 +80,26 @@
+ Write-Host "[16AI-QW-38G][cargo] stderr=$stderrPath"
+ Write-Host "[16AI-QW-38G][trace] layer_jsonl=$layerJsonlPath hidden_jsonl=$hiddenJsonlPath raw_jsonl=$rawJsonlPath"
+ 
+-$process = Start-Process `
++Write-Host "[16AI-QW-38G-R1][build] cargo build --release example infer_only"
++$buildProcess = Start-Process `
+   -FilePath "cargo.exe" `
+-  -ArgumentList $argsList `
++  -ArgumentList $buildArgsList `
++  -RedirectStandardOutput (Join-Path $OutDir "build_qw38g_r1_stdout.log") `
++  -RedirectStandardError (Join-Path $OutDir "build_qw38g_r1_stderr.log") `
++  -NoNewWindow `
++  -Wait `
++  -PassThru
++
++if ($buildProcess.ExitCode -ne 0) {
++  Write-Host "[16AI-QW-38G-R1][error] cargo build failed exit_code=$($buildProcess.ExitCode)"
++  Get-Content (Join-Path $OutDir "build_qw38g_r1_stderr.log") -Tail 120 -Encoding UTF8
++  exit $buildProcess.ExitCode
++}
++
++Write-Host "[16AI-QW-38G-R1][run] exe=$exePath"
++$process = Start-Process `
++  -FilePath $exePath `
++  -ArgumentList $runArgsList `
+   -RedirectStandardOutput $stdoutPath `
+   -RedirectStandardError $stderrPath `
+   -NoNewWindow `
+@@ -82,33 +107,33 @@
+   -PassThru
+ 
+ $code = $process.ExitCode
+-Write-Host "[16AI-QW-38G][run] exit_code=$code stdout=$stdoutPath stderr=$stderrPath"
++Write-Host "[16AI-QW-38G-R1][run] exit_code=$code stdout=$stdoutPath stderr=$stderrPath"
+ 
+ if ($code -ne 0) {
+-  Write-Host "[16AI-QW-38G][error] infer_only failed with exit code $code"
++  Write-Host "[16AI-QW-38G-R1][error] infer_only failed with exit code $code"
+   if (Test-Path $stderrPath) {
+-    Write-Host "[16AI-QW-38G][stderr_tail] $stderrPath"
++    Write-Host "[16AI-QW-38G-R1][stderr_tail] $stderrPath"
+     Get-Content $stderrPath -Tail 120 -Encoding UTF8
+   }
+   exit $code
+ }
+ 
+-if (Test-Path ".\scripts\summarize_16AI_QW_38G_layerwise_reserved_direction.py") {
+-  python ".\scripts\summarize_16AI_QW_38G_layerwise_reserved_direction.py" `
+-    --jsonl $layerJsonlPath `
+-    --out $summaryPath
+-}
+-
+ if (!(Test-Path $layerJsonlPath)) {
+   Write-Host "[16AI-QW-38G][error] layerwise trace missing: $layerJsonlPath"
+   exit 1
+ }
+ 
+ if (!(Test-Path $summaryPath)) {
+-  Write-Host "[16AI-QW-38G][error] layerwise summary missing: $summaryPath"
++  Write-Host "[16AI-QW-38G-R1][error] Rust-native layerwise summary missing: $summaryPath"
++  exit 1
++}
++
++if (!(Test-Path $receiptPath)) {
++  Write-Host "[16AI-QW-38G-R1][error] Rust-native runtime receipt missing: $receiptPath"
+   exit 1
+ }
+ 
+-Write-Host "[16AI-QW-38G][ok] cargo exit_code=0"
+-Write-Host "[16AI-QW-38G][layer_trace] $layerJsonlPath"
+-Write-Host "[16AI-QW-38G][summary] $summaryPath"
++Write-Host "[16AI-QW-38G-R1][ok] exit_code=0 rust_native_summary=true python_postprocess_required=false"
++Write-Host "[16AI-QW-38G-R1][layer_trace] $layerJsonlPath"
++Write-Host "[16AI-QW-38G-R1][summary] $summaryPath"
++Write-Host "[16AI-QW-38G-R1][receipt] $receiptPath"

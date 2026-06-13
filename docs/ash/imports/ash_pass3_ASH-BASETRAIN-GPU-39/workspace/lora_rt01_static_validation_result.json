@@ -1,0 +1,21 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-LORA-RT-01",
+  "status": "PASS_STATIC_LORA_RT01_DOMAIN_ADAPTER_PREFLIGHT_BAKED_PENDING_LOCAL_CARGO_BUILD",
+  "checks": {
+    "domain_adapter_runtime_module_exists": true,
+    "lib_rs_module_declared": true,
+    "infer_entry_imports_runtime_adapter": true,
+    "output_artifact_inserts_domain_adapter_receipt": true,
+    "receipt_is_honest_partial_until_delta_hook": true,
+    "actual_delta_not_claimed": true,
+    "examples_present": true
+  },
+  "cargo_check": "NOT_RUN_IN_CONTAINER_cargo_not_available",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "base_safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "next_patch": "16AI-QW-38G-R6A-LORA-RT-02 Domain Adapter GPU/Runtime Logit Delta Hook Seal"
+}

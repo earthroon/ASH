@@ -1,0 +1,38 @@
+{
+  "patch_id": "QW-52B-M4",
+  "title": "QWave Phase Escape Candidate Trace / No Rerank Mutation Seal",
+  "base_patch": "QW-52B-M3",
+  "status": "PASS_STATIC_QWAVE_PHASE_ESCAPE_CANDIDATE_TRACE",
+  "json_static_validation": "PASS",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE",
+  "runtime_probe": "NOT_RUN_CARGO_UNAVAILABLE",
+  "crate_language_audit": {
+    "status": "PASS",
+    "patch_added_crate_js_ts_files": [],
+    "crate_js_ts_allowed": false,
+    "frontend_desktop_js_ts_allowed": true,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL"
+  },
+  "checks": {
+    "schema_json_valid": true,
+    "fixture_json_valid": true,
+    "receipt_json_valid": true,
+    "augmented_registry_json_valid": true,
+    "detector_count_before_12_after_13": true,
+    "runtime_apply_false": true,
+    "hidden_state_mutation_false": true,
+    "logit_mutation_false": true,
+    "sampler_mutation_false": true,
+    "token_rank_mutation_false": true,
+    "token_selection_mutation_false": true,
+    "token_ban_false": true,
+    "rerank_execution_false": true,
+    "crate_js_ts_added_false": true
+  },
+  "warnings": [
+    "cargo unavailable in bake environment; Rust validator source was added but not executed here",
+    "runtime probe not executed in bake environment"
+  ]
+}

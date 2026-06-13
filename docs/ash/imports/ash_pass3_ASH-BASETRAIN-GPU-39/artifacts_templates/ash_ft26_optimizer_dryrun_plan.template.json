@@ -1,0 +1,22 @@
+{
+  "patch_id": "ASH-FT-26",
+  "title": "Group-Local Gradient Validation / Optimizer Dry-run Boundary Seal",
+  "mode": "group_local_gradient_validation_optimizer_dryrun",
+  "base_required": "ASH-FT-25",
+  "scope": "selected_group_only",
+  "allow_gradient_revalidation": true,
+  "allow_optimizer_dryrun": true,
+  "allow_real_optimizer_step": false,
+  "allow_optimizer_state_mutation": false,
+  "allow_weight_update": false,
+  "allow_delta_packet_creation": false,
+  "allow_delta_stack_append": false,
+  "allow_base_checkpoint_mutation": false,
+  "allow_runtime_default_apply": false,
+  "allow_checkpoint_alias_rebind": false,
+  "allow_promotion": false,
+  "optimizer_profile": "adamw_dryrun",
+  "learning_rate": "0.00001",
+  "clip_norm_threshold": "1.0",
+  "next_patch": "ASH-FT-27"
+}

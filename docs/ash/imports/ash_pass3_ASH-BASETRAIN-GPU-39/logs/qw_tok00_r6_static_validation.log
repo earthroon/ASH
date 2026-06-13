@@ -1,0 +1,32 @@
+QW-TOK-00-R6 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok00R6RuntimeVocabCapEvidenceCollectorConfig: PASS
+QwTok00R6OperatorPathProbe: PASS
+QwTok00R6ModelConfigEvidence: PASS
+QwTok00R6CheckpointManifestEvidence: PASS
+QwTok00R6SafetensorsShapeEvidence: PASS
+QwTok00R6RuntimeModelSpecEvidence: PASS
+QwTok00R6NativeProjectionEvidence: PASS
+QwTok00R6R5InputCandidatePacket: PASS
+QwTok00R6NoApplySeal: PASS
+QwTok00R6RuntimeVocabCapEvidenceCollectorReport: PASS
+build_qw_tok00_r6_runtime_vocab_cap_evidence_collector_report: PASS
+build_qw_tok00_r6_default_runtime_vocab_cap_evidence_collector_report: PASS
+allow_weight_tensor_full_load: false: PASS
+allow_apply: false: PASS
+allow_runtime_spec_write: false: PASS
+allow_checkpoint_manifest_write: false: PASS
+allow_embedding_resize: false: PASS
+allow_lm_head_resize: false: PASS
+allow_runtime_decode_bind: false: PASS
+test qw_tok00_r6_runtime_vocab_cap_evidence_collector.rs present: PASS
+test qw_tok00_r6_operator_path_probe.rs present: PASS
+test qw_tok00_r6_no_apply_no_mutation.rs present: PASS
+test qw_tok00_r6_evidence_packet_contract.rs present: PASS
+artifacts/qw_tok00_r6_runtime_vocab_cap_evidence_collector_report.json exists: PASS
+artifacts/qw_tok00_r6_evidence_packet.json exists: PASS
+workspace/runtime_traces/qw_tok00_r6_runtime_vocab_cap_evidence_collector_trace.jsonl exists: PASS
+workspace/trace/qw_tok00_r6_runtime_vocab_cap_evidence_collector_receipt.json exists: PASS
+no checkpoint/model weight files packaged: PASS
+overall: PASS

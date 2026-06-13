@@ -1,0 +1,27 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
+  "schema_version": 1,
+  "run_receipt_required_fields": [
+    "run_id",
+    "prompt_id",
+    "prompt_hash",
+    "profile_id",
+    "backend",
+    "seed",
+    "decode_config",
+    "output",
+    "metrics",
+    "pass_fail"
+  ],
+  "hard_fail_metrics": [
+    "global_finite_fallback_count",
+    "byte_piece_count>=3",
+    "jamo_leak_count>=5",
+    "salad02_critical",
+    "salad04_critical",
+    "empty_output"
+  ],
+  "baseline_profile": "M01_static_safe",
+  "candidate_profile": "M04_dynamic_controlled",
+  "ssot": "fixed_prompt_suite+seed_config_backend_matrix+generated_output_receipt"
+}

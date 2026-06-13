@@ -1,0 +1,442 @@
+﻿D:\1111113232\DUST\1\ash_pass3\crates\base_train\src\pipeline.rs:4: use burn_wgpu::{graphics, init_setup, RuntimeOptions, WgpuDevice};
+D:\1111113232\DUST\1\ash_pass3\crates\base_train\src\pipeline.rs:137: let runtime_options = RuntimeOptions::default();
+D:\1111113232\DUST\1\ash_pass3\crates\base_train\src\pipeline.rs:146: "metal" => init_setup::<graphics::Metal>(&device, runtime_options),
+D:\1111113232\DUST\1\ash_pass3\crates\base_train\src\pipeline.rs:148: init_setup::<graphics::Vulkan>(&device, runtime_options)
+D:\1111113232\DUST\1\ash_pass3\crates\base_train\src\pipeline.rs:150: _ => init_setup::<graphics::AutoGraphicsApi>(&device, runtime_options),
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:6: pub struct NativeWgpuRuntimeHandles {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:12: impl NativeWgpuRuntimeHandles {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:27: pub fn try_extract_runtime_handles(device: &WgpuDevice) -> Option<NativeWgpuRuntimeHandles> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:30: // but burn_wgpu_local::try_extract_runtime_handles_from_wgpu_device currently
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:36: burn_wgpu_local::try_extract_runtime_handles_from_wgpu_device(device)
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:37: .map(|handles| NativeWgpuRuntimeHandles::new(handles.device, handles.queue, handles.source))
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:41: pub fn try_extract_runtime_handles(_device: &WgpuDevice) -> Option<NativeWgpuRuntimeHandles> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:46: try_extract_runtime_handles(device).map(|handles| handles.build_raw_bridge())
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\device_handles.rs:50: try_extract_runtime_handles(device).is_some()
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:2: try_build_same_device_raw_bridge, try_extract_runtime_handles, NativeWgpuRuntimeHandles,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:6: use burn_wgpu::{init_device, RuntimeOptions, WgpuSetup};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:16: pub struct ExistingDeviceBootstrap {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:19: pub runtime_handles: NativeWgpuRuntimeHandles,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:24: impl ExistingDeviceBootstrap {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:30: impl Drop for ExistingDeviceBootstrap {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:40: pub fn bootstrap_existing_device(source: &'static str) -> Result<ExistingDeviceBootstrap> {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:74: let burn_device = init_device(setup, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:76: WgpuDevice::Existing(id) => id,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:96: let runtime_handles = try_extract_runtime_handles(&burn_device).ok_or_else(|| {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\existing_device_bootstrap.rs:131: Ok(ExistingDeviceBootstrap {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:18: use crate::{NativeWgpuRuntimeHandles, RawWgpuBufferLease};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\gpu_sampling.rs:769: pub fn from_handles(handles: &NativeWgpuRuntimeHandles) -> Self {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:126: pub use device_handles::{NativeWgpuRuntimeHandles, supports_same_device_raw_bridge, try_build_same_device_raw_bridge, try_extract_runtime_handles};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:133: pub use existing_device_bootstrap::{bootstrap_existing_device, ExistingDeviceBootstrap};
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:137: RuntimeSpliceAccessTelemetry as TensorCubeRuntimeSpliceAccessTelemetry,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:138: RuntimeSpliceOutcomeKind as TensorCubeRuntimeSpliceOutcomeKind,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:139: RuntimeSpliceStage as TensorCubeRuntimeSpliceStage,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:140: RuntimeSpliceTelemetryLabelSummary as TensorCubeRuntimeSpliceTelemetryLabelSummary,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:141: RuntimeSpliceTelemetrySummary as TensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\lib.rs:142: ExternalAliasWritableAllowReason as TensorCubeWritableAllowReason,
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:9: // use cubecl_wgpu::wgpu as backend_wgpu;
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:320: let Some(resolved) = burn_fusion_local::try_float_tensor_into_cube_tensor_via_handle_map(&primitive) else {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:324: let Some(_borrowed) = burn_wgpu_local::try_borrow_cube_tensor_raw_resource(&resolved.tensor) else {
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:355: let resolved = burn_fusion_local::try_float_tensor_into_cube_tensor_via_handle_map(&primitive)?;
+D:\1111113232\DUST\1\ash_pass3\crates\burn_webgpu_backend\src\raw_bridge.rs:356: let borrowed = burn_wgpu_local::try_borrow_cube_tensor_raw_resource(&resolved.tensor)?;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bin\lora_train.rs:65: let device = WgpuDevice::default();
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:3: evaluate_tensorcube_health, resolve_runtime_lora_target_module_dims,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:4: tensorcube_health_snapshot_from_native_trace_status, ModelSpec, NativeTraceRuntimeStatus,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:5: NativeWgpuModel, ReferenceModel, TensorCubeHealthAction, TensorCubeHealthDecision,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:6: TensorCubeHealthMode, TensorCubeHealthSnapshot,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:83: pub tensorcube_health: Option<TensorCubeHealthDecision>,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:99: pub tensorcube_health: Option<TensorCubeHealthDecision>,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:154: tensorcube_health: self.tensorcube_health.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:342: fn emit_tensorcube_health_mode_log(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:343: mode: TensorCubeHealthMode,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:348: "[tensorcube][health_mode] mode={} target={} fail_closed={}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:355: fn emit_tensorcube_health_decision_log(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:357: snapshot: &TensorCubeHealthSnapshot,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:358: decision: &TensorCubeHealthDecision,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:366: "[tensorcube][health_decision] target={} severity={} action={} reasons={:?} raw_bridge_seen={} runtime_splice_seen={} gpu_sampling_seen={} same_device_borrow={} host_upload_fallback={} materialize_missing={} fallback_to_owned={} promotion_failed={} cpu_materialize={} native_trace_submit_ready={}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1084: let health_mode = TensorCubeHealthMode::from_env();
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1086: let health_snapshot = tensorcube_health_snapshot_from_native_trace_status(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1090: let health_decision = evaluate_tensorcube_health(&health_snapshot, &health_policy);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1091: emit_tensorcube_health_mode_log(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1096: emit_tensorcube_health_decision_log(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1101: report.tensorcube_health = Some(health_decision.clone());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1108: TensorCubeHealthAction::FailClosed | TensorCubeHealthAction::QuarantineTarget => {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1110: "tensorcube health gate rejected native module-local runtime: target={} severity={} action={} reasons={:?}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1121: TensorCubeHealthAction::DemoteToHostFallback => {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1129: "[bridge][module_local][runtime] upfront downgrade target_key={} mode={} reason=tensorcube_health_gate severity={} action={} device_source={} existing_id={} registry_registered={} runtime_handles_field_ok={} runtime_handles_live_ok={} direct_raw_bridge_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\bridge.rs:1147: TensorCubeHealthAction::KeepNative | TensorCubeHealthAction::WarnNative => {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\governance_runtime.rs:739: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:5: use crate::runtime_health::{RuntimeHealthCompact, TensorcubeHealthCompact};
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:24: TensorcubeHostUploadHeavy,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:43: Self::TensorcubeHostUploadHeavy => "tensorcube_host_upload_heavy",
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:143: fn runtime_tensorcube(runtime_health: Option<&RuntimeHealthCompact>) -> Option<&TensorcubeHealthCompact> {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:144: runtime_health.and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:174: fn tensorcube(surface: &SubtitleCandidateSurfaceInput) -> Option<&TensorcubeHealthCompact> {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:175: runtime_tensorcube(surface.runtime_health.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:215: fn tensorcube_host_upload_heavy(surface: &SubtitleCandidateSurfaceInput) -> bool {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:216: if let Some(tc) = tensorcube(surface) {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:405: if tensorcube_host_upload_heavy(rejected) {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:406: tags.push_reason(SubtitleHardCaseReason::TensorcubeHostUploadHeavy);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:673: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:791: tensorcube_runtime_splice_summary: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:814: let tc = tensorcube(&surface).expect("tensorcube compact should exist");
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:829: tensorcube: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:862: tensorcube: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:922: .and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:927: .and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:954: fn tensorcube_reason_can_trigger_without_raw_bridge_proxy() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:965: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case.rs:1000: .contains(&SubtitleHardCaseReason::TensorcubeHostUploadHeavy));
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:13: use crate::runtime_health::TensorcubeHealthCompact;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:307: fn replay_tensorcube(surface: &SubtitleCandidateSurfaceInput) -> Option<&TensorcubeHealthCompact> {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:311: .and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:323: fn tensorcube_pressure_score(surface: &SubtitleCandidateSurfaceInput) -> u64 {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:324: replay_tensorcube(surface)
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:334: fn tensorcube_pressure_changed(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:338: tensorcube_pressure_score(baseline) != tensorcube_pressure_score(replay)
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:407: let _tensorcube_pressure_changed = tensorcube_pressure_changed(&baseline_input, &replay_input);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:559: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:577: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:617: assert_eq!(tensorcube_pressure_score(&surface), 10);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:707: fn tensorcube_pressure_compares_direct_counters() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:716: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:739: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:754: assert!(tensorcube_pressure_changed(&baseline, &replay));
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\hard_case_replay.rs:755: assert!(tensorcube_pressure_score(&replay) < tensorcube_pressure_score(&baseline));
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\lib.rs:211: TensorcubeHealthCompact,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\lib.rs:216: assess_runtime_health_for_selection, decision_to_compact, tensorcube_pressure_score,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\lib.rs:236: training_replay_recovered, training_tensorcube_pressure_score,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:207: let tensorcube_pressure = runtime_health
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:208: .tensorcube
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:218: if tensorcube_pressure > 0 {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:219: return Some("tensorcube_pressure".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:337: if matches!(history.last_runtime_health_state.as_deref(), Some("tensorcube_pressure")) {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:387: .any(|r| r.contains("tensorcube_pressure_hard"))
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\orchestration_runtime.rs:917: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:18: pub tensorcube_health_mode: String,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:98: tensorcube_health_mode: String,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:135: tensorcube_health_mode,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:157: env_value("ASH_TENSORCUBE_HEALTH_MODE", "warn"),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:190: - tensorcube_health_mode: `{}`\n\
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\perf_artifact.rs:200: artifact.tensorcube_health_mode,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\pipeline_contract.rs:22: tensorcube: Some(crate::runtime_health::TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\pipeline_contract.rs:47: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\pipeline_contract.rs:578: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\pipeline_contract.rs:1026: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:9: TensorCubeRuntimeSpliceTelemetryCompact,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:35: pub struct TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2119: pub tensorcube: Option<TensorcubeHealthCompact>,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2186: fn tensorcube_from_compact(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2187: compact: Option<&TensorCubeRuntimeSpliceTelemetryCompact>,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2188: ) -> Option<TensorcubeHealthCompact> {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2189: compact.map(|c| TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2267: let tensorcube_compact = result
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2268: .tensorcube_runtime_splice_summary
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2286: tensorcube: tensorcube_from_compact(tensorcube_compact.as_ref()),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2343: tensorcube: tensorcube_from_compact(
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2344: candidate.tensorcube_runtime_splice_summary_compact.as_ref(),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2525: tensorcube_runtime_splice_summary: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2582: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2608: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2680: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2697: assert!(decoded.tensorcube.is_none());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2703: fn tensorcube_compact_preserves_pressure_counters() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2704: let compact = TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2715: tensorcube: Some(compact.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2719: let json = serde_json::to_string(&runtime).expect("serialize tensorcube runtime health");
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2721: serde_json::from_str(&json).expect("deserialize tensorcube runtime health");
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\runtime_health.rs:2723: assert_eq!(decoded.tensorcube, Some(compact));
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:16: pub tensorcube_soft_threshold: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:17: pub tensorcube_hard_threshold: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:22: pub tensorcube_soft_penalty_points: i32,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:38: tensorcube_soft_threshold: 3,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:39: tensorcube_hard_threshold: 8,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:43: tensorcube_soft_penalty_points: 2,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:58: pub tensorcube_pressure_score: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:71: pub tensorcube_hard_fail: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:78: pub replay_improved_tensorcube: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:102: pub fn tensorcube_pressure_score(runtime_health: Option<&RuntimeHealthCompact>) -> usize {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:104: .and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:144: fn replay_improved_tensorcube(replay: Option<&HardCaseReplayCompact>) -> bool {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:145: replay_improved_reason(replay, "tensorcube_host_upload_heavy")
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:165: let tensorcube_pressure_score = tensorcube_pressure_score(runtime_health);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:205: let replay_improved_tensorcube = if policy.allow_replay_soft_recovery {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:206: replay_improved_tensorcube(replay)
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:223: let tensorcube_hard_fail = tensorcube_pressure_score >= policy.tensorcube_hard_threshold
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:224: && !replay_improved_tensorcube;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:250: if tensorcube_pressure_score >= policy.tensorcube_soft_threshold
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:251: && tensorcube_pressure_score < policy.tensorcube_hard_threshold
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:252: && !replay_improved_tensorcube
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:254: soft_penalty_points += policy.tensorcube_soft_penalty_points;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:255: reasons.push("tensorcube_pressure_soft".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:272: tensorcube_pressure_score,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:284: tensorcube_hard_fail,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:289: replay_improved_tensorcube,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:340: if assessment.tensorcube_hard_fail {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:341: reasons.push("runtime_gate:tensorcube_pressure_hard".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:350: || assessment.tensorcube_hard_fail
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:373: use crate::runtime_health::{RawBridgeHealthCompact, SamplingHealthCompact, TensorcubeHealthCompact};
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:383: tensorcube: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:394: tensorcube_health: None,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:407: assert!(!assessment.tensorcube_hard_fail);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:429: fn tensorcube_soft_threshold_adds_penalty() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:431: policy.tensorcube_soft_threshold = 3;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:432: policy.tensorcube_hard_threshold = 10;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:437: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:448: assert_eq!(assessment.tensorcube_pressure_score, 3);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:450: assert!(!assessment.tensorcube_hard_fail);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:566: reasons: vec!["raw_bridge_warning".to_string(), "tensorcube_pressure_soft".to_string()],
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:607: fn tensorcube_pressure_hard_fail_blocks_selection() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:610: tensorcube_pressure_score: 10,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:611: tensorcube_hard_fail: true,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\selection_runtime.rs:618: assert!(gate.reasons.iter().any(|r| r.contains("tensorcube_pressure_hard")));
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:17: pub quarantine_on_tensorcube_hard_fail: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:19: pub tensorcube_soft_threshold: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:20: pub tensorcube_hard_threshold: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:43: quarantine_on_tensorcube_hard_fail: true,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:44: tensorcube_soft_threshold: 3,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:45: tensorcube_hard_threshold: 8,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:67: pub tensorcube_pressure_score: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:187: pub tensorcube_pressure_examples: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:218: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:292: pub fn training_tensorcube_pressure_score(runtime_health: Option<&RuntimeHealthCompact>) -> usize {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:294: .and_then(|h| h.tensorcube.as_ref())
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:336: let tensorcube_pressure_score = training_tensorcube_pressure_score(runtime_health);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:350: if tensorcube_pressure_score >= policy.tensorcube_soft_threshold {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:351: reasons.push("tensorcube_pressure".to_string());
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:364: tensorcube_pressure_score,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:391: if assessment.tensorcube_pressure_score >= policy.tensorcube_hard_threshold
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:392: && policy.quarantine_on_tensorcube_hard_fail
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:397: reasons: vec!["tensorcube_pressure_hard".to_string()],
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:420: if assessment.tensorcube_pressure_score >= policy.tensorcube_soft_threshold
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:645: if assessment.tensorcube_pressure_score > 0 {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:646: summary.tensorcube_pressure_examples += 1;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:715: tensorcube_pressure_examples: current.tensorcube_pressure_examples,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:887: TensorcubeHealthCompact,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:918: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:982: assert_eq!(assessment.tensorcube_pressure_score, 0);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1010: fn tensorcube_soft_pressure_becomes_downweight() {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1012: policy.tensorcube_soft_threshold = 3;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1013: policy.tensorcube_hard_threshold = 10;
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1018: tensorcube: Some(TensorcubeHealthCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1033: assert_eq!(assessment.tensorcube_pressure_score, 3);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1105: reasons: vec!["tensorcube_pressure_soft".to_string()],
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1236: let tensorcube = make_downweight_runtime_health();
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1240: make_view(1, Some(&tensorcube), None, None),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1254: let tensorcube = make_downweight_runtime_health();
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1257: make_view(1, Some(&tensorcube), None, None),
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1398: assert!(summary.tensorcube_pressure_examples >= 1);
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1423: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\lora_train\src\training_runtime.rs:1535: tensorcube_pressure_examples: 0,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:2: use crate::generation_telemetry::with_tensorcube_runtime_splice_label;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:377: let ((mut kv, mut logits, mut first), tensorcube_runtime_splice) = with_tensorcube_runtime_splice_label(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:405: first.tensorcube_runtime_splice = tensorcube_runtime_splice;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:427: let ((mut kv, mut logits, mut first), tensorcube_runtime_splice) = with_tensorcube_runtime_splice_label(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:455: first.tensorcube_runtime_splice = tensorcube_runtime_splice;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:490: let ((mut generated_prefix, mut logits, mut next), tensorcube_runtime_splice) = with_tensorcube_runtime_splice_label(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:519: next.tensorcube_runtime_splice = tensorcube_runtime_splice;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:534: let ((mut generated_prefix, mut logits, mut next), tensorcube_runtime_splice) = with_tensorcube_runtime_splice_label(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:563: next.tensorcube_runtime_splice = tensorcube_runtime_splice;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:135: pub fn from_tensorcube_health_mode(mode: TensorCubeHealthMode) -> Self {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:137: TensorCubeHealthMode::Permissive => Self::permissive(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:138: TensorCubeHealthMode::Warn => Self::warn(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:139: TensorCubeHealthMode::Strict => Self::strict_gpu_path(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:1996: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2038: LastLogitsAccessPolicy::from_tensorcube_health_mode(TensorCubeHealthMode::from_env())
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2051: "[tensorcube][cpu_materialize] mode={} scope={} allowed=false materialized=false storage_kind={:?} vocab_size={} reason=strict_gpu_path_rejected_cpu_row",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2058: "tensorcube strict gpu path rejected cpu row fallback: mode={} scope={} storage_kind={:?} vocab_size={} cpu_row_present={} gpu_last_row_present={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2079: "[tensorcube][cpu_materialize] mode={} scope={} allowed=true materialized=true storage_kind={:?} vocab_size={} reason=lazy_gpu_last_row_to_cpu_row",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2102: "[tensorcube][cpu_fallback_dispatch] mode={} scope={} label={} allowed={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2111: "tensorcube strict gpu path rejected cpu fallback dispatch: mode={} scope={} label={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2343: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2410: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2437: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2477: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2516: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2790: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2826: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_sampling.rs:2868: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:11: TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:12: TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:265: pub struct TensorCubeRuntimeSpliceLabelSummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:278: pub struct TensorCubeRuntimeSpliceTelemetrySummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:288: pub by_label: BTreeMap<String, TensorCubeRuntimeSpliceLabelSummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:293: pub struct TensorCubeRuntimeSpliceTelemetryCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:300: pub by_label_group: BTreeMap<String, TensorCubeRuntimeSpliceLabelSummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:304: pub struct TensorCubeRuntimeSpliceStepTelemetry {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:306: pub summary: TensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:323: pub tensorcube_runtime_splice: Option<TensorCubeRuntimeSpliceStepTelemetry>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:356: pub tensorcube_runtime_splice: Option<TensorCubeRuntimeSpliceStepTelemetry>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:376: pub tensorcube_runtime_splice_summary: Option<TensorCubeRuntimeSpliceTelemetrySummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:395: tensorcube_runtime_splice: choice.tensorcube_runtime_splice.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:620: self.tensorcube_runtime_splice_summary = tensorcube_runtime_splice_summary_from_backend(runtime_splice_summary);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:625: before: Option<&BackendTensorCubeRuntimeSpliceTelemetryLabelSummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:626: after: Option<&BackendTensorCubeRuntimeSpliceTelemetryLabelSummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:627: ) -> Option<TensorCubeRuntimeSpliceLabelSummary> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:628: let zero = BackendTensorCubeRuntimeSpliceTelemetryLabelSummary::default();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:631: let summary = TensorCubeRuntimeSpliceLabelSummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:655: before: &BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:656: after: &BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:657: ) -> Option<TensorCubeRuntimeSpliceTelemetrySummary> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:664: let summary = TensorCubeRuntimeSpliceTelemetrySummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:689: fn tensorcube_runtime_splice_step_from_backend(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:691: before: &BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:692: after: &BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:693: ) -> Option<TensorCubeRuntimeSpliceStepTelemetry> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:694: backend_runtime_splice_summary_delta(before, after).map(|summary| TensorCubeRuntimeSpliceStepTelemetry {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:700: pub(crate) fn with_tensorcube_runtime_splice_label<T, F>(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:703: ) -> Result<(T, Option<TensorCubeRuntimeSpliceStepTelemetry>)>
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:710: let step = tensorcube_runtime_splice_step_from_backend(label, &before, &after);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:714: fn tensorcube_runtime_splice_summary_from_backend(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:715: summary: BackendTensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:716: ) -> Option<TensorCubeRuntimeSpliceTelemetrySummary> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:729: Some(TensorCubeRuntimeSpliceTelemetrySummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:739: by_label: summary.by_label.into_iter().map(|(k, v)| (k, TensorCubeRuntimeSpliceLabelSummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:906: impl TensorCubeRuntimeSpliceTelemetrySummary {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:907: pub fn by_label_group(&self) -> BTreeMap<String, TensorCubeRuntimeSpliceLabelSummary> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:908: let mut out: BTreeMap<String, TensorCubeRuntimeSpliceLabelSummary> = BTreeMap::new();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:911: let bucket: &mut TensorCubeRuntimeSpliceLabelSummary = out.entry(group).or_default();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:925: pub fn compact(&self) -> TensorCubeRuntimeSpliceTelemetryCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:926: TensorCubeRuntimeSpliceTelemetryCompact {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\generation_telemetry.rs:1071: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:3: ActiveTensorHandleState, ActiveTensorRawHandle, BridgeMode, NativeWgpuRuntimeHandles,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\gpu_penalty.rs:299: pub fn from_handles(handles: &NativeWgpuRuntimeHandles) -> Self {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:4: mod tensorcube_health;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:17: use burn_webgpu_backend::{bootstrap_existing_device, packed_path_id as text_packed_path_id, packed_path_name as text_packed_path_name, with_runtime_splice_telemetry_label, try_build_same_device_raw_bridge, try_extract_runtime_handles, AtlasTextDensityUniform, BridgeStats, BurnToRawWgpuBridge, ExistingDeviceBootstrap, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingPath, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, HeadwiseAtlasDispatcher, HeadwiseAtlasRuntimeSpec, NativeWgpuRuntimeHandles, RawBridgeOutcome, RawBridgePath, RawWgpuBufferLease, TensorCubeRuntimeSpliceTelemetryLabelSummary as BackendTensorCubeRuntimeSpliceTelemetryLabelSummary, TensorCubeRuntimeSpliceTelemetrySummary as BackendTensorCubeRuntimeSpliceTelemetrySummary, TextDensityBindingSummary, TextDensityGateRuntime, TextDensityGateUniform};
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:47: pub use tensorcube_health::{
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:48: TensorCubeHealthAction, TensorCubeHealthDecision, TensorCubeHealthMode,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:49: TensorCubeHealthPolicy, TensorCubeHealthSeverity, TensorCubeHealthSnapshot,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:50: TensorCubeReasonCode, evaluate_tensorcube_health,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:51: tensorcube_health_snapshot_from_generation_telemetry,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:52: tensorcube_health_snapshot_from_native_trace_status,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:53: tensorcube_health_snapshot_from_telemetry_summaries,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:62: TelemetrySeverity, TensorCubeRuntimeSpliceLabelSummary, TensorCubeRuntimeSpliceStepTelemetry,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:63: TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:488: native_device_bootstrap: Option<ExistingDeviceBootstrap>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:489: runtime_handles: Option<NativeWgpuRuntimeHandles>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1275: fn clone_same_device_runtime_handles(&self) -> Option<NativeWgpuRuntimeHandles> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1278: .or_else(|| try_extract_runtime_handles(&self.device))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1281: pub fn same_device_runtime_handles(&self) -> Option<&NativeWgpuRuntimeHandles> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1328: let runtime_handles_live_ok = try_extract_runtime_handles(&self.device).is_some();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1394: let bootstrap = bootstrap_existing_device("model_core_native_existing_device")?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1404: let runtime_handles_live_ok = try_extract_runtime_handles(&device).is_some();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2196: tensorcube_runtime_splice: None,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\runtime_lora.rs:19392: let Some(handles) = burn_wgpu_local::try_extract_runtime_handles_from_wgpu_device(device) else {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:5: NativeTraceRuntimeStatus, TensorCubeRuntimeSpliceTelemetrySummary,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:10: pub enum TensorCubeHealthSeverity {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:18: impl TensorCubeHealthSeverity {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:31: pub enum TensorCubeHealthAction {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:40: impl TensorCubeHealthAction {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:54: pub enum TensorCubeReasonCode {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:66: impl TensorCubeReasonCode {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:84: pub struct TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:104: pub struct TensorCubeHealthPolicy {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:117: impl Default for TensorCubeHealthPolicy {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:123: impl TensorCubeHealthPolicy {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:171: pub enum TensorCubeHealthMode {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:178: impl TensorCubeHealthMode {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:180: match std::env::var("ASH_TENSORCUBE_HEALTH_MODE") {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:203: pub fn training_native_policy(&self) -> TensorCubeHealthPolicy {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:205: Self::Permissive => TensorCubeHealthPolicy::permissive(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:206: Self::Warn => TensorCubeHealthPolicy::training_native_strict().warn_from_strict(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:207: Self::Strict => TensorCubeHealthPolicy::training_native_strict(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:214: pub struct TensorCubeHealthDecision {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:215: pub severity: TensorCubeHealthSeverity,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:216: pub action: TensorCubeHealthAction,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:217: pub reason_codes: Vec<TensorCubeReasonCode>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:222: reasons: &mut Vec<TensorCubeReasonCode>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:223: reason: TensorCubeReasonCode,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:230: pub fn evaluate_tensorcube_health(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:231: snapshot: &TensorCubeHealthSnapshot,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:232: policy: &TensorCubeHealthPolicy,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:233: ) -> TensorCubeHealthDecision {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:240: push_reason(&mut reasons, TensorCubeReasonCode::RawBridgeMissing);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:245: push_reason(&mut reasons, TensorCubeReasonCode::RuntimeSpliceMissing);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:250: push_reason(&mut reasons, TensorCubeReasonCode::GpuSamplingMissing);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:255: push_reason(&mut reasons, TensorCubeReasonCode::SameDeviceBorrowMissing);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:260: push_reason(&mut reasons, TensorCubeReasonCode::HostUploadFallbackObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:263: push_reason(&mut reasons, TensorCubeReasonCode::HostUploadFallbackObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:268: push_reason(&mut reasons, TensorCubeReasonCode::CpuMaterializeObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:271: push_reason(&mut reasons, TensorCubeReasonCode::CpuMaterializeObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:276: push_reason(&mut reasons, TensorCubeReasonCode::MaterializeMissingObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:281: push_reason(&mut reasons, TensorCubeReasonCode::FallbackToOwnedObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:284: push_reason(&mut reasons, TensorCubeReasonCode::FallbackToOwnedObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:289: push_reason(&mut reasons, TensorCubeReasonCode::PromotionFailedObserved);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:294: TensorCubeHealthSeverity::Critical
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:296: TensorCubeHealthSeverity::Degraded
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:298: TensorCubeHealthSeverity::Warn
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:300: TensorCubeHealthSeverity::Healthy
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:304: TensorCubeHealthSeverity::Healthy => TensorCubeHealthAction::KeepNative,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:305: TensorCubeHealthSeverity::Warn => TensorCubeHealthAction::WarnNative,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:306: TensorCubeHealthSeverity::Degraded => TensorCubeHealthAction::WarnNative,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:307: TensorCubeHealthSeverity::Critical if policy.fail_closed_on_critical => {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:308: TensorCubeHealthAction::FailClosed
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:310: TensorCubeHealthSeverity::Critical => TensorCubeHealthAction::DemoteToHostFallback,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:313: TensorCubeHealthDecision {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:321: pub fn tensorcube_health_snapshot_from_native_trace_status(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:324: ) -> TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:325: TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:341: pub fn tensorcube_health_snapshot_from_telemetry_summaries(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:345: runtime_splice: Option<&TensorCubeRuntimeSpliceTelemetrySummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:348: ) -> TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:353: TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:369: pub fn tensorcube_health_snapshot_from_generation_telemetry(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:372: ) -> TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:373: tensorcube_health_snapshot_from_telemetry_summaries(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:377: telemetry.tensorcube_runtime_splice_summary.as_ref(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:389: let snapshot = TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:395: ..TensorCubeHealthSnapshot::default()
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:397: let decision = evaluate_tensorcube_health(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:399: &TensorCubeHealthPolicy::training_native_strict(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:401: assert_eq!(decision.severity, TensorCubeHealthSeverity::Critical);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:402: assert_eq!(decision.action, TensorCubeHealthAction::FailClosed);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:403: assert!(decision.reason_codes.contains(&TensorCubeReasonCode::RawBridgeMissing));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:408: let snapshot = TensorCubeHealthSnapshot {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:412: ..TensorCubeHealthSnapshot::default()
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:414: let policy = TensorCubeHealthMode::Warn.training_native_policy();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:415: let decision = evaluate_tensorcube_health(&snapshot, &policy);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:416: assert_eq!(decision.severity, TensorCubeHealthSeverity::Critical);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:417: assert_eq!(decision.action, TensorCubeHealthAction::DemoteToHostFallback);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:422: let snapshot = TensorCubeHealthSnapshot::default();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:423: let decision = evaluate_tensorcube_health(&snapshot, &TensorCubeHealthPolicy::permissive());
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:424: assert_eq!(decision.severity, TensorCubeHealthSeverity::Healthy);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\tensorcube_health.rs:425: assert_eq!(decision.action, TensorCubeHealthAction::KeepNative);
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:448: let tensorcube_runtime_splice_summary_compact = result
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:449: .tensorcube_runtime_splice_summary
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:608: "tensorcube_runtime_splice_summary".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:609: json!(&result.tensorcube_runtime_splice_summary),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:612: "tensorcube_runtime_splice_summary_compact".to_string(),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:613: json!(&tensorcube_runtime_splice_summary_compact),
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:971: if let Some(summary) = result.tensorcube_runtime_splice_summary.as_ref() {
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:973: response_json.insert("tensorcubeSpliceReadOnlyBorrowed".to_string(), json!(summary.read_only_borrowed));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:974: response_json.insert("tensorcubeSpliceWritableAllowlistMiss".to_string(), json!(summary.writable_allowlist_miss));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:975: response_json.insert("tensorcubeSpliceMaterializeMissing".to_string(), json!(summary.materialize_missing));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:976: response_json.insert("tensorcubeSplicePromotionSucceeded".to_string(), json!(summary.promotion_succeeded));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:977: response_json.insert("tensorcubeSplicePromotionFailed".to_string(), json!(summary.promotion_failed));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:978: response_json.insert("tensorcubeSpliceFallbackToOwned".to_string(), json!(summary.fallback_to_owned));
+D:\1111113232\DUST\1\ash_pass3\crates\orchestrator_local\src\infer_entry.rs:979: response_json.insert("tensorcubeSpliceCompact".to_string(), json!(compact));
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\engine\generation_summary.rs:22: tensorcube_runtime_splice_observed: summary.tensorcube_runtime_splice_observed,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:115: let tensorcube_runtime_splice_summary_compact = result
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:116: .tensorcube_runtime_splice_summary
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:189: tensorcube_runtime_splice_summary: result.tensorcube_runtime_splice_summary,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer\candidate_output.rs:190: tensorcube_runtime_splice_summary_compact,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:2: use burn_wgpu::{graphics, init_setup, RuntimeOptions, WgpuDevice};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:27: let device = WgpuDevice::default();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:31: init_setup::<graphics::Vulkan>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:38: init_setup::<graphics::Vulkan>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:45: init_setup::<graphics::Metal>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\backend.rs:52: init_setup::<graphics::AutoGraphicsApi>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:119: pub tensorcube_runtime_splice_observed: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\causal_lm.rs:332: tensorcube_runtime_splice_observed: result.tensorcube_runtime_splice_summary.is_some(),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:3: use model_core::{CandidatePoolTelemetryEntry, DeltaKLoraProfile, GenerationFinishReason, GenerationSamplingConfig, GenerationTelemetry, GpuPenaltyTelemetry, GpuRawBridgeTelemetryCompact, GpuRawBridgeTelemetrySummary, GpuSamplingAdaptiveProfile, GpuSamplingAdaptiveTuningPolicy, GpuSamplingAdaptiveTuningState, GpuSamplingAppliedRolloutDecision, GpuSamplingAutoCalibrationPolicy, GpuSamplingAutoCalibrationState, GpuSamplingCalibratedParityPolicy, GpuSamplingParityEnforcementMode, GpuSamplingParityEnforcementPolicy, GpuSamplingParityGateDecision, GpuSamplingParityGatePolicy, GpuSamplingPersistentRecoveryState, GpuSamplingPersistentStatePolicy, GpuSamplingPersistentStateStatus, GpuSamplingPersistentStateStore, GpuSamplingProfileDurabilityConfig, GpuSamplingRecoveryPolicy, GpuSamplingRecoveryState, GpuSamplingRecoveryUpdateDecision, GpuSamplingResolvedDurabilityPolicy, GpuSamplingResolvedParityPolicy, GpuSamplingPerfTelemetryCompact, GpuSamplingPerfTelemetrySummary, GpuSamplingTelemetryCompact, GpuSamplingTelemetrySummary, ModelSpec, NativeWgpuModel, ReferenceModel, RuntimeLoraAttachment, SamplingPolicyCompact, SamplingRolloutPolicy, TensorCubeRuntimeSpliceTelemetryCompact, TensorCubeRuntimeSpliceTelemetrySummary, evaluate_gpu_sampling_parity_gate, gpu_sampling_profile_slot_key, next_gpu_sampling_persisted_rollout, resolve_adaptive_gpu_sampling_parity_policy, resolve_auto_calibrated_parity_policy, resolve_gpu_sampling_rollout_with_enforcement, resolve_profile_specific_durability_policy, restore_profile_slot_from_store, to_persistent_recovery_state, to_persistent_state_store, to_runtime_adaptive_tuning_state, to_runtime_auto_calibration_state, to_runtime_recovery_state, update_gpu_sampling_adaptive_tuning_state, update_gpu_sampling_auto_calibration_state, update_gpu_sampling_recovery_state, upsert_profile_slot_into_store, validate_gpu_sampling_persistent_state, validate_gpu_sampling_persistent_state_store};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1077: pub tensorcube_runtime_splice_summary: Option<TensorCubeRuntimeSpliceTelemetrySummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1078: pub tensorcube_runtime_splice_summary_compact: Option<TensorCubeRuntimeSpliceTelemetryCompact>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:1149: pub tensorcube_runtime_splice_summary: Option<TensorCubeRuntimeSpliceTelemetrySummary>,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\infer.rs:2942: tensorcube_runtime_splice_summary: generation_telemetry.as_ref().and_then(|t| t.tensorcube_runtime_splice_summary.clone()),
+D:\1111113232\DUST\1\ash_pass3\crates\runtime\src\types.rs:375: tensorcube_runtime_splice_observed: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\examples\infer_final_layers6.rs:66: r"D:\1111113232\DUST\ash_local_orchestrator_baked_v12_dust_wgpu_finetune_pass5\ash_pass3\specs\model_spec.toml"
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:2: use burn_wgpu::{graphics, init_setup, RuntimeOptions, WgpuDevice};
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:27: let device = WgpuDevice::default();
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:31: init_setup::<graphics::Vulkan>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:38: init_setup::<graphics::Vulkan>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:45: init_setup::<graphics::Metal>(&device, RuntimeOptions::default());
+D:\1111113232\DUST\1\ash_pass3\crates\runtime_unz\src\backend.rs:52: init_setup::<graphics::AutoGraphicsApi>(&device, RuntimeOptions::default());

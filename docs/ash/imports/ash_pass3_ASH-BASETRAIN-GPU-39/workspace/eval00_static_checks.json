@@ -1,0 +1,20 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
+  "status": "PASS_STATIC",
+  "checks": {
+    "module_exists": true,
+    "lib_exports_added": true,
+    "append_hook_added": true,
+    "prompt_suite_count": 12,
+    "matrix_profile_count": 10,
+    "matrix_seed_count": 3,
+    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+    "runtime_smoke": "NOT_RUN"
+  },
+  "ssot": "fixed prompt suite and evaluation matrix are committed as workspace artifacts",
+  "notes": [
+    "EVAL-00 does not enable new decode behavior.",
+    "Default mode is ManifestOnly.",
+    "StrictRegressionGate must not be used until real runtime runs populate eval00_runs.jsonl."
+  ]
+}

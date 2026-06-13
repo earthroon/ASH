@@ -1,0 +1,1 @@
+python -c "import torch; print('torch', torch.__version__); print('cuda', torch.cuda.is_available()); print('device', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'); import safetensors; print('safetensors ok')"

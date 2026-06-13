@@ -1,0 +1,131 @@
+[
+  {
+    "case_id": "available_candidate_xyz_projection",
+    "candidate_rank": 0,
+    "token_id": 1201,
+    "piece": "가",
+    "facade_frames": [
+      {
+        "cheon_core": 0.2,
+        "ji_support": 0.8,
+        "in_bridge": 0.55,
+        "direction_cheon": 0.1,
+        "direction_ji": 0.75,
+        "direction_in": 0.45,
+        "pressure": 0.25,
+        "closure": 0.2,
+        "curvature": 0.15,
+        "transition_energy": 0.3,
+        "flow_continuity": 0.9
+      }
+    ],
+    "expected": {
+      "projection_status": "Available",
+      "compact_xyz_available": true,
+      "risk_level_max": "Low"
+    }
+  },
+  {
+    "case_id": "partial_candidate_xyz_projection_missing_z_pressure",
+    "candidate_rank": 1,
+    "token_id": 1202,
+    "piece": "까",
+    "facade_frames": [
+      {
+        "cheon_core": 0.6,
+        "ji_support": 0.78,
+        "in_bridge": 0.56,
+        "direction_cheon": 0.5,
+        "direction_ji": 0.72,
+        "direction_in": 0.43,
+        "pressure": null,
+        "closure": 0.75,
+        "curvature": 0.4,
+        "transition_energy": 0.65,
+        "flow_continuity": 0.7
+      }
+    ],
+    "expected": {
+      "projection_status": "Partial",
+      "missing_channels_contains": [
+        "pressure"
+      ],
+      "compact_xyz_available": true,
+      "risk_level_max": "Medium"
+    }
+  },
+  {
+    "case_id": "missing_facade_projection_unavailable",
+    "candidate_rank": 0,
+    "token_id": 9999,
+    "piece": "unknown",
+    "facade_frames": null,
+    "expected": {
+      "projection_status": "Unavailable",
+      "risk_level": "Unavailable",
+      "action_allowed": false,
+      "mutation_allowed": false
+    }
+  },
+  {
+    "case_id": "g_family_z_spread_trace",
+    "candidates": [
+      {
+        "piece": "가",
+        "family_hint": "G_PLAIN",
+        "facade_frames": [
+          {
+            "cheon_core": 0.2,
+            "ji_support": 0.8,
+            "in_bridge": 0.5,
+            "direction_cheon": 0.1,
+            "direction_ji": 0.7,
+            "direction_in": 0.4,
+            "pressure": 0.25,
+            "closure": 0.3,
+            "curvature": 0.2
+          }
+        ]
+      },
+      {
+        "piece": "까",
+        "family_hint": "G_FORTIS",
+        "facade_frames": [
+          {
+            "cheon_core": 0.55,
+            "ji_support": 0.8,
+            "in_bridge": 0.5,
+            "direction_cheon": 0.45,
+            "direction_ji": 0.7,
+            "direction_in": 0.4,
+            "pressure": 0.8,
+            "closure": 0.85,
+            "curvature": 0.3
+          }
+        ]
+      },
+      {
+        "piece": "카",
+        "family_hint": "G_ASPIRATED",
+        "facade_frames": [
+          {
+            "cheon_core": 0.7,
+            "ji_support": 0.8,
+            "in_bridge": 0.5,
+            "direction_cheon": 0.65,
+            "direction_ji": 0.7,
+            "direction_in": 0.4,
+            "pressure": 0.75,
+            "closure": 0.45,
+            "curvature": 0.8
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "z_spread_detected": true,
+      "all_candidates_projection_available": true,
+      "no_classification_applied": true
+    }
+  }
+]

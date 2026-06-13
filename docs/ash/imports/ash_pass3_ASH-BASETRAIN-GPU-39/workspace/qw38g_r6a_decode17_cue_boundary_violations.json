@@ -1,0 +1,74 @@
+[
+  {
+    "action_hint": "CompressCandidate",
+    "candidate_id": "candidate-cps-overflow",
+    "compression_recommended": true,
+    "cue_id": "mock-cue-0002",
+    "limit_value": 17.0,
+    "measured_value": 18.333,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 0.55,
+    "violation_type": "CpsSoftOverflow"
+  },
+  {
+    "action_hint": "ReviewRequired",
+    "candidate_id": "candidate-line-count-overflow",
+    "compression_recommended": false,
+    "cue_id": "mock-cue-0003",
+    "limit_value": 2,
+    "measured_value": 4,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 0.6,
+    "violation_type": "LineCountOverflow"
+  },
+  {
+    "action_hint": "CompressCandidate",
+    "candidate_id": "candidate-total-char-overflow",
+    "compression_recommended": true,
+    "cue_id": "mock-cue-0004",
+    "limit_value": 36,
+    "measured_value": 27,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 0.55,
+    "violation_type": "TotalCharBudgetOverflow"
+  },
+  {
+    "action_hint": "RetryDecodeWithShorterBudget",
+    "candidate_id": "candidate-short-cue-overflow",
+    "compression_recommended": false,
+    "cue_id": "mock-cue-0005",
+    "limit_value": 13,
+    "measured_value": 16,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 0.72,
+    "violation_type": "ShortCueOverflow"
+  },
+  {
+    "action_hint": "ReviewRequired",
+    "candidate_id": "candidate-underfilled",
+    "compression_recommended": false,
+    "cue_id": "mock-cue-0006",
+    "limit_value": 36,
+    "measured_value": 2,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 0.42,
+    "violation_type": "UnderfilledCandidate"
+  },
+  {
+    "action_hint": "RequireCueTiming",
+    "candidate_id": "candidate-missing-timing",
+    "compression_recommended": false,
+    "cue_id": "mock-cue-0007",
+    "limit_value": null,
+    "measured_value": null,
+    "reject_recommended": false,
+    "review_required": true,
+    "severity_score": 1.0,
+    "violation_type": "MissingCueTiming"
+  }
+]

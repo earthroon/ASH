@@ -1,0 +1,8 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-30",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_30_cpu_logits_gradient_formula_receipt --jobs 1",
+  "recommended_cpu_formula_receipt_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_30_cpu_logits_gradient_formula_receipt",
+  "required_env": "ASH_BASETRAIN_GPU_21_RAW_LOGITS_2048_F32_LE_PATH",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-31",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-30A"
+}

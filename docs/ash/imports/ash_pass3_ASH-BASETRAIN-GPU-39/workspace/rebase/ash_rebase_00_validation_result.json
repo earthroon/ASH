@@ -1,0 +1,24 @@
+{
+  "patch_id": "ASH-REBASE-00",
+  "status": "PASS",
+  "checked_outputs": [
+    "ash_rebase_00_scan_result.json",
+    "ash_rebase_00_manifest.json",
+    "ash_rebase_00_legacy_index.json",
+    "ash_rebase_00_policy_candidates.json",
+    "ash_rebase_00_missing_artifacts.json",
+    "ash_rebase_00_receipt.json",
+    "ash_rebase_00_rebind_report.md"
+  ],
+  "safety_invariants": {
+    "runtime_mutation": false,
+    "model_weight_mutation": false,
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "runtime_default_apply": false,
+    "r12_quarantined_low_confidence": true,
+    "next_allowed_patch": "QW-50-R0W"
+  },
+  "errors": []
+}

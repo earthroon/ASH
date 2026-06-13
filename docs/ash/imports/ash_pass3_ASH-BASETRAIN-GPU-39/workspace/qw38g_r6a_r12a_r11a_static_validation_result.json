@@ -1,0 +1,36 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R11A",
+  "status": "STATIC_VALIDATION_PASS",
+  "checks": {
+    "runner_exists": true,
+    "rust_helper_exists": true,
+    "env_gate_helper_exists": true,
+    "readiness_helper_exists": true,
+    "runner_loads_r11": true,
+    "runner_loads_r10a": true,
+    "scaffold_mode": true,
+    "user_supplied_mode": true,
+    "silent_generation_blocked": true,
+    "missing_text_not_ready": true,
+    "writes_manifest": true,
+    "writes_gaps": true
+  },
+  "compile_executed_in_container": false,
+  "runtime_executed_in_container": false,
+  "mutation_performed": false,
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false,
+  "changed_files": [
+    "crates/model_core/src/qw38g_r6a_r12a_runtime_attenuation_candidate.rs",
+    "scripts/run_16AI_QW_38G_R6A_R12A_R11A_validation_case_set_authoring.ps1",
+    "patch_reports/16AI-QW-38G-R6A-R12A-R11A_validation_case_set_authoring.md",
+    "acceptance_reports/16AI-QW-38G-R6A-R12A-R11A_validation_case_set_authoring.md",
+    "workspace/qw38g_r6a_r12a_r11a_static_validation_result.json",
+    "workspace/qw38g_r6a_r12a_r11a_static_validation_result.md",
+    "workspace/qw38g_r6a_r12a_r11a_changed_files.txt"
+  ]
+}

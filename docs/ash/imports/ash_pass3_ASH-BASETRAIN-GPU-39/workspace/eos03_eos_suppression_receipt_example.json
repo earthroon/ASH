@@ -1,0 +1,29 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EOS-03",
+  "runner": "orchestrator_local_infer_entry",
+  "enforcement_patch": true,
+  "audit_only": false,
+  "request_id": "eos03_greeting_01",
+  "eos_token_id": 2,
+  "min_new_tokens_effective_in_sampler": 8,
+  "eos_guard_enabled": true,
+  "eos_guard_policy": "SUPPRESS_EOS_BEFORE_MIN_NEW_TOKENS_BY_RERUN_WITH_EOS_BANNED",
+  "illegal_eos_seen_before_guard": true,
+  "eos_guard_rerun_attempted": true,
+  "eos_suppressed_by_min_new_tokens_count": 1,
+  "generated_tail_len_before_guard": 2,
+  "generated_tail_head_before_guard": [
+    29899,
+    2
+  ],
+  "generated_tail_len_final": "<after_rerun_tail_len>",
+  "generated_tail_head_final": "<after_rerun_tail_head>",
+  "finish_reason_legal": "<true_if_not_eos_before_min>",
+  "status": "PASS_EOS_SUPPRESSED_BEFORE_MIN_NEW_TOKENS | PARTIAL_EOS_SUPPRESSION_ATTEMPTED_BUT_COLLAPSE_PERSISTED",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

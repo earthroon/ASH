@@ -1,0 +1,47 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-01",
+  "input_patch": "16AI-QW-38G-R6A-KV-ROLLBACK-00",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "behavior_change": false,
+  "probe_only": true,
+  "mode": "PlanOnly",
+  "requires_kv_rollback00": true,
+  "kv_rollback00_status_seen": "STATIC_PLACEHOLDER_RUNTIME_NOT_RUN",
+  "steps_observed": 0,
+  "forked_replay": {
+    "attempted_count": 0,
+    "fork_created_count": 0,
+    "restore_to_fork_count": 0,
+    "one_step_replay_count": 0,
+    "fork_disposed_count": 0
+  },
+  "verification": {
+    "top1_match_count": 0,
+    "top5_overlap_ge_3_count": 0,
+    "top5_overlap_ge_4_count": 0,
+    "logits_shape_match_count": 0,
+    "main_state_unchanged_count": 0,
+    "restore_verified_for_salad03b_count": 0
+  },
+  "grades": {
+    "not_attempted_count": 0,
+    "denied_count": 0,
+    "shape_only_count": 0,
+    "top5_overlap_count": 0,
+    "top1_match_count": 0,
+    "logits_tolerance_match_count": 0,
+    "strict_match_count": 0,
+    "failed_count": 0
+  },
+  "safety": {
+    "main_state_changed_count": 0,
+    "fork_not_disposed_count": 0,
+    "shape_mismatch_count": 0,
+    "position_mismatch_count": 0
+  },
+  "acceptance": {
+    "ready_for_salad03b_controlled_execute": false,
+    "ready_for_default_rollback_execute": false,
+    "reason": "forked replay verification structures baked; runtime probe not run in container"
+  }
+}

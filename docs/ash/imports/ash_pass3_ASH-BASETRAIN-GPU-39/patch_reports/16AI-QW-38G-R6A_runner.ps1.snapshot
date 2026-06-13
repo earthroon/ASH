@@ -1,0 +1,78 @@
+param(
+  [switch]$Build,
+  [int]$MaxNewTokens = 1,
+  [string]$Text = "1+1은?",
+  [string]$Group = "auto",
+  [string]$Slot = "auto",
+  [int]$MaxBytes = 4096
+)
+
+$ErrorActionPreference = "Stop"
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
+
+$env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+$env:ASH_FORCE_NO_LORA = "1"
+$env:ASH_SHADER_DEBUG_BINDING = "1"
+$env:ASH_SHADER_DEBUG_BINDING_DRY_RUN = "1"
+$env:ASH_SHADER_DEBUG_BINDING_GROUP = $Group
+$env:ASH_SHADER_DEBUG_BINDING_SLOT = $Slot
+$env:ASH_SHADER_DEBUG_BUFFER_MAX_BYTES = "$MaxBytes"
+$env:ASH_SHADER_DEBUG_BINDING_MAP = "workspace/qw38g_r6a_debug_binding_map.json"
+$env:ASH_SHADER_DEBUG_BINDING_RECEIPT = "workspace/qw38g_r6a_debug_binding_receipt.json"
+
+# Keep nearby evidence enabled, but bounded.
+$env:ASH_RAW_TOPK_TRACE = "1"
+$env:ASH_RAW_TOPK_TRACE_TOP_N = "8"
+$env:ASH_RAW_TOPK_TRACE_MAX_STEPS = "1"
+$env:ASH_HIDDEN_PROJECTION_TRACE = "1"
+$env:ASH_HIDDEN_PROJECTION_TRACE_MAX_STEPS = "1"
+$env:ASH_HIDDEN_PROJECTION_TOP_N = "8"
+
+if ($Build) {
+  Write-Host "[16AI-QW-38G-R6A][build] cargo build --release example infer_only"
+  cargo build --release --manifest-path ".\crates\runtime\Cargo.toml" --example infer_only `
+    1> ".\workspace\build_qw38g_r6a_stdout.log" `
+    2> ".\workspace\build_qw38g_r6a_stderr.log"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[16AI-QW-38G-R6A][build_error] exit_code=$LASTEXITCODE"
+    Get-Content ".\workspace\build_qw38g_r6a_stderr.log" -Tail 120 -Encoding UTF8
+    exit $LASTEXITCODE
+  }
+}
+
+$livePath = ".\workspace\infer_qw38g_r6a_debug_binding_live.log"
+$receiptPath = ".\workspace\qw38g_r6a_debug_binding_receipt.json"
+$mapPath = ".\workspace\qw38g_r6a_debug_binding_map.json"
+Remove-Item $livePath,$receiptPath,$mapPath -ErrorAction SilentlyContinue
+
+Write-Host "[16AI-QW-38G-R6A][run] dry_run=1 group=$Group slot=$Slot max_bytes=$MaxBytes max_new_tokens=$MaxNewTokens"
+& ".\target\release\examples\infer_only.exe" `
+  --model-spec ".\specs\model_spec_v5_48259.toml" `
+  --tokenizer ".\artifacts\tokenizer_manifest_v5_final.json" `
+  --checkpoint ".\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors" `
+  --task freeform `
+  --max-new-tokens $MaxNewTokens `
+  --seed 42 `
+  --text $Text `
+  --json `
+  2>&1 | Tee-Object $livePath
+$code = $LASTEXITCODE
+Write-Host "[16AI-QW-38G-R6A][run_done] exit_code=$code live=$livePath"
+
+if (-not (Test-Path $receiptPath)) {
+  Write-Host "[16AI-QW-38G-R6A][error] receipt missing: $receiptPath"
+  exit 1
+}
+
+Write-Host "[16AI-QW-38G-R6A][receipt] $receiptPath"
+Get-Content $receiptPath -Encoding UTF8
+if (Test-Path $mapPath) {
+  Write-Host "[16AI-QW-38G-R6A][map] $mapPath"
+  Get-Content $mapPath -Encoding UTF8
+}
+
+exit $code

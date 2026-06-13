@@ -1,0 +1,456 @@
+{
+  "all_rejected": [
+    {
+      "metric": {
+        "candidate_char_count": 0,
+        "candidate_id": "candidate-empty",
+        "candidate_ko_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "candidate_visible_char_count": 0,
+        "compression_ratio": 0.0,
+        "cps": 0.0,
+        "duration_ms": 800,
+        "has_empty_text": true,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          0
+        ],
+        "line_count": 1,
+        "max_line_char_count": 0,
+        "min_line_char_count": 0,
+        "over_compressed": true,
+        "under_translated": true
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-empty",
+        "compression_penalty": 0.22,
+        "cps_penalty": 0.0,
+        "final_surface_score": 0.81,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.22,
+        "punctuation_penalty": 0.0,
+        "reasons": [
+          "empty_candidate",
+          "over_compressed",
+          "under_translated"
+        ],
+        "rejected": true
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 10,
+        "candidate_id": "candidate-malformed",
+        "candidate_ko_hash": "36e3649ac9b550011d0832300f4a8993844326e33602e43b3d1bbdca4eba50a2",
+        "candidate_visible_char_count": 10,
+        "compression_ratio": 0.4166666666666667,
+        "cps": 12.5,
+        "duration_ms": 800,
+        "has_empty_text": false,
+        "has_malformed_text": true,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": true,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          10
+        ],
+        "line_count": 1,
+        "max_line_char_count": 10,
+        "min_line_char_count": 10,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-malformed",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 0.73,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.3,
+        "punctuation_penalty": 0.0,
+        "reasons": [
+          "malformed_candidate",
+          "trailing_noise"
+        ],
+        "rejected": true
+      }
+    }
+  ],
+  "cps_overflow": [
+    {
+      "metric": {
+        "candidate_char_count": 30,
+        "candidate_id": "candidate-too-long",
+        "candidate_ko_hash": "cc7a6aef61f2821a06bc403073cbeaec252983497eecf6e9f21fd4a5786f545f",
+        "candidate_visible_char_count": 22,
+        "compression_ratio": 0.9166666666666666,
+        "cps": 18.333333333333336,
+        "duration_ms": 1200,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          22
+        ],
+        "line_count": 1,
+        "max_line_char_count": 22,
+        "min_line_char_count": 22,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-too-long",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.25,
+        "final_surface_score": 0.6,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.18,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.43,
+        "punctuation_penalty": 0.0,
+        "reasons": [
+          "cps_overflow",
+          "line_too_long"
+        ],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 7,
+        "candidate_id": "candidate-readable",
+        "candidate_ko_hash": "0e104a89dcae4936651056e8f82f52f6ce7f312ad86ebca85da616635d6924be",
+        "candidate_visible_char_count": 6,
+        "compression_ratio": 0.25,
+        "cps": 5.0,
+        "duration_ms": 1200,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          6
+        ],
+        "line_count": 1,
+        "max_line_char_count": 6,
+        "min_line_char_count": 6,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-readable",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    }
+  ],
+  "orphan_particle": [
+    {
+      "metric": {
+        "candidate_char_count": 20,
+        "candidate_id": "candidate-orphan",
+        "candidate_ko_hash": "2c36f39cdc914bd1e890b6809553164f3b7ac809111915c0592ec0e64436dd80",
+        "candidate_visible_char_count": 14,
+        "compression_ratio": 0.5833333333333334,
+        "cps": 5.833333333333334,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": true,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 12,
+        "line_char_counts": [
+          13,
+          1
+        ],
+        "line_count": 2,
+        "max_line_char_count": 13,
+        "min_line_char_count": 1,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-orphan",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 0.58,
+        "line_balance_penalty": 0.1,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.35,
+        "penalty_total": 0.45,
+        "punctuation_penalty": 0.0,
+        "reasons": [
+          "line_imbalance",
+          "orphan_particle"
+        ],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 8,
+        "candidate_id": "candidate-clean",
+        "candidate_ko_hash": "1f67b8d289aa0dab77005de913c962099c4e258d5650984fd3814ea265dbb730",
+        "candidate_visible_char_count": 6,
+        "compression_ratio": 0.25,
+        "cps": 2.5,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          6
+        ],
+        "line_count": 1,
+        "max_line_char_count": 6,
+        "min_line_char_count": 6,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-clean",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    }
+  ],
+  "pool_not_ready": [],
+  "valid_surface": [
+    {
+      "metric": {
+        "candidate_char_count": 17,
+        "candidate_id": "candidate-0001-greedy",
+        "candidate_ko_hash": "28f3c3fd1037778e817801a549615961911969afd53fba03dee639dca97e6965",
+        "candidate_visible_char_count": 13,
+        "compression_ratio": 0.5416666666666666,
+        "cps": 5.416666666666667,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          13
+        ],
+        "line_count": 1,
+        "max_line_char_count": 13,
+        "min_line_char_count": 13,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-0001-greedy",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 22,
+        "candidate_id": "candidate-0002-lowtemp",
+        "candidate_ko_hash": "f46a57782e68578c306417a58e253e8b9343188e3e1ed602f3ab07fec92f4003",
+        "candidate_visible_char_count": 16,
+        "compression_ratio": 0.6666666666666666,
+        "cps": 6.666666666666667,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          16
+        ],
+        "line_count": 1,
+        "max_line_char_count": 16,
+        "min_line_char_count": 16,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-0002-lowtemp",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 26,
+        "candidate_id": "candidate-0003-minp",
+        "candidate_ko_hash": "23073146b32d765b0bc653f9edac398760ade3d630bb5954f43255605ad98ca1",
+        "candidate_visible_char_count": 19,
+        "compression_ratio": 0.7916666666666666,
+        "cps": 7.916666666666667,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          19
+        ],
+        "line_count": 1,
+        "max_line_char_count": 19,
+        "min_line_char_count": 19,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-0003-minp",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 0.85,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.18,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.18,
+        "punctuation_penalty": 0.0,
+        "reasons": [
+          "line_too_long"
+        ],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 16,
+        "candidate_id": "candidate-0004-loopstrict",
+        "candidate_ko_hash": "39006160ad137e907be91539de5072751a77dbaf828fedb1544c86d83e6008b9",
+        "candidate_visible_char_count": 12,
+        "compression_ratio": 0.5,
+        "cps": 5.0,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          12
+        ],
+        "line_count": 1,
+        "max_line_char_count": 12,
+        "min_line_char_count": 12,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-0004-loopstrict",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    },
+    {
+      "metric": {
+        "candidate_char_count": 18,
+        "candidate_id": "candidate-0005-register",
+        "candidate_ko_hash": "9e9005d220cefcfae3805848cb77d14eb2d54138f9bdddbc65efbef7306116c1",
+        "candidate_visible_char_count": 14,
+        "compression_ratio": 0.5833333333333334,
+        "cps": 5.833333333333334,
+        "duration_ms": 2400,
+        "has_empty_text": false,
+        "has_malformed_text": false,
+        "has_orphan_particle": false,
+        "has_repeated_punctuation": false,
+        "has_trailing_noise": false,
+        "line_balance_delta": 0,
+        "line_char_counts": [
+          14
+        ],
+        "line_count": 1,
+        "max_line_char_count": 14,
+        "min_line_char_count": 14,
+        "over_compressed": false,
+        "under_translated": false
+      },
+      "overlay": {
+        "bonus_total": 0.03,
+        "candidate_id": "candidate-0005-register",
+        "compression_penalty": 0.0,
+        "cps_penalty": 0.0,
+        "final_surface_score": 1.0,
+        "line_balance_penalty": 0.0,
+        "line_length_penalty": 0.0,
+        "orphan_particle_penalty": 0.0,
+        "penalty_total": 0.0,
+        "punctuation_penalty": 0.0,
+        "reasons": [],
+        "rejected": false
+      }
+    }
+  ]
+}

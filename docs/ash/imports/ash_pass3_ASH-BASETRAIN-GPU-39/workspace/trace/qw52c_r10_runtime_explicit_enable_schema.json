@@ -1,0 +1,29 @@
+{
+  "patch_id": "QW-52C-R10",
+  "schema_version": "runtime_explicit_enable_receipt_v1",
+  "status_values": [
+    "Unavailable",
+    "MissingReceipt",
+    "TargetMismatch",
+    "Partial",
+    "ReceiptRecorded",
+    "ShadowDryRunGateReady",
+    "Pass",
+    "Warn"
+  ],
+  "required_outputs": [
+    "artifacts/qw52c_r10_explicit_enable_receipt.json",
+    "artifacts/qw52c_r10_shadow_apply_dry_run_gate.json",
+    "artifacts/qw52c_r10_runtime_explicit_enable_manifest.json",
+    "workspace/trace/qw52c_r10_runtime_explicit_enable_receipt.json"
+  ],
+  "invariants": {
+    "explicit_enable_scope": "ShadowDryRunOnly",
+    "shadow_apply_dry_run": true,
+    "shadow_apply_result_applied": false,
+    "runtime_apply": false,
+    "runtime_default_apply": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false
+  }
+}

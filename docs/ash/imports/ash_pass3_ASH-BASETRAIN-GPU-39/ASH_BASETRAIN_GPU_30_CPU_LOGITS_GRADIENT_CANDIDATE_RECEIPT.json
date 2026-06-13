@@ -1,0 +1,25 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-30",
+  "cpu_logits_gradient_candidate_created": true,
+  "candidate_kind": "cpu_softmax_minus_target_logits_gradient_candidate",
+  "candidate_scope": "local_window_2048_target_1",
+  "candidate_dtype": "f32",
+  "candidate_shape": [
+    1,
+    1,
+    2048
+  ],
+  "candidate_element_count": 2048,
+  "candidate_bytes": 8192,
+  "candidate_write_target": "cpu_receipt_only",
+  "gpu_write_target": "none",
+  "cpu_softmax_computed": true,
+  "cpu_one_hot_target_applied": true,
+  "cpu_logits_gradient_candidate_materialized": true,
+  "cpu_candidate_digest_created": true,
+  "cpu_candidate_stats_created": true,
+  "gpu_gradient_buffer_written": false,
+  "gpu_compute_dispatch_executed": false,
+  "backward_executed": false,
+  "optimizer_step_executed": false
+}

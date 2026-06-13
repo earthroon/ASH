@@ -1,0 +1,20 @@
+SFT-GPU-BUILD-01 static verification
+
+Runtime tool availability in bake container:
+- cargo: unavailable
+- rustc: unavailable
+- rustfmt: unavailable
+
+Static checks performed:
+- patched Rust delimiter balance: PASS_STATIC
+- old targeted error pattern scan: PASS_STATIC_FOR_TARGETED_PATTERNS
+- required report files present: PASS_STATIC
+
+Cargo verification must be run on the user's target machine.
+Targeted stale-pattern scan:
+- timing_probe_report.device_fingerprint:
+- decide(input, config, &failures, native_gpu_backend_confirmed):
+crates/ash_core/src/sft_ffn_texture_atlas_hybrid_timing.rs:640:    let decision = decide(input, config, &failures, native_gpu_backend_confirmed);
+- let mut candidate_version:
+- candidate_registry_version double-label:
+- step_telemetry_receipt_created stale seal usage:

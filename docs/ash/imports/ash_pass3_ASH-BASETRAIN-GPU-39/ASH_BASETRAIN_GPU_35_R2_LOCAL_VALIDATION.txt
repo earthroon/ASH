@@ -1,0 +1,15 @@
+container_cargo_build = NOT_EXECUTED_IN_CONTAINER
+container_cargo_run = NOT_EXECUTED_IN_CONTAINER
+user_local_runtime_pass_required = true
+runtime_gpu_required = false
+actual_gpu_buffer_allocation_in_35_r2 = false
+
+Recommended commands:
+cd "D:\1111113232\DUST\1\ash_pass3"
+$env:CARGO_BUILD_JOBS="1"
+$env:CARGO_INCREMENTAL="0"
+$env:RUSTFLAGS="-C debuginfo=0"
+$env:ASH_BASETRAIN_GPU_OPERATOR_SELECTED_GROUP_MANIFEST_PATH="D:\1111113232\DUST\1\ash_pass3\target\selected_atlas_group_slot_0_manifest.operator.json"
+$env:ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH="D:\1111113232\DUST\1\ash_pass3\target\selected_atlas_group_slot_0_manifest.json"
+cargo build -p base_train --bin ash_basetrain_gpu_35_r2_selected_group_manifest_template_materialization --jobs 1
+cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2_selected_group_manifest_template_materialization

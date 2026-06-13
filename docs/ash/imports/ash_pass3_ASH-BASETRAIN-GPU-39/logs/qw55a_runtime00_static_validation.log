@@ -1,0 +1,42 @@
+{
+  "crates/model_core/src/qw55a_runtime_topk_snapshot.rs": {
+    "Qw55aRuntime00Config": true,
+    "build_qw55a_runtime00_topk_snapshot_from_logits": true,
+    "Qw55aRuntime00FailurePolicy": true
+  },
+  "crates/model_core/src/qw55a_runtime_selector.rs": {
+    "Qw55aRuntime00Decision": true,
+    "build_qw55a_runtime00_decision_from_logits": true,
+    "greedy_fallback_used: false": true,
+    "ExplicitSelectorFailureStop": true
+  },
+  "crates/model_core/src/generation_sampling.rs": {
+    "QW-55A-RUNTIME-00: explicit-enable runtime TopK snapshot bind": true,
+    "QW55A_RUNTIME00_EXPLICIT_SELECTOR_FAILURE_STOP": true,
+    "qw55a_runtime00_enabled_from_env": true
+  },
+  "crates/runtime/examples/infer_only.rs": {
+    "--enable-qw55a": true,
+    "ASH_QW55A_ENABLE": true,
+    "apply_qw55a_cli_env": true
+  },
+  "specs/runtime_profile.toml": {
+    "[decode.qw55a_runtime]": true,
+    "enabled = false": true,
+    "forbid_greedy_fallback = true": true,
+    "runtime_commit_allowed = true": true
+  },
+  "qw55a_runtime_profile_defaults": {
+    "enabled_false_default": true,
+    "explicit_enable_required_true": true,
+    "greedy_fallback_forbidden": true,
+    "runtime_commit_allowed_explicit": true
+  },
+  "forbidden_runtime_leaks": {
+    "no_hard_ban_allowed": true,
+    "no_token_mask_allowed": true,
+    "no_vocab_removal_allowed": true,
+    "no_model_mutation_allowed": true
+  },
+  "overall": true
+}

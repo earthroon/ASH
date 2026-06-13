@@ -1,0 +1,228 @@
+[
+  {
+    "fixture": "accept",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-0001",
+      "cue_id": "mock-cue-0001",
+      "candidate_pool_id": "candidate-pool-0001",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-0004-loopstrict",
+      "final_selected_candidate_id": "candidate-0004-loopstrict",
+      "final_selected_quality_receipt_hash": "sha256:3059785310ff72e7edd0c178c7aed9cc6c423f34386586454b603db02c5d0b10",
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:c9b697e028471fba1c2ce348361acfa24fefea9a6905110a0dd1f4f271461348"
+      ],
+      "fallback_selection_snapshot_hash": null,
+      "final_gate_decision": "AcceptSelectedCandidate",
+      "final_candidate_accepted": true,
+      "final_candidate_rejected": false,
+      "fallback_candidate_selected": false,
+      "review_required": false,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "selected_salad_reject",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-salad-reject",
+      "cue_id": "mock-cue-0002",
+      "candidate_pool_id": "candidate-pool-salad-reject",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-surface-good-salad-bad",
+      "final_selected_candidate_id": null,
+      "final_selected_quality_receipt_hash": null,
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:1b0dfb5d5c21304d44661914f60637557f299b7e4f3f6673c61ac38f01ee4047"
+      ],
+      "fallback_selection_snapshot_hash": null,
+      "final_gate_decision": "RejectSelectedCandidate",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": true,
+      "fallback_candidate_selected": false,
+      "review_required": false,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "morph_loop_reject",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-morph-reject",
+      "cue_id": "mock-cue-0003",
+      "candidate_pool_id": "candidate-pool-morph-reject",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-morph-loop",
+      "final_selected_candidate_id": null,
+      "final_selected_quality_receipt_hash": null,
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:2baecf8535a8828dcc344ea9e1414c37f3ed1250326240cb849959149a1887aa"
+      ],
+      "fallback_selection_snapshot_hash": null,
+      "final_gate_decision": "RejectSelectedCandidate",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": true,
+      "fallback_candidate_selected": false,
+      "review_required": false,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "transition_hard_risk_reject",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-transition-risk",
+      "cue_id": "mock-cue-0004",
+      "candidate_pool_id": "candidate-pool-transition-risk",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-byte-risk",
+      "final_selected_candidate_id": null,
+      "final_selected_quality_receipt_hash": null,
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:924780e0bf6ebb29cf2b737a2227943317d38fbd6a0881caf183df1fa9336a3f"
+      ],
+      "fallback_selection_snapshot_hash": null,
+      "final_gate_decision": "RejectSelectedCandidate",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": true,
+      "fallback_candidate_selected": false,
+      "review_required": false,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "fallback_candidate",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-fallback",
+      "cue_id": "mock-cue-0005",
+      "candidate_pool_id": "candidate-pool-fallback",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-top-surface-salad",
+      "final_selected_candidate_id": "candidate-safe-fallback",
+      "final_selected_quality_receipt_hash": "sha256:f1a03e29d3d3c0f7a48fdc141fabb736dd5761381b57d80428f208eaf5384ce4",
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:215010f75e863429f9161c7d0da8bdea171072f0abb3d25fc42177ba3bc615fa",
+        "sha256:de9841ed402c918bbd39c03391166bfdf407dc1484ea9c503b921ae4286028a4"
+      ],
+      "fallback_selection_snapshot_hash": "sha256:157f0b5e84cd70a99cf033ac45059c00255840e2cb433d95cd7221aaf4daf1f0",
+      "final_gate_decision": "SelectFallbackCandidate",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": false,
+      "fallback_candidate_selected": true,
+      "review_required": false,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "all_unsafe_review",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-all-unsafe",
+      "cue_id": "mock-cue-0006",
+      "candidate_pool_id": "candidate-pool-all-unsafe",
+      "surface_rerank_receipt_hash": "sha256:mock-surface-rerank-receipt-hash",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": "candidate-unsafe-a",
+      "final_selected_candidate_id": null,
+      "final_selected_quality_receipt_hash": null,
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:8d764731b8d551e130bc3804b2c69d0f18f649627cf5f7590906e62949d535b2",
+        "sha256:c865808e8633b4066cbe6a30243c33f58b9aeaf846608e82875a4072fc58b80b"
+      ],
+      "fallback_selection_snapshot_hash": "sha256:7c4de6257b9ba128a0d9177512e5f70bd1426782e734f2ad1a74a72ec1cad572",
+      "final_gate_decision": "ReviewRequired",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": false,
+      "fallback_candidate_selected": false,
+      "review_required": true,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  },
+  {
+    "fixture": "surface_missing_skip",
+    "key_material": {
+      "patch_id": "16AI-QW-38G-R6A-DECODE-11",
+      "domain_ssot": "en_to_ko_translation_subtitle_machine",
+      "decode_session_id": "mock-decode-session-surface-missing",
+      "cue_id": "mock-cue-0007",
+      "candidate_pool_id": "candidate-pool-surface-missing",
+      "surface_rerank_receipt_hash": "",
+      "candidate_pool_receipt_hash": "sha256:mock-candidate-pool-receipt-hash",
+      "selected_surface_candidate_id": null,
+      "final_selected_candidate_id": null,
+      "final_selected_quality_receipt_hash": null,
+      "degeneration_policy_hash": "sha256:3abdaa965670f0ac87a859f0ec25b5777a1b86fc3618644e183a1f786dbf7e36",
+      "candidate_gate_result_hashes": [
+        "sha256:10fc9657885147bffc5383d94fb825a984a9fe7904fe293dab72f094b727fef6"
+      ],
+      "fallback_selection_snapshot_hash": null,
+      "final_gate_decision": "SkippedSurfaceRerankMissing",
+      "final_candidate_accepted": false,
+      "final_candidate_rejected": false,
+      "fallback_candidate_selected": false,
+      "review_required": true,
+      "rollback_retry_recommended": false,
+      "runtime_decode_executed": false,
+      "model_forward_executed": false,
+      "sampling_executed": false,
+      "qe_model_executed": false,
+      "source_adequacy_executed": false,
+      "glossary_constraint_executed": false
+    }
+  }
+]

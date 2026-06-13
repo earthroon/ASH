@@ -1,0 +1,814 @@
+[
+  {
+    "case_id": "WCTX01-C001",
+    "group": "domain_ssot",
+    "input_text": "애쉬는 영>한 번역자막기 도메인이다",
+    "expectations": [
+      {
+        "surface": "영>한",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역자막기",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "도메인이다",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C002",
+    "group": "enko_pair",
+    "input_text": "SOURCE Hello there TARGET 안녕하세요",
+    "expectations": [
+      {
+        "surface": "SOURCE",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "Hello",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "TARGET",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "안녕하세요",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C003",
+    "group": "enko_pair",
+    "input_text": "원문 I am fine 번역문 난 괜찮아",
+    "expectations": [
+      {
+        "surface": "원문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "괜찮아",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C004",
+    "group": "timed_cue",
+    "input_text": "SRT 00:01:02,000 --> 00:01:04,000 Hello 번역 안녕",
+    "expectations": [
+      {
+        "surface": "SRT",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "00:01:02,000",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "번역",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "안녕",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C005",
+    "group": "timed_cue",
+    "input_text": "WebVTT cue001 SOURCE I missed you TARGET 보고 싶었어",
+    "expectations": [
+      {
+        "surface": "WebVTT",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "cue001",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "SOURCE",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "TARGET",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C006",
+    "group": "translation_naturalization",
+    "input_text": "영어 joke를 한국어 자막으로 자연화해",
+    "expectations": [
+      {
+        "surface": "영어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "자막으로",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C007",
+    "group": "translation_naturalization",
+    "input_text": "직역투는 피하고 한국어 입말로 줄여",
+    "expectations": [
+      {
+        "surface": "직역투는",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "입말로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C008",
+    "group": "source_preservation",
+    "input_text": "의역하되 원문 의미는 지워버리지마",
+    "expectations": [
+      {
+        "surface": "의역하되",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "원문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "지워버리지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C009",
+    "group": "terminology",
+    "input_text": "고유명사 Miorine은 미오리네로 고정해",
+    "expectations": [
+      {
+        "surface": "고유명사",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "Miorine은",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "미오리네로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C010",
+    "group": "terminology",
+    "input_text": "용어집에서 Gundam은 건담으로 유지해",
+    "expectations": [
+      {
+        "surface": "용어집에서",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "Gundam은",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "건담으로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C011",
+    "group": "speaker_register",
+    "input_text": "화자 SpeakerA 대사는 반말로 유지해",
+    "expectations": [
+      {
+        "surface": "화자",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "SpeakerA",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "대사는",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "반말로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C012",
+    "group": "speaker_register",
+    "input_text": "화자명은 번역하지마",
+    "expectations": [
+      {
+        "surface": "화자명은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역하지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C013",
+    "group": "line_break_enko",
+    "input_text": "영문 대사 길어서 한국어 자막은 두줄로 나눠",
+    "expectations": [
+      {
+        "surface": "영문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "자막은",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C014",
+    "group": "readability_compression",
+    "input_text": "CPS가 높으면 번역문을 축약해",
+    "expectations": [
+      {
+        "surface": "CPS가",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역문을",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "축약해",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C015",
+    "group": "line_break_enko",
+    "input_text": "줄바꿈은 의미 단위로 넣어",
+    "expectations": [
+      {
+        "surface": "줄바꿈은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "의미",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "단위로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C016",
+    "group": "timing_preservation",
+    "input_text": "타임코드는 바꾸지마 번역만 해",
+    "expectations": [
+      {
+        "surface": "타임코드는",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "바꾸지마",
+        "required": true,
+        "expected_role": "negation"
+      },
+      {
+        "surface": "번역만",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C017",
+    "group": "timing_preservation",
+    "input_text": "싱크는 유지하고 한국어 문장만 다듬어",
+    "expectations": [
+      {
+        "surface": "싱크는",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "문장만",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C018",
+    "group": "sound_effect",
+    "input_text": "효과음 SFX door opens는 [문 열림]으로 남겨",
+    "expectations": [
+      {
+        "surface": "효과음",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "SFX",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "opens는",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C019",
+    "group": "lyrics_translation",
+    "input_text": "노래 가사는 라임보다 의미를 우선해",
+    "expectations": [
+      {
+        "surface": "노래",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "가사는",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "의미를",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C020",
+    "group": "joke_translation",
+    "input_text": "말장난은 주석 없이 한국어 농담으로 바꿔",
+    "expectations": [
+      {
+        "surface": "말장난은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "농담으로",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C021",
+    "group": "tag_preservation",
+    "input_text": "HTML 태그 <i>Hello</i>는 보존해",
+    "expectations": [
+      {
+        "surface": "HTML",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "태그",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "<i>Hello</i>는",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C022",
+    "group": "format_preservation",
+    "input_text": "ASS 스타일 코드는 번역하지마",
+    "expectations": [
+      {
+        "surface": "ASS",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "코드는",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "번역하지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C023",
+    "group": "format_preservation",
+    "input_text": "NOTE 블록은 원문 메모라 번역하지마",
+    "expectations": [
+      {
+        "surface": "NOTE",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "원문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역하지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C024",
+    "group": "no_hallucination",
+    "input_text": "번역 후보가 원문에 없는 정보를 지어내지마",
+    "expectations": [
+      {
+        "surface": "번역",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "원문에",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "지어내지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C025",
+    "group": "cue_reference",
+    "input_text": "캐릭터 호칭은 이전 cue 기준으로 맞춰",
+    "expectations": [
+      {
+        "surface": "캐릭터",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "호칭은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "cue",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C026",
+    "group": "cue_reference",
+    "input_text": "이 cue는 앞 문장의 주어를 받아",
+    "expectations": [
+      {
+        "surface": "이",
+        "required": true,
+        "expected_role": "reference"
+      },
+      {
+        "surface": "cue는",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "주어를",
+        "required": true,
+        "expected_role": null
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C027",
+    "group": "cue_reference",
+    "input_text": "그 번역은 앞 cue와 톤이 달라",
+    "expectations": [
+      {
+        "surface": "그",
+        "required": true,
+        "expected_role": "reference"
+      },
+      {
+        "surface": "번역은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "cue와",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C028",
+    "group": "cue_reference",
+    "input_text": "방금 cue의 target을 다시 비교해",
+    "expectations": [
+      {
+        "surface": "방금",
+        "required": true,
+        "expected_role": "reference"
+      },
+      {
+        "surface": "cue의",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "target을",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C029",
+    "group": "readability_compression",
+    "input_text": "번역문은 42자를 넘기지마",
+    "expectations": [
+      {
+        "surface": "번역문은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "42자를",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "넘기지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C030",
+    "group": "readability_compression",
+    "input_text": "한 줄 자막은 16자 안팎으로 압축해",
+    "expectations": [
+      {
+        "surface": "자막은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "16자",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "압축해",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C031",
+    "group": "domain_contract",
+    "input_text": "영한 자막기 SSOT부터 다시 재정렬해",
+    "expectations": [
+      {
+        "surface": "영한",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "자막기",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "SSOT부터",
+        "required": true,
+        "expected_role": "contractanchor"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C032",
+    "group": "domain_contract",
+    "input_text": "영문 원문 번역문 타임코드가 WCTX SSOT다",
+    "expectations": [
+      {
+        "surface": "영문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "원문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "번역문",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "타임코드가",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C033",
+    "group": "negation_translation",
+    "input_text": "SOURCE I cannot do this TARGET 이건 못해",
+    "expectations": [
+      {
+        "surface": "SOURCE",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "TARGET",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "못해",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C034",
+    "group": "subtitle_memory",
+    "input_text": "이전 번역문과 용어를 맞춰",
+    "expectations": [
+      {
+        "surface": "이전",
+        "required": true,
+        "expected_role": "reference"
+      },
+      {
+        "surface": "번역문과",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "용어를",
+        "required": true,
+        "expected_role": "technicalterm"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C035",
+    "group": "translation_constraint",
+    "input_text": "원문에 없는 감정표현은 추가하지마",
+    "expectations": [
+      {
+        "surface": "원문에",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "감정표현은",
+        "required": true,
+        "expected_role": null
+      },
+      {
+        "surface": "추가하지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  },
+  {
+    "case_id": "WCTX01-C036",
+    "group": "translation_constraint",
+    "input_text": "한국어 자막은 짧게 하지만 의미는 빼지마",
+    "expectations": [
+      {
+        "surface": "한국어",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "자막은",
+        "required": true,
+        "expected_role": "technicalterm"
+      },
+      {
+        "surface": "빼지마",
+        "required": true,
+        "expected_role": "negation"
+      }
+    ]
+  }
+]

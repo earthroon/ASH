@@ -1,0 +1,33 @@
+SFT-GPU-RUN-09 STATIC VALIDATION
+
+[OK] added crates/ash_core/src/sft_gpu_post_switch_health.rs
+[OK] added crates/ash_core/tests/sft_gpu_run_09_post_switch_health.rs
+[OK] added crates/lora_train/src/gpu_trained_post_switch_health.rs
+[OK] added crates/lora_train/tests/gpu_trained_post_switch_health.rs
+[OK] added crates/burn_webgpu_backend/src/gpu_trained_post_switch_health.rs
+[OK] added crates/burn_webgpu_backend/tests/gpu_trained_post_switch_health.rs
+[OK] ash_core lib.rs module/export connected
+[OK] lora_train lib.rs module/export connected
+[OK] burn_webgpu_backend lib.rs module/export connected
+[OK] source RUN-08 current pointer switch seal required
+[OK] current pointer source match required
+[OK] current adapter digest match required
+[OK] runtime current adapter active check required
+[OK] post-switch smoke required
+[OK] smoke finite/non-empty/no-panic guards required
+[OK] health snapshot write allowed
+[OK] fallback readiness check allowed
+[OK] rollback availability check allowed
+[OK] rollback execution remains closed
+[OK] textureLoad post-switch guard required
+[OK] textureSample/sampler/normalized-uv weight fetch rejected
+[OK] new current pointer update remains closed
+[OK] promotion apply rerun remains closed
+[OK] lifecycle mutation remains closed
+[OK] slot action apply remains closed
+[OK] demotion/quarantine apply remain closed
+[OK] ASH current binding remains closed
+[OK] runtime SFT training / gradient / optimizer remain closed
+
+[PENDING] cargo/rustc/rustfmt unavailable in this environment
+[PENDING] target backend post-switch smoke runtime receipt

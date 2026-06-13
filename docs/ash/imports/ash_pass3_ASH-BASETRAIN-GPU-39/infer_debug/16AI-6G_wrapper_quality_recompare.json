@@ -1,0 +1,1967 @@
+{
+  "pairs": [
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "▁브라질 ▁장수풍뎅이 의 ▁장점은 ▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 27971.7751,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁건강상에",
+        "new_text_len": 5,
+        "new_token_ids": [
+          29886
+        ],
+        "prompt_ids": [
+          16422,
+          16908,
+          369,
+          2766,
+          39013
+        ],
+        "prompt_text": "사용자: 브라질 장수풍뎅이의 장점은 무엇인가요?\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "사 용 자 <unk> <unk> ▁브라질 <unk> 장 수 풍 뎅 이 의 <unk> ▁장점은 <unk> ▁무엇인가요? <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 116813.0758,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁중요한",
+        "new_text_len": 4,
+        "new_token_ids": [
+          870
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          16422,
+          3,
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          2766,
+          3,
+          39013,
+          334,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 브라질 장수풍뎅이의 장점은 무엇인가요?\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "ko_beetle_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -20,
+      "winner": "Tie",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "▁브라질 ▁장수풍뎅이 의 ▁장점은 ▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 25224.7605,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁건강상에",
+        "new_text_len": 5,
+        "new_token_ids": [
+          29886
+        ],
+        "prompt_ids": [
+          16422,
+          16908,
+          369,
+          2766,
+          39013
+        ],
+        "prompt_text": "질문: 브라질 장수풍뎅이의 장점은 무엇인가요?\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "질 문 <unk> <unk> ▁브라질 <unk> 장 수 풍 뎅 이 의 <unk> ▁장점은 <unk> ▁무엇인가요? <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 101608.7494,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁생각해",
+        "new_text_len": 4,
+        "new_token_ids": [
+          442
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          16422,
+          3,
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          2766,
+          3,
+          39013,
+          334,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 브라질 장수풍뎅이의 장점은 무엇인가요?\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "ko_beetle_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -16,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "▁브라질 ▁장수풍뎅이 의 ▁장점은 ▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 26800.9417,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁건강상에",
+        "new_text_len": 5,
+        "new_token_ids": [
+          29886
+        ],
+        "prompt_ids": [
+          16422,
+          16908,
+          369,
+          2766,
+          39013
+        ],
+        "prompt_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_beetle_question",
+        "decoded_prompt": "▁브라질 <unk> 장 수 풍 뎅 이 의 <unk> ▁장점은 <unk> ▁무엇인가요?",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 65321.842399999994,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁모양으로",
+        "new_text_len": 5,
+        "new_token_ids": [
+          14561
+        ],
+        "prompt_ids": [
+          16422,
+          3,
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          2766,
+          3,
+          39013,
+          334
+        ],
+        "prompt_text": "브라질 장수풍뎅이의 장점은 무엇인가요?",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "ko_beetle_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -8,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "▁장수풍뎅이 의 ▁특징",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 17085.0645,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁살인",
+        "new_text_len": 3,
+        "new_token_ids": [
+          7093
+        ],
+        "prompt_ids": [
+          16908,
+          369,
+          5665
+        ],
+        "prompt_text": "사용자: 장수풍뎅이의 특징\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "사 용 자 <unk> <unk> 장 수 풍 뎅 이 의 <unk> ▁특징 <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 94658.3381,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁중요한",
+        "new_text_len": 4,
+        "new_token_ids": [
+          870
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          5665,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 장수풍뎅이의 특징\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "ko_compound_noun",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -17,
+      "winner": "Tie",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "▁장수풍뎅이 의 ▁특징",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 15431.5881,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁살인",
+        "new_text_len": 3,
+        "new_token_ids": [
+          7093
+        ],
+        "prompt_ids": [
+          16908,
+          369,
+          5665
+        ],
+        "prompt_text": "질문: 장수풍뎅이의 특징\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "질 문 <unk> <unk> 장 수 풍 뎅 이 의 <unk> ▁특징 <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 76893.1103,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁이런",
+        "new_text_len": 3,
+        "new_token_ids": [
+          355
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          5665,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 장수풍뎅이의 특징\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "ko_compound_noun",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -13,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "▁장수풍뎅이 의 ▁특징",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 17067.8874,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁살인",
+        "new_text_len": 3,
+        "new_token_ids": [
+          7093
+        ],
+        "prompt_ids": [
+          16908,
+          369,
+          5665
+        ],
+        "prompt_text": "장수풍뎅이의 특징",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_compound_noun",
+        "decoded_prompt": "장 수 풍 뎅 이 의 <unk> ▁특징",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 39195.2736,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁살인",
+        "new_text_len": 3,
+        "new_token_ids": [
+          7093
+        ],
+        "prompt_ids": [
+          1851,
+          2137,
+          9585,
+          43406,
+          373,
+          369,
+          3,
+          5665
+        ],
+        "prompt_text": "장수풍뎅이의 특징",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "ko_compound_noun",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=55.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -5,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "▁검은 ▁고양이가 ▁창문 ▁아래에 ▁앉아 ▁있었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 31879.8542,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁계실까",
+        "new_text_len": 4,
+        "new_token_ids": [
+          27495
+        ],
+        "prompt_ids": [
+          13337,
+          1998,
+          6172,
+          12887,
+          2139,
+          5946
+        ],
+        "prompt_text": "사용자: 검은 고양이가 창문 아래에 앉아 있었다.\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": true,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "사 용 자 <unk> <unk> ▁검은 <unk> ▁고양이가 <unk> ▁창문 <unk> ▁아래에 <unk> ▁앉아 <unk> ▁있었다. <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 115214.3059,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          13337,
+          3,
+          1998,
+          3,
+          6172,
+          3,
+          12887,
+          3,
+          2139,
+          3,
+          5946,
+          328,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 검은 고양이가 창문 아래에 앉아 있었다.\n어시스턴트:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "ko_descriptive_sentence",
+      "decision": "AssembledImproved",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 5.0,
+      "quality_delta": 5.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -18,
+      "winner": "Assembled",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "▁검은 ▁고양이가 ▁창문 ▁아래에 ▁앉아 ▁있었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 29016.2789,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁계실까",
+        "new_text_len": 4,
+        "new_token_ids": [
+          27495
+        ],
+        "prompt_ids": [
+          13337,
+          1998,
+          6172,
+          12887,
+          2139,
+          5946
+        ],
+        "prompt_text": "질문: 검은 고양이가 창문 아래에 앉아 있었다.\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "질 문 <unk> <unk> ▁검은 <unk> ▁고양이가 <unk> ▁창문 <unk> ▁아래에 <unk> ▁앉아 <unk> ▁있었다. <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 99333.8059,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁양념치킨",
+        "new_text_len": 5,
+        "new_token_ids": [
+          31123
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          13337,
+          3,
+          1998,
+          3,
+          6172,
+          3,
+          12887,
+          3,
+          2139,
+          3,
+          5946,
+          328,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 검은 고양이가 창문 아래에 앉아 있었다.\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "ko_descriptive_sentence",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -14,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "▁검은 ▁고양이가 ▁창문 ▁아래에 ▁앉아 ▁있었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 30260.8046,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁계실까",
+        "new_text_len": 4,
+        "new_token_ids": [
+          27495
+        ],
+        "prompt_ids": [
+          13337,
+          1998,
+          6172,
+          12887,
+          2139,
+          5946
+        ],
+        "prompt_text": "검은 고양이가 창문 아래에 앉아 있었다.",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_descriptive_sentence",
+        "decoded_prompt": "▁검은 <unk> ▁고양이가 <unk> ▁창문 <unk> ▁아래에 <unk> ▁앉아 <unk> ▁있었다.",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 60081.5648,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁김치",
+        "new_text_len": 3,
+        "new_token_ids": [
+          2386
+        ],
+        "prompt_ids": [
+          13337,
+          3,
+          1998,
+          3,
+          6172,
+          3,
+          12887,
+          3,
+          2139,
+          3,
+          5946,
+          328
+        ],
+        "prompt_text": "검은 고양이가 창문 아래에 앉아 있었다.",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "ko_descriptive_sentence",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -6,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 6042.1233,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁성취감이",
+        "new_text_len": 5,
+        "new_token_ids": [
+          20358
+        ],
+        "prompt_ids": [
+          39013
+        ],
+        "prompt_text": "사용자: 무엇인가요?\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "사 용 자 <unk> <unk> ▁무엇인가요? <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 72884.9233,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁중요한",
+        "new_text_len": 4,
+        "new_token_ids": [
+          870
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          39013,
+          334,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 무엇인가요?\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "ko_ending_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=30.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -13,
+      "winner": "Tie",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 6704.0533,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁성취감이",
+        "new_text_len": 5,
+        "new_token_ids": [
+          20358
+        ],
+        "prompt_ids": [
+          39013
+        ],
+        "prompt_text": "질문: 무엇인가요?\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "질 문 <unk> <unk> ▁무엇인가요? <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 49158.6652,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁이런",
+        "new_text_len": 3,
+        "new_token_ids": [
+          355
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          39013,
+          334,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 무엇인가요?\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "ko_ending_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=30.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -9,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "▁무엇인가요",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 6824.6282,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁성취감이",
+        "new_text_len": 5,
+        "new_token_ids": [
+          20358
+        ],
+        "prompt_ids": [
+          39013
+        ],
+        "prompt_text": "무엇인가요?",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_ending_question",
+        "decoded_prompt": "▁무엇인가요?",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 11841.294899999999,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁잘하면",
+        "new_text_len": 4,
+        "new_token_ids": [
+          11290
+        ],
+        "prompt_ids": [
+          39013,
+          334
+        ],
+        "prompt_text": "무엇인가요?",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "ko_ending_question",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -1,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "▁고양이가 ▁밥을 ▁먹었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 16264.9129,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁석회",
+        "new_text_len": 3,
+        "new_token_ids": [
+          29917
+        ],
+        "prompt_ids": [
+          1998,
+          1268,
+          7967
+        ],
+        "prompt_text": "사용자: 고양이가 밥을 먹었다.\n어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": true,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "사 용 자 <unk> <unk> ▁고양이가 <unk> ▁밥을 <unk> ▁먹었다. <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 102017.77590000001,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          1998,
+          3,
+          1268,
+          3,
+          7967,
+          328,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 고양이가 밥을 먹었다.\n어시스턴트:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "ko_particle_short",
+      "decision": "AssembledImproved",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 5.0,
+      "quality_delta": 5.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -15,
+      "winner": "Assembled",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "▁고양이가 ▁밥을 ▁먹었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 14646.642399999999,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁석회",
+        "new_text_len": 3,
+        "new_token_ids": [
+          29917
+        ],
+        "prompt_ids": [
+          1998,
+          1268,
+          7967
+        ],
+        "prompt_text": "질문: 고양이가 밥을 먹었다.\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "질 문 <unk> <unk> ▁고양이가 <unk> ▁밥을 <unk> ▁먹었다. <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 65851.8411,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁그때까지만",
+        "new_text_len": 6,
+        "new_token_ids": [
+          28930
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          1998,
+          3,
+          1268,
+          3,
+          7967,
+          328,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 고양이가 밥을 먹었다.\n답변:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "ko_particle_short",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -11,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "▁고양이가 ▁밥을 ▁먹었다",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 17032.2358,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁석회",
+        "new_text_len": 3,
+        "new_token_ids": [
+          29917
+        ],
+        "prompt_ids": [
+          1998,
+          1268,
+          7967
+        ],
+        "prompt_text": "고양이가 밥을 먹었다.",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "ko_particle_short",
+        "decoded_prompt": "▁고양이가 <unk> ▁밥을 <unk> ▁먹었다.",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 28577.127699999997,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁무용",
+        "new_text_len": 3,
+        "new_token_ids": [
+          6905
+        ],
+        "prompt_ids": [
+          1998,
+          3,
+          1268,
+          3,
+          7967,
+          328
+        ],
+        "prompt_text": "고양이가 밥을 먹었다.",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "ko_particle_short",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=80.000",
+        "source_path_score=100.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": -3,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "사 용 자 <unk> <unk> 어 시 스 턴 트 <unk> <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 85467.3835,
+        "empty_output": false,
+        "fragmentation_score": 0.0,
+        "high_repetition": false,
+        "new_text": "라도",
+        "new_text_len": 2,
+        "new_token_ids": [
+          1301
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 어시스턴트:\n어시스턴트:",
+        "quality_score": 100.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "사 용 자 <unk> <unk> 어 시 스 턴 트 <unk> <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 86829.2385,
+        "empty_output": false,
+        "fragmentation_score": 0.0,
+        "high_repetition": false,
+        "new_text": "라도",
+        "new_text_len": 2,
+        "new_token_ids": [
+          1301
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 어시스턴트:\n어시스턴트:",
+        "quality_score": 100.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "wrapper_assistant_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "질 문 <unk> <unk> 어 시 스 턴 트 <unk> <unk> 답 변 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 71232.2372,
+        "empty_output": false,
+        "fragmentation_score": 0.0,
+        "high_repetition": false,
+        "new_text": "라도",
+        "new_text_len": 2,
+        "new_token_ids": [
+          1301
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 어시스턴트:\n답변:",
+        "quality_score": 100.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "질 문 <unk> <unk> 어 시 스 턴 트 <unk> <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 66956.09240000001,
+        "empty_output": false,
+        "fragmentation_score": 0.0,
+        "high_repetition": false,
+        "new_text": "라도",
+        "new_text_len": 2,
+        "new_token_ids": [
+          1301
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 어시스턴트:\n답변:",
+        "quality_score": 100.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "wrapper_assistant_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 32098.232699999997,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁효과적으로",
+        "new_text_len": 6,
+        "new_token_ids": [
+          29872
+        ],
+        "prompt_ids": [
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": false,
+        "case_id": "wrapper_assistant_label",
+        "decoded_prompt": "어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 31904.6344,
+        "empty_output": false,
+        "fragmentation_score": 25.0,
+        "high_repetition": false,
+        "new_text": "▁효과적으로",
+        "new_text_len": 6,
+        "new_token_ids": [
+          29872
+        ],
+        "prompt_ids": [
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "어시스턴트:",
+        "quality_score": 75.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": true,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "wrapper_assistant_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "plain"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "사 용 자 <unk> <unk> 사 용 자 <unk> <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 74053.315,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 사용자:\n어시스턴트:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "baseline": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "사 용 자 <unk> <unk> 사 용 자 <unk> <unk> 어 시 스 턴 트 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 84502.4504,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          852,
+          877,
+          1551,
+          15030,
+          2391,
+          3
+        ],
+        "prompt_text": "사용자: 사용자:\n어시스턴트:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "dialogue-ko"
+      },
+      "case_id": "wrapper_user_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "dialogue-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "질 문 <unk> <unk> 사 용 자 <unk> <unk> 답 변 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 66697.51,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 사용자:\n답변:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "baseline": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "질 문 <unk> <unk> 사 용 자 <unk> <unk> 답 변 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 61654.00060000001,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1044,
+          5528,
+          3,
+          3,
+          1638,
+          2899,
+          1115,
+          3,
+          3,
+          19586,
+          13121,
+          3
+        ],
+        "prompt_text": "질문: 사용자:\n답변:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "instruction-ko"
+      },
+      "case_id": "wrapper_user_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "instruction-ko"
+    },
+    {
+      "assembled": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "사 용 자 <unk>",
+        "diagnostics": [
+          "assembled tokenizer branch-local compare only"
+        ],
+        "elapsed_ms": 20311.582000000002,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3
+        ],
+        "prompt_text": "사용자:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "assembled",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "baseline": {
+        "byte_token_leak": true,
+        "case_id": "wrapper_user_label",
+        "decoded_prompt": "사 용 자 <unk>",
+        "diagnostics": [
+          "baseline tokenizer branch"
+        ],
+        "elapsed_ms": 21562.249099999997,
+        "empty_output": false,
+        "fragmentation_score": 30.0,
+        "high_repetition": false,
+        "new_text": "<0x63>",
+        "new_text_len": 6,
+        "new_token_ids": [
+          171
+        ],
+        "prompt_ids": [
+          1638,
+          2899,
+          1115,
+          3
+        ],
+        "prompt_text": "사용자:",
+        "quality_score": 70.0,
+        "sampling_preset": "greedy",
+        "spaced_korean": false,
+        "special_marker_leak": false,
+        "tokenizer_mode": "baseline",
+        "unique_new_token_ratio": 1.0,
+        "weak_word_boundary": false,
+        "wrapper": "plain"
+      },
+      "case_id": "wrapper_user_label",
+      "decision": "AssembledUnchanged",
+      "diagnostics": [
+        "default commit remains false",
+        "assembled ids used only in assembled compare branch",
+        "source_assembly_fragmentation_delta=0.000",
+        "source_path_score=0.000"
+      ],
+      "fragmentation_delta": 0.0,
+      "quality_delta": 0.0,
+      "sampling_preset": "greedy",
+      "token_len_delta": 0,
+      "winner": "Tie",
+      "wrapper": "plain"
+    }
+  ],
+  "run": {
+    "assembly_commit_mode": "compare-only",
+    "checkpoint_required": true,
+    "committed_prompt_ids": "branch-local",
+    "default_commit": false,
+    "generation": true,
+    "id": "16AI-6G",
+    "kind": "wrapper_quality_recompare_with_assembled_ids",
+    "max_new_tokens": 1,
+    "new_token_ids_created": false,
+    "token_ids_mutated": false,
+    "vocab_augmented": false,
+    "vocab_limit": 48259
+  },
+  "ssot": {
+    "model_identity": "Ash 1.1B",
+    "model_size_source": "project_ssot_pending_checkpoint_metadata",
+    "source_commit_gate": "16AI-6F PASS_COMMIT_GATE_COMPARE_ONLY",
+    "source_policy_gate": "16AI-6H PASS_POLICY_COMPARE_ONLY",
+    "spec_path_status": "legacy_filename_not_model_size_ssot"
+  },
+  "summary": {
+    "acceptance_status": "PASS_QUALITY_RECOMPARE",
+    "assembled_improved_count": 2,
+    "assembled_runs": 21,
+    "assembled_unchanged_count": 19,
+    "assembled_worsened_count": 0,
+    "avg_fragmentation_delta": 0.4761904776096344,
+    "avg_quality_delta": 0.4761904776096344,
+    "baseline_runs": 21,
+    "best_wrapper_by_quality_delta": "dialogue-ko",
+    "failed": 0,
+    "total_pairs": 21
+  }
+}

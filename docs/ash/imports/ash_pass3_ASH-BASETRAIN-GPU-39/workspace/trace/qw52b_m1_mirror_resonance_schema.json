@@ -1,0 +1,41 @@
+{
+  "patch_id": "QW-52B-M1",
+  "title": "Input-Output Mirror Resonance Detector / Trace Only Seal",
+  "base_patch": "QW-52B",
+  "detector_id": "mirror_resonance_detector",
+  "detector_family": "input_output_reflection",
+  "summary_vector_order": [
+    "phase_mean",
+    "phase_delta_mean",
+    "pressure_mean",
+    "closure_mean",
+    "curvature_mean",
+    "transition_energy_mean",
+    "flow_continuity_mean",
+    "qwave_signature_hash_scalar"
+  ],
+  "config_default": {
+    "distance_scale": 1.0,
+    "self_echo_weight": 1.0,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85,
+    "min_available_dims": 3,
+    "recent_window_size": 8
+  },
+  "mutation_policy_required": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false
+  },
+  "required_invariant": {
+    "trace_only": true,
+    "missing_trace_becomes_unavailable": true,
+    "no_candidate_selection_change": true
+  }
+}

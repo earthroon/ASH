@@ -1,0 +1,45 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-02",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03D",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "behavior_change": false,
+  "detector_only": true,
+  "requires_decode03d": true,
+  "decode03d_status_seen": null,
+  "decode03c_status_seen": null,
+  "decode03b_status_seen": null,
+  "decode03a_status_seen": null,
+  "sampler05_status_seen": null,
+  "steps_observed": 0,
+  "risk_counts": {
+    "low": 0,
+    "medium": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "score": {
+    "mean": null,
+    "max": null,
+    "p50": null,
+    "p90": null,
+    "p99": null
+  },
+  "signals": {
+    "same_token_streak_max": 0,
+    "repeat_3gram_count_total": 0,
+    "byte_piece_count_total": 0,
+    "jamo_leak_count_total": 0,
+    "symbol_noise_count_total": 0,
+    "global_finite_fallback_count": 0,
+    "numeric_risk_count": 0
+  },
+  "candidates": {
+    "rollback_candidate_count": 0,
+    "safe_stop_candidate_count": 0,
+    "eos_bias_candidate_count": 0,
+    "action_executed_count": 0
+  },
+  "ready_for_salad03_rollback_candidate": false,
+  "ready_for_default_salad_guard": false,
+  "reason": "static bake only; run ASH_SALAD02_DETECTOR=receipt after DECODE-03D controlled evidence"
+}

@@ -1,0 +1,68 @@
+{
+  "run": {
+    "id": "16AI-6V-0",
+    "kind": "tokenizer_v6_compat_ssot_seal",
+    "generation": false,
+    "checkpoint_required": false,
+    "manifest_created": false,
+    "runtime_changed": false,
+    "token_ids_mutated": false,
+    "vocab_augmented": false,
+    "new_token_ids_created": false,
+    "embedding_resize_required": false
+  },
+  "identity": {
+    "model_identity": "Ash 1.1B",
+    "base_tokenizer_version": "v5",
+    "target_tokenizer_version": "v6-compat",
+    "v6_type": "checkpoint-compatible runtime tokenizer",
+    "vocab_size": 48259,
+    "checkpoint_compatible": true
+  },
+  "compatibility_contract": {
+    "base_vocab_preserved": true,
+    "token_id_table_mutated": false,
+    "new_token_ids_created": false,
+    "vocab_augmented": false,
+    "embedding_resize_required": false,
+    "checkpoint_rewrite_required": false,
+    "fallback_to_v5": true,
+    "default_mode": "v5-baseline",
+    "global_default_commit": false
+  },
+  "runtime_capabilities": {
+    "protected_span_scanner": true,
+    "cheonjiin_structural_analyzer": true,
+    "existing_vocab_lookup_lattice": true,
+    "dp_best_token_path_assembler": true,
+    "quality_policy_gate": true,
+    "branch_local_commit_selector": true,
+    "gpu_shadow_backend_gate": true
+  },
+  "verified_gates": {
+    "assembly_delta": "16AI-6E-R4 PASS_DELTA_REPORT",
+    "coverage": "16AI-6E-R5 PASS_COVERAGE_REPORT",
+    "commit_gate": "16AI-6F PASS_COMMIT_GATE_COMPARE_ONLY",
+    "quality_recompare": "16AI-6G PASS_QUALITY_RECOMPARE",
+    "policy_integration": "16AI-6H-R2 PASS_POLICY_QUALITY_INTEGRATED",
+    "gated_commit": "16AI-6I PASS_GATED_COMMIT_PROBE",
+    "gpu_shadow_1": "16AI-6J PASS_GPU_SHADOW_PARITY",
+    "gpu_shadow_8": "16AI-6J-R2 PASS_GPU_SHADOW_REPLAY8"
+  },
+  "gpu_contract": {
+    "gpu_shadow_supported": true,
+    "gpu_shadow_parity_1_verified": true,
+    "gpu_shadow_replay8_verified": true,
+    "gpu_default": false,
+    "cpu_fallback": true,
+    "max_verified_new_tokens": 8
+  },
+  "pending_vs_pass_contract": {
+    "pending_runtime_is_pass": false,
+    "bake_manifest_is_runtime_pass": false,
+    "runtime_pass_required_for_gate_import": true
+  },
+  "acceptance": {
+    "status": "PASS_TOKENIZER_V6_COMPAT_SSOT"
+  }
+}

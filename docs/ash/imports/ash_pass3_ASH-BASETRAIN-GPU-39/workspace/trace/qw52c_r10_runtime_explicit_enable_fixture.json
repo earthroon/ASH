@@ -1,0 +1,71 @@
+[
+  {
+    "case_id": "explicit_enable_opens_shadow_dry_run_only",
+    "commit_candidate": {
+      "candidate_id": "qw52c_r8_commit_candidate_reduced_dream_weight_v1",
+      "commit_candidate_sealed": true,
+      "commit_candidate_applied": false
+    },
+    "gate": {
+      "runtime_shadow_gate_created": true,
+      "runtime_shadow_gate_open": false
+    },
+    "explicit_enable": {
+      "candidate_id": "qw52c_r8_commit_candidate_reduced_dream_weight_v1",
+      "explicit_enable_scope": "ShadowDryRunOnly",
+      "operator_id_digest": "sha256:operator_digest",
+      "operator_note_digest": "sha256:shadow_dry_run_note"
+    },
+    "expected": {
+      "explicit_enable_status": "ShadowDryRunGateReady",
+      "shadow_apply_dry_run_allowed": true,
+      "shadow_apply_dry_run_performed": true,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "runtime_apply_scope_rejected",
+    "explicit_enable": {
+      "explicit_enable_scope": "RuntimeApplyRequested"
+    },
+    "expected": {
+      "receipt_status": "InvalidScope",
+      "shadow_apply_dry_run_allowed": false,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "explicit_enable_target_mismatch",
+    "commit_candidate": {
+      "candidate_id": "qw52c_r8_commit_candidate_reduced_dream_weight_v1"
+    },
+    "explicit_enable": {
+      "candidate_id": "wrong_candidate_id",
+      "explicit_enable_scope": "ShadowDryRunOnly"
+    },
+    "expected": {
+      "explicit_enable_status": "TargetMismatch",
+      "shadow_apply_dry_run_allowed": false
+    }
+  },
+  {
+    "case_id": "shadow_apply_result_not_applied",
+    "shadow_apply_dry_run": true,
+    "expected": {
+      "shadow_apply_result_applied": false,
+      "token_rank_mutation": false,
+      "token_selection_mutation": false,
+      "logit_mutation": false,
+      "sampler_mutation": false
+    }
+  },
+  {
+    "case_id": "missing_r9_gate_unavailable",
+    "runtime_shadow_gate_available": false,
+    "expected": {
+      "explicit_enable_status": "Unavailable",
+      "shadow_apply_dry_run_allowed": false,
+      "runtime_apply_allowed": false
+    }
+  }
+]

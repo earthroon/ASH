@@ -1,0 +1,35 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-00",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-04",
+  "status": "PASS_STATIC",
+  "suite": {
+    "prompt_count": 12,
+    "profile_count": 10,
+    "seed_count": 3,
+    "backend_count": 3,
+    "expected_run_count": 1080,
+    "completed_run_count": 0,
+    "excluded_run_count": 0
+  },
+  "overall": {
+    "pass_count": 0,
+    "warn_count": 0,
+    "fail_count": 0,
+    "not_comparable_count": 0
+  },
+  "by_profile": {},
+  "regression": {
+    "baseline_profile": "M01_static_safe",
+    "candidate_profile": "M04_dynamic_controlled",
+    "salad_score_improved": false,
+    "critical_fail_regression": false,
+    "speed_regression_warn": false,
+    "over_stop_regression": false
+  },
+  "acceptance": {
+    "ready_for_decode03d_tuning": true,
+    "ready_for_salad03b_execute_trial": false,
+    "ready_for_default_dynamic_sampler": false,
+    "reason": "manifest and regression harness sealed; runtime bench not run in this container"
+  }
+}

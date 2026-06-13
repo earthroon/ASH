@@ -1,0 +1,23 @@
+SFT-FFN-LORA-03 STATIC VALIDATION
+
+Checked:
+- crates/ash_core/src/sft_ffn_lora_optimizer.rs exists
+- crates/ash_core/tests/sft_ffn_lora_03_optimizer_step_candidate.rs exists
+- crates/burn_webgpu_backend/src/ffn_lora_optimizer.rs exists
+- crates/ash_core/src/lib.rs exports sft_ffn_lora_optimizer
+- crates/burn_webgpu_backend/src/lib.rs exports ffn_lora_optimizer
+- acceptance report exists
+- bake report exists
+
+Brace balance:
+- sft_ffn_lora_optimizer.rs balanced
+- sft_ffn_lora_03_optimizer_step_candidate.rs balanced
+- ffn_lora_optimizer.rs balanced
+
+Tool availability:
+- cargo: unavailable in current environment
+- rustc: unavailable in current environment
+- rustfmt: unavailable in current environment
+
+Runtime status:
+- PASS_STATIC / PENDING_GPU_OPTIMIZER_STEP_RUNTIME

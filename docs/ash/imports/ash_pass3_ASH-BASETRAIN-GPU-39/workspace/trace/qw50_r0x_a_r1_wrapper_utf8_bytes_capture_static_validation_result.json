@@ -1,0 +1,20 @@
+{
+  "patch_id": "QW-50-R0X-A-R1",
+  "title": "Greedy Repeat Attractor Observation Wrapper UTF-8 Bytes Capture / No Runtime Mutation Seal",
+  "base_patch": "QW-50-R0X-A",
+  "scope": "wrapper_io_capture_only",
+  "fixed_error": "UnicodeDecodeError cp949 in subprocess readerthread; proc.stdout NoneType write_text failure",
+  "runtime_mutation": false,
+  "token_mutation": false,
+  "logit_mutation": false,
+  "sampler_mutation": false,
+  "model_weight_mutation": false,
+  "capture_policy": {
+    "subprocess_text_mode": false,
+    "stdout_capture": "bytes",
+    "stderr_capture": "bytes",
+    "decode": "utf-8 errors=replace",
+    "raw_stdout_bin_written": true,
+    "raw_stderr_bin_written": true
+  }
+}

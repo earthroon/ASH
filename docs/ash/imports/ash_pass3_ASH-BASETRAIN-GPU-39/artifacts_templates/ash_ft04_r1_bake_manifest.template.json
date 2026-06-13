@@ -1,0 +1,18 @@
+{
+  "patch_id": "ASH-FT-04-R1",
+  "title": "GPU Upload Receipt Field Rebind / total_upload_bytes Compile Closure / No Forward No Train Seal",
+  "base": "ASH-FT-04",
+  "runtime_artifacts_packaged": false,
+  "fix": "AshFt04GpuUploadSummaryReceipt.total_uploaded_bytes = total_upload_bytes",
+  "guards": {
+    "shader_module_created": false,
+    "compute_pipeline_created": false,
+    "dispatch_executed": false,
+    "forward_executed": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "train_executed": false,
+    "candidate_weight_write_executed": false,
+    "runtime_default_apply_executed": false
+  }
+}

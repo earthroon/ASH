@@ -1,0 +1,218 @@
+﻿D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:156: .reshape([vocab_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:212: let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:213: let k_cache = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:214: let v_cache = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:226: .swap_dims(1, 2)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:227: .reshape([batch, seq, hidden]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:265: let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:266: let k_new = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:267: let v_new = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:281: .swap_dims(1, 2)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\decode_state.rs:282: .reshape([batch, seq, hidden]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:43: AttentionSection, DropoutSection, EmbeddingSection, LanguageSection, LoraSupportSection,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\lib.rs:104: pub use model_layers::{AshDecoderBlock, AshLinear, AshModel, AshRmsNorm};
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:13: pub struct AshLinear<B: Backend> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:22: impl<B: Backend> AshLinear<B> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:84: .matmul(a.swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:85: .matmul(b.swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:102: .matmul(lora.a.clone().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:103: .matmul(lora.b.clone().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:133: .matmul(lora.lora_a.val().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:134: .matmul(lora.lora_b.val().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:151: let x2 = x.clone().reshape([batch * seq, in_dim]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:152: let mut y2 = x2.clone().matmul(self.weight.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:155: y2 = y2 + bias.val().reshape([1, bias.val().dims()[0]]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:161: y2.reshape([batch, seq, out_dim])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:173: let x2 = x.clone().reshape([batch * seq, in_dim]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:174: let mut y2 = x2.clone().matmul(self.weight.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:177: y2 = y2 + bias.val().reshape([1, bias.val().dims()[0]]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:192: y2.reshape([batch, seq, out_dim])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:251: x * inv * self.weight.val().reshape([1, 1, self.weight.val().dims()[0]])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:297: let q = q.reshape([batch, num_kv_heads, group_size, q_seq, q_dim]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:298: let k = k.reshape([batch, num_kv_heads, 1, kv_seq, kv_dim]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:299: let v = v.reshape([batch, num_kv_heads, 1, kv_seq, kv_dim]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:302: .matmul(k.swap_dims(3, 4))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:305: let ctx = attn.matmul(v);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:306: ctx.reshape([batch, num_heads, q_seq, q_dim])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:313: pub q_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:314: pub k_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:315: pub v_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:316: pub o_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:317: pub gate_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:318: pub up_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:319: pub down_proj: AshLinear<B>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:338: q_proj: AshLinear::new(format!("layers.{layer_idx}.attn.q_proj"), hidden, hidden, bias, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:339: k_proj: AshLinear::new(format!("layers.{layer_idx}.attn.k_proj"), hidden, kv_hidden, bias, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:340: v_proj: AshLinear::new(format!("layers.{layer_idx}.attn.v_proj"), hidden, kv_hidden, bias, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:341: o_proj: AshLinear::new(format!("layers.{layer_idx}.attn.o_proj"), hidden, hidden, bias, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:342: gate_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.gate_proj"), hidden, inter, false, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:343: up_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.up_proj"), hidden, inter, false, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:344: down_proj: AshLinear::new(format!("layers.{layer_idx}.ffn.down_proj"), inter, hidden, false, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:371: let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:372: let k = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:373: let v = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:375: .swap_dims(1, 2)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:376: .reshape([batch, seq, hidden]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:415: let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:416: let k = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:417: let v = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:419: .swap_dims(1, 2)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:420: .reshape([batch, seq, hidden]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:445: pub token_embedding: Param<Tensor<B, 2>>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:455: let token_embedding = Param::from_tensor(Tensor::<B, 2>::random(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:468: token_embedding,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:477: let vocab = self.token_embedding.val();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:479: let flat = input_ids.reshape([batch * seq]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:480: vocab.select(0, flat).reshape([batch, seq, self.spec.dimensions.hidden_size])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:587: let hidden2 = hidden.reshape([batch * seq, hidden_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:588: let logits2 = hidden2.matmul(self.lm_head.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:590: logits2.reshape([batch, seq, vocab_size])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:603: let hidden2 = hidden.reshape([batch * seq, hidden_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:604: let logits2 = hidden2.matmul(self.lm_head.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:606: logits2.reshape([batch, seq, vocab_size])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:619: let hidden2 = hidden.reshape([batch * seq, hidden_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:620: let logits2 = hidden2.matmul(self.lm_head.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\model_layers.rs:622: logits2.reshape([batch, seq, vocab_size])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:13: linear_apply,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:14: linear_apply_batched,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:485: embedding_row_gather_enabled: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:486: embedding_full_bytes: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:487: last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:607: let q = q.reshape([batch, seq, heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:608: let k_cache = k.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:609: let v_cache = v.reshape([batch, seq, kv_heads, head_dim]).swap_dims(1, 2);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:621: .swap_dims(1, 2)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:622: .reshape([batch, seq, hidden]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1387: use_embedding_row_gather: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1431: let embedding_full_bytes = full.embedding.len().saturating_mul(std::mem::size_of::<f32>());
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1432: if use_embedding_row_gather {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1434: "[native-embedding-row-gather] full_embedding_upload_skipped=true full_bytes={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1435: embedding_full_bytes,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1442: !use_embedding_row_gather,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1453: embedding_row_gather_enabled: use_embedding_row_gather,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1454: embedding_full_bytes,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1455: last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1485: use_embedding_row_gather: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1497: use_embedding_row_gather,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1621: .expect("failed to materialize input ids for row_gather embedding");
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1629: fn embedding_rows_for_token_ids(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1638: .expect("row_gather embedding requires full checkpoint execution weights");
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1646: "[native-embedding-row-gather][warn] token_id_out_of_vocab={} vocab={} using_token_id=0",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1655: rows.extend_from_slice(&full.embedding[start..end]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1658: if let Ok(mut slot) = self.last_embedding_row_gather_bytes.lock() {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1662: "[native-embedding-row-gather] mode=row_gather prompt_len={} hidden={} bytes={} unique_tokens={} full_embedding_upload_skipped=true full_bytes={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1667: self.embedding_full_bytes,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1679: if self.embedding_row_gather_enabled {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1681: self.embedding_rows_for_token_ids(&token_ids, batch, seq)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1728: .reshape([1, 1, atlas.vocab_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1730: if self.embedding_row_gather_enabled {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1734: let hidden2 = hidden.reshape([batch * seq, hidden_size]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1735: let logits2 = hidden2.matmul(self.model.lm_head.val().swap_dims(0, 1));
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1736: logits2.reshape([batch, seq, vocab_size])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1756: last_hidden.matmul(self.model.lm_head.val().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1773: .matmul(tile.weight.clone().swap_dims(0, 1))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:1774: .reshape([tile.token_len]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2517: .reshape([vocab_size]))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2530: .reshape([1, hidden_size]))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2586: let mut q_all = linear_apply_batched(&normed, &layer.q_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2591: let k_all = linear_apply_batched(&normed, &layer.k_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2595: let mut v_all = linear_apply_batched(&normed, &layer.v_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2610: let o_all = linear_apply_batched(&ctx, &layer.o_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2614: let attn_out = linear_apply_batched(&ctx, &layer.o_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2617: let gate = linear_apply_batched(&normed_ffn, &layer.gate_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2621: let up = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2626: let mut down = linear_apply_batched(&fused, &layer.down_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2732: states.push(full.embedding[start..end.min(full.embedding.len())].to_vec());
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2740: let mut v = linear_apply(s, &layer.q_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2747: let k_all: Vec<Vec<f32>> = normed.iter().map(|s| linear_apply(s, &layer.k_proj)).collect();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2752: let mut v = linear_apply(s, &layer.v_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2772: let o = linear_apply(token_ctx, &layer.o_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2803: let attn_out = linear_apply(&ctx[token_idx], &layer.o_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2814: let gate_all: Vec<Vec<f32>> = normed_ffn.iter().map(|s| linear_apply(s, &layer.gate_proj)).collect();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2818: let up_all: Vec<Vec<f32>> = normed_ffn.iter().map(|s| linear_apply(s, &layer.up_proj)).collect();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2838: let mut down = linear_apply(&fused, &layer.down_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\native_wgpu.rs:2900: pub fn module_linear_weight(&self, target_key: &str) -> Result<FullLinearWeights> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:16: linear_apply,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:17: linear_apply_batched,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:161: states.push(full.embedding[start..end.min(full.embedding.len())].to_vec());
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:172: let mut v = linear_apply(s, &layer.q_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:177: let k_all: Vec<Vec<f32>> = normed.iter().map(|s| linear_apply(s, &layer.k_proj)).collect();
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:181: let mut v = linear_apply(s, &layer.v_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:198: let attn_out = linear_apply(&ctx[idx], &layer.o_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:212: let gate = linear_apply(&normed_ffn[idx], &layer.gate_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:213: let up = linear_apply(&normed_ffn[idx], &layer.up_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:218: let mut down = linear_apply(&fused, &layer.down_proj);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:376: let mut q_all = linear_apply_batched(&normed, &layer.q_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:381: let k_all = linear_apply_batched(&normed, &layer.k_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:385: let mut v_all = linear_apply_batched(&normed, &layer.v_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:400: let o_all = linear_apply_batched(&ctx, &layer.o_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:404: let attn_out = linear_apply_batched(&ctx, &layer.o_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:407: let gate = linear_apply_batched(&normed_ffn, &layer.gate_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:411: let up = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:416: let mut down = linear_apply_batched(&fused, &layer.down_proj)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:483: pub fn module_linear_weight(&self, target_key: &str) -> Result<FullLinearWeights> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:646: pub struct FullLinearWeights {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:655: pub q_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:656: pub k_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:657: pub v_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:658: pub o_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:659: pub gate_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:660: pub up_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:661: pub down_proj: FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:885: pub embedding: Vec<f32>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:895: pub embedding: Vec<String>,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:903: embedding: vec!["model.embed_tokens.weight".into(), "tok_embeddings.weight".into(), "embed_tokens.weight".into()],
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:950: fn load_linear(map: &BTreeMap<String, (Vec<usize>, Vec<f32>)>, names: Vec<String>, bias_names: Vec<String>) -> Result<FullLinearWeights> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:955: Ok(FullLinearWeights { weight: data.clone(), out_dim, in_dim, bias })
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:961: let (embed_shape, embedding) = first_tensor(&map, &mapping.embedding)?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:966: let q_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "self_attn.q_proj.weight"), layer_tensor_name_candidates(layer_idx, "self_attn.q_proj.bias"))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:967: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "attn.q_proj.weight"), layer_tensor_name_candidates(layer_idx, "attn.q_proj.bias")))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:968: let k_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "self_attn.k_proj.weight"), layer_tensor_name_candidates(layer_idx, "self_attn.k_proj.bias"))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:969: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "attn.k_proj.weight"), layer_tensor_name_candidates(layer_idx, "attn.k_proj.bias")))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:970: let v_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "self_attn.v_proj.weight"), layer_tensor_name_candidates(layer_idx, "self_attn.v_proj.bias"))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:971: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "attn.v_proj.weight"), layer_tensor_name_candidates(layer_idx, "attn.v_proj.bias")))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:972: let o_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "self_attn.o_proj.weight"), layer_tensor_name_candidates(layer_idx, "self_attn.o_proj.bias"))
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:973: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "attn.o_proj.weight"), layer_tensor_name_candidates(layer_idx, "attn.o_proj.bias")))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:974: let gate_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.gate_proj.weight"), vec![])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:975: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.gate_proj.weight"), vec![]))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:976: let up_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.up_proj.weight"), vec![])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:977: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.up_proj.weight"), vec![]))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:978: let down_proj = load_linear(&map, layer_tensor_name_candidates(layer_idx, "mlp.down_proj.weight"), vec![])
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:979: .or_else(|_| load_linear(&map, layer_tensor_name_candidates(layer_idx, "ffn.down_proj.weight"), vec![]))?;
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:989: embedding: embedding.clone(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1043: fn checkpoint_linear_from_weights<B: Backend>(
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1045: src: &FullLinearWeights,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1047: ) -> AshLinear<B> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1054: AshLinear::from_checkpoint_tensor(target_key, weight, bias)
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1079: q_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.q_proj"), &weights.q_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1080: k_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.k_proj"), &weights.k_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1081: v_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.v_proj"), &weights.v_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1082: o_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.attn.o_proj"), &weights.o_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1083: gate_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.gate_proj"), &weights.gate_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1084: up_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.up_proj"), &weights.up_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1085: down_proj: checkpoint_linear_from_weights::<B>(format!("layers.{layer_idx}.ffn.down_proj"), &weights.down_proj, device),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1092: fn load_linear_into_model<B: Backend>(target: &mut AshLinear<B>, src: &FullLinearWeights, device: &B::Device) {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1104: upload_full_embedding: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1138: let token_embedding = if upload_full_embedding {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1141: &full.embedding,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1147: // Commit 16Y-4: row_gather mode must not allocate the full [vocab, hidden]
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1148: // embedding table on the GPU. A 1-row placeholder keeps AshModel's shape
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1149: // contract alive; NativeWgpuModel routes embedding through prompt-row staging.
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1152: "model.embed_tokens.weight.placeholder_row_gather",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_checkpoint.rs:1161: token_embedding,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:3: pub(crate) fn linear_apply(input: &[f32], lin: &FullLinearWeights) -> Vec<f32> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:158: if src_end > full.embedding.len() || dst_end > data.len() {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:160: "batched embedding lookup out of bounds: token={} hidden_dim={} src_end={} embedding_len={} dst_end={} data_len={}",
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:164: full.embedding.len(),
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:169: data[dst_start..dst_end].copy_from_slice(&full.embedding[src_start..src_end]);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:207: pub(crate) fn linear_apply_batched(hidden: &BatchedHidden, lin: &FullLinearWeights) -> Result<BatchedHidden> {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\reference_math.rs:208: ensure!(hidden.hidden_dim >= lin.in_dim, "batched linear input dim too small: hidden_dim={} required={}", hidden.hidden_dim, lin.in_dim);
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\runtime_lora.rs:16050: .iter().flatten().any(|v| !v.is_finite());
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\runtime_lora.rs:24344: for value in values.flatten() {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:14: pub embeddings: EmbeddingSection,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:45: pub max_position_embeddings: usize,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:49: pub struct EmbeddingSection {
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:50: pub tie_word_embeddings: bool,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:51: pub embedding_dtype: String,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:93: pub embedding: f32,
+D:\1111113232\DUST\1\ash_pass3\crates\model_core\src\spec.rs:157: let lm_head = if self.embeddings.tie_word_embeddings { 0 } else { d.vocab_size * d.hidden_size };

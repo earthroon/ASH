@@ -1,0 +1,19 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01C-A",
+  "status": "PASS_STATIC_BAKE_PENDING_LOCAL_CARGO_BUILD",
+  "cargo_build_executed": false,
+  "cargo_build_error": "cargo not available in bake container",
+  "ssot": "orchestrator_local infer entry boundary writes SALAD receipt for every infer run and detects generic short EOS collapse",
+  "checks": {
+    "patch_id_updated": true,
+    "generic_early_eos_collapse_guard": true,
+    "specific_space_eos_only_guard_removed_as_primary": true,
+    "receipt_always_write_policy": true,
+    "canonical_receipt_path": "workspace/salad01c_generation_receipt.json",
+    "payload_receipt_path_supported": true,
+    "output_json_embeds_salad01c_receipt": true,
+    "mojibake_risk_audit": true,
+    "model_mutation_flags_false": true
+  },
+  "modified_model_files": false
+}

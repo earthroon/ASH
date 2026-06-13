@@ -1,0 +1,28 @@
+--- /mnt/data/work16r1/ash_pass3_ASH-BASETRAIN-GPU-16_chunk_window_logits_expansion_dispatch_smoke_baked/crates/base_train/src/ash_basetrain_gpu_16_chunk_window_logits_expansion_dispatch_smoke.rs	2026-06-09 05:38:04.000000000 +0000
++++ /mnt/data/work16r1/ash_pass3_ASH-BASETRAIN-GPU-16-R1_dispatch_x_type_bridge_fix_baked/crates/base_train/src/ash_basetrain_gpu_16_chunk_window_logits_expansion_dispatch_smoke.rs	2026-06-09 05:48:19.214859619 +0000
+@@ -24,6 +24,7 @@
+ const FIXED_SMOKE_TOKEN_ID: u32 = 1;
+ const LOGITS_WINDOW_SIZE: u64 = 2048;
+ const LOGITS_DISPATCH_X: u32 = 128;
++const LOGITS_DISPATCH_X_RECEIPT_U64: u64 = LOGITS_DISPATCH_X as u64;
+ 
+ #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+ pub struct AshBaseTrainGpu16Source15ExpansionReadinessValidation {
+@@ -35,7 +36,7 @@
+     pub source_15_no_dispatch_no_optimizer_contract_validated: bool,
+     pub source_target_logits_window_size: u64,
+     pub source_target_logits_output_bytes: u64,
+-    pub source_target_dispatch_x: u32,
++    pub source_target_dispatch_x: u64,
+     pub source_ready_for_next_dispatch_candidate: bool,
+     pub source_lm_head_payload_expansion_required: bool,
+     pub source_lm_head_target_payload_bytes: u64,
+@@ -1624,7 +1625,7 @@
+     let source_ready = expansion_state.ready_for_next_dispatch_candidate
+         && expansion_state.target_logits_window_size == LOGITS_WINDOW_SIZE
+         && expansion_state.target_logits_output_bytes == LOGITS_WINDOW_SIZE * 4
+-        && expansion_state.target_dispatch_x == LOGITS_DISPATCH_X
++        && expansion_state.target_dispatch_x == LOGITS_DISPATCH_X_RECEIPT_U64
+         && expansion_state.lm_head_payload_expansion_required
+         && expansion_state.lm_head_target_payload_bytes == 16_777_216;
+     let boundary = no_dispatch_contract.pass

@@ -1,0 +1,14 @@
+ASH-1 static sanity
+PASS crates/ash_core/src/identity_profile.rs
+PASS crates/ash_core/src/capability.rs
+PASS crates/ash_core/src/bin/ash_identity_capability_audit.rs
+PASS crates/ash_core/tests/ash_1_identity_capability.rs
+PASS acceptance_reports/ASH-1_identity_capability_schema.md
+PASS lib identity_profile module
+PASS lib capability module
+PASS audit status const
+PASS default identity
+PASS default capability registry
+PASS no Python ASH-1 validator
+PASS no forbidden ash_core dependency
+cargo unavailable in bake container; Rust compile not executed

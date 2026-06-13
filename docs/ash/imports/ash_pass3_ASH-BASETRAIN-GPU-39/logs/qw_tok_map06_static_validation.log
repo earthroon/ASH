@@ -1,0 +1,16 @@
+crates/model_core/src/tokenizer_v5_first_model_input_packet_smoke.rs: PASS
+crates/model_core/tests/qw_tok_map06_model_input_packet_smoke.rs: PASS
+crates/model_core/tests/qw_tok_map06_input_id_range.rs: PASS
+crates/model_core/tests/qw_tok_map06_attention_position_contract.rs: PASS
+crates/model_core/tests/qw_tok_map06_no_transformer_forward.rs: PASS
+crates/model_core/tests/qw_tok_map06_batch_shape.rs: PASS
+artifacts/qw_tok_map06_first_model_input_packet_smoke_report.json: PASS
+workspace/trace/qw_tok_map06_first_model_input_packet_smoke_receipt.json: PASS
+target vocab const 48259: PASS
+no transformer forward config false: PASS
+no embedding lookup config false: PASS
+no lm_head logits config false: PASS
+no token generation config false: PASS
+no runtime apply config false: PASS
+cargo/rustc unavailable in container: SKIPPED
+overall: PASS

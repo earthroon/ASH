@@ -1,0 +1,1244 @@
+diff -ruN minp_c2_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md minp_c2_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md
+--- minp_c2_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md	2026-05-26 23:43:04.553361506 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-MINP-C2 Acceptance
++
++## Static acceptance
++- semantic_prior_scores module: PASS
++- SemanticPriorScoreSnapshot type: PASS
++- token_id aligned qwave/deltak Vec<f32>: PASS
++- range clamp [-1.0, 1.0]: PASS
++- control/byte/mojibake negative prior fixtures: PASS
++- normal Korean token non-negative fixture: PASS
++- CPU oracle snapshot lookup path: PASS
++- GPU score buffer supply path: PASS
++- strict readiness application guard remains required by C1 config: PASS
++
++## Execution acceptance
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- WebGPU runtime: NOT_RUN
++
++## Status
++STATIC_PASS_EXECUTION_NOT_RUN
+diff -ruN minp_c2_orig/crates/model_core/src/cpu_oracle_sampler.rs minp_c2_work/crates/model_core/src/cpu_oracle_sampler.rs
+--- minp_c2_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:23:39.000000000 +0000
++++ minp_c2_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:43:04.549561464 +0000
+@@ -222,7 +222,11 @@
+     config: &GenerationSamplingConfig,
+     ctx: &CpuOracleContext,
+ ) -> CpuOracleSampleResult {
+-    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, SemanticPriorScores::default())
++    let prior = config.semantic_score_snapshot.as_ref().map(|snapshot| SemanticPriorScores {
++        qwave_scores: if snapshot.qwave_available { Some(snapshot.qwave_scores.as_slice()) } else { None },
++        deltak_scores: if snapshot.deltak_available { Some(snapshot.deltak_scores.as_slice()) } else { None },
++    }).unwrap_or_default();
++    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, prior)
+ }
+ 
+ pub fn sample_with_cpu_oracle_with_semantic_prior(
+diff -ruN minp_c2_orig/crates/model_core/src/generation_sampling.rs minp_c2_work/crates/model_core/src/generation_sampling.rs
+--- minp_c2_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 23:22:26.000000000 +0000
++++ minp_c2_work/crates/model_core/src/generation_sampling.rs	2026-05-26 23:43:04.549059931 +0000
+@@ -2,6 +2,7 @@
+ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
+ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
++use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
+ use std::collections::BTreeMap;
+ use crate::sampling_helpers::{
+     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
+@@ -709,6 +710,7 @@
+     pub top_p: f32,
+     pub min_p: f32,
+     pub semantic_prior: SemanticPriorConfig,
++    pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
+     pub seed: Option<u64>,
+     pub stop_sequences: Vec<String>,
+     pub min_new_tokens: usize,
+@@ -741,6 +743,7 @@
+             top_p: 1.0,
+             min_p: 0.0,
+             semantic_prior: SemanticPriorConfig::default(),
++            semantic_score_snapshot: None,
+             seed: None,
+             stop_sequences: Vec::new(),
+             min_new_tokens: 0,
+@@ -782,7 +785,7 @@
+             rollout_reason: Some(resolved_reason.into()),
+             min_p: Some(self.min_p),
+             semantic_prior_enabled: Some(self.semantic_prior.enabled),
+-            semantic_prior_effective: Some(self.semantic_prior.enabled),
++            semantic_prior_effective: Some(self.semantic_prior.enabled && self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false)),
+             semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
+             compare_score_eps: self.compare_score_eps,
+             compare_logprob_eps: self.compare_logprob_eps,
+@@ -808,8 +811,8 @@
+             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
+             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
+             semantic_prior: self.semantic_prior.sanitized().into(),
+-            qwave_scores: None,
+-            deltak_scores: None,
++            qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
++            deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
+             seed_lo: (seed & 0xffff_ffff) as u32,
+             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
+             rollout_policy,
+diff -ruN minp_c2_orig/crates/model_core/src/lib.rs minp_c2_work/crates/model_core/src/lib.rs
+--- minp_c2_orig/crates/model_core/src/lib.rs	2026-05-26 23:33:33.000000000 +0000
++++ minp_c2_work/crates/model_core/src/lib.rs	2026-05-26 23:43:04.550290318 +0000
+@@ -13,6 +13,8 @@
+ mod sampler_parity;
+ mod sampler_parity_validation;
+ mod minp_c1a_smoke;
++mod semantic_prior_scores;
++mod minp_c2_score_provider_smoke;
+ mod model_layers;
+ mod native_wgpu;
+ mod native_atlas_ffn_probe;
+@@ -63,6 +65,12 @@
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
++pub use semantic_prior_scores::{
++    SemanticPriorProviderConfig, SemanticPriorScoreSnapshot, SemanticPriorScoreSummary,
++    ScoreRange, build_semantic_prior_score_snapshot, classify_piece,
++    qwave_static_score, deltak_static_score, stable_vocab_hash,
++};
+ pub use generation_telemetry::{
+     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
+     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
+diff -ruN minp_c2_orig/crates/model_core/src/minp_c2_score_provider_smoke.rs minp_c2_work/crates/model_core/src/minp_c2_score_provider_smoke.rs
+--- minp_c2_orig/crates/model_core/src/minp_c2_score_provider_smoke.rs	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/crates/model_core/src/minp_c2_score_provider_smoke.rs	2026-05-26 23:43:04.549853997 +0000
+@@ -0,0 +1,56 @@
++use serde::{Deserialize, Serialize};
++
++use crate::semantic_prior_scores::{
++    SemanticPriorProviderConfig,
++    build_semantic_prior_score_snapshot,
++};
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct MinpC2FixtureReceipt {
++    pub fixture: String,
++    pub status: String,
++    pub vocab_size: usize,
++    pub qwave_len: usize,
++    pub deltak_len: usize,
++    pub qwave_available: bool,
++    pub deltak_available: bool,
++    pub control_token_negative: bool,
++    pub korean_token_non_negative: bool,
++    pub byte_token_negative: bool,
++    pub mojibake_token_negative: bool,
++    pub nan_count: usize,
++    pub inf_count: usize,
++}
++
++pub fn run_minp_c2_score_provider_smoke() -> Vec<MinpC2FixtureReceipt> {
++    let vocab = vec![
++        (0, "<pad>".to_string()),
++        (1, "▁이어가고".to_string()),
++        (2, "<eos>".to_string()),
++        (3, "<byte:EC>".to_string()),
++        (4, "?댁뼱媛怨?".to_string()),
++    ];
++    let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
++    let snap = build_semantic_prior_score_snapshot(&vocab, &cfg);
++    vec![MinpC2FixtureReceipt {
++        fixture: "token_static_prior_v1".to_string(),
++        status: if snap.qwave_scores.len() == snap.vocab_size
++            && snap.deltak_scores.len() == snap.vocab_size
++            && snap.qwave_scores[0] <= -0.8
++            && snap.qwave_scores[1] >= 0.0
++            && snap.deltak_scores[3] < 0.0
++            && snap.qwave_scores[4] < 0.0
++        { "PASS".to_string() } else { "FAIL".to_string() },
++        vocab_size: snap.vocab_size,
++        qwave_len: snap.qwave_scores.len(),
++        deltak_len: snap.deltak_scores.len(),
++        qwave_available: snap.qwave_available,
++        deltak_available: snap.deltak_available,
++        control_token_negative: snap.qwave_scores[0] <= -0.8 && snap.deltak_scores[0] <= -0.8,
++        korean_token_non_negative: snap.qwave_scores[1] >= 0.0 && snap.deltak_scores[1] >= 0.0,
++        byte_token_negative: snap.qwave_scores[3] < 0.0 && snap.deltak_scores[3] < 0.0,
++        mojibake_token_negative: snap.qwave_scores[4] < 0.0 && snap.deltak_scores[4] < 0.0,
++        nan_count: snap.summary.nan_count,
++        inf_count: snap.summary.inf_count,
++    }]
++}
+diff -ruN minp_c2_orig/crates/model_core/src/semantic_prior_scores.rs minp_c2_work/crates/model_core/src/semantic_prior_scores.rs
+--- minp_c2_orig/crates/model_core/src/semantic_prior_scores.rs	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/crates/model_core/src/semantic_prior_scores.rs	2026-05-26 23:43:04.546466102 +0000
+@@ -0,0 +1,355 @@
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++pub struct ScoreRange {
++    pub min: f32,
++    pub max: f32,
++}
++
++impl ScoreRange {
++    pub const UNIT_NEG_POS: Self = Self { min: -1.0, max: 1.0 };
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticPriorProviderConfig {
++    pub enabled: bool,
++    pub qwave_enabled: bool,
++    pub deltak_enabled: bool,
++    pub normalize: bool,
++    pub clamp_min: f32,
++    pub clamp_max: f32,
++    pub require_vocab_match: bool,
++}
++
++impl Default for SemanticPriorProviderConfig {
++    fn default() -> Self {
++        Self {
++            enabled: false,
++            qwave_enabled: true,
++            deltak_enabled: true,
++            normalize: true,
++            clamp_min: -1.0,
++            clamp_max: 1.0,
++            require_vocab_match: true,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticPriorScoreSummary {
++    pub qwave_min: f32,
++    pub qwave_max: f32,
++    pub qwave_mean: f32,
++    pub deltak_min: f32,
++    pub deltak_max: f32,
++    pub deltak_mean: f32,
++    pub zero_count_qwave: usize,
++    pub zero_count_deltak: usize,
++    pub control_token_count: usize,
++    pub byte_token_count: usize,
++    pub mojibake_suspect_count: usize,
++    pub nan_count: usize,
++    pub inf_count: usize,
++}
++
++impl Default for SemanticPriorScoreSummary {
++    fn default() -> Self {
++        Self {
++            qwave_min: 0.0,
++            qwave_max: 0.0,
++            qwave_mean: 0.0,
++            deltak_min: 0.0,
++            deltak_max: 0.0,
++            deltak_mean: 0.0,
++            zero_count_qwave: 0,
++            zero_count_deltak: 0,
++            control_token_count: 0,
++            byte_token_count: 0,
++            mojibake_suspect_count: 0,
++            nan_count: 0,
++            inf_count: 0,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SemanticPriorScoreSnapshot {
++    pub vocab_size: usize,
++    pub vocab_hash: String,
++    pub tokenizer_hash: Option<String>,
++    pub qwave_scores: Vec<f32>,
++    pub deltak_scores: Vec<f32>,
++    pub qwave_available: bool,
++    pub deltak_available: bool,
++    pub qwave_source_id: String,
++    pub deltak_source_id: String,
++    pub qwave_range: ScoreRange,
++    pub deltak_range: ScoreRange,
++    pub normalized_range: ScoreRange,
++    pub score_basis: String,
++    pub dynamic_context_scoring: bool,
++    pub created_by_patch: String,
++    pub summary: SemanticPriorScoreSummary,
++}
++
++impl SemanticPriorScoreSnapshot {
++    pub fn empty(vocab_size: usize, vocab_hash: impl Into<String>) -> Self {
++        Self {
++            vocab_size,
++            vocab_hash: vocab_hash.into(),
++            tokenizer_hash: None,
++            qwave_scores: vec![0.0; vocab_size],
++            deltak_scores: vec![0.0; vocab_size],
++            qwave_available: false,
++            deltak_available: false,
++            qwave_source_id: "unavailable_zero_buffer".to_string(),
++            deltak_source_id: "unavailable_zero_buffer".to_string(),
++            qwave_range: ScoreRange::UNIT_NEG_POS,
++            deltak_range: ScoreRange::UNIT_NEG_POS,
++            normalized_range: ScoreRange::UNIT_NEG_POS,
++            score_basis: "zero_source_fallback".to_string(),
++            dynamic_context_scoring: false,
++            created_by_patch: "16AI-QW-38G-R6A-MINP-C2".to_string(),
++            summary: SemanticPriorScoreSummary::default(),
++        }
++    }
++
++    pub fn validate_alignment(&self, vocab_size: usize) -> Result<(), String> {
++        if self.vocab_size != vocab_size {
++            return Err(format!("semantic score vocab_size mismatch: snapshot={} expected={}", self.vocab_size, vocab_size));
++        }
++        if self.qwave_scores.len() != vocab_size {
++            return Err(format!("qwave_scores length mismatch: {} != {}", self.qwave_scores.len(), vocab_size));
++        }
++        if self.deltak_scores.len() != vocab_size {
++            return Err(format!("deltak_scores length mismatch: {} != {}", self.deltak_scores.len(), vocab_size));
++        }
++        Ok(())
++    }
++}
++
++pub fn build_semantic_prior_score_snapshot(
++    vocab: &[(u32, String)],
++    config: &SemanticPriorProviderConfig,
++) -> SemanticPriorScoreSnapshot {
++    let vocab_size = vocab.iter().map(|(id, _)| *id as usize).max().map(|v| v + 1).unwrap_or(0);
++    let vocab_hash = stable_vocab_hash(vocab);
++    if !config.enabled {
++        let mut snap = SemanticPriorScoreSnapshot::empty(vocab_size, vocab_hash);
++        snap.qwave_source_id = "provider_disabled_zero_buffer".to_string();
++        snap.deltak_source_id = "provider_disabled_zero_buffer".to_string();
++        return snap;
++    }
++
++    let mut qwave_scores = vec![0.0f32; vocab_size];
++    let mut deltak_scores = vec![0.0f32; vocab_size];
++    let mut control_count = 0usize;
++    let mut byte_count = 0usize;
++    let mut mojibake_count = 0usize;
++    let mut nan_count = 0usize;
++    let mut inf_count = 0usize;
++
++    for (token_id, piece) in vocab {
++        let idx = *token_id as usize;
++        if idx >= vocab_size { continue; }
++        let features = classify_piece(piece);
++        if features.control { control_count += 1; }
++        if features.byte_token { byte_count += 1; }
++        if features.mojibake_suspect { mojibake_count += 1; }
++
++        let mut q = if config.qwave_enabled { qwave_static_score(piece, &features) } else { 0.0 };
++        let mut k = if config.deltak_enabled { deltak_static_score(piece, &features) } else { 0.0 };
++        q = sanitize_score(q, config, &mut nan_count, &mut inf_count);
++        k = sanitize_score(k, config, &mut nan_count, &mut inf_count);
++        qwave_scores[idx] = q;
++        deltak_scores[idx] = k;
++    }
++
++    let summary = summarize_scores(&qwave_scores, &deltak_scores, control_count, byte_count, mojibake_count, nan_count, inf_count);
++    SemanticPriorScoreSnapshot {
++        vocab_size,
++        vocab_hash,
++        tokenizer_hash: None,
++        qwave_scores,
++        deltak_scores,
++        qwave_available: config.qwave_enabled,
++        deltak_available: config.deltak_enabled,
++        qwave_source_id: "qwave_token_static_prior_v1".to_string(),
++        deltak_source_id: "deltak_token_static_prior_v1".to_string(),
++        qwave_range: ScoreRange::UNIT_NEG_POS,
++        deltak_range: ScoreRange::UNIT_NEG_POS,
++        normalized_range: ScoreRange::UNIT_NEG_POS,
++        score_basis: "token_static_prior_v1".to_string(),
++        dynamic_context_scoring: false,
++        created_by_patch: "16AI-QW-38G-R6A-MINP-C2".to_string(),
++        summary,
++    }
++}
++
++#[derive(Debug, Clone, Copy, Default)]
++pub struct PieceFeatures {
++    pub control: bool,
++    pub byte_token: bool,
++    pub mojibake_suspect: bool,
++    pub unknown: bool,
++    pub has_hangul: bool,
++    pub has_ascii_alpha: bool,
++    pub has_digit: bool,
++    pub sentencepiece_boundary: bool,
++    pub whitespace_only: bool,
++    pub punctuation_heavy: bool,
++}
++
++pub fn classify_piece(piece: &str) -> PieceFeatures {
++    let control = matches!(piece, "<pad>" | "<bos>" | "<eos>" | "<unk>")
++        || (piece.starts_with("<glossary:") && piece.ends_with('>'));
++    let byte_token = (piece.starts_with("<byte:") && piece.ends_with('>'))
++        || (piece.starts_with("<0x") && piece.ends_with('>'));
++    let mojibake_suspect = piece.contains('�')
++        || piece.contains("?댁")
++        || piece.contains('媛')
++        || piece.contains('怨')
++        || piece.contains('Ã')
++        || piece.contains('ì')
++        || piece.contains('ê');
++    let unknown = piece == "<unk>";
++    let has_hangul = piece.chars().any(|ch| ('가'..='힣').contains(&ch) || ('ㄱ'..='ㅎ').contains(&ch) || ('ㅏ'..='ㅣ').contains(&ch));
++    let has_ascii_alpha = piece.chars().any(|ch| ch.is_ascii_alphabetic());
++    let has_digit = piece.chars().any(|ch| ch.is_ascii_digit());
++    let sentencepiece_boundary = piece.starts_with('▁');
++    let stripped = piece.trim_matches('▁');
++    let whitespace_only = stripped.trim().is_empty();
++    let punct_count = stripped.chars().filter(|ch| ch.is_ascii_punctuation() || matches!(ch, '…' | '·' | '—' | '–' | '。' | '、' | '！' | '？')).count();
++    let char_count = stripped.chars().count().max(1);
++    let punctuation_heavy = punct_count >= 3 || (punct_count * 2 >= char_count && char_count > 1);
++    PieceFeatures { control, byte_token, mojibake_suspect, unknown, has_hangul, has_ascii_alpha, has_digit, sentencepiece_boundary, whitespace_only, punctuation_heavy }
++}
++
++pub fn qwave_static_score(piece: &str, f: &PieceFeatures) -> f32 {
++    if f.control { return -1.0; }
++    if f.mojibake_suspect { return -0.8; }
++    if f.byte_token { return -0.4; }
++    if f.unknown { return -0.6; }
++    if f.whitespace_only { return -0.2; }
++    let mut score = 0.0f32;
++    if f.has_hangul { score += 0.4; }
++    if f.sentencepiece_boundary && f.has_hangul { score += 0.1; }
++    if looks_like_korean_particle_or_ending(piece) { score += 0.2; }
++    if f.has_ascii_alpha { score += 0.05; }
++    if f.punctuation_heavy { score -= 0.25; }
++    score.clamp(-1.0, 1.0)
++}
++
++pub fn deltak_static_score(piece: &str, f: &PieceFeatures) -> f32 {
++    if f.control { return -1.0; }
++    if f.mojibake_suspect { return -0.8; }
++    if f.byte_token { return -0.5; }
++    if f.unknown { return -0.6; }
++    if f.whitespace_only { return -0.2; }
++    let mut score = 0.0f32;
++    let stripped = piece.trim_matches('▁');
++    let len = stripped.chars().count();
++    if f.has_hangul || f.has_ascii_alpha { score += 0.3; }
++    if (1..=8).contains(&len) { score += 0.1; }
++    if f.has_digit { score += 0.05; }
++    if f.punctuation_heavy { score -= 0.25; }
++    score.clamp(-1.0, 1.0)
++}
++
++fn looks_like_korean_particle_or_ending(piece: &str) -> bool {
++    let p = piece.trim_start_matches('▁');
++    matches!(p, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "까지" | "부터" | "요" | "다" | "니다" | "습니다" | "한다" | "했다" | "하며" | "하고" | "지만" | "면서")
++        || p.ends_with("다")
++        || p.ends_with("요")
++        || p.ends_with("니다")
++        || p.ends_with("고")
++        || p.ends_with("며")
++}
++
++fn sanitize_score(value: f32, config: &SemanticPriorProviderConfig, nan_count: &mut usize, inf_count: &mut usize) -> f32 {
++    if value.is_nan() {
++        *nan_count += 1;
++        return 0.0;
++    }
++    if !value.is_finite() {
++        *inf_count += 1;
++        return 0.0;
++    }
++    if config.normalize {
++        value.clamp(config.clamp_min.max(-1.0), config.clamp_max.min(1.0))
++    } else {
++        value
++    }
++}
++
++fn summarize_scores(
++    qwave: &[f32],
++    deltak: &[f32],
++    control_count: usize,
++    byte_count: usize,
++    mojibake_count: usize,
++    nan_count: usize,
++    inf_count: usize,
++) -> SemanticPriorScoreSummary {
++    fn stats(values: &[f32]) -> (f32, f32, f32, usize) {
++        if values.is_empty() { return (0.0, 0.0, 0.0, 0); }
++        let min = values.iter().copied().fold(f32::INFINITY, f32::min);
++        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
++        let mean = values.iter().sum::<f32>() / values.len() as f32;
++        let zeros = values.iter().filter(|v| **v == 0.0).count();
++        (min, max, mean, zeros)
++    }
++    let (qmin, qmax, qmean, qzeros) = stats(qwave);
++    let (kmin, kmax, kmean, kzeros) = stats(deltak);
++    SemanticPriorScoreSummary {
++        qwave_min: qmin,
++        qwave_max: qmax,
++        qwave_mean: qmean,
++        deltak_min: kmin,
++        deltak_max: kmax,
++        deltak_mean: kmean,
++        zero_count_qwave: qzeros,
++        zero_count_deltak: kzeros,
++        control_token_count: control_count,
++        byte_token_count: byte_count,
++        mojibake_suspect_count: mojibake_count,
++        nan_count,
++        inf_count,
++    }
++}
++
++pub fn stable_vocab_hash(vocab: &[(u32, String)]) -> String {
++    let mut hash: u64 = 0xcbf29ce484222325;
++    let mut sorted = vocab.to_vec();
++    sorted.sort_by_key(|(id, _)| *id);
++    for (id, piece) in sorted {
++        for b in id.to_le_bytes() { hash = (hash ^ b as u64).wrapping_mul(0x100000001b3); }
++        for b in piece.as_bytes() { hash = (hash ^ *b as u64).wrapping_mul(0x100000001b3); }
++        hash = (hash ^ 0xff).wrapping_mul(0x100000001b3);
++    }
++    format!("fnv1a64:{hash:016x}")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn c2_scores_are_token_id_aligned_and_clamped() {
++        let vocab = vec![
++            (0, "<pad>".to_string()),
++            (1, "▁이어가고".to_string()),
++            (2, "<eos>".to_string()),
++            (3, "<byte:EC>".to_string()),
++            (4, "?댁뼱媛怨?".to_string()),
++        ];
++        let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
++        let snap = build_semantic_prior_score_snapshot(&vocab, &cfg);
++        assert_eq!(snap.qwave_scores.len(), 5);
++        assert_eq!(snap.deltak_scores.len(), 5);
++        assert!(snap.qwave_scores[0] <= -0.8);
++        assert!(snap.qwave_scores[1] >= 0.0);
++        assert!(snap.deltak_scores[3] < 0.0);
++        assert!(snap.summary.mojibake_suspect_count >= 1);
++    }
++}
+diff -ruN minp_c2_orig/workspace/minp_c2.patch minp_c2_work/workspace/minp_c2.patch
+--- minp_c2_orig/workspace/minp_c2.patch	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2.patch	2026-05-26 23:43:39.196691023 +0000
+@@ -0,0 +1,531 @@
++diff -ruN minp_c2_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md minp_c2_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md
++--- minp_c2_orig/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c2_work/acceptance_reports/16AI-QW-38G-R6A-MINP-C2_acceptance.md	2026-05-26 23:43:04.553361506 +0000
++@@ -0,0 +1,20 @@
+++# 16AI-QW-38G-R6A-MINP-C2 Acceptance
+++
+++## Static acceptance
+++- semantic_prior_scores module: PASS
+++- SemanticPriorScoreSnapshot type: PASS
+++- token_id aligned qwave/deltak Vec<f32>: PASS
+++- range clamp [-1.0, 1.0]: PASS
+++- control/byte/mojibake negative prior fixtures: PASS
+++- normal Korean token non-negative fixture: PASS
+++- CPU oracle snapshot lookup path: PASS
+++- GPU score buffer supply path: PASS
+++- strict readiness application guard remains required by C1 config: PASS
+++
+++## Execution acceptance
+++- cargo check: NOT_RUN
+++- cargo test: NOT_RUN
+++- WebGPU runtime: NOT_RUN
+++
+++## Status
+++STATIC_PASS_EXECUTION_NOT_RUN
++diff -ruN minp_c2_orig/crates/model_core/src/cpu_oracle_sampler.rs minp_c2_work/crates/model_core/src/cpu_oracle_sampler.rs
++--- minp_c2_orig/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:23:39.000000000 +0000
+++++ minp_c2_work/crates/model_core/src/cpu_oracle_sampler.rs	2026-05-26 23:43:04.549561464 +0000
++@@ -222,7 +222,11 @@
++     config: &GenerationSamplingConfig,
++     ctx: &CpuOracleContext,
++ ) -> CpuOracleSampleResult {
++-    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, SemanticPriorScores::default())
+++    let prior = config.semantic_score_snapshot.as_ref().map(|snapshot| SemanticPriorScores {
+++        qwave_scores: if snapshot.qwave_available { Some(snapshot.qwave_scores.as_slice()) } else { None },
+++        deltak_scores: if snapshot.deltak_available { Some(snapshot.deltak_scores.as_slice()) } else { None },
+++    }).unwrap_or_default();
+++    sample_with_cpu_oracle_with_semantic_prior(logits, config, ctx, prior)
++ }
++ 
++ pub fn sample_with_cpu_oracle_with_semantic_prior(
++diff -ruN minp_c2_orig/crates/model_core/src/generation_sampling.rs minp_c2_work/crates/model_core/src/generation_sampling.rs
++--- minp_c2_orig/crates/model_core/src/generation_sampling.rs	2026-05-26 23:22:26.000000000 +0000
+++++ minp_c2_work/crates/model_core/src/generation_sampling.rs	2026-05-26 23:43:04.549059931 +0000
++@@ -2,6 +2,7 @@
++ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
++ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
++ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
+++use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
++ use std::collections::BTreeMap;
++ use crate::sampling_helpers::{
++     apply_banned_token_mask, apply_repetition_penalty, append_token_piece_to_text,
++@@ -709,6 +710,7 @@
++     pub top_p: f32,
++     pub min_p: f32,
++     pub semantic_prior: SemanticPriorConfig,
+++    pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
++     pub seed: Option<u64>,
++     pub stop_sequences: Vec<String>,
++     pub min_new_tokens: usize,
++@@ -741,6 +743,7 @@
++             top_p: 1.0,
++             min_p: 0.0,
++             semantic_prior: SemanticPriorConfig::default(),
+++            semantic_score_snapshot: None,
++             seed: None,
++             stop_sequences: Vec::new(),
++             min_new_tokens: 0,
++@@ -782,7 +785,7 @@
++             rollout_reason: Some(resolved_reason.into()),
++             min_p: Some(self.min_p),
++             semantic_prior_enabled: Some(self.semantic_prior.enabled),
++-            semantic_prior_effective: Some(self.semantic_prior.enabled),
+++            semantic_prior_effective: Some(self.semantic_prior.enabled && self.semantic_score_snapshot.as_ref().map(|s| s.qwave_available || s.deltak_available).unwrap_or(false)),
++             semantic_bias_cap: Some(self.semantic_prior.sanitized().bias_cap),
++             compare_score_eps: self.compare_score_eps,
++             compare_logprob_eps: self.compare_logprob_eps,
++@@ -808,8 +811,8 @@
++             top_p: if self.top_p > 0.0 { self.top_p } else { 1.0 },
++             min_p: if self.min_p > 0.0 { self.min_p.clamp(0.0, 0.95) } else { 0.0 },
++             semantic_prior: self.semantic_prior.sanitized().into(),
++-            qwave_scores: None,
++-            deltak_scores: None,
+++            qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
+++            deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
++             seed_lo: (seed & 0xffff_ffff) as u32,
++             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
++             rollout_policy,
++diff -ruN minp_c2_orig/crates/model_core/src/lib.rs minp_c2_work/crates/model_core/src/lib.rs
++--- minp_c2_orig/crates/model_core/src/lib.rs	2026-05-26 23:33:33.000000000 +0000
+++++ minp_c2_work/crates/model_core/src/lib.rs	2026-05-26 23:43:04.550290318 +0000
++@@ -13,6 +13,8 @@
++ mod sampler_parity;
++ mod sampler_parity_validation;
++ mod minp_c1a_smoke;
+++mod semantic_prior_scores;
+++mod minp_c2_score_provider_smoke;
++ mod model_layers;
++ mod native_wgpu;
++ mod native_atlas_ffn_probe;
++@@ -63,6 +65,12 @@
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+++pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
+++pub use semantic_prior_scores::{
+++    SemanticPriorProviderConfig, SemanticPriorScoreSnapshot, SemanticPriorScoreSummary,
+++    ScoreRange, build_semantic_prior_score_snapshot, classify_piece,
+++    qwave_static_score, deltak_static_score, stable_vocab_hash,
+++};
++ pub use generation_telemetry::{
++     CandidatePoolTelemetryEntry, GenerationFinishReason, GenerationStepTelemetry, GenerationTelemetry,
++     GpuRawBridgeLabelSummary, GpuRawBridgePath, GpuRawBridgeStepTelemetry, GpuRawBridgeTelemetryCompact,
++diff -ruN minp_c2_orig/crates/model_core/src/minp_c2_score_provider_smoke.rs minp_c2_work/crates/model_core/src/minp_c2_score_provider_smoke.rs
++--- minp_c2_orig/crates/model_core/src/minp_c2_score_provider_smoke.rs	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c2_work/crates/model_core/src/minp_c2_score_provider_smoke.rs	2026-05-26 23:43:04.549853997 +0000
++@@ -0,0 +1,56 @@
+++use serde::{Deserialize, Serialize};
+++
+++use crate::semantic_prior_scores::{
+++    SemanticPriorProviderConfig,
+++    build_semantic_prior_score_snapshot,
+++};
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct MinpC2FixtureReceipt {
+++    pub fixture: String,
+++    pub status: String,
+++    pub vocab_size: usize,
+++    pub qwave_len: usize,
+++    pub deltak_len: usize,
+++    pub qwave_available: bool,
+++    pub deltak_available: bool,
+++    pub control_token_negative: bool,
+++    pub korean_token_non_negative: bool,
+++    pub byte_token_negative: bool,
+++    pub mojibake_token_negative: bool,
+++    pub nan_count: usize,
+++    pub inf_count: usize,
+++}
+++
+++pub fn run_minp_c2_score_provider_smoke() -> Vec<MinpC2FixtureReceipt> {
+++    let vocab = vec![
+++        (0, "<pad>".to_string()),
+++        (1, "▁이어가고".to_string()),
+++        (2, "<eos>".to_string()),
+++        (3, "<byte:EC>".to_string()),
+++        (4, "?댁뼱媛怨?".to_string()),
+++    ];
+++    let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
+++    let snap = build_semantic_prior_score_snapshot(&vocab, &cfg);
+++    vec![MinpC2FixtureReceipt {
+++        fixture: "token_static_prior_v1".to_string(),
+++        status: if snap.qwave_scores.len() == snap.vocab_size
+++            && snap.deltak_scores.len() == snap.vocab_size
+++            && snap.qwave_scores[0] <= -0.8
+++            && snap.qwave_scores[1] >= 0.0
+++            && snap.deltak_scores[3] < 0.0
+++            && snap.qwave_scores[4] < 0.0
+++        { "PASS".to_string() } else { "FAIL".to_string() },
+++        vocab_size: snap.vocab_size,
+++        qwave_len: snap.qwave_scores.len(),
+++        deltak_len: snap.deltak_scores.len(),
+++        qwave_available: snap.qwave_available,
+++        deltak_available: snap.deltak_available,
+++        control_token_negative: snap.qwave_scores[0] <= -0.8 && snap.deltak_scores[0] <= -0.8,
+++        korean_token_non_negative: snap.qwave_scores[1] >= 0.0 && snap.deltak_scores[1] >= 0.0,
+++        byte_token_negative: snap.qwave_scores[3] < 0.0 && snap.deltak_scores[3] < 0.0,
+++        mojibake_token_negative: snap.qwave_scores[4] < 0.0 && snap.deltak_scores[4] < 0.0,
+++        nan_count: snap.summary.nan_count,
+++        inf_count: snap.summary.inf_count,
+++    }]
+++}
++diff -ruN minp_c2_orig/crates/model_core/src/semantic_prior_scores.rs minp_c2_work/crates/model_core/src/semantic_prior_scores.rs
++--- minp_c2_orig/crates/model_core/src/semantic_prior_scores.rs	1970-01-01 00:00:00.000000000 +0000
+++++ minp_c2_work/crates/model_core/src/semantic_prior_scores.rs	2026-05-26 23:43:04.546466102 +0000
++@@ -0,0 +1,355 @@
+++use serde::{Deserialize, Serialize};
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+++pub struct ScoreRange {
+++    pub min: f32,
+++    pub max: f32,
+++}
+++
+++impl ScoreRange {
+++    pub const UNIT_NEG_POS: Self = Self { min: -1.0, max: 1.0 };
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticPriorProviderConfig {
+++    pub enabled: bool,
+++    pub qwave_enabled: bool,
+++    pub deltak_enabled: bool,
+++    pub normalize: bool,
+++    pub clamp_min: f32,
+++    pub clamp_max: f32,
+++    pub require_vocab_match: bool,
+++}
+++
+++impl Default for SemanticPriorProviderConfig {
+++    fn default() -> Self {
+++        Self {
+++            enabled: false,
+++            qwave_enabled: true,
+++            deltak_enabled: true,
+++            normalize: true,
+++            clamp_min: -1.0,
+++            clamp_max: 1.0,
+++            require_vocab_match: true,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticPriorScoreSummary {
+++    pub qwave_min: f32,
+++    pub qwave_max: f32,
+++    pub qwave_mean: f32,
+++    pub deltak_min: f32,
+++    pub deltak_max: f32,
+++    pub deltak_mean: f32,
+++    pub zero_count_qwave: usize,
+++    pub zero_count_deltak: usize,
+++    pub control_token_count: usize,
+++    pub byte_token_count: usize,
+++    pub mojibake_suspect_count: usize,
+++    pub nan_count: usize,
+++    pub inf_count: usize,
+++}
+++
+++impl Default for SemanticPriorScoreSummary {
+++    fn default() -> Self {
+++        Self {
+++            qwave_min: 0.0,
+++            qwave_max: 0.0,
+++            qwave_mean: 0.0,
+++            deltak_min: 0.0,
+++            deltak_max: 0.0,
+++            deltak_mean: 0.0,
+++            zero_count_qwave: 0,
+++            zero_count_deltak: 0,
+++            control_token_count: 0,
+++            byte_token_count: 0,
+++            mojibake_suspect_count: 0,
+++            nan_count: 0,
+++            inf_count: 0,
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct SemanticPriorScoreSnapshot {
+++    pub vocab_size: usize,
+++    pub vocab_hash: String,
+++    pub tokenizer_hash: Option<String>,
+++    pub qwave_scores: Vec<f32>,
+++    pub deltak_scores: Vec<f32>,
+++    pub qwave_available: bool,
+++    pub deltak_available: bool,
+++    pub qwave_source_id: String,
+++    pub deltak_source_id: String,
+++    pub qwave_range: ScoreRange,
+++    pub deltak_range: ScoreRange,
+++    pub normalized_range: ScoreRange,
+++    pub score_basis: String,
+++    pub dynamic_context_scoring: bool,
+++    pub created_by_patch: String,
+++    pub summary: SemanticPriorScoreSummary,
+++}
+++
+++impl SemanticPriorScoreSnapshot {
+++    pub fn empty(vocab_size: usize, vocab_hash: impl Into<String>) -> Self {
+++        Self {
+++            vocab_size,
+++            vocab_hash: vocab_hash.into(),
+++            tokenizer_hash: None,
+++            qwave_scores: vec![0.0; vocab_size],
+++            deltak_scores: vec![0.0; vocab_size],
+++            qwave_available: false,
+++            deltak_available: false,
+++            qwave_source_id: "unavailable_zero_buffer".to_string(),
+++            deltak_source_id: "unavailable_zero_buffer".to_string(),
+++            qwave_range: ScoreRange::UNIT_NEG_POS,
+++            deltak_range: ScoreRange::UNIT_NEG_POS,
+++            normalized_range: ScoreRange::UNIT_NEG_POS,
+++            score_basis: "zero_source_fallback".to_string(),
+++            dynamic_context_scoring: false,
+++            created_by_patch: "16AI-QW-38G-R6A-MINP-C2".to_string(),
+++            summary: SemanticPriorScoreSummary::default(),
+++        }
+++    }
+++
+++    pub fn validate_alignment(&self, vocab_size: usize) -> Result<(), String> {
+++        if self.vocab_size != vocab_size {
+++            return Err(format!("semantic score vocab_size mismatch: snapshot={} expected={}", self.vocab_size, vocab_size));
+++        }
+++        if self.qwave_scores.len() != vocab_size {
+++            return Err(format!("qwave_scores length mismatch: {} != {}", self.qwave_scores.len(), vocab_size));
+++        }
+++        if self.deltak_scores.len() != vocab_size {
+++            return Err(format!("deltak_scores length mismatch: {} != {}", self.deltak_scores.len(), vocab_size));
+++        }
+++        Ok(())
+++    }
+++}
+++
+++pub fn build_semantic_prior_score_snapshot(
+++    vocab: &[(u32, String)],
+++    config: &SemanticPriorProviderConfig,
+++) -> SemanticPriorScoreSnapshot {
+++    let vocab_size = vocab.iter().map(|(id, _)| *id as usize).max().map(|v| v + 1).unwrap_or(0);
+++    let vocab_hash = stable_vocab_hash(vocab);
+++    if !config.enabled {
+++        let mut snap = SemanticPriorScoreSnapshot::empty(vocab_size, vocab_hash);
+++        snap.qwave_source_id = "provider_disabled_zero_buffer".to_string();
+++        snap.deltak_source_id = "provider_disabled_zero_buffer".to_string();
+++        return snap;
+++    }
+++
+++    let mut qwave_scores = vec![0.0f32; vocab_size];
+++    let mut deltak_scores = vec![0.0f32; vocab_size];
+++    let mut control_count = 0usize;
+++    let mut byte_count = 0usize;
+++    let mut mojibake_count = 0usize;
+++    let mut nan_count = 0usize;
+++    let mut inf_count = 0usize;
+++
+++    for (token_id, piece) in vocab {
+++        let idx = *token_id as usize;
+++        if idx >= vocab_size { continue; }
+++        let features = classify_piece(piece);
+++        if features.control { control_count += 1; }
+++        if features.byte_token { byte_count += 1; }
+++        if features.mojibake_suspect { mojibake_count += 1; }
+++
+++        let mut q = if config.qwave_enabled { qwave_static_score(piece, &features) } else { 0.0 };
+++        let mut k = if config.deltak_enabled { deltak_static_score(piece, &features) } else { 0.0 };
+++        q = sanitize_score(q, config, &mut nan_count, &mut inf_count);
+++        k = sanitize_score(k, config, &mut nan_count, &mut inf_count);
+++        qwave_scores[idx] = q;
+++        deltak_scores[idx] = k;
+++    }
+++
+++    let summary = summarize_scores(&qwave_scores, &deltak_scores, control_count, byte_count, mojibake_count, nan_count, inf_count);
+++    SemanticPriorScoreSnapshot {
+++        vocab_size,
+++        vocab_hash,
+++        tokenizer_hash: None,
+++        qwave_scores,
+++        deltak_scores,
+++        qwave_available: config.qwave_enabled,
+++        deltak_available: config.deltak_enabled,
+++        qwave_source_id: "qwave_token_static_prior_v1".to_string(),
+++        deltak_source_id: "deltak_token_static_prior_v1".to_string(),
+++        qwave_range: ScoreRange::UNIT_NEG_POS,
+++        deltak_range: ScoreRange::UNIT_NEG_POS,
+++        normalized_range: ScoreRange::UNIT_NEG_POS,
+++        score_basis: "token_static_prior_v1".to_string(),
+++        dynamic_context_scoring: false,
+++        created_by_patch: "16AI-QW-38G-R6A-MINP-C2".to_string(),
+++        summary,
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Default)]
+++pub struct PieceFeatures {
+++    pub control: bool,
+++    pub byte_token: bool,
+++    pub mojibake_suspect: bool,
+++    pub unknown: bool,
+++    pub has_hangul: bool,
+++    pub has_ascii_alpha: bool,
+++    pub has_digit: bool,
+++    pub sentencepiece_boundary: bool,
+++    pub whitespace_only: bool,
+++    pub punctuation_heavy: bool,
+++}
+++
+++pub fn classify_piece(piece: &str) -> PieceFeatures {
+++    let control = matches!(piece, "<pad>" | "<bos>" | "<eos>" | "<unk>")
+++        || (piece.starts_with("<glossary:") && piece.ends_with('>'));
+++    let byte_token = (piece.starts_with("<byte:") && piece.ends_with('>'))
+++        || (piece.starts_with("<0x") && piece.ends_with('>'));
+++    let mojibake_suspect = piece.contains('�')
+++        || piece.contains("?댁")
+++        || piece.contains('媛')
+++        || piece.contains('怨')
+++        || piece.contains('Ã')
+++        || piece.contains('ì')
+++        || piece.contains('ê');
+++    let unknown = piece == "<unk>";
+++    let has_hangul = piece.chars().any(|ch| ('가'..='힣').contains(&ch) || ('ㄱ'..='ㅎ').contains(&ch) || ('ㅏ'..='ㅣ').contains(&ch));
+++    let has_ascii_alpha = piece.chars().any(|ch| ch.is_ascii_alphabetic());
+++    let has_digit = piece.chars().any(|ch| ch.is_ascii_digit());
+++    let sentencepiece_boundary = piece.starts_with('▁');
+++    let stripped = piece.trim_matches('▁');
+++    let whitespace_only = stripped.trim().is_empty();
+++    let punct_count = stripped.chars().filter(|ch| ch.is_ascii_punctuation() || matches!(ch, '…' | '·' | '—' | '–' | '。' | '、' | '！' | '？')).count();
+++    let char_count = stripped.chars().count().max(1);
+++    let punctuation_heavy = punct_count >= 3 || (punct_count * 2 >= char_count && char_count > 1);
+++    PieceFeatures { control, byte_token, mojibake_suspect, unknown, has_hangul, has_ascii_alpha, has_digit, sentencepiece_boundary, whitespace_only, punctuation_heavy }
+++}
+++
+++pub fn qwave_static_score(piece: &str, f: &PieceFeatures) -> f32 {
+++    if f.control { return -1.0; }
+++    if f.mojibake_suspect { return -0.8; }
+++    if f.byte_token { return -0.4; }
+++    if f.unknown { return -0.6; }
+++    if f.whitespace_only { return -0.2; }
+++    let mut score = 0.0f32;
+++    if f.has_hangul { score += 0.4; }
+++    if f.sentencepiece_boundary && f.has_hangul { score += 0.1; }
+++    if looks_like_korean_particle_or_ending(piece) { score += 0.2; }
+++    if f.has_ascii_alpha { score += 0.05; }
+++    if f.punctuation_heavy { score -= 0.25; }
+++    score.clamp(-1.0, 1.0)
+++}
+++
+++pub fn deltak_static_score(piece: &str, f: &PieceFeatures) -> f32 {
+++    if f.control { return -1.0; }
+++    if f.mojibake_suspect { return -0.8; }
+++    if f.byte_token { return -0.5; }
+++    if f.unknown { return -0.6; }
+++    if f.whitespace_only { return -0.2; }
+++    let mut score = 0.0f32;
+++    let stripped = piece.trim_matches('▁');
+++    let len = stripped.chars().count();
+++    if f.has_hangul || f.has_ascii_alpha { score += 0.3; }
+++    if (1..=8).contains(&len) { score += 0.1; }
+++    if f.has_digit { score += 0.05; }
+++    if f.punctuation_heavy { score -= 0.25; }
+++    score.clamp(-1.0, 1.0)
+++}
+++
+++fn looks_like_korean_particle_or_ending(piece: &str) -> bool {
+++    let p = piece.trim_start_matches('▁');
+++    matches!(p, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "까지" | "부터" | "요" | "다" | "니다" | "습니다" | "한다" | "했다" | "하며" | "하고" | "지만" | "면서")
+++        || p.ends_with("다")
+++        || p.ends_with("요")
+++        || p.ends_with("니다")
+++        || p.ends_with("고")
+++        || p.ends_with("며")
+++}
+++
+++fn sanitize_score(value: f32, config: &SemanticPriorProviderConfig, nan_count: &mut usize, inf_count: &mut usize) -> f32 {
+++    if value.is_nan() {
+++        *nan_count += 1;
+++        return 0.0;
+++    }
+++    if !value.is_finite() {
+++        *inf_count += 1;
+++        return 0.0;
+++    }
+++    if config.normalize {
+++        value.clamp(config.clamp_min.max(-1.0), config.clamp_max.min(1.0))
+++    } else {
+++        value
+++    }
+++}
+++
+++fn summarize_scores(
+++    qwave: &[f32],
+++    deltak: &[f32],
+++    control_count: usize,
+++    byte_count: usize,
+++    mojibake_count: usize,
+++    nan_count: usize,
+++    inf_count: usize,
+++) -> SemanticPriorScoreSummary {
+++    fn stats(values: &[f32]) -> (f32, f32, f32, usize) {
+++        if values.is_empty() { return (0.0, 0.0, 0.0, 0); }
+++        let min = values.iter().copied().fold(f32::INFINITY, f32::min);
+++        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+++        let mean = values.iter().sum::<f32>() / values.len() as f32;
+++        let zeros = values.iter().filter(|v| **v == 0.0).count();
+++        (min, max, mean, zeros)
+++    }
+++    let (qmin, qmax, qmean, qzeros) = stats(qwave);
+++    let (kmin, kmax, kmean, kzeros) = stats(deltak);
+++    SemanticPriorScoreSummary {
+++        qwave_min: qmin,
+++        qwave_max: qmax,
+++        qwave_mean: qmean,
+++        deltak_min: kmin,
+++        deltak_max: kmax,
+++        deltak_mean: kmean,
+++        zero_count_qwave: qzeros,
+++        zero_count_deltak: kzeros,
+++        control_token_count: control_count,
+++        byte_token_count: byte_count,
+++        mojibake_suspect_count: mojibake_count,
+++        nan_count,
+++        inf_count,
+++    }
+++}
+++
+++pub fn stable_vocab_hash(vocab: &[(u32, String)]) -> String {
+++    let mut hash: u64 = 0xcbf29ce484222325;
+++    let mut sorted = vocab.to_vec();
+++    sorted.sort_by_key(|(id, _)| *id);
+++    for (id, piece) in sorted {
+++        for b in id.to_le_bytes() { hash = (hash ^ b as u64).wrapping_mul(0x100000001b3); }
+++        for b in piece.as_bytes() { hash = (hash ^ *b as u64).wrapping_mul(0x100000001b3); }
+++        hash = (hash ^ 0xff).wrapping_mul(0x100000001b3);
+++    }
+++    format!("fnv1a64:{hash:016x}")
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    #[test]
+++    fn c2_scores_are_token_id_aligned_and_clamped() {
+++        let vocab = vec![
+++            (0, "<pad>".to_string()),
+++            (1, "▁이어가고".to_string()),
+++            (2, "<eos>".to_string()),
+++            (3, "<byte:EC>".to_string()),
+++            (4, "?댁뼱媛怨?".to_string()),
+++        ];
+++        let cfg = SemanticPriorProviderConfig { enabled: true, ..Default::default() };
+++        let snap = build_semantic_prior_score_snapshot(&vocab, &cfg);
+++        assert_eq!(snap.qwave_scores.len(), 5);
+++        assert_eq!(snap.deltak_scores.len(), 5);
+++        assert!(snap.qwave_scores[0] <= -0.8);
+++        assert!(snap.qwave_scores[1] >= 0.0);
+++        assert!(snap.deltak_scores[3] < 0.0);
+++        assert!(snap.summary.mojibake_suspect_count >= 1);
+++    }
+++}
+diff -ruN minp_c2_orig/workspace/minp_c2_report.md minp_c2_work/workspace/minp_c2_report.md
+--- minp_c2_orig/workspace/minp_c2_report.md	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2_report.md	2026-05-26 23:43:04.553228423 +0000
+@@ -0,0 +1,32 @@
++# 16AI-QW-38G-R6A-MINP-C2 Report
++
++## Scope
++QWave / ΔK token score source provider seal. This patch adds a token-id aligned static score snapshot provider. It does not implement dynamic context scoring.
++
++## SSOT
++- Semantic score source SSOT: `model_core::semantic_prior_scores::SemanticPriorScoreSnapshot`
++- Score basis: `token_static_prior_v1`
++
++## Implemented
++- `semantic_prior_scores.rs` module
++- `SemanticPriorProviderConfig`
++- `SemanticPriorScoreSnapshot`
++- `build_semantic_prior_score_snapshot(vocab, config)`
++- token static QWave heuristic
++- token static ΔK heuristic
++- NaN/Inf -> 0.0 policy
++- score clamp to [-1.0, 1.0]
++- `GenerationSamplingConfig.semantic_score_snapshot`
++- CPU oracle snapshot lookup via `sample_with_cpu_oracle`
++- GPU score buffer supply through `to_gpu_sampling_config()`
++- fixture receipts and acceptance artifacts
++
++## Non-scope
++- dynamic context QWave
++- dynamic context ΔK
++- semantic prior default enable
++- LoRA/training changes
++- tokenizer/vocab/lm_head surgery
++
++## Execution
++Static patch only in this environment. Cargo/WGSL runtime validation is NOT_RUN.
+diff -ruN minp_c2_orig/workspace/minp_c2_score_provider_fixtures.json minp_c2_work/workspace/minp_c2_score_provider_fixtures.json
+--- minp_c2_orig/workspace/minp_c2_score_provider_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2_score_provider_fixtures.json	2026-05-26 23:43:04.551909875 +0000
+@@ -0,0 +1,38 @@
++{
++  "score_range_test": {
++    "expected": "all scores in [-1.0, 1.0]",
++    "status": "STATIC_FIXTURE_PASS"
++  },
++  "vocab_length_test": {
++    "expected": "qwave/deltak lengths equal vocab_size",
++    "status": "STATIC_FIXTURE_PASS"
++  },
++  "control_token_test": {
++    "tokens": [
++      "<pad>",
++      "<eos>"
++    ],
++    "expected": "qwave/deltak <= -0.8",
++    "status": "STATIC_FIXTURE_PASS"
++  },
++  "normal_korean_token_test": {
++    "tokens": [
++      "▁이어가고"
++    ],
++    "expected": "qwave/deltak >= 0.0",
++    "status": "STATIC_FIXTURE_PASS"
++  },
++  "byte_mojibake_token_test": {
++    "tokens": [
++      "<byte:EC>",
++      "?댁뼱媛怨?"
++    ],
++    "expected": "negative prior and mojibake count",
++    "status": "STATIC_FIXTURE_PASS"
++  },
++  "strict_not_ready_application_test": {
++    "snapshot_created": true,
++    "semantic_prior_effective": false,
++    "reason": "SAMPLER04_STRICT_NOT_READY when promotion is not ready"
++  }
++}
+\ No newline at end of file
+diff -ruN minp_c2_orig/workspace/minp_c2_score_provider_static_checks.json minp_c2_work/workspace/minp_c2_score_provider_static_checks.json
+--- minp_c2_orig/workspace/minp_c2_score_provider_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2_score_provider_static_checks.json	2026-05-26 23:43:04.553085249 +0000
+@@ -0,0 +1,12 @@
++{
++  "semantic_prior_scores_module_exists": true,
++  "lib_declares_semantic_prior_scores": true,
++  "snapshot_type_exists": true,
++  "provider_config_exists": true,
++  "build_snapshot_fn_exists": true,
++  "generation_config_has_snapshot": true,
++  "to_gpu_uses_snapshot_buffers": true,
++  "cpu_oracle_uses_snapshot": true,
++  "smoke_module_exists": true,
++  "json_artifacts_valid": true
++}
+\ No newline at end of file
+diff -ruN minp_c2_orig/workspace/minp_c2_score_snapshot_receipt.json minp_c2_work/workspace/minp_c2_score_snapshot_receipt.json
+--- minp_c2_orig/workspace/minp_c2_score_snapshot_receipt.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2_score_snapshot_receipt.json	2026-05-26 23:43:04.551703381 +0000
+@@ -0,0 +1,50 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2",
++  "vocab_size": 5,
++  "qwave_len": 5,
++  "deltak_len": 5,
++  "qwave_min": -1.0,
++  "qwave_max": 0.7,
++  "qwave_mean": -0.5,
++  "deltak_min": -1.0,
++  "deltak_max": 0.4,
++  "deltak_mean": -0.58,
++  "nan_count": 0,
++  "inf_count": 0,
++  "control_token_count": 2,
++  "byte_token_count": 1,
++  "mojibake_suspect_count": 1,
++  "fixture_vocab": [
++    {
++      "id": 0,
++      "piece": "<pad>",
++      "qwave": -1.0,
++      "deltak": -1.0
++    },
++    {
++      "id": 1,
++      "piece": "▁이어가고",
++      "qwave": 0.7,
++      "deltak": 0.4
++    },
++    {
++      "id": 2,
++      "piece": "<eos>",
++      "qwave": -1.0,
++      "deltak": -1.0
++    },
++    {
++      "id": 3,
++      "piece": "<byte:EC>",
++      "qwave": -0.4,
++      "deltak": -0.5
++    },
++    {
++      "id": 4,
++      "piece": "?댁뼱媛怨?",
++      "qwave": -0.8,
++      "deltak": -0.8
++    }
++  ],
++  "note": "Fixture receipt only; full runtime vocab snapshot generation requires loading the production tokenizer manifest."
++}
+\ No newline at end of file
+diff -ruN minp_c2_orig/workspace/minp_c2_semantic_score_source_summary.json minp_c2_work/workspace/minp_c2_semantic_score_source_summary.json
+--- minp_c2_orig/workspace/minp_c2_semantic_score_source_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ minp_c2_work/workspace/minp_c2_semantic_score_source_summary.json	2026-05-26 23:43:04.551171880 +0000
+@@ -0,0 +1,22 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-MINP-C2",
++  "status": "QWAVE_DELTAK_TOKEN_SCORE_SOURCE_PROVIDER_DEFINED",
++  "score_source_ssot": "model_core::semantic_prior_scores::SemanticPriorScoreSnapshot",
++  "score_basis": "token_static_prior_v1",
++  "dynamic_context_scoring": false,
++  "qwave_available": true,
++  "deltak_available": true,
++  "score_range": [
++    -1.0,
++    1.0
++  ],
++  "vocab_alignment_required": true,
++  "semantic_prior_default_enabled": false,
++  "requires_sampler04_strict_ready_for_application": true,
++  "non_scope": [
++    "dynamic_context_qwave",
++    "dynamic_context_deltak",
++    "lora_training",
++    "context_router"
++  ]
++}
+\ No newline at end of file

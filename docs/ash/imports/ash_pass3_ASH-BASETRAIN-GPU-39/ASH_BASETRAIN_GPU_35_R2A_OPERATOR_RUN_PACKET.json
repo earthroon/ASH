@@ -1,0 +1,17 @@
+{
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-35-R2AF",
+  "next_patch_if_operator_manifest_written": "ASH-BASETRAIN-GPU-35-R2",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-35-R2B",
+  "operator_manifest_env": "ASH_BASETRAIN_GPU_OPERATOR_SELECTED_GROUP_MANIFEST_PATH",
+  "operator_manifest_example_skeleton_path": "target/selected_atlas_group_slot_0_manifest.operator.skeleton.json",
+  "operator_manifest_failure_class": "MISSING_OPERATOR_MANIFEST_FILE",
+  "operator_manifest_path": "D:\\1111113232\\DUST\\1\\ash_pass3\\target\\selected_atlas_group_slot_0_manifest.operator.json",
+  "pass": true,
+  "patch_id": "ASH-BASETRAIN-GPU-35-R2A",
+  "recommended_failure_detail_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2a_operator_manifest_materialization_failure_detail",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_35_r2a_operator_manifest_materialization_failure_detail --jobs 1",
+  "runtime_gpu_required": false,
+  "selected_group_weight_load_required": false,
+  "target_manifest_env": "ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH",
+  "target_manifest_path": "D:\\1111113232\\DUST\\1\\ash_pass3\\target\\selected_atlas_group_slot_0_manifest.json"
+}

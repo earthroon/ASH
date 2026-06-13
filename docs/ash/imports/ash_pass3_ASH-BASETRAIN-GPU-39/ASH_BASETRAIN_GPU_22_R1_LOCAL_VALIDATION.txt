@@ -1,0 +1,13 @@
+ASH-BASETRAIN-GPU-22-R1 LOCAL VALIDATION
+
+container_validation:
+- zip/input unpacked: OK
+- source file patched: OK
+- giant top-level json! bundle replaced with serde_json::Map assembly: OK
+- segmented section builders present: OK
+- recursion_limit attribute added: false
+- cargo build/run in container: not executed; cargo unavailable in current container
+
+operator_validation_required:
+- cargo build -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit --jobs 1
+- cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_22_loss_scalar_audit

@@ -1,0 +1,4 @@
+{"id":"P01_resample_failed_high_risk","prompt":"짧은 한국어 QA 도중 resample 실패가 발생한 상황을 모사한다.","expected":"Stop01Reason::ResampleFailed candidate"}
+{"id":"P02_post_resample_high_unimproved","prompt":"rollback 이후에도 HIGH risk가 유지되는 상황을 모사한다.","expected":"Stop01Reason::PostResampleHighUnimproved candidate"}
+{"id":"P03_numeric_risk","prompt":"NaN/Inf 또는 numeric risk가 발생한 상황을 모사한다.","expected":"Stop01Reason::NumericRisk candidate"}
+{"id":"P04_global_finite_fallback","prompt":"global finite fallback 발생 상황을 모사한다.","expected":"Stop01Reason::GlobalFiniteFallback candidate"}

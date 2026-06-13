@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-02",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "name": "module_file_exists",
+      "ok": true,
+      "detail": "crates/model_core/src/salad02_detector.rs"
+    },
+    {
+      "name": "lib_mod_registered",
+      "ok": true,
+      "detail": "lib.rs module registration"
+    },
+    {
+      "name": "lib_exports_registered",
+      "ok": true,
+      "detail": "lib.rs pub use"
+    },
+    {
+      "name": "sampler_hook_registered",
+      "ok": true,
+      "detail": "sampler_parity append hook"
+    },
+    {
+      "name": "observe_only_contract",
+      "ok": true,
+      "detail": "behavior_change=false detector_only=true"
+    },
+    {
+      "name": "action_never_executed",
+      "ok": true,
+      "detail": "action_executed false in detection"
+    },
+    {
+      "name": "token_classifier_present",
+      "ok": true,
+      "detail": "lightweight token piece classifier"
+    },
+    {
+      "name": "window_metrics_present",
+      "ok": true,
+      "detail": "window metrics"
+    },
+    {
+      "name": "summary_writer_present",
+      "ok": true,
+      "detail": "summary writer"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+SFT-GPU-STREAM-01 static validation
+
+Environment:
+- cargo: not found
+- rustc: not found
+- rustfmt: not found
+
+Static checks performed:
+- added module file exists: crates/ash_core/src/sft_gpu_stream_step_telemetry.rs
+- added test file exists: crates/ash_core/tests/sft_gpu_stream_01_step_telemetry_receipt.rs
+- lib.rs exports new module: pub mod sft_gpu_stream_step_telemetry; pub use sft_gpu_stream_step_telemetry::*;
+- acceptance report exists: acceptance_reports/SFT-GPU-STREAM-01_native_gpu_lora_sft_step_telemetry_receipt.md
+- brace balance checked for module and test file
+- parenthesis balance checked for module and test file
+
+Pending local validation commands:
+- cargo test -p ash_core sft_gpu_stream_01 -- --nocapture
+- cargo test -p ash_core sft_run_03 -- --nocapture
+- cargo test -p ash_core sft_run_04 -- --nocapture
+
+Seal result:
+PASS_STATIC / PENDING_LOCAL_TOOLCHAIN_RUNTIME_GPU_STREAM

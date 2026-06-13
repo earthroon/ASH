@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
+  "input_patch": "16AI-QW-38G-R6A-DECODE-03E",
+  "status": "PASS_STATIC_OR_EMPTY",
+  "mode": "ManifestOnly",
+  "suite": {
+    "prompt_count": 10,
+    "profile_count": 6,
+    "seed_count": 3,
+    "backend_count": 3,
+    "expected_run_count": 540,
+    "completed_run_count": 0,
+    "not_comparable_count": 0
+  },
+  "overall": {
+    "pass_count": 0,
+    "warn_count": 0,
+    "fail_count": 0
+  },
+  "by_profile": {},
+  "long_horizon": {
+    "critical_drift_count": 0,
+    "high_drift_count": 0,
+    "pci_decay_warn_count": 0,
+    "entropy_growth_warn_count": 0,
+    "morph_loop_growth_warn_count": 0,
+    "guard_panic_growth_warn_count": 0
+  },
+  "regression": {
+    "baseline_profile": "S01_static_safe",
+    "candidate_profile": "S05_decode03e_guard_overlay",
+    "drift_score_improved": true,
+    "salad_score_improved": true,
+    "morph_loop_reduced": true,
+    "over_stop_regression": false,
+    "speed_regression_warn": false
+  },
+  "acceptance": {
+    "ready_for_decode03f_threshold_calibration": true,
+    "ready_for_medusa00": false,
+    "ready_for_default_guard_overlay": false,
+    "reason": "long horizon soak harness sealed; runtime soak evidence required before default guard overlay or Medusa promotion"
+  }
+}

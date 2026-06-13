@@ -1,0 +1,183 @@
+--- /mnt/data/work_38g_r3_orig/crates/runtime/src/infer.rs	2026-05-22 10:04:56.000000000 +0000
++++ crates/runtime/src/infer.rs	2026-05-22 11:43:32.124639032 +0000
+@@ -213,6 +213,64 @@
+     q38g_r2_write_receipt("RUNNING", stage, extra);
+ }
+ 
++
++// 16AI-QW-38G-R3 — Native Forward Stage Map / Executed Path Discovery Seal
++fn q38g_r3_enabled() -> bool {
++    q35e_env_truthy("ASH_FORWARD_STAGE_MAP") || q35e_env_truthy("ASH_QW38G_R3_STAGE_MAP")
++}
++
++fn q38g_r3_stage_map_path() -> String {
++    q38g_r2_env("ASH_FORWARD_STAGE_MAP_OUT", "workspace/qw38g_r3_forward_stage_map.json")
++}
++
++fn q38g_r3_receipt_path() -> String {
++    q38g_r2_env("ASH_FORWARD_STAGE_MAP_RECEIPT", "workspace/qw38g_r3_runtime_receipt.json")
++}
++
++fn q38g_r3_heartbeat(stage: &str, extra: serde_json::Value) {
++    let text = serde_json::to_string(&extra).unwrap_or_else(|_| "{}".to_string());
++    eprintln!("[16AI-QW-38G-R3][stage_enter] name={} note={}", stage, text);
++}
++
++fn q38g_r3_write_receipt(status: &str, last_stage: &str, extra: serde_json::Value) {
++    let stage_map_path = q38g_r3_stage_map_path();
++    let receipt_path = q38g_r3_receipt_path();
++    let (layer_trace_path, _summary_path, _r2_receipt_path, raw_topk_path, hidden_proj_path) =
++        q38g_r2_receipt_paths();
++    let stage_map_written = q38g_r2_path_written(&stage_map_path);
++    let raw_topk_trace_written = q38g_r2_path_written(&raw_topk_path);
++    let hidden_projection_trace_written = q38g_r2_path_written(&hidden_proj_path);
++    let layerwise_trace_written = q38g_r2_path_written(&layer_trace_path);
++    let warning_codes = if layerwise_trace_written {
++        Vec::<String>::new()
++    } else {
++        vec!["LAYERWISE_TRACE_HOOK_NOT_REACHED".to_string()]
++    };
++    let payload = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R3",
++        "status": status,
++        "last_stage": last_stage,
++        "timestamp_unix_ms": current_unix_ms(),
++        "stage_map_path": stage_map_path,
++        "stage_map_written": stage_map_written,
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "raw_topk_trace_path": raw_topk_path,
++        "raw_topk_trace_written": raw_topk_trace_written,
++        "hidden_projection_trace_path": hidden_proj_path,
++        "hidden_projection_trace_written": hidden_projection_trace_written,
++        "layerwise_trace_jsonl_path": layer_trace_path,
++        "layerwise_trace_written": layerwise_trace_written,
++        "actual_traceable_boundary": if layerwise_trace_written { "layerwise_residual" } else if hidden_projection_trace_written { "final_hidden_projection" } else if raw_topk_trace_written { "raw_topk_projection" } else { "unknown" },
++        "layerwise_trace_possible_from_current_hook": layerwise_trace_written,
++        "recommended_next_patch": if layerwise_trace_written { "16AI-QW-38G-R4_LAYER_RESIDUAL_PROJECTION_TAP" } else { "16AI-QW-38G-R4_GPU_DEBUG_TAP_OR_FORWARD_HOOK_RELOCATION" },
++        "warning_codes": warning_codes,
++        "extra": extra,
++    });
++    eprintln!("[16AI-QW-38G-R3][receipt] status={} last_stage={} path={}", status, last_stage, receipt_path);
++    q38g_r2_write_json(&receipt_path, &payload);
++}
++
+ fn gpu_sampling_runtime_fingerprint() -> String {
+     "runtime_gpu_sampling_v1".to_string()
+ }
+@@ -2729,6 +2787,26 @@
+     let subtitle_surface_request = req.clone();
+     let req = ResolvedStandardInferRequest::from_request(req)?;
+     let q38g_r2_trace_enabled = q38g_r2_enabled();
++    let q38g_r3_stage_map_enabled = q38g_r3_enabled();
++    if q38g_r3_stage_map_enabled {
++        q38g_r3_heartbeat(
++            "runtime_infer_entry",
++            serde_json::json!({
++                "request_id": req.request_id.clone(),
++                "model_spec_path": req.model_spec_path.clone(),
++                "tokenizer_manifest_path": req.tokenizer_manifest_path.clone(),
++            }),
++        );
++        q38g_r3_heartbeat(
++            "env",
++            serde_json::json!({
++                "ASH_FORWARD_STAGE_MAP": std::env::var("ASH_FORWARD_STAGE_MAP").unwrap_or_default(),
++                "ASH_FORWARD_STAGE_MAP_OUT": std::env::var("ASH_FORWARD_STAGE_MAP_OUT").unwrap_or_default(),
++                "ASH_LAYERWISE_RESERVED_TRACE": std::env::var("ASH_LAYERWISE_RESERVED_TRACE").unwrap_or_default(),
++                "ASH_FORCE_NO_LORA": std::env::var("ASH_FORCE_NO_LORA").unwrap_or_default(),
++            }),
++        );
++    }
+     if q38g_r2_trace_enabled {
+         q38g_r2_heartbeat(
+             "start",
+@@ -2755,6 +2833,9 @@
+         validate_subtitle_cue_context(cue)?;
+     }
+     let spec = ModelSpec::load_toml(&req.model_spec_path)?;
++    if q38g_r3_stage_map_enabled {
++        q38g_r3_heartbeat("model_spec_loaded", serde_json::json!({"model_spec_id": spec.model_spec_id.clone(), "preferred_backend": spec.backend.preferred_backend.clone()}));
++    }
+     if q38g_r2_trace_enabled {
+         q38g_r2_heartbeat(
+             "model_spec_loaded",
+@@ -2763,6 +2844,9 @@
+     }
+     let manifest = TokenizerManifest::load_json(&req.tokenizer_manifest_path)?;
+     let tokenizer = NativeTokenizer::from_manifest(manifest.clone());
++    if q38g_r3_stage_map_enabled {
++        q38g_r3_heartbeat("tokenizer_loaded", serde_json::json!({"tokenizer_manifest_id": manifest.manifest_id.clone(), "vocab_size": manifest.vocab.len()}));
++    }
+     if q38g_r2_trace_enabled {
+         q38g_r2_heartbeat(
+             "tokenizer_loaded",
+@@ -2888,6 +2972,9 @@
+         attach_resolution.missing_selected_count,
+     );
+ 
++    if q38g_r3_stage_map_enabled {
++        q38g_r3_heartbeat("force_no_lora", serde_json::json!({"force_no_lora": force_no_lora, "selected_lora_ids": decision.selected_lora_ids.clone(), "loaded_loras": loaded_loras.len(), "attached_loras": attached.len()}));
++    }
+     if q38g_r2_trace_enabled {
+         q38g_r2_heartbeat(
+             "force_no_lora",
+@@ -2920,6 +3007,9 @@
+     );
+ 
+     let prompt_ids = tokenizer.encode(&prompt)?;
++    if q38g_r3_stage_map_enabled {
++        q38g_r3_heartbeat("prompt_built", serde_json::json!({"prompt_template_id": prompt_template_id.as_str(), "prompt_len": prompt_ids.len(), "input_text_chars": req.input_text.chars().count()}));
++    }
+     if q38g_r2_trace_enabled {
+         q38g_r2_heartbeat(
+             "prompt_built",
+@@ -3047,6 +3137,9 @@
+                 req.force_native_safe_attention,
+                 req.force_native_reference_prefill,
+             );
++            if q38g_r3_stage_map_enabled {
++                q38g_r3_heartbeat("native_model_load_start", serde_json::json!({"use_vocab_atlas": native_use_vocab_atlas, "use_embedding_row_gather": native_use_embedding_row_gather, "vocab_tile_size": req.native_vocab_tile_size}));
++            }
+             if q38g_r2_trace_enabled {
+                 q38g_r2_heartbeat(
+                     "native_model_load_start",
+@@ -3071,6 +3164,9 @@
+             ) {
+                 Ok(mut native_model) => {
+                     eprintln!("[debug] native_wgpu_enabled = true");
++                    if q38g_r3_stage_map_enabled {
++                        q38g_r3_heartbeat("native_model_load_done", serde_json::json!({"native_wgpu_enabled": true}));
++                    }
+                     if q38g_r2_trace_enabled {
+                         q38g_r2_heartbeat(
+                             "native_model_load_done",
+@@ -3842,6 +3938,28 @@
+         );
+         eprintln!("[16AI-QW-38G-R2][done] status={}", status);
+     }
++    if q38g_r3_stage_map_enabled {
++        let stage_map_path = q38g_r3_stage_map_path();
++        let stage_map_written = q38g_r2_path_written(&stage_map_path);
++        let status = if stage_map_written {
++            "PASS_STAGE_MAP"
++        } else {
++            "FAIL_STAGE_MAP_INCOMPLETE"
++        };
++        q38g_r3_write_receipt(
++            status,
++            "emit_response",
++            serde_json::json!({
++                "resolved_backend": resolved_backend.clone(),
++                "prompt_len": prompt_len,
++                "generated_tail_len": final_tail_ids.len(),
++                "output_text_preview": output_text.chars().take(120).collect::<String>(),
++                "stage_map_path": stage_map_path,
++                "stage_map_written": stage_map_written,
++            }),
++        );
++        eprintln!("[16AI-QW-38G-R3][done] status={}", status);
++    }
+ 
+     Ok(StandardInferResult {
+         output_text,

@@ -1,0 +1,46 @@
+{
+  "patch_id": "QW-50-R0W-A",
+  "base_patch": "QW-50-R0W",
+  "status": "PENDING_RUNTIME_PROBE_STATIC_BAKE_PASS",
+  "rust_owned": true,
+  "python_injector_only": true,
+  "trace_outputs": {
+    "no_guard_prefix_trace": "workspace/trace/qw50_r0w_a_no_guard_prefix_trace.json",
+    "guarded_prefix_trace": "workspace/trace/qw50_r0w_a_guarded_prefix_trace.json",
+    "summary": "workspace/trace/qw50_r0w_a_prefix_snapshot_summary.json",
+    "static_validation": "workspace/trace/qw50_r0w_a_static_validation_result.json"
+  },
+  "observed": {
+    "decode_state_snapshots_present": false,
+    "generated_tail_present": false,
+    "last_token_present": false,
+    "prefix_before_after_present": false,
+    "duplication_summary_present": true,
+    "rust_validation_present": true,
+    "runtime_probe_required": true
+  },
+  "duplicationSummary": {
+    "steps_inspected": 0,
+    "duplication_detected": false,
+    "first_duplication_step": null,
+    "duplication_count": 0,
+    "affected_steps": [],
+    "recommended_next_patch": null
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "prefix_fix_applied": false,
+    "python_trace_mutation": false,
+    "python_receipt_mutation": false
+  },
+  "next_candidates": [
+    "QW-50-R0W-B",
+    "QW-50-R0X",
+    "QW-50-R0Y",
+    "QW-50-R0Z"
+  ]
+}

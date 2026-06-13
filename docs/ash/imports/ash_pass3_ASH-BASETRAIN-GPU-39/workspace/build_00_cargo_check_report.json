@@ -1,0 +1,107 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-BUILD-00",
+  "title": "Cargo Workspace Check / Rust Compilation Readiness Seal",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "generated_at_utc": "2026-05-29T02:29:41Z",
+  "preceded_by": "16AI-QW-38G-R6A-CLOSURE-04",
+  "closure_04_static_integrity_required": true,
+  "closure_04_static_integrity_present": true,
+  "closure_04_static_integrity_status": "PASS",
+  "closure_04_preflight_passed": true,
+  "closure_04_preflight_issue": null,
+  "cargo_available": false,
+  "cargo_path": null,
+  "rustc_available": false,
+  "rustc_path": null,
+  "cargo_metadata_executed": false,
+  "cargo_metadata_status": "NOT_RUN_CARGO_UNAVAILABLE",
+  "cargo_check_workspace_all_targets_executed": false,
+  "cargo_check_workspace_all_targets_status": "NOT_RUN_CARGO_UNAVAILABLE",
+  "cargo_test_workspace_no_run_executed": false,
+  "cargo_test_workspace_no_run_status": "NOT_RUN_CARGO_UNAVAILABLE",
+  "cargo_fmt_all_check_executed": false,
+  "cargo_fmt_all_check_status": "NOT_RUN_CARGO_UNAVAILABLE",
+  "commands": {
+    "cargo_metadata": {
+      "cmd": [
+        "cargo",
+        "metadata",
+        "--format-version",
+        "1"
+      ],
+      "executed": false,
+      "exit_code": null,
+      "reason": "cargo_not_found",
+      "stdout_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_metadata_stdout.log",
+      "stderr_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_metadata_stderr.log"
+    },
+    "cargo_check_workspace_all_targets": {
+      "cmd": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets"
+      ],
+      "executed": false,
+      "exit_code": null,
+      "reason": "cargo_not_found",
+      "stdout_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_check_workspace_all_targets_stdout.log",
+      "stderr_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_check_workspace_all_targets_stderr.log"
+    },
+    "cargo_test_workspace_no_run": {
+      "cmd": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--no-run"
+      ],
+      "executed": false,
+      "exit_code": null,
+      "reason": "cargo_not_found",
+      "stdout_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_test_workspace_no_run_stdout.log",
+      "stderr_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_test_workspace_no_run_stderr.log"
+    },
+    "cargo_fmt_all_check": {
+      "cmd": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "executed": false,
+      "exit_code": null,
+      "reason": "cargo_not_found",
+      "stdout_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_fmt_all_check_stdout.log",
+      "stderr_log": "/mnt/data/ash_build00_work/workspace/build_00_cargo_fmt_all_check_stderr.log"
+    }
+  },
+  "compile_error_count": null,
+  "compile_error_count_observed": null,
+  "unresolved_import_count": null,
+  "missing_module_count": null,
+  "feature_gate_error_count": null,
+  "path_dependency_error_count": 1,
+  "path_dependency_error_count_static_manifest_scan": 1,
+  "warning_count": null,
+  "workspace_root_detected": true,
+  "package_count_static": 17,
+  "active_crate_count": 15,
+  "legacy_crate_count": 1,
+  "non_default_workspace_member_count": 1,
+  "excluded_crate_count": 2,
+  "active_crate_excluded_without_receipt": false,
+  "source_file_mutation_executed_count": 0,
+  "runtime_decode_executed": false,
+  "model_forward_executed": false,
+  "sampling_executed": false,
+  "subtitle_export_executed": false,
+  "translation_quality_eval_executed": false,
+  "performance_benchmark_executed": false,
+  "build_readiness_status": "BLOCKED_ENVIRONMENT",
+  "production_safe_confirmed": false,
+  "ready_for_run_decode": false,
+  "ready_for_export_sub": false,
+  "blocking_reason": "cargo_and_rustc_not_available_in_bake_environment",
+  "next_required_action": "rerun tools/run_build_00_cargo_checks.py in an environment with cargo and rustc installed"
+}

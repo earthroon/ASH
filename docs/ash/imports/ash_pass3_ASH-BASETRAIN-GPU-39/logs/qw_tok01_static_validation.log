@@ -1,0 +1,39 @@
+QW-TOK-01 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok01EncodeDecodeFixtureConfig: PASS
+QwTok01TokenizerLoaderProbe: PASS
+QwTok01SpecialTokenFixtureEntry: PASS
+QwTok01SpecialTokenRoundtripReport: PASS
+QwTok01RoundtripFixtureCase: PASS
+QwTok01RoundtripFixtureReport: PASS
+QwTok01ByteFallbackReport: PASS
+QwTok01NoRuntimeBindSeal: PASS
+QwTok01EncodeDecodeFixtureReport: PASS
+build_qw_tok01_tokenizer_loader_probe: PASS
+build_qw_tok01_special_token_fixture_entry: PASS
+build_qw_tok01_roundtrip_fixture_case: PASS
+build_qw_tok01_byte_fallback_report: PASS
+build_qw_tok01_no_runtime_bind_seal: PASS
+build_qw_tok01_encode_decode_fixture_report: PASS
+build_qw_tok01_default_encode_decode_fixture_report: PASS
+default blocks allow_model_inference: false: PASS
+default blocks allow_runtime_decode_bind: false: PASS
+default blocks allow_embedding_lookup: false: PASS
+default blocks allow_lm_head_logits: false: PASS
+default blocks allow_sampler_mutation: false: PASS
+default blocks allow_qw_selector_mutation: false: PASS
+default blocks allow_mcts_mutation: false: PASS
+default blocks allow_tokenizer_rewrite: false: PASS
+test qw_tok01_encode_decode_fixture.rs present: PASS
+test qw_tok01_special_token_roundtrip.rs present: PASS
+test qw_tok01_byte_fallback_roundtrip.rs present: PASS
+test qw_tok01_no_runtime_bind_no_infer.rs present: PASS
+artifacts/qw_tok01_tokenizer_v5_encode_decode_fixture_report.json exists: PASS
+artifacts/qw_tok01_roundtrip_cases.json exists: PASS
+artifacts/qw_tok01_special_token_table.json exists: PASS
+workspace/runtime_traces/qw_tok01_encode_decode_fixture_trace.jsonl exists: PASS
+workspace/trace/qw_tok01_encode_decode_fixture_receipt.json exists: PASS
+tokenizer model not packaged in workdir: PASS
+tokenizer vocab not packaged in workdir: PASS
+overall: PASS

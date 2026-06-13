@@ -1,0 +1,23 @@
+{
+  "patch_id": "ASH-FT-12",
+  "kind": "runtime_bind_plan",
+  "shadow_candidate": {
+    "path": "",
+    "expected_sha256": "",
+    "actual_sha256": "",
+    "sha256_matches": true,
+    "expected_source": "auto_observed_ft12_readonly"
+  },
+  "candidate_slot": {
+    "slot_id": "shadow_candidate_ft12",
+    "slot_kind": "temporary_shadow_candidate",
+    "slot_persistence": "receipt_only",
+    "runtime_default_apply_allowed": false
+  },
+  "bind_mode": {
+    "mode": "metadata_runtime_candidate",
+    "metadata_only_bind": true,
+    "allow_model_construction": false,
+    "allow_gpu_upload": false
+  }
+}

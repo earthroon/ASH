@@ -1,0 +1,44 @@
+{
+  "patch_id": "QW-52A-R1",
+  "title": "Existing Cheonjiin Jaso Stroke Tensor Facade / No Math Rewrite Seal",
+  "base_patch": "QW-52A-R0",
+  "status": "STATIC_PASS_RUNTIME_NOT_RUN",
+  "facade": {
+    "module": "model_core::cheonjiin_jaso_stroke_facade",
+    "available": true,
+    "candidate_api_available": true,
+    "surface_api_available": true,
+    "qwave52a_attach_api_available": true
+  },
+  "existing_sources": {
+    "hangul_feature_row": true,
+    "qwave_cell": true,
+    "qwave_pulse": true,
+    "qwave_transition": true,
+    "cheonjiin_structural_probe_library": true
+  },
+  "no_math_rewrite": {
+    "new_hangul_decomposition_added": false,
+    "new_cheonjiin_lut_added": false,
+    "new_qwave_phase_math_added": false,
+    "new_stroke_rule_added": false,
+    "new_webgpu_shader_added": false
+  },
+  "mutation_policy": {
+    "decode_policy_mutation": false,
+    "guard_policy_mutation": false,
+    "lora_scale_mutation": false,
+    "model_weight_mutation": false,
+    "token_ban_added": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "hidden_state_fusion": false,
+    "adapter_projection_applied": false
+  },
+  "runtime_validation": {
+    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE",
+    "facade_validator_binary_present": true,
+    "runtime_probe": "NOT_RUN_CARGO_UNAVAILABLE"
+  },
+  "next_candidates": ["QW-52A-R2", "QW-52B"]
+}

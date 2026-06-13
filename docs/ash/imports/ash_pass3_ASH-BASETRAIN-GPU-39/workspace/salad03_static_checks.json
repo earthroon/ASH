@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-03",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "name": "module_file_exists",
+      "ok": true,
+      "detail": "crates/model_core/src/salad03_rollback.rs"
+    },
+    {
+      "name": "lib_mod_registered",
+      "ok": true,
+      "detail": "lib.rs module registration"
+    },
+    {
+      "name": "lib_exports_registered",
+      "ok": true,
+      "detail": "lib.rs pub use"
+    },
+    {
+      "name": "sampler_hook_registered",
+      "ok": true,
+      "detail": "sampler_parity append hook"
+    },
+    {
+      "name": "plan_only_default",
+      "ok": true,
+      "detail": "PlanOnly mode present"
+    },
+    {
+      "name": "string_only_rollback_forbidden",
+      "ok": true,
+      "detail": "token/KV ledger SSOT"
+    },
+    {
+      "name": "kv_snapshot_gate_present",
+      "ok": true,
+      "detail": "KV restore gate fields"
+    },
+    {
+      "name": "execution_default_false",
+      "ok": true,
+      "detail": "plan-only execution false"
+    },
+    {
+      "name": "safe_resample_config_present",
+      "ok": true,
+      "detail": "safe resample config"
+    }
+  ]
+}

@@ -1,0 +1,462 @@
+--- orig/crates/model_core/src/lib.rs	2026-04-19 11:17:52.000000000 +0000
++++ src/crates/model_core/src/lib.rs	2026-04-19 11:54:46.415622312 +0000
+@@ -1316,6 +1316,365 @@
+     out
+ }
+ 
++#[derive(Debug, Clone)]
++struct PaddedTokenBatch {
++    batch_size: usize,
++    max_seq_len: usize,
++    lengths: Vec<usize>,
++    token_ids: Vec<u32>,
++    active_mask: Vec<f32>,
++}
++
++#[derive(Debug, Clone)]
++struct BatchedHidden {
++    batch_size: usize,
++    seq_len: usize,
++    hidden_dim: usize,
++    lengths: Vec<usize>,
++    data: Vec<f32>,
++}
++
++impl BatchedHidden {
++    fn row_range(&self, row: usize) -> std::ops::Range<usize> {
++        let start = row * self.hidden_dim;
++        start..start + self.hidden_dim
++    }
++
++    fn row(&self, row: usize) -> &[f32] {
++        let range = self.row_range(row);
++        &self.data[range]
++    }
++
++    fn row_mut(&mut self, row: usize) -> &mut [f32] {
++        let range = self.row_range(row);
++        &mut self.data[range]
++    }
++
++    fn is_active(&self, row: usize) -> bool {
++        let batch = row / self.seq_len.max(1);
++        let pos = row % self.seq_len.max(1);
++        pos < self.lengths.get(batch).copied().unwrap_or(0)
++    }
++}
++
++fn build_padded_token_batch(batch_ids: &[Vec<u32>]) -> Result<PaddedTokenBatch> {
++    if batch_ids.is_empty() {
++        return Ok(PaddedTokenBatch {
++            batch_size: 0,
++            max_seq_len: 0,
++            lengths: Vec::new(),
++            token_ids: Vec::new(),
++            active_mask: Vec::new(),
++        });
++    }
++
++    let batch_size = batch_ids.len();
++    let max_seq_len = batch_ids.iter().map(|ids| ids.len()).max().unwrap_or(0);
++    let mut token_ids = vec![0u32; batch_size * max_seq_len.max(1)];
++    let mut active_mask = vec![0.0f32; batch_size * max_seq_len.max(1)];
++    let lengths: Vec<usize> = batch_ids.iter().map(|ids| ids.len()).collect();
++
++    for (batch_idx, ids) in batch_ids.iter().enumerate() {
++        let row_offset = batch_idx * max_seq_len.max(1);
++        for (token_idx, token) in ids.iter().enumerate() {
++            token_ids[row_offset + token_idx] = *token;
++            active_mask[row_offset + token_idx] = 1.0;
++        }
++    }
++
++    Ok(PaddedTokenBatch {
++        batch_size,
++        max_seq_len,
++        lengths,
++        token_ids,
++        active_mask,
++    })
++}
++
++fn embed_token_batch(full: &FullCheckpointWeights, batch: &PaddedTokenBatch) -> Result<BatchedHidden> {
++    let hidden_dim = full.hidden_size.max(1);
++    let row_count = batch.batch_size * batch.max_seq_len.max(1);
++    let mut data = vec![0.0f32; row_count * hidden_dim];
++
++    for batch_idx in 0..batch.batch_size {
++        for token_idx in 0..batch.lengths[batch_idx] {
++            let flat_idx = batch_idx * batch.max_seq_len.max(1) + token_idx;
++            if batch.active_mask.get(flat_idx).copied().unwrap_or(0.0) <= 0.0 {
++                continue;
++            }
++            let token = batch.token_ids[flat_idx] as usize % full.vocab_size.max(1);
++            let src_start = token * hidden_dim;
++            let src_end = src_start + hidden_dim;
++            let dst_start = flat_idx * hidden_dim;
++            let dst_end = dst_start + hidden_dim;
++            if src_end > full.embedding.len() || dst_end > data.len() {
++                bail!(
++                    "batched embedding lookup out of bounds: token={} hidden_dim={} src_end={} embedding_len={} dst_end={} data_len={}",
++                    token,
++                    hidden_dim,
++                    src_end,
++                    full.embedding.len(),
++                    dst_end,
++                    data.len(),
++                );
++            }
++            data[dst_start..dst_end].copy_from_slice(&full.embedding[src_start..src_end]);
++        }
++    }
++
++    Ok(BatchedHidden {
++        batch_size: batch.batch_size,
++        seq_len: batch.max_seq_len.max(1),
++        hidden_dim,
++        lengths: batch.lengths.clone(),
++        data,
++    })
++}
++
++fn rms_norm_batched(hidden: &BatchedHidden, weight: &[f32], eps: f64) -> Result<BatchedHidden> {
++    let mut out = vec![0.0f32; hidden.data.len()];
++    let rows = hidden.batch_size * hidden.seq_len.max(1);
++    for row in 0..rows {
++        if !hidden.is_active(row) {
++            continue;
++        }
++        let src = hidden.row(row);
++        let dst_range = hidden.row_range(row);
++        let ms = src.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>() / src.len().max(1) as f64;
++        let inv = 1.0 / (ms + eps).sqrt();
++        for (i, value) in src.iter().enumerate() {
++            out[dst_range.start + i] = (*value as f64 * inv * *weight.get(i).unwrap_or(&1.0) as f64) as f32;
++        }
++    }
++
++    Ok(BatchedHidden {
++        batch_size: hidden.batch_size,
++        seq_len: hidden.seq_len,
++        hidden_dim: hidden.hidden_dim,
++        lengths: hidden.lengths.clone(),
++        data: out,
++    })
++}
++
++fn linear_apply_batched(hidden: &BatchedHidden, lin: &FullLinearWeights) -> Result<BatchedHidden> {
++    ensure!(hidden.hidden_dim >= lin.in_dim, "batched linear input dim too small: hidden_dim={} required={}", hidden.hidden_dim, lin.in_dim);
++    let rows = hidden.batch_size * hidden.seq_len.max(1);
++    let mut out = vec![0.0f32; rows * lin.out_dim];
++
++    for row in 0..rows {
++        if !hidden.is_active(row) {
++            continue;
++        }
++        let src = hidden.row(row);
++        let dst_range = row * lin.out_dim..(row + 1) * lin.out_dim;
++        for o in 0..lin.out_dim {
++            let weights = &lin.weight[o * lin.in_dim..(o + 1) * lin.in_dim];
++            let mut acc = 0.0f32;
++            for i in 0..lin.in_dim.min(src.len()) {
++                acc += src[i] * weights[i];
++            }
++            if let Some(bias) = &lin.bias {
++                if let Some(value) = bias.get(o) {
++                    acc += *value;
++                }
++            }
++            out[dst_range.start + o] = acc;
++        }
++    }
++
++    Ok(BatchedHidden {
++        batch_size: hidden.batch_size,
++        seq_len: hidden.seq_len,
++        hidden_dim: lin.out_dim,
++        lengths: hidden.lengths.clone(),
++        data: out,
++    })
++}
++
++fn apply_reference_loras_batched(model: &ReferenceModel, layer_idx: usize, target_suffix: &str, hidden: &mut BatchedHidden) {
++    let rows = hidden.batch_size * hidden.seq_len.max(1);
++    for row in 0..rows {
++        if !hidden.is_active(row) {
++            continue;
++        }
++        model.apply_reference_loras(layer_idx, target_suffix, hidden.row_mut(row));
++    }
++}
++
++fn causal_attention_batched(
++    q_all: &BatchedHidden,
++    k_all: &BatchedHidden,
++    v_all: &BatchedHidden,
++    num_heads: usize,
++    num_kv_heads: usize,
++    head_dim: usize,
++) -> Result<BatchedHidden> {
++    ensure!(q_all.batch_size == k_all.batch_size && q_all.batch_size == v_all.batch_size, "batched attention batch size mismatch");
++    ensure!(q_all.seq_len == k_all.seq_len && q_all.seq_len == v_all.seq_len, "batched attention seq len mismatch");
++    ensure!(q_all.lengths == k_all.lengths && q_all.lengths == v_all.lengths, "batched attention lengths mismatch");
++
++    let num_heads = num_heads.max(1);
++    let head_dim = head_dim.max(1);
++    let actual_kv_heads = (k_all.hidden_dim / head_dim.max(1)).max(1).max(num_kv_heads.max(1));
++    let mut out = BatchedHidden {
++        batch_size: q_all.batch_size,
++        seq_len: q_all.seq_len,
++        hidden_dim: q_all.hidden_dim,
++        lengths: q_all.lengths.clone(),
++        data: vec![0.0f32; q_all.data.len()],
++    };
++
++    for batch_idx in 0..q_all.batch_size {
++        let seq_len = q_all.lengths[batch_idx].min(q_all.seq_len);
++        for t in 0..seq_len {
++            let row = batch_idx * q_all.seq_len + t;
++            let q = q_all.row(row);
++            let out_row = out.row_mut(row);
++            for head in 0..num_heads {
++                let hs = head * head_dim;
++                let he = hs + head_dim;
++                if hs >= q.len() {
++                    continue;
++                }
++                let q_head = &q[hs..he.min(q.len())];
++                let kv_head = ((head * actual_kv_heads) / num_heads).min(actual_kv_heads.saturating_sub(1));
++                let kv_start = kv_head * head_dim;
++                let kv_end = kv_start + head_dim;
++                let mut scores = Vec::with_capacity(t + 1);
++                let mut max_score = f32::MIN;
++                for j in 0..=t {
++                    let kv_row = batch_idx * q_all.seq_len + j;
++                    let k = k_all.row(kv_row);
++                    let k_head = &k[kv_start.min(k.len())..kv_end.min(k.len())];
++                    let mut score = 0.0f32;
++                    for d in 0..q_head.len().min(k_head.len()) {
++                        score += q_head[d] * k_head[d];
++                    }
++                    score /= (head_dim as f32).sqrt();
++                    max_score = max_score.max(score);
++                    scores.push(score);
++                }
++                let mut denom = 0.0f32;
++                for score in &mut scores {
++                    *score = (*score - max_score).exp();
++                    denom += *score;
++                }
++                let denom = denom.max(1e-6);
++                for j in 0..=t {
++                    let coeff = scores[j] / denom;
++                    let kv_row = batch_idx * q_all.seq_len + j;
++                    let v = v_all.row(kv_row);
++                    let v_head = &v[kv_start.min(v.len())..kv_end.min(v.len())];
++                    for d in 0..v_head.len() {
++                        if hs + d < out_row.len() {
++                            out_row[hs + d] += coeff * v_head[d];
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    Ok(out)
++}
++
++fn add_batched(lhs: &BatchedHidden, rhs: &BatchedHidden) -> Result<BatchedHidden> {
++    ensure!(lhs.batch_size == rhs.batch_size, "batched add batch size mismatch");
++    ensure!(lhs.seq_len == rhs.seq_len, "batched add seq len mismatch");
++    ensure!(lhs.hidden_dim == rhs.hidden_dim, "batched add hidden dim mismatch");
++    ensure!(lhs.lengths == rhs.lengths, "batched add lengths mismatch");
++
++    let mut data = lhs.data.clone();
++    for (dst, src) in data.iter_mut().zip(rhs.data.iter()) {
++        *dst += *src;
++    }
++
++    Ok(BatchedHidden {
++        batch_size: lhs.batch_size,
++        seq_len: lhs.seq_len,
++        hidden_dim: lhs.hidden_dim,
++        lengths: lhs.lengths.clone(),
++        data,
++    })
++}
++
++fn silu_mul_batched(gate: &BatchedHidden, up: &BatchedHidden) -> Result<BatchedHidden> {
++    ensure!(gate.batch_size == up.batch_size, "batched silu_mul batch size mismatch");
++    ensure!(gate.seq_len == up.seq_len, "batched silu_mul seq len mismatch");
++    ensure!(gate.hidden_dim == up.hidden_dim, "batched silu_mul hidden dim mismatch");
++    ensure!(gate.lengths == up.lengths, "batched silu_mul lengths mismatch");
++
++    let mut out = vec![0.0f32; gate.data.len()];
++    for i in 0..out.len() {
++        out[i] = silu(gate.data[i]) * up.data[i];
++    }
++
++    Ok(BatchedHidden {
++        batch_size: gate.batch_size,
++        seq_len: gate.seq_len,
++        hidden_dim: gate.hidden_dim,
++        lengths: gate.lengths.clone(),
++        data: out,
++    })
++}
++
++fn capture_module_from_batched_hidden(
++    target_key: &str,
++    expected_in: usize,
++    expected_out: usize,
++    module_input: &BatchedHidden,
++    module_output: &BatchedHidden,
++) -> Result<Vec<CapturedModuleIo>> {
++    ensure!(module_input.batch_size == module_output.batch_size, "module-local batched capture batch size mismatch");
++    ensure!(module_input.seq_len == module_output.seq_len, "module-local batched capture seq len mismatch");
++    ensure!(module_input.lengths == module_output.lengths, "module-local batched capture lengths mismatch");
++
++    let mut captures = Vec::with_capacity(module_input.batch_size);
++    for batch_idx in 0..module_input.batch_size {
++        let seq_len = module_input.lengths[batch_idx].min(module_input.seq_len);
++        let mut input_flat = Vec::with_capacity(seq_len * expected_in);
++        let mut output_flat = Vec::with_capacity(seq_len * expected_out);
++        for token_idx in 0..seq_len {
++            let row = batch_idx * module_input.seq_len + token_idx;
++            let input_row = module_input.row(row);
++            let output_row = module_output.row(row);
++            if input_row.len() != expected_in {
++                bail!(
++                    "module-local batched trace input dim mismatch: target_key={} expected_in={} actual_in={} batch_idx={} token_idx={}",
++                    target_key,
++                    expected_in,
++                    input_row.len(),
++                    batch_idx,
++                    token_idx,
++                );
++            }
++            if output_row.len() != expected_out {
++                bail!(
++                    "module-local batched trace output dim mismatch: target_key={} expected_out={} actual_out={} batch_idx={} token_idx={}",
++                    target_key,
++                    expected_out,
++                    output_row.len(),
++                    batch_idx,
++                    token_idx,
++                );
++            }
++            input_flat.extend_from_slice(input_row);
++            output_flat.extend_from_slice(output_row);
++        }
++        captures.push(CapturedModuleIo {
++            target_key: target_key.to_string(),
++            input_dim: expected_in,
++            output_dim: expected_out,
++            seq_len,
++            module_input: input_flat,
++            module_output: output_flat,
++        });
++    }
++
++    Ok(captures)
++}
++
++
+ fn tensor_to_f32_vec(view: &safetensors::tensor::TensorView<'_>) -> Result<Vec<f32>> {
+     use safetensors::tensor::Dtype;
+     let bytes = view.data();
+@@ -3969,11 +4328,89 @@
+         batch_ids: &[Vec<u32>],
+         target_key: &str,
+     ) -> Result<Vec<CapturedModuleIo>> {
+-        let mut out = Vec::with_capacity(batch_ids.len());
+-        for input_ids in batch_ids {
+-            out.push(self.capture_module_io_ids(input_ids, target_key)?);
++        if batch_ids.is_empty() {
++            return Ok(Vec::new());
+         }
+-        Ok(out)
++
++        let full = match &self.execution_path {
++            ReferenceExecutionPath::FullCheckpointBacked(full) => full,
++            ReferenceExecutionPath::CompactSmoke => bail!("module-local trace requires full checkpoint-backed reference model: target_key={}", target_key),
++        };
++        let (expected_in, expected_out) = resolve_runtime_lora_target_module_dims(&self.spec, target_key)?;
++        let parts: Vec<&str> = target_key.split('.').collect();
++        if parts.len() != 4 || parts[0] != "layers" {
++            bail!("unsupported module-local target_key format: {}", target_key);
++        }
++        let layer_idx: usize = parts[1]
++            .parse()
++            .map_err(|_| anyhow::anyhow!("invalid layer index in target_key: {}", target_key))?;
++        let suffix = format!("{}.{}", parts[2], parts[3]);
++        if !matches!(suffix.as_str(), "ffn.up_proj" | "attn.q_proj" | "attn.o_proj") {
++            bail!(
++                "phase E currently supports only ffn.up_proj, attn.q_proj, and attn.o_proj traces: target_key={} expected_in={} expected_out={}",
++                target_key,
++                expected_in,
++                expected_out,
++            );
++        }
++
++        let padded = build_padded_token_batch(batch_ids)?;
++        if padded.max_seq_len == 0 {
++            return Ok(batch_ids
++                .iter()
++                .map(|_| CapturedModuleIo {
++                    target_key: target_key.to_string(),
++                    input_dim: expected_in,
++                    output_dim: expected_out,
++                    seq_len: 0,
++                    module_input: Vec::new(),
++                    module_output: Vec::new(),
++                })
++                .collect());
++        }
++
++        let mut states = embed_token_batch(full, &padded)?;
++        for (idx, layer) in full.layers.iter().enumerate() {
++            let normed = rms_norm_batched(&states, &layer.input_norm, self.spec.norm.eps)?;
++            let mut q_all = linear_apply_batched(&normed, &layer.q_proj)?;
++            apply_reference_loras_batched(self, idx, "attn.q_proj", &mut q_all);
++            let k_all = linear_apply_batched(&normed, &layer.k_proj)?;
++            let mut v_all = linear_apply_batched(&normed, &layer.v_proj)?;
++            apply_reference_loras_batched(self, idx, "attn.v_proj", &mut v_all);
++            let ctx = causal_attention_batched(
++                &q_all,
++                &k_all,
++                &v_all,
++                self.spec.dimensions.num_attention_heads.max(1),
++                self.spec.dimensions.num_key_value_heads.max(1),
++                self.spec.dimensions.head_dim.max(1),
++            )?;
++
++            if idx == layer_idx && suffix == "attn.q_proj" {
++                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed, &q_all);
++            }
++            if idx == layer_idx && suffix == "attn.o_proj" {
++                let o_all = linear_apply_batched(&ctx, &layer.o_proj)?;
++                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &ctx, &o_all);
++            }
++
++            let attn_out = linear_apply_batched(&ctx, &layer.o_proj)?;
++            let after_attn = add_batched(&states, &attn_out)?;
++            let normed_ffn = rms_norm_batched(&after_attn, &layer.post_attn_norm, self.spec.norm.eps)?;
++            if idx == layer_idx {
++                let up_all = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
++                return capture_module_from_batched_hidden(target_key, expected_in, expected_out, &normed_ffn, &up_all);
++            }
++
++            let gate = linear_apply_batched(&normed_ffn, &layer.gate_proj)?;
++            let up = linear_apply_batched(&normed_ffn, &layer.up_proj)?;
++            let fused = silu_mul_batched(&gate, &up)?;
++            let mut down = linear_apply_batched(&fused, &layer.down_proj)?;
++            apply_reference_loras_batched(self, idx, "ffn.down_proj", &mut down);
++            states = add_batched(&after_attn, &down)?;
++        }
++
++        bail!("failed to capture module-local batched trace for target_key={} layer_idx={} (layer not reached)", target_key, layer_idx)
+     }
+ 
+     pub fn capture_module_io_ids(&self, input_ids: &[u32], target_key: &str) -> Result<CapturedModuleIo> {

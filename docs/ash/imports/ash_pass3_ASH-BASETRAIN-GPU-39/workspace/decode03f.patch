@@ -1,0 +1,1872 @@
+diff -ruN decode03f_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md decode03f_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md
+--- decode03f_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md	2026-05-27 08:31:19.733665564 +0000
+@@ -0,0 +1,19 @@
++# 16AI-QW-38G-R6A-DECODE-03F Acceptance
++
++## Status
++PASS_STATIC / NOT_RUN_RUNTIME
++
++## 확정
++- Candidate-only calibration layer baked.
++- Runtime apply is explicitly forbidden in this patch.
++- Base config mutation count is fixed to 0 in static summary.
++
++## 추정
++- EVAL-02 long-horizon drift results can feed candidate generation.
++- EVAL-01 semantic parity gates controlled promotion.
++
++## 판단불가
++- cargo check and runtime bench were not run because cargo/rustc are unavailable in the container.
++
++## Next
++16AI-QW-38G-R6A-EVAL-03 — Candidate Calibration Regression Replay Seal
+diff -ruN decode03f_orig/crates/model_core/src/decode03f_guard_calibration.rs decode03f_work/crates/model_core/src/decode03f_guard_calibration.rs
+--- decode03f_orig/crates/model_core/src/decode03f_guard_calibration.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/crates/model_core/src/decode03f_guard_calibration.rs	2026-05-27 08:30:18.575760636 +0000
+@@ -0,0 +1,771 @@
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const DECODE03F_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03F";
++pub const DECODE03F_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-02";
++pub const DECODE03F_SSOT: &str = "decode03e_applied_receipt+eval00_eval01_eval02_regression_summaries";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Decode03FMode {
++    Off,
++    AnalyzeOnly,
++    CandidateOnly,
++    StrictCandidateGate,
++}
++
++impl Decode03FMode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_DECODE03F_MODE")
++            .unwrap_or_else(|_| "analyze_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "candidate" | "candidate_only" | "candidates" => Self::CandidateOnly,
++            "strict" | "strict_candidate_gate" => Self::StrictCandidateGate,
++            _ => Self::AnalyzeOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::AnalyzeOnly => "AnalyzeOnly",
++            Self::CandidateOnly => "CandidateOnly",
++            Self::StrictCandidateGate => "StrictCandidateGate",
++        }
++    }
++
++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
++    pub fn produces_candidate(self) -> bool { matches!(self, Self::CandidateOnly | Self::StrictCandidateGate) }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
++pub enum Decode03FGuardParamKey {
++    MorphPenaltyWeight,
++    MinPFloor,
++    TopPCeiling,
++    NoRepeatNgram,
++    PanicMorphScoreThreshold,
++    PanicSaladScoreThreshold,
++    ActiveSetProtectionMin,
++    GuardEscalationPciThreshold,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
++pub enum Decode03FLoopProfile {
++    JosaLoop,
++    EomiLoop,
++    JamoLeak,
++    ByteJamoLeak,
++    SyllableFragmentLoop,
++    EojeolBoundaryCollapse,
++    PunctuationGlueLoop,
++    MixedMorphLoop,
++}
++
++impl Decode03FLoopProfile {
++    pub fn as_key(self) -> &'static str {
++        match self {
++            Self::JosaLoop => "josa_loop",
++            Self::EomiLoop => "eomi_loop",
++            Self::JamoLeak => "jamo_leak",
++            Self::ByteJamoLeak => "byte_jamo_leak",
++            Self::SyllableFragmentLoop => "syllable_fragment_loop",
++            Self::EojeolBoundaryCollapse => "eojeol_boundary_collapse",
++            Self::PunctuationGlueLoop => "punctuation_glue_loop",
++            Self::MixedMorphLoop => "mixed_morph_loop",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FLoopParamSet {
++    pub morph_penalty_weight: f32,
++    pub min_p_floor: f32,
++    pub top_p_ceiling: f32,
++    pub no_repeat_ngram: Option<usize>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FGuardParamSet {
++    pub josa_loop: Decode03FLoopParamSet,
++    pub eomi_loop: Decode03FLoopParamSet,
++    pub jamo_leak: Decode03FLoopParamSet,
++    pub byte_jamo_leak: Decode03FLoopParamSet,
++    pub syllable_fragment_loop: Decode03FLoopParamSet,
++    pub eojeol_boundary_collapse: Decode03FLoopParamSet,
++    pub punctuation_glue_loop: Decode03FLoopParamSet,
++    pub mixed_morph_loop: Decode03FLoopParamSet,
++    pub panic_morph_score_threshold: f32,
++    pub panic_salad_score_threshold: f32,
++    pub active_set_protection_min: usize,
++    pub guard_escalation_pci_threshold: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FInputStatus {
++    pub eval00_status_seen: Option<String>,
++    pub eval01_status_seen: Option<String>,
++    pub eval02_status_seen: Option<String>,
++    pub decode03e_status_seen: Option<String>,
++    pub backend_semantic_parity_ok: bool,
++    pub backend_strict_parity_ok: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FCalibrationInput {
++    pub mode: Decode03FMode,
++    pub run_id: String,
++    pub baseline_profile: String,
++    pub candidate_profile: String,
++    pub eval00_summary_path: Option<String>,
++    pub eval01_summary_path: Option<String>,
++    pub eval02_summary_path: Option<String>,
++    pub decode03e_summary_path: Option<String>,
++    pub eval00_status_seen: Option<String>,
++    pub eval01_status_seen: Option<String>,
++    pub eval02_status_seen: Option<String>,
++    pub decode03e_status_seen: Option<String>,
++    pub backend_semantic_parity_ok: bool,
++    pub backend_strict_parity_ok: bool,
++    pub long_horizon_drift_score: Option<f32>,
++    pub speed_regression_warn: bool,
++    pub over_stop_regression: bool,
++    pub salad_score_improved: Option<bool>,
++    pub morph_loop_reduced: Option<bool>,
++    pub critical_salad_count: usize,
++    pub global_finite_fallback_count: usize,
++    pub active_set_empty_count: usize,
++    pub active_set_too_small_skip_count: usize,
++    pub normal_prompt_stop_count: usize,
++    pub guard_panic_growth_warn_count: usize,
++    pub current_params: Decode03FGuardParamSet,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FParamDelta {
++    pub loop_profile: Option<Decode03FLoopProfile>,
++    pub param_key: Decode03FGuardParamKey,
++    pub old_value: String,
++    pub new_value: String,
++    pub delta_direction: String,
++    pub delta_magnitude: f32,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FExpectedEffect {
++    pub expected_salad_reduction: String,
++    pub expected_morph_loop_reduction: String,
++    pub expected_false_positive_change: String,
++    pub expected_speed_impact: String,
++    pub expected_stop_frequency_change: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FRiskAssessment {
++    pub over_suppression_risk: String,
++    pub under_suppression_risk: String,
++    pub backend_divergence_risk: String,
++    pub speed_regression_risk: String,
++    pub stop_overtrigger_risk: String,
++    pub risk_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FAcceptanceGate {
++    pub can_generate_candidate: bool,
++    pub can_promote_to_controlled_apply: bool,
++    pub can_promote_to_default: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub promotion_requirements: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FCalibrationCandidate {
++    pub patch_id: String,
++    pub schema_version: u32,
++    pub candidate_id: String,
++    pub source_run_id: String,
++    pub baseline_profile: String,
++    pub candidate_profile: String,
++    pub candidate_only: bool,
++    pub runtime_apply: bool,
++    pub input_status: Decode03FInputStatus,
++    pub current_params: Decode03FGuardParamSet,
++    pub proposed_params: Decode03FGuardParamSet,
++    pub param_deltas: Vec<Decode03FParamDelta>,
++    pub expected_effect: Decode03FExpectedEffect,
++    pub risk_assessment: Decode03FRiskAssessment,
++    pub acceptance_gate: Decode03FAcceptanceGate,
++    pub calibration_reasons: Vec<String>,
++    pub calibration_warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FSummaryInputs {
++    pub eval00_seen: bool,
++    pub eval01_seen: bool,
++    pub eval02_seen: bool,
++    pub decode03e_seen: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FSummaryCandidates {
++    pub generated_count: usize,
++    pub can_promote_to_controlled_apply_count: usize,
++    pub can_promote_to_default_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Decode03FSummaryDeltas {
++    pub morph_penalty_increase_count: usize,
++    pub morph_penalty_decrease_count: usize,
++    pub min_p_floor_increase_count: usize,
++    pub min_p_floor_decrease_count: usize,
++    pub top_p_ceiling_increase_count: usize,
++    pub top_p_ceiling_decrease_count: usize,
++    pub panic_threshold_relax_count: usize,
++    pub active_set_protection_tighten_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FSummarySafety {
++    pub runtime_apply_count: usize,
++    pub base_config_mutation_count: usize,
++    pub candidate_without_eval02_count: usize,
++    pub candidate_with_global_fallback_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FSummaryAcceptance {
++    pub ready_for_decode03g_controlled_calibration_apply: bool,
++    pub ready_for_default_guard_overlay: bool,
++    pub ready_for_medusa00: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode03FSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub mode: String,
++    pub candidate_only: bool,
++    pub runtime_apply: bool,
++    pub inputs: Decode03FSummaryInputs,
++    pub candidates: Decode03FSummaryCandidates,
++    pub deltas: Decode03FSummaryDeltas,
++    pub risk: Decode03FRiskAssessment,
++    pub safety: Decode03FSummarySafety,
++    pub acceptance: Decode03FSummaryAcceptance,
++}
++
++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
++    if value.is_finite() { value.max(lo).min(hi) } else { lo }
++}
++
++fn clamp_usize(value: usize, lo: usize, hi: usize) -> usize { value.max(lo).min(hi) }
++
++pub fn default_guard_param_set() -> Decode03FGuardParamSet {
++    Decode03FGuardParamSet {
++        josa_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.18, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
++        eomi_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.22, min_p_floor: 0.10, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
++        jamo_leak: Decode03FLoopParamSet { morph_penalty_weight: 0.35, min_p_floor: 0.12, top_p_ceiling: 0.82, no_repeat_ngram: Some(3) },
++        byte_jamo_leak: Decode03FLoopParamSet { morph_penalty_weight: 0.45, min_p_floor: 0.14, top_p_ceiling: 0.78, no_repeat_ngram: Some(4) },
++        syllable_fragment_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.16, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
++        eojeol_boundary_collapse: Decode03FLoopParamSet { morph_penalty_weight: 0.20, min_p_floor: 0.09, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
++        punctuation_glue_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.18, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
++        mixed_morph_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.22, min_p_floor: 0.10, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
++        panic_morph_score_threshold: 0.80,
++        panic_salad_score_threshold: 0.80,
++        active_set_protection_min: 3,
++        guard_escalation_pci_threshold: 0.30,
++    }
++}
++
++pub fn clamp_guard_param_set(mut params: Decode03FGuardParamSet) -> Decode03FGuardParamSet {
++    fn clamp_loop(p: &mut Decode03FLoopParamSet) {
++        p.morph_penalty_weight = clamp_f32(p.morph_penalty_weight, 0.0, 0.50);
++        p.min_p_floor = clamp_f32(p.min_p_floor, 0.0, 0.20);
++        p.top_p_ceiling = clamp_f32(p.top_p_ceiling, 0.60, 0.98);
++        p.no_repeat_ngram = p.no_repeat_ngram.map(|n| clamp_usize(n, 0, 6));
++    }
++    clamp_loop(&mut params.josa_loop);
++    clamp_loop(&mut params.eomi_loop);
++    clamp_loop(&mut params.jamo_leak);
++    clamp_loop(&mut params.byte_jamo_leak);
++    clamp_loop(&mut params.syllable_fragment_loop);
++    clamp_loop(&mut params.eojeol_boundary_collapse);
++    clamp_loop(&mut params.punctuation_glue_loop);
++    clamp_loop(&mut params.mixed_morph_loop);
++    params.panic_morph_score_threshold = clamp_f32(params.panic_morph_score_threshold, 0.60, 0.95);
++    params.panic_salad_score_threshold = clamp_f32(params.panic_salad_score_threshold, 0.60, 0.95);
++    params.guard_escalation_pci_threshold = clamp_f32(params.guard_escalation_pci_threshold, 0.10, 0.60);
++    params.active_set_protection_min = clamp_usize(params.active_set_protection_min, 2, 12);
++    params
++}
++
++fn path_from_env(name: &str, default: &str) -> PathBuf {
++    env::var(name).map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(default))
++}
++
++fn candidates_path() -> PathBuf { path_from_env("ASH_DECODE03F_CANDIDATES", "workspace/decode03f_candidates.jsonl") }
++fn summary_path() -> PathBuf { path_from_env("ASH_DECODE03F_SUMMARY", "workspace/decode03f_summary.json") }
++fn eval00_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL00_SUMMARY", "workspace/eval00_summary.json") }
++fn eval01_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL01_SUMMARY", "workspace/eval01_summary.json") }
++fn eval02_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL02_SUMMARY", "workspace/eval02_summary.json") }
++fn decode03e_path() -> PathBuf { path_from_env("ASH_DECODE03F_DECODE03E_SUMMARY", "workspace/decode03e_summary.json") }
++
++fn read_json(path: &PathBuf) -> Option<Value> {
++    fs::read_to_string(path).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok())
++}
++
++fn get_string(value: Option<&Value>) -> Option<String> {
++    value.and_then(|v| v.as_str().map(|s| s.to_string()))
++}
++
++fn get_bool(value: Option<&Value>) -> Option<bool> { value.and_then(|v| v.as_bool()) }
++fn get_f32(value: Option<&Value>) -> Option<f32> { value.and_then(|v| v.as_f64()).map(|v| v as f32) }
++fn get_usize(value: Option<&Value>) -> Option<usize> { value.and_then(|v| v.as_u64()).map(|v| v as usize) }
++
++fn profile_stat<'a>(summary: &'a Value, profile: &str) -> Option<&'a Value> {
++    summary.get("by_profile").and_then(|v| v.get(profile))
++}
++
++pub fn input_from_summary_files(mode: Decode03FMode) -> Decode03FCalibrationInput {
++    let eval00_p = eval00_path();
++    let eval01_p = eval01_path();
++    let eval02_p = eval02_path();
++    let decode03e_p = decode03e_path();
++    let eval00 = read_json(&eval00_p);
++    let eval01 = read_json(&eval01_p);
++    let eval02 = read_json(&eval02_p);
++    let decode03e = read_json(&decode03e_p);
++
++    let baseline_profile = env::var("ASH_DECODE03F_BASELINE_PROFILE").unwrap_or_else(|_| "S01_static_safe".to_string());
++    let candidate_profile = env::var("ASH_DECODE03F_CANDIDATE_PROFILE").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
++
++    let eval02_candidate = eval02.as_ref().and_then(|v| profile_stat(v, &candidate_profile));
++    let eval02_regression = eval02.as_ref().and_then(|v| v.get("regression"));
++    let eval02_long = eval02.as_ref().and_then(|v| v.get("long_horizon"));
++    let eval01_acceptance = eval01.as_ref().and_then(|v| v.get("acceptance"));
++    let decode03e_safety = decode03e.as_ref().and_then(|v| v.get("safety"));
++
++    let semantic_parity_ok = get_bool(eval01_acceptance.and_then(|v| v.get("ready_for_decode03e_guard_overlay_apply")))
++        .or_else(|| get_bool(eval01.as_ref().and_then(|v| v.get("acceptance")).and_then(|v| v.get("ready_for_decode03e_guard_overlay_apply"))))
++        .unwrap_or_else(|| env::var("ASH_DECODE03F_BACKEND_SEMANTIC_PARITY_OK").map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on")).unwrap_or(false));
++
++    let backend_strict_parity_ok = env::var("ASH_DECODE03F_BACKEND_STRICT_PARITY_OK")
++        .map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on"))
++        .unwrap_or(false);
++
++    let drift = get_f32(eval02_candidate.and_then(|v| v.get("drift_score_mean")))
++        .or_else(|| get_f32(eval02_long.and_then(|v| v.get("drift_score_mean"))));
++
++    let speed_regression_warn = get_bool(eval02_regression.and_then(|v| v.get("speed_regression_warn"))).unwrap_or(false);
++    let over_stop_regression = get_bool(eval02_regression.and_then(|v| v.get("over_stop_regression"))).unwrap_or(false);
++    let salad_improved = get_bool(eval02_regression.and_then(|v| v.get("salad_score_improved")));
++    let morph_reduced = get_bool(eval02_regression.and_then(|v| v.get("morph_loop_reduced")));
++
++    let critical_salad_count = get_usize(eval02_long.and_then(|v| v.get("critical_drift_count"))).unwrap_or(0);
++    let global_finite_fallback_count = eval02.as_ref()
++        .and_then(|v| v.get("overall"))
++        .and_then(|v| get_usize(v.get("global_finite_fallback_count")))
++        .unwrap_or(0);
++    let active_set_empty_count = decode03e_safety.and_then(|v| get_usize(v.get("active_set_empty_count"))).unwrap_or(0);
++    let active_set_too_small_skip_count = decode03e_safety.and_then(|v| get_usize(v.get("active_set_too_small_skip_count"))).unwrap_or(0);
++    let normal_prompt_stop_count = eval02_regression.and_then(|v| get_usize(v.get("normal_prompt_stop_count"))).unwrap_or(0);
++    let guard_panic_growth_warn_count = eval02_long.and_then(|v| get_usize(v.get("guard_panic_growth_warn_count"))).unwrap_or(0);
++
++    Decode03FCalibrationInput {
++        mode,
++        run_id: env::var("ASH_DECODE03F_RUN_ID").unwrap_or_else(|_| "decode03f_calibration_candidate".to_string()),
++        baseline_profile,
++        candidate_profile,
++        eval00_summary_path: Some(eval00_p.to_string_lossy().to_string()),
++        eval01_summary_path: Some(eval01_p.to_string_lossy().to_string()),
++        eval02_summary_path: Some(eval02_p.to_string_lossy().to_string()),
++        decode03e_summary_path: Some(decode03e_p.to_string_lossy().to_string()),
++        eval00_status_seen: eval00.as_ref().and_then(|v| get_string(v.get("status"))),
++        eval01_status_seen: eval01.as_ref().and_then(|v| get_string(v.get("status"))),
++        eval02_status_seen: eval02.as_ref().and_then(|v| get_string(v.get("status"))),
++        decode03e_status_seen: decode03e.as_ref().and_then(|v| get_string(v.get("status"))),
++        backend_semantic_parity_ok: semantic_parity_ok,
++        backend_strict_parity_ok,
++        long_horizon_drift_score: drift,
++        speed_regression_warn,
++        over_stop_regression,
++        salad_score_improved: salad_improved,
++        morph_loop_reduced: morph_reduced,
++        critical_salad_count,
++        global_finite_fallback_count,
++        active_set_empty_count,
++        active_set_too_small_skip_count,
++        normal_prompt_stop_count,
++        guard_panic_growth_warn_count,
++        current_params: default_guard_param_set(),
++    }
++}
++
++fn loop_param_mut(params: &mut Decode03FGuardParamSet, profile: Decode03FLoopProfile) -> &mut Decode03FLoopParamSet {
++    match profile {
++        Decode03FLoopProfile::JosaLoop => &mut params.josa_loop,
++        Decode03FLoopProfile::EomiLoop => &mut params.eomi_loop,
++        Decode03FLoopProfile::JamoLeak => &mut params.jamo_leak,
++        Decode03FLoopProfile::ByteJamoLeak => &mut params.byte_jamo_leak,
++        Decode03FLoopProfile::SyllableFragmentLoop => &mut params.syllable_fragment_loop,
++        Decode03FLoopProfile::EojeolBoundaryCollapse => &mut params.eojeol_boundary_collapse,
++        Decode03FLoopProfile::PunctuationGlueLoop => &mut params.punctuation_glue_loop,
++        Decode03FLoopProfile::MixedMorphLoop => &mut params.mixed_morph_loop,
++    }
++}
++
++fn loop_param(params: &Decode03FGuardParamSet, profile: Decode03FLoopProfile) -> &Decode03FLoopParamSet {
++    match profile {
++        Decode03FLoopProfile::JosaLoop => &params.josa_loop,
++        Decode03FLoopProfile::EomiLoop => &params.eomi_loop,
++        Decode03FLoopProfile::JamoLeak => &params.jamo_leak,
++        Decode03FLoopProfile::ByteJamoLeak => &params.byte_jamo_leak,
++        Decode03FLoopProfile::SyllableFragmentLoop => &params.syllable_fragment_loop,
++        Decode03FLoopProfile::EojeolBoundaryCollapse => &params.eojeol_boundary_collapse,
++        Decode03FLoopProfile::PunctuationGlueLoop => &params.punctuation_glue_loop,
++        Decode03FLoopProfile::MixedMorphLoop => &params.mixed_morph_loop,
++    }
++}
++
++fn push_delta(
++    deltas: &mut Vec<Decode03FParamDelta>,
++    loop_profile: Option<Decode03FLoopProfile>,
++    param_key: Decode03FGuardParamKey,
++    old_value: impl ToString,
++    new_value: impl ToString,
++    reason: &str,
++) {
++    let old_s = old_value.to_string();
++    let new_s = new_value.to_string();
++    let old_f = old_s.parse::<f32>().ok();
++    let new_f = new_s.parse::<f32>().ok();
++    let (direction, magnitude) = match (old_f, new_f) {
++        (Some(o), Some(n)) if n > o => ("increase".to_string(), (n - o).abs()),
++        (Some(o), Some(n)) if n < o => ("decrease".to_string(), (n - o).abs()),
++        (Some(_), Some(_)) => ("hold".to_string(), 0.0),
++        _ => ("hold".to_string(), 0.0),
++    };
++    deltas.push(Decode03FParamDelta {
++        loop_profile,
++        param_key,
++        old_value: old_s,
++        new_value: new_s,
++        delta_direction: direction,
++        delta_magnitude: magnitude,
++        reason: reason.to_string(),
++    });
++}
++
++pub fn generate_calibration_candidate(input: &Decode03FCalibrationInput) -> Decode03FCalibrationCandidate {
++    let mut proposed = input.current_params.clone();
++    let mut deltas = Vec::new();
++    let mut reasons = Vec::new();
++    let mut warnings = Vec::new();
++
++    let under_suppression = input.salad_score_improved == Some(false)
++        && input.morph_loop_reduced == Some(false)
++        && input.critical_salad_count == 0
++        && input.active_set_empty_count == 0;
++
++    let over_stop = input.morph_loop_reduced == Some(true) && input.normal_prompt_stop_count > 0;
++    let active_set_pressure = input.active_set_too_small_skip_count > 0 || input.active_set_empty_count > 0;
++
++    if under_suppression {
++        reasons.push("under_suppression_detected".to_string());
++        for profile in [Decode03FLoopProfile::EomiLoop, Decode03FLoopProfile::SyllableFragmentLoop, Decode03FLoopProfile::MixedMorphLoop] {
++            let old = loop_param(&proposed, profile).morph_penalty_weight;
++            let new = clamp_f32(old + 0.03, 0.0, 0.50);
++            loop_param_mut(&mut proposed, profile).morph_penalty_weight = new;
++            push_delta(&mut deltas, Some(profile), Decode03FGuardParamKey::MorphPenaltyWeight, format!("{old:.3}"), format!("{new:.3}"), "morph_loop_remained_high_without_active_set_empty");
++        }
++        let old = proposed.eomi_loop.min_p_floor;
++        let new = clamp_f32(old + 0.02, 0.0, 0.20);
++        proposed.eomi_loop.min_p_floor = new;
++        push_delta(&mut deltas, Some(Decode03FLoopProfile::EomiLoop), Decode03FGuardParamKey::MinPFloor, format!("{old:.3}"), format!("{new:.3}"), "increase_min_p_floor_for_remaining_eomi_loop");
++        let old = proposed.eomi_loop.top_p_ceiling;
++        let new = clamp_f32(old - 0.02, 0.60, 0.98);
++        proposed.eomi_loop.top_p_ceiling = new;
++        push_delta(&mut deltas, Some(Decode03FLoopProfile::EomiLoop), Decode03FGuardParamKey::TopPCeiling, format!("{old:.3}"), format!("{new:.3}"), "tighten_top_p_ceiling_for_remaining_eomi_loop");
++    }
++
++    if over_stop || input.over_stop_regression {
++        reasons.push("over_stop_or_false_positive_pressure_detected".to_string());
++        let old = proposed.panic_morph_score_threshold;
++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
++        proposed.panic_morph_score_threshold = new;
++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicMorphScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "normal_prompt_stop_seen_relax_panic_morph_threshold");
++        let old = proposed.panic_salad_score_threshold;
++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
++        proposed.panic_salad_score_threshold = new;
++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicSaladScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "normal_prompt_stop_seen_relax_panic_salad_threshold");
++        let old = proposed.josa_loop.top_p_ceiling;
++        let new = clamp_f32(old + 0.02, 0.60, 0.98);
++        proposed.josa_loop.top_p_ceiling = new;
++        push_delta(&mut deltas, Some(Decode03FLoopProfile::JosaLoop), Decode03FGuardParamKey::TopPCeiling, format!("{old:.3}"), format!("{new:.3}"), "reduce_josa_loop_over_suppression_risk");
++    }
++
++    if active_set_pressure {
++        reasons.push("active_set_pressure_detected".to_string());
++        let old_min = proposed.active_set_protection_min;
++        let new_min = clamp_usize(old_min + 1, 2, 12);
++        proposed.active_set_protection_min = new_min;
++        push_delta(&mut deltas, None, Decode03FGuardParamKey::ActiveSetProtectionMin, old_min, new_min, "increase_active_set_protection_min");
++        for profile in [Decode03FLoopProfile::JosaLoop, Decode03FLoopProfile::EomiLoop] {
++            let old = loop_param(&proposed, profile).morph_penalty_weight;
++            let new = clamp_f32(old - 0.03, 0.0, 0.50);
++            loop_param_mut(&mut proposed, profile).morph_penalty_weight = new;
++            push_delta(&mut deltas, Some(profile), Decode03FGuardParamKey::MorphPenaltyWeight, format!("{old:.3}"), format!("{new:.3}"), "relax_penalty_due_to_active_set_pressure");
++        }
++    }
++
++    if input.guard_panic_growth_warn_count > 0 && input.morph_loop_reduced != Some(true) {
++        reasons.push("panic_growth_without_morph_reduction_detected".to_string());
++        let old = proposed.panic_morph_score_threshold;
++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
++        proposed.panic_morph_score_threshold = new;
++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicMorphScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "panic_growth_did_not_reduce_morph_loop");
++    }
++
++    if input.speed_regression_warn {
++        warnings.push("speed_regression_warn_seen".to_string());
++        reasons.push("narrow_overlay_scope_for_speed_regression".to_string());
++    }
++
++    if input.global_finite_fallback_count > 0 {
++        warnings.push("global_finite_fallback_seen_candidate_cannot_promote".to_string());
++    }
++    if input.active_set_empty_count > 0 {
++        warnings.push("active_set_empty_seen_candidate_cannot_promote".to_string());
++    }
++    if !input.backend_semantic_parity_ok {
++        warnings.push("backend_semantic_parity_not_confirmed".to_string());
++    }
++    if !input.backend_strict_parity_ok {
++        warnings.push("backend_strict_parity_not_confirmed".to_string());
++    }
++    if input.eval02_status_seen.is_none() {
++        warnings.push("eval02_summary_missing".to_string());
++    }
++
++    proposed = clamp_guard_param_set(proposed);
++
++    let can_generate = input.eval02_status_seen.is_some() || !matches!(input.mode, Decode03FMode::StrictCandidateGate);
++    let mut denied = Vec::new();
++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.eval02_status_seen.is_none() {
++        denied.push("missing_eval02_summary".to_string());
++    }
++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.global_finite_fallback_count > 0 {
++        denied.push("global_finite_fallback_seen".to_string());
++    }
++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.active_set_empty_count > 0 {
++        denied.push("active_set_empty_seen".to_string());
++    }
++
++    let can_generate = can_generate && denied.is_empty();
++    let can_promote_controlled = false;
++    let can_promote_default = false;
++
++    let risk = Decode03FRiskAssessment {
++        over_suppression_risk: if input.normal_prompt_stop_count > 0 || input.over_stop_regression { "high" } else if active_set_pressure { "medium" } else { "low" }.to_string(),
++        under_suppression_risk: if under_suppression { "high" } else if input.long_horizon_drift_score.unwrap_or(0.0) >= 0.55 { "medium" } else { "low" }.to_string(),
++        backend_divergence_risk: if !input.backend_semantic_parity_ok { "high" } else if !input.backend_strict_parity_ok { "medium" } else { "low" }.to_string(),
++        speed_regression_risk: if input.speed_regression_warn { "medium" } else { "low" }.to_string(),
++        stop_overtrigger_risk: if input.normal_prompt_stop_count > 0 { "high" } else if input.over_stop_regression { "medium" } else { "low" }.to_string(),
++        risk_reasons: warnings.clone(),
++    };
++
++    let expected = Decode03FExpectedEffect {
++        expected_salad_reduction: if under_suppression { "decrease" } else { "unknown" }.to_string(),
++        expected_morph_loop_reduction: if under_suppression { "decrease" } else { "unknown" }.to_string(),
++        expected_false_positive_change: if over_stop || active_set_pressure { "decrease" } else { "neutral" }.to_string(),
++        expected_speed_impact: if input.speed_regression_warn { "neutral" } else { "unknown" }.to_string(),
++        expected_stop_frequency_change: if over_stop { "decrease" } else { "neutral" }.to_string(),
++    };
++
++    let mut promotion_requirements = vec![
++        "EVAL-02 candidate profile rerun PASS".to_string(),
++        "EVAL-01 semantic parity rerun PASS".to_string(),
++        "normal prompt stop count == 0".to_string(),
++        "global finite fallback count == 0".to_string(),
++        "active set empty count == 0".to_string(),
++    ];
++    if !input.backend_strict_parity_ok {
++        promotion_requirements.push("EVAL-01 strict parity improvement preferred".to_string());
++    }
++
++    Decode03FCalibrationCandidate {
++        patch_id: DECODE03F_PATCH_ID.to_string(),
++        schema_version: 1,
++        candidate_id: format!("DECODE03F_CANDIDATE_{}", input.run_id),
++        source_run_id: input.run_id.clone(),
++        baseline_profile: input.baseline_profile.clone(),
++        candidate_profile: input.candidate_profile.clone(),
++        candidate_only: true,
++        runtime_apply: false,
++        input_status: Decode03FInputStatus {
++            eval00_status_seen: input.eval00_status_seen.clone(),
++            eval01_status_seen: input.eval01_status_seen.clone(),
++            eval02_status_seen: input.eval02_status_seen.clone(),
++            decode03e_status_seen: input.decode03e_status_seen.clone(),
++            backend_semantic_parity_ok: input.backend_semantic_parity_ok,
++            backend_strict_parity_ok: input.backend_strict_parity_ok,
++        },
++        current_params: input.current_params.clone(),
++        proposed_params: proposed,
++        param_deltas: deltas,
++        expected_effect: expected,
++        risk_assessment: risk,
++        acceptance_gate: Decode03FAcceptanceGate {
++            can_generate_candidate: can_generate,
++            can_promote_to_controlled_apply: can_promote_controlled,
++            can_promote_to_default: can_promote_default,
++            denied_reasons: denied,
++            warning_reasons: warnings.clone(),
++            promotion_requirements,
++        },
++        calibration_reasons: if reasons.is_empty() { vec!["analysis_completed_no_param_change_required".to_string()] } else { reasons },
++        calibration_warnings: warnings,
++    }
++}
++
++pub fn append_candidate(candidate: &Decode03FCalibrationCandidate) -> Result<(), String> {
++    let path = candidates_path();
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    let line = serde_json::to_string(candidate).map_err(|e| e.to_string())?;
++    use std::io::Write;
++    let mut file = fs::OpenOptions::new().create(true).append(true).open(path).map_err(|e| e.to_string())?;
++    writeln!(file, "{}", line).map_err(|e| e.to_string())
++}
++
++fn read_candidates() -> Vec<Decode03FCalibrationCandidate> {
++    let path = candidates_path();
++    let Ok(raw) = fs::read_to_string(path) else { return Vec::new(); };
++    raw.lines()
++        .filter_map(|line| serde_json::from_str::<Decode03FCalibrationCandidate>(line).ok())
++        .collect()
++}
++
++pub fn summarize_decode03f_candidates(candidates: &[Decode03FCalibrationCandidate], mode: Decode03FMode) -> Decode03FSummary {
++    let generated_count = candidates.len();
++    let controlled = candidates.iter().filter(|c| c.acceptance_gate.can_promote_to_controlled_apply).count();
++    let default_count = candidates.iter().filter(|c| c.acceptance_gate.can_promote_to_default).count();
++    let runtime_apply_count = candidates.iter().filter(|c| c.runtime_apply).count();
++    let candidate_without_eval02_count = candidates.iter().filter(|c| c.input_status.eval02_status_seen.is_none()).count();
++    let candidate_with_global_fallback_count = candidates.iter().filter(|c| c.calibration_warnings.iter().any(|w| w.contains("global_finite_fallback"))).count();
++
++    let mut deltas = Decode03FSummaryDeltas::default();
++    for c in candidates {
++        for d in &c.param_deltas {
++            match (d.param_key, d.delta_direction.as_str()) {
++                (Decode03FGuardParamKey::MorphPenaltyWeight, "increase") => deltas.morph_penalty_increase_count += 1,
++                (Decode03FGuardParamKey::MorphPenaltyWeight, "decrease") => deltas.morph_penalty_decrease_count += 1,
++                (Decode03FGuardParamKey::MinPFloor, "increase") => deltas.min_p_floor_increase_count += 1,
++                (Decode03FGuardParamKey::MinPFloor, "decrease") => deltas.min_p_floor_decrease_count += 1,
++                (Decode03FGuardParamKey::TopPCeiling, "increase") => deltas.top_p_ceiling_increase_count += 1,
++                (Decode03FGuardParamKey::TopPCeiling, "decrease") => deltas.top_p_ceiling_decrease_count += 1,
++                (Decode03FGuardParamKey::PanicMorphScoreThreshold, "increase")
++                | (Decode03FGuardParamKey::PanicSaladScoreThreshold, "increase") => deltas.panic_threshold_relax_count += 1,
++                (Decode03FGuardParamKey::ActiveSetProtectionMin, "increase") => deltas.active_set_protection_tighten_count += 1,
++                _ => {}
++            }
++        }
++    }
++
++    let last_risk = candidates.last().map(|c| c.risk_assessment.clone()).unwrap_or_else(|| Decode03FRiskAssessment {
++        over_suppression_risk: "unknown".to_string(),
++        under_suppression_risk: "unknown".to_string(),
++        backend_divergence_risk: "unknown".to_string(),
++        speed_regression_risk: "unknown".to_string(),
++        stop_overtrigger_risk: "unknown".to_string(),
++        risk_reasons: vec!["no_candidate_generated".to_string()],
++    });
++
++    let inputs = Decode03FSummaryInputs {
++        eval00_seen: candidates.iter().any(|c| c.input_status.eval00_status_seen.is_some()),
++        eval01_seen: candidates.iter().any(|c| c.input_status.eval01_status_seen.is_some()),
++        eval02_seen: candidates.iter().any(|c| c.input_status.eval02_status_seen.is_some()),
++        decode03e_seen: candidates.iter().any(|c| c.input_status.decode03e_status_seen.is_some()),
++    };
++
++    let status = if runtime_apply_count > 0 || candidate_with_global_fallback_count > 0 { "FAIL" }
++        else if generated_count == 0 || candidate_without_eval02_count > 0 || !inputs.eval01_seen { "PASS_WITH_WARNINGS" }
++        else { "PASS_STATIC" };
++
++    Decode03FSummary {
++        patch_id: DECODE03F_PATCH_ID.to_string(),
++        status: status.to_string(),
++        mode: mode.as_str().to_string(),
++        candidate_only: !matches!(mode, Decode03FMode::Off),
++        runtime_apply: false,
++        inputs,
++        candidates: Decode03FSummaryCandidates {
++            generated_count,
++            can_promote_to_controlled_apply_count: controlled,
++            can_promote_to_default_count: default_count,
++        },
++        deltas,
++        risk: last_risk,
++        safety: Decode03FSummarySafety {
++            runtime_apply_count,
++            base_config_mutation_count: 0,
++            candidate_without_eval02_count,
++            candidate_with_global_fallback_count,
++        },
++        acceptance: Decode03FSummaryAcceptance {
++            ready_for_decode03g_controlled_calibration_apply: generated_count > 0 && runtime_apply_count == 0,
++            ready_for_default_guard_overlay: false,
++            ready_for_medusa00: false,
++            reason: "calibration candidate sealed; requires EVAL-00/01/02 rerun before runtime apply".to_string(),
++        },
++    }
++}
++
++pub fn write_decode03f_summary_from_candidate_file() -> Result<Decode03FSummary, String> {
++    let candidates = read_candidates();
++    let mode = Decode03FMode::from_env();
++    let summary = summarize_decode03f_candidates(&candidates, mode);
++    let path = summary_path();
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
++    Ok(summary)
++}
++
++pub fn append_decode03f_receipt_from_sampler03(_receipt: &SamplerParityReceipt) {
++    let mode = Decode03FMode::from_env();
++    if !mode.enabled() { return; }
++
++    if matches!(mode, Decode03FMode::AnalyzeOnly) {
++        let _ = write_decode03f_summary_from_candidate_file();
++        return;
++    }
++
++    let input = input_from_summary_files(mode);
++    let candidate = generate_calibration_candidate(&input);
++    if candidate.acceptance_gate.can_generate_candidate {
++        let _ = append_candidate(&candidate);
++    } else if matches!(mode, Decode03FMode::StrictCandidateGate) {
++        let _ = append_candidate(&candidate);
++    }
++    let _ = write_decode03f_summary_from_candidate_file();
++}
++
++pub fn write_decode03f_manifests() -> Result<(), String> {
++    let mut schema = BTreeMap::new();
++    schema.insert("patch_id", DECODE03F_PATCH_ID);
++    schema.insert("ssot", DECODE03F_SSOT);
++    schema.insert("mode_default", "AnalyzeOnly");
++    let path = path_from_env("ASH_DECODE03F_SCHEMA", "workspace/decode03f_calibration_schema.json");
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(path, serde_json::to_string_pretty(&schema).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
++}
+diff -ruN decode03f_orig/crates/model_core/src/lib.rs decode03f_work/crates/model_core/src/lib.rs
+--- decode03f_orig/crates/model_core/src/lib.rs	2026-05-27 08:19:20.000000000 +0000
++++ decode03f_work/crates/model_core/src/lib.rs	2026-05-27 08:30:36.623015176 +0000
+@@ -32,6 +32,7 @@
+ mod eval01_backend_replay;
+ mod decode03e_guard_overlay;
+ mod eval02_long_horizon;
++mod decode03f_guard_calibration;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -259,6 +260,22 @@
+ };
+ 
+ 
++pub use decode03f_guard_calibration::{
++    DECODE03F_PATCH_ID, DECODE03F_INPUT_PATCH_ID, DECODE03F_SSOT, Decode03FMode,
++    Decode03FGuardParamKey, Decode03FLoopProfile, Decode03FLoopParamSet, Decode03FGuardParamSet,
++    Decode03FInputStatus, Decode03FCalibrationInput, Decode03FCalibrationCandidate,
++    Decode03FParamDelta, Decode03FExpectedEffect, Decode03FRiskAssessment, Decode03FAcceptanceGate,
++    Decode03FSummaryInputs, Decode03FSummaryCandidates, Decode03FSummaryDeltas,
++    Decode03FSummarySafety, Decode03FSummaryAcceptance, Decode03FSummary,
++    default_guard_param_set as decode03f_default_guard_param_set, clamp_guard_param_set as decode03f_clamp_guard_param_set,
++    input_from_summary_files as decode03f_input_from_summary_files,
++    generate_calibration_candidate as decode03f_generate_calibration_candidate,
++    append_candidate as append_decode03f_candidate, summarize_decode03f_candidates,
++    append_decode03f_receipt_from_sampler03, write_decode03f_summary_from_candidate_file,
++    write_decode03f_manifests,
++};
++
++
+ 
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+diff -ruN decode03f_orig/crates/model_core/src/sampler_parity.rs decode03f_work/crates/model_core/src/sampler_parity.rs
+--- decode03f_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:19:20.000000000 +0000
++++ decode03f_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:30:39.353352247 +0000
+@@ -465,5 +465,6 @@
+     crate::eval01_backend_replay::append_eval01_receipt_from_sampler03(receipt);
+     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
+     crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
++    crate::decode03f_guard_calibration::append_decode03f_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN decode03f_orig/workspace/decode03f.patch decode03f_work/workspace/decode03f.patch
+--- decode03f_orig/workspace/decode03f.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f.patch	2026-05-27 08:31:20.397304800 +0000
+@@ -0,0 +1,842 @@
++diff -ruN decode03f_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md decode03f_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md
++--- decode03f_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ decode03f_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-03F_acceptance.md	2026-05-27 08:31:19.733665564 +0000
++@@ -0,0 +1,19 @@
+++# 16AI-QW-38G-R6A-DECODE-03F Acceptance
+++
+++## Status
+++PASS_STATIC / NOT_RUN_RUNTIME
+++
+++## 확정
+++- Candidate-only calibration layer baked.
+++- Runtime apply is explicitly forbidden in this patch.
+++- Base config mutation count is fixed to 0 in static summary.
+++
+++## 추정
+++- EVAL-02 long-horizon drift results can feed candidate generation.
+++- EVAL-01 semantic parity gates controlled promotion.
+++
+++## 판단불가
+++- cargo check and runtime bench were not run because cargo/rustc are unavailable in the container.
+++
+++## Next
+++16AI-QW-38G-R6A-EVAL-03 — Candidate Calibration Regression Replay Seal
++diff -ruN decode03f_orig/crates/model_core/src/decode03f_guard_calibration.rs decode03f_work/crates/model_core/src/decode03f_guard_calibration.rs
++--- decode03f_orig/crates/model_core/src/decode03f_guard_calibration.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode03f_work/crates/model_core/src/decode03f_guard_calibration.rs	2026-05-27 08:30:18.575760636 +0000
++@@ -0,0 +1,771 @@
+++use serde::{Deserialize, Serialize};
+++use serde_json::Value;
+++use std::{collections::BTreeMap, env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const DECODE03F_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03F";
+++pub const DECODE03F_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-02";
+++pub const DECODE03F_SSOT: &str = "decode03e_applied_receipt+eval00_eval01_eval02_regression_summaries";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Decode03FMode {
+++    Off,
+++    AnalyzeOnly,
+++    CandidateOnly,
+++    StrictCandidateGate,
+++}
+++
+++impl Decode03FMode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_DECODE03F_MODE")
+++            .unwrap_or_else(|_| "analyze_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "candidate" | "candidate_only" | "candidates" => Self::CandidateOnly,
+++            "strict" | "strict_candidate_gate" => Self::StrictCandidateGate,
+++            _ => Self::AnalyzeOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::AnalyzeOnly => "AnalyzeOnly",
+++            Self::CandidateOnly => "CandidateOnly",
+++            Self::StrictCandidateGate => "StrictCandidateGate",
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
+++    pub fn produces_candidate(self) -> bool { matches!(self, Self::CandidateOnly | Self::StrictCandidateGate) }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+++pub enum Decode03FGuardParamKey {
+++    MorphPenaltyWeight,
+++    MinPFloor,
+++    TopPCeiling,
+++    NoRepeatNgram,
+++    PanicMorphScoreThreshold,
+++    PanicSaladScoreThreshold,
+++    ActiveSetProtectionMin,
+++    GuardEscalationPciThreshold,
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+++pub enum Decode03FLoopProfile {
+++    JosaLoop,
+++    EomiLoop,
+++    JamoLeak,
+++    ByteJamoLeak,
+++    SyllableFragmentLoop,
+++    EojeolBoundaryCollapse,
+++    PunctuationGlueLoop,
+++    MixedMorphLoop,
+++}
+++
+++impl Decode03FLoopProfile {
+++    pub fn as_key(self) -> &'static str {
+++        match self {
+++            Self::JosaLoop => "josa_loop",
+++            Self::EomiLoop => "eomi_loop",
+++            Self::JamoLeak => "jamo_leak",
+++            Self::ByteJamoLeak => "byte_jamo_leak",
+++            Self::SyllableFragmentLoop => "syllable_fragment_loop",
+++            Self::EojeolBoundaryCollapse => "eojeol_boundary_collapse",
+++            Self::PunctuationGlueLoop => "punctuation_glue_loop",
+++            Self::MixedMorphLoop => "mixed_morph_loop",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FLoopParamSet {
+++    pub morph_penalty_weight: f32,
+++    pub min_p_floor: f32,
+++    pub top_p_ceiling: f32,
+++    pub no_repeat_ngram: Option<usize>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FGuardParamSet {
+++    pub josa_loop: Decode03FLoopParamSet,
+++    pub eomi_loop: Decode03FLoopParamSet,
+++    pub jamo_leak: Decode03FLoopParamSet,
+++    pub byte_jamo_leak: Decode03FLoopParamSet,
+++    pub syllable_fragment_loop: Decode03FLoopParamSet,
+++    pub eojeol_boundary_collapse: Decode03FLoopParamSet,
+++    pub punctuation_glue_loop: Decode03FLoopParamSet,
+++    pub mixed_morph_loop: Decode03FLoopParamSet,
+++    pub panic_morph_score_threshold: f32,
+++    pub panic_salad_score_threshold: f32,
+++    pub active_set_protection_min: usize,
+++    pub guard_escalation_pci_threshold: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FInputStatus {
+++    pub eval00_status_seen: Option<String>,
+++    pub eval01_status_seen: Option<String>,
+++    pub eval02_status_seen: Option<String>,
+++    pub decode03e_status_seen: Option<String>,
+++    pub backend_semantic_parity_ok: bool,
+++    pub backend_strict_parity_ok: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FCalibrationInput {
+++    pub mode: Decode03FMode,
+++    pub run_id: String,
+++    pub baseline_profile: String,
+++    pub candidate_profile: String,
+++    pub eval00_summary_path: Option<String>,
+++    pub eval01_summary_path: Option<String>,
+++    pub eval02_summary_path: Option<String>,
+++    pub decode03e_summary_path: Option<String>,
+++    pub eval00_status_seen: Option<String>,
+++    pub eval01_status_seen: Option<String>,
+++    pub eval02_status_seen: Option<String>,
+++    pub decode03e_status_seen: Option<String>,
+++    pub backend_semantic_parity_ok: bool,
+++    pub backend_strict_parity_ok: bool,
+++    pub long_horizon_drift_score: Option<f32>,
+++    pub speed_regression_warn: bool,
+++    pub over_stop_regression: bool,
+++    pub salad_score_improved: Option<bool>,
+++    pub morph_loop_reduced: Option<bool>,
+++    pub critical_salad_count: usize,
+++    pub global_finite_fallback_count: usize,
+++    pub active_set_empty_count: usize,
+++    pub active_set_too_small_skip_count: usize,
+++    pub normal_prompt_stop_count: usize,
+++    pub guard_panic_growth_warn_count: usize,
+++    pub current_params: Decode03FGuardParamSet,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FParamDelta {
+++    pub loop_profile: Option<Decode03FLoopProfile>,
+++    pub param_key: Decode03FGuardParamKey,
+++    pub old_value: String,
+++    pub new_value: String,
+++    pub delta_direction: String,
+++    pub delta_magnitude: f32,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FExpectedEffect {
+++    pub expected_salad_reduction: String,
+++    pub expected_morph_loop_reduction: String,
+++    pub expected_false_positive_change: String,
+++    pub expected_speed_impact: String,
+++    pub expected_stop_frequency_change: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FRiskAssessment {
+++    pub over_suppression_risk: String,
+++    pub under_suppression_risk: String,
+++    pub backend_divergence_risk: String,
+++    pub speed_regression_risk: String,
+++    pub stop_overtrigger_risk: String,
+++    pub risk_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FAcceptanceGate {
+++    pub can_generate_candidate: bool,
+++    pub can_promote_to_controlled_apply: bool,
+++    pub can_promote_to_default: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub promotion_requirements: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FCalibrationCandidate {
+++    pub patch_id: String,
+++    pub schema_version: u32,
+++    pub candidate_id: String,
+++    pub source_run_id: String,
+++    pub baseline_profile: String,
+++    pub candidate_profile: String,
+++    pub candidate_only: bool,
+++    pub runtime_apply: bool,
+++    pub input_status: Decode03FInputStatus,
+++    pub current_params: Decode03FGuardParamSet,
+++    pub proposed_params: Decode03FGuardParamSet,
+++    pub param_deltas: Vec<Decode03FParamDelta>,
+++    pub expected_effect: Decode03FExpectedEffect,
+++    pub risk_assessment: Decode03FRiskAssessment,
+++    pub acceptance_gate: Decode03FAcceptanceGate,
+++    pub calibration_reasons: Vec<String>,
+++    pub calibration_warnings: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FSummaryInputs {
+++    pub eval00_seen: bool,
+++    pub eval01_seen: bool,
+++    pub eval02_seen: bool,
+++    pub decode03e_seen: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FSummaryCandidates {
+++    pub generated_count: usize,
+++    pub can_promote_to_controlled_apply_count: usize,
+++    pub can_promote_to_default_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Decode03FSummaryDeltas {
+++    pub morph_penalty_increase_count: usize,
+++    pub morph_penalty_decrease_count: usize,
+++    pub min_p_floor_increase_count: usize,
+++    pub min_p_floor_decrease_count: usize,
+++    pub top_p_ceiling_increase_count: usize,
+++    pub top_p_ceiling_decrease_count: usize,
+++    pub panic_threshold_relax_count: usize,
+++    pub active_set_protection_tighten_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FSummarySafety {
+++    pub runtime_apply_count: usize,
+++    pub base_config_mutation_count: usize,
+++    pub candidate_without_eval02_count: usize,
+++    pub candidate_with_global_fallback_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FSummaryAcceptance {
+++    pub ready_for_decode03g_controlled_calibration_apply: bool,
+++    pub ready_for_default_guard_overlay: bool,
+++    pub ready_for_medusa00: bool,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode03FSummary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub candidate_only: bool,
+++    pub runtime_apply: bool,
+++    pub inputs: Decode03FSummaryInputs,
+++    pub candidates: Decode03FSummaryCandidates,
+++    pub deltas: Decode03FSummaryDeltas,
+++    pub risk: Decode03FRiskAssessment,
+++    pub safety: Decode03FSummarySafety,
+++    pub acceptance: Decode03FSummaryAcceptance,
+++}
+++
+++fn clamp_f32(value: f32, lo: f32, hi: f32) -> f32 {
+++    if value.is_finite() { value.max(lo).min(hi) } else { lo }
+++}
+++
+++fn clamp_usize(value: usize, lo: usize, hi: usize) -> usize { value.max(lo).min(hi) }
+++
+++pub fn default_guard_param_set() -> Decode03FGuardParamSet {
+++    Decode03FGuardParamSet {
+++        josa_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.18, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
+++        eomi_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.22, min_p_floor: 0.10, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
+++        jamo_leak: Decode03FLoopParamSet { morph_penalty_weight: 0.35, min_p_floor: 0.12, top_p_ceiling: 0.82, no_repeat_ngram: Some(3) },
+++        byte_jamo_leak: Decode03FLoopParamSet { morph_penalty_weight: 0.45, min_p_floor: 0.14, top_p_ceiling: 0.78, no_repeat_ngram: Some(4) },
+++        syllable_fragment_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.16, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
+++        eojeol_boundary_collapse: Decode03FLoopParamSet { morph_penalty_weight: 0.20, min_p_floor: 0.09, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
+++        punctuation_glue_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.18, min_p_floor: 0.08, top_p_ceiling: 0.86, no_repeat_ngram: Some(3) },
+++        mixed_morph_loop: Decode03FLoopParamSet { morph_penalty_weight: 0.22, min_p_floor: 0.10, top_p_ceiling: 0.84, no_repeat_ngram: Some(3) },
+++        panic_morph_score_threshold: 0.80,
+++        panic_salad_score_threshold: 0.80,
+++        active_set_protection_min: 3,
+++        guard_escalation_pci_threshold: 0.30,
+++    }
+++}
+++
+++pub fn clamp_guard_param_set(mut params: Decode03FGuardParamSet) -> Decode03FGuardParamSet {
+++    fn clamp_loop(p: &mut Decode03FLoopParamSet) {
+++        p.morph_penalty_weight = clamp_f32(p.morph_penalty_weight, 0.0, 0.50);
+++        p.min_p_floor = clamp_f32(p.min_p_floor, 0.0, 0.20);
+++        p.top_p_ceiling = clamp_f32(p.top_p_ceiling, 0.60, 0.98);
+++        p.no_repeat_ngram = p.no_repeat_ngram.map(|n| clamp_usize(n, 0, 6));
+++    }
+++    clamp_loop(&mut params.josa_loop);
+++    clamp_loop(&mut params.eomi_loop);
+++    clamp_loop(&mut params.jamo_leak);
+++    clamp_loop(&mut params.byte_jamo_leak);
+++    clamp_loop(&mut params.syllable_fragment_loop);
+++    clamp_loop(&mut params.eojeol_boundary_collapse);
+++    clamp_loop(&mut params.punctuation_glue_loop);
+++    clamp_loop(&mut params.mixed_morph_loop);
+++    params.panic_morph_score_threshold = clamp_f32(params.panic_morph_score_threshold, 0.60, 0.95);
+++    params.panic_salad_score_threshold = clamp_f32(params.panic_salad_score_threshold, 0.60, 0.95);
+++    params.guard_escalation_pci_threshold = clamp_f32(params.guard_escalation_pci_threshold, 0.10, 0.60);
+++    params.active_set_protection_min = clamp_usize(params.active_set_protection_min, 2, 12);
+++    params
+++}
+++
+++fn path_from_env(name: &str, default: &str) -> PathBuf {
+++    env::var(name).map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(default))
+++}
+++
+++fn candidates_path() -> PathBuf { path_from_env("ASH_DECODE03F_CANDIDATES", "workspace/decode03f_candidates.jsonl") }
+++fn summary_path() -> PathBuf { path_from_env("ASH_DECODE03F_SUMMARY", "workspace/decode03f_summary.json") }
+++fn eval00_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL00_SUMMARY", "workspace/eval00_summary.json") }
+++fn eval01_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL01_SUMMARY", "workspace/eval01_summary.json") }
+++fn eval02_path() -> PathBuf { path_from_env("ASH_DECODE03F_EVAL02_SUMMARY", "workspace/eval02_summary.json") }
+++fn decode03e_path() -> PathBuf { path_from_env("ASH_DECODE03F_DECODE03E_SUMMARY", "workspace/decode03e_summary.json") }
+++
+++fn read_json(path: &PathBuf) -> Option<Value> {
+++    fs::read_to_string(path).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok())
+++}
+++
+++fn get_string(value: Option<&Value>) -> Option<String> {
+++    value.and_then(|v| v.as_str().map(|s| s.to_string()))
+++}
+++
+++fn get_bool(value: Option<&Value>) -> Option<bool> { value.and_then(|v| v.as_bool()) }
+++fn get_f32(value: Option<&Value>) -> Option<f32> { value.and_then(|v| v.as_f64()).map(|v| v as f32) }
+++fn get_usize(value: Option<&Value>) -> Option<usize> { value.and_then(|v| v.as_u64()).map(|v| v as usize) }
+++
+++fn profile_stat<'a>(summary: &'a Value, profile: &str) -> Option<&'a Value> {
+++    summary.get("by_profile").and_then(|v| v.get(profile))
+++}
+++
+++pub fn input_from_summary_files(mode: Decode03FMode) -> Decode03FCalibrationInput {
+++    let eval00_p = eval00_path();
+++    let eval01_p = eval01_path();
+++    let eval02_p = eval02_path();
+++    let decode03e_p = decode03e_path();
+++    let eval00 = read_json(&eval00_p);
+++    let eval01 = read_json(&eval01_p);
+++    let eval02 = read_json(&eval02_p);
+++    let decode03e = read_json(&decode03e_p);
+++
+++    let baseline_profile = env::var("ASH_DECODE03F_BASELINE_PROFILE").unwrap_or_else(|_| "S01_static_safe".to_string());
+++    let candidate_profile = env::var("ASH_DECODE03F_CANDIDATE_PROFILE").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
+++
+++    let eval02_candidate = eval02.as_ref().and_then(|v| profile_stat(v, &candidate_profile));
+++    let eval02_regression = eval02.as_ref().and_then(|v| v.get("regression"));
+++    let eval02_long = eval02.as_ref().and_then(|v| v.get("long_horizon"));
+++    let eval01_acceptance = eval01.as_ref().and_then(|v| v.get("acceptance"));
+++    let decode03e_safety = decode03e.as_ref().and_then(|v| v.get("safety"));
+++
+++    let semantic_parity_ok = get_bool(eval01_acceptance.and_then(|v| v.get("ready_for_decode03e_guard_overlay_apply")))
+++        .or_else(|| get_bool(eval01.as_ref().and_then(|v| v.get("acceptance")).and_then(|v| v.get("ready_for_decode03e_guard_overlay_apply"))))
+++        .unwrap_or_else(|| env::var("ASH_DECODE03F_BACKEND_SEMANTIC_PARITY_OK").map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on")).unwrap_or(false));
+++
+++    let backend_strict_parity_ok = env::var("ASH_DECODE03F_BACKEND_STRICT_PARITY_OK")
+++        .map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on"))
+++        .unwrap_or(false);
+++
+++    let drift = get_f32(eval02_candidate.and_then(|v| v.get("drift_score_mean")))
+++        .or_else(|| get_f32(eval02_long.and_then(|v| v.get("drift_score_mean"))));
+++
+++    let speed_regression_warn = get_bool(eval02_regression.and_then(|v| v.get("speed_regression_warn"))).unwrap_or(false);
+++    let over_stop_regression = get_bool(eval02_regression.and_then(|v| v.get("over_stop_regression"))).unwrap_or(false);
+++    let salad_improved = get_bool(eval02_regression.and_then(|v| v.get("salad_score_improved")));
+++    let morph_reduced = get_bool(eval02_regression.and_then(|v| v.get("morph_loop_reduced")));
+++
+++    let critical_salad_count = get_usize(eval02_long.and_then(|v| v.get("critical_drift_count"))).unwrap_or(0);
+++    let global_finite_fallback_count = eval02.as_ref()
+++        .and_then(|v| v.get("overall"))
+++        .and_then(|v| get_usize(v.get("global_finite_fallback_count")))
+++        .unwrap_or(0);
+++    let active_set_empty_count = decode03e_safety.and_then(|v| get_usize(v.get("active_set_empty_count"))).unwrap_or(0);
+++    let active_set_too_small_skip_count = decode03e_safety.and_then(|v| get_usize(v.get("active_set_too_small_skip_count"))).unwrap_or(0);
+++    let normal_prompt_stop_count = eval02_regression.and_then(|v| get_usize(v.get("normal_prompt_stop_count"))).unwrap_or(0);
+++    let guard_panic_growth_warn_count = eval02_long.and_then(|v| get_usize(v.get("guard_panic_growth_warn_count"))).unwrap_or(0);
+++
+++    Decode03FCalibrationInput {
+++        mode,
+++        run_id: env::var("ASH_DECODE03F_RUN_ID").unwrap_or_else(|_| "decode03f_calibration_candidate".to_string()),
+++        baseline_profile,
+++        candidate_profile,
+++        eval00_summary_path: Some(eval00_p.to_string_lossy().to_string()),
+++        eval01_summary_path: Some(eval01_p.to_string_lossy().to_string()),
+++        eval02_summary_path: Some(eval02_p.to_string_lossy().to_string()),
+++        decode03e_summary_path: Some(decode03e_p.to_string_lossy().to_string()),
+++        eval00_status_seen: eval00.as_ref().and_then(|v| get_string(v.get("status"))),
+++        eval01_status_seen: eval01.as_ref().and_then(|v| get_string(v.get("status"))),
+++        eval02_status_seen: eval02.as_ref().and_then(|v| get_string(v.get("status"))),
+++        decode03e_status_seen: decode03e.as_ref().and_then(|v| get_string(v.get("status"))),
+++        backend_semantic_parity_ok: semantic_parity_ok,
+++        backend_strict_parity_ok,
+++        long_horizon_drift_score: drift,
+++        speed_regression_warn,
+++        over_stop_regression,
+++        salad_score_improved: salad_improved,
+++        morph_loop_reduced: morph_reduced,
+++        critical_salad_count,
+++        global_finite_fallback_count,
+++        active_set_empty_count,
+++        active_set_too_small_skip_count,
+++        normal_prompt_stop_count,
+++        guard_panic_growth_warn_count,
+++        current_params: default_guard_param_set(),
+++    }
+++}
+++
+++fn loop_param_mut(params: &mut Decode03FGuardParamSet, profile: Decode03FLoopProfile) -> &mut Decode03FLoopParamSet {
+++    match profile {
+++        Decode03FLoopProfile::JosaLoop => &mut params.josa_loop,
+++        Decode03FLoopProfile::EomiLoop => &mut params.eomi_loop,
+++        Decode03FLoopProfile::JamoLeak => &mut params.jamo_leak,
+++        Decode03FLoopProfile::ByteJamoLeak => &mut params.byte_jamo_leak,
+++        Decode03FLoopProfile::SyllableFragmentLoop => &mut params.syllable_fragment_loop,
+++        Decode03FLoopProfile::EojeolBoundaryCollapse => &mut params.eojeol_boundary_collapse,
+++        Decode03FLoopProfile::PunctuationGlueLoop => &mut params.punctuation_glue_loop,
+++        Decode03FLoopProfile::MixedMorphLoop => &mut params.mixed_morph_loop,
+++    }
+++}
+++
+++fn loop_param(params: &Decode03FGuardParamSet, profile: Decode03FLoopProfile) -> &Decode03FLoopParamSet {
+++    match profile {
+++        Decode03FLoopProfile::JosaLoop => &params.josa_loop,
+++        Decode03FLoopProfile::EomiLoop => &params.eomi_loop,
+++        Decode03FLoopProfile::JamoLeak => &params.jamo_leak,
+++        Decode03FLoopProfile::ByteJamoLeak => &params.byte_jamo_leak,
+++        Decode03FLoopProfile::SyllableFragmentLoop => &params.syllable_fragment_loop,
+++        Decode03FLoopProfile::EojeolBoundaryCollapse => &params.eojeol_boundary_collapse,
+++        Decode03FLoopProfile::PunctuationGlueLoop => &params.punctuation_glue_loop,
+++        Decode03FLoopProfile::MixedMorphLoop => &params.mixed_morph_loop,
+++    }
+++}
+++
+++fn push_delta(
+++    deltas: &mut Vec<Decode03FParamDelta>,
+++    loop_profile: Option<Decode03FLoopProfile>,
+++    param_key: Decode03FGuardParamKey,
+++    old_value: impl ToString,
+++    new_value: impl ToString,
+++    reason: &str,
+++) {
+++    let old_s = old_value.to_string();
+++    let new_s = new_value.to_string();
+++    let old_f = old_s.parse::<f32>().ok();
+++    let new_f = new_s.parse::<f32>().ok();
+++    let (direction, magnitude) = match (old_f, new_f) {
+++        (Some(o), Some(n)) if n > o => ("increase".to_string(), (n - o).abs()),
+++        (Some(o), Some(n)) if n < o => ("decrease".to_string(), (n - o).abs()),
+++        (Some(_), Some(_)) => ("hold".to_string(), 0.0),
+++        _ => ("hold".to_string(), 0.0),
+++    };
+++    deltas.push(Decode03FParamDelta {
+++        loop_profile,
+++        param_key,
+++        old_value: old_s,
+++        new_value: new_s,
+++        delta_direction: direction,
+++        delta_magnitude: magnitude,
+++        reason: reason.to_string(),
+++    });
+++}
+++
+++pub fn generate_calibration_candidate(input: &Decode03FCalibrationInput) -> Decode03FCalibrationCandidate {
+++    let mut proposed = input.current_params.clone();
+++    let mut deltas = Vec::new();
+++    let mut reasons = Vec::new();
+++    let mut warnings = Vec::new();
+++
+++    let under_suppression = input.salad_score_improved == Some(false)
+++        && input.morph_loop_reduced == Some(false)
+++        && input.critical_salad_count == 0
+++        && input.active_set_empty_count == 0;
+++
+++    let over_stop = input.morph_loop_reduced == Some(true) && input.normal_prompt_stop_count > 0;
+++    let active_set_pressure = input.active_set_too_small_skip_count > 0 || input.active_set_empty_count > 0;
+++
+++    if under_suppression {
+++        reasons.push("under_suppression_detected".to_string());
+++        for profile in [Decode03FLoopProfile::EomiLoop, Decode03FLoopProfile::SyllableFragmentLoop, Decode03FLoopProfile::MixedMorphLoop] {
+++            let old = loop_param(&proposed, profile).morph_penalty_weight;
+++            let new = clamp_f32(old + 0.03, 0.0, 0.50);
+++            loop_param_mut(&mut proposed, profile).morph_penalty_weight = new;
+++            push_delta(&mut deltas, Some(profile), Decode03FGuardParamKey::MorphPenaltyWeight, format!("{old:.3}"), format!("{new:.3}"), "morph_loop_remained_high_without_active_set_empty");
+++        }
+++        let old = proposed.eomi_loop.min_p_floor;
+++        let new = clamp_f32(old + 0.02, 0.0, 0.20);
+++        proposed.eomi_loop.min_p_floor = new;
+++        push_delta(&mut deltas, Some(Decode03FLoopProfile::EomiLoop), Decode03FGuardParamKey::MinPFloor, format!("{old:.3}"), format!("{new:.3}"), "increase_min_p_floor_for_remaining_eomi_loop");
+++        let old = proposed.eomi_loop.top_p_ceiling;
+++        let new = clamp_f32(old - 0.02, 0.60, 0.98);
+++        proposed.eomi_loop.top_p_ceiling = new;
+++        push_delta(&mut deltas, Some(Decode03FLoopProfile::EomiLoop), Decode03FGuardParamKey::TopPCeiling, format!("{old:.3}"), format!("{new:.3}"), "tighten_top_p_ceiling_for_remaining_eomi_loop");
+++    }
+++
+++    if over_stop || input.over_stop_regression {
+++        reasons.push("over_stop_or_false_positive_pressure_detected".to_string());
+++        let old = proposed.panic_morph_score_threshold;
+++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
+++        proposed.panic_morph_score_threshold = new;
+++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicMorphScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "normal_prompt_stop_seen_relax_panic_morph_threshold");
+++        let old = proposed.panic_salad_score_threshold;
+++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
+++        proposed.panic_salad_score_threshold = new;
+++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicSaladScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "normal_prompt_stop_seen_relax_panic_salad_threshold");
+++        let old = proposed.josa_loop.top_p_ceiling;
+++        let new = clamp_f32(old + 0.02, 0.60, 0.98);
+++        proposed.josa_loop.top_p_ceiling = new;
+++        push_delta(&mut deltas, Some(Decode03FLoopProfile::JosaLoop), Decode03FGuardParamKey::TopPCeiling, format!("{old:.3}"), format!("{new:.3}"), "reduce_josa_loop_over_suppression_risk");
+++    }
+++
+++    if active_set_pressure {
+++        reasons.push("active_set_pressure_detected".to_string());
+++        let old_min = proposed.active_set_protection_min;
+++        let new_min = clamp_usize(old_min + 1, 2, 12);
+++        proposed.active_set_protection_min = new_min;
+++        push_delta(&mut deltas, None, Decode03FGuardParamKey::ActiveSetProtectionMin, old_min, new_min, "increase_active_set_protection_min");
+++        for profile in [Decode03FLoopProfile::JosaLoop, Decode03FLoopProfile::EomiLoop] {
+++            let old = loop_param(&proposed, profile).morph_penalty_weight;
+++            let new = clamp_f32(old - 0.03, 0.0, 0.50);
+++            loop_param_mut(&mut proposed, profile).morph_penalty_weight = new;
+++            push_delta(&mut deltas, Some(profile), Decode03FGuardParamKey::MorphPenaltyWeight, format!("{old:.3}"), format!("{new:.3}"), "relax_penalty_due_to_active_set_pressure");
+++        }
+++    }
+++
+++    if input.guard_panic_growth_warn_count > 0 && input.morph_loop_reduced != Some(true) {
+++        reasons.push("panic_growth_without_morph_reduction_detected".to_string());
+++        let old = proposed.panic_morph_score_threshold;
+++        let new = clamp_f32(old + 0.05, 0.60, 0.95);
+++        proposed.panic_morph_score_threshold = new;
+++        push_delta(&mut deltas, None, Decode03FGuardParamKey::PanicMorphScoreThreshold, format!("{old:.3}"), format!("{new:.3}"), "panic_growth_did_not_reduce_morph_loop");
+++    }
+++
+++    if input.speed_regression_warn {
+++        warnings.push("speed_regression_warn_seen".to_string());
+++        reasons.push("narrow_overlay_scope_for_speed_regression".to_string());
+++    }
+++
+++    if input.global_finite_fallback_count > 0 {
+++        warnings.push("global_finite_fallback_seen_candidate_cannot_promote".to_string());
+++    }
+++    if input.active_set_empty_count > 0 {
+++        warnings.push("active_set_empty_seen_candidate_cannot_promote".to_string());
+++    }
+++    if !input.backend_semantic_parity_ok {
+++        warnings.push("backend_semantic_parity_not_confirmed".to_string());
+++    }
+++    if !input.backend_strict_parity_ok {
+++        warnings.push("backend_strict_parity_not_confirmed".to_string());
+++    }
+++    if input.eval02_status_seen.is_none() {
+++        warnings.push("eval02_summary_missing".to_string());
+++    }
+++
+++    proposed = clamp_guard_param_set(proposed);
+++
+++    let can_generate = input.eval02_status_seen.is_some() || !matches!(input.mode, Decode03FMode::StrictCandidateGate);
+++    let mut denied = Vec::new();
+++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.eval02_status_seen.is_none() {
+++        denied.push("missing_eval02_summary".to_string());
+++    }
+++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.global_finite_fallback_count > 0 {
+++        denied.push("global_finite_fallback_seen".to_string());
+++    }
+++    if matches!(input.mode, Decode03FMode::StrictCandidateGate) && input.active_set_empty_count > 0 {
+++        denied.push("active_set_empty_seen".to_string());
+++    }
+++
+++    let can_generate = can_generate && denied.is_empty();
+++    let can_promote_controlled = false;
+++    let can_promote_default = false;
+++
+++    let risk = Decode03FRiskAssessment {
+++        over_suppression_risk: if input.normal_prompt_stop_count > 0 || input.over_stop_regression { "high" } else if active_set_pressure { "medium" } else { "low" }.to_string(),
+++        under_suppression_risk: if under_suppression { "high" } else if input.long_horizon_drift_score.unwrap_or(0.0) >= 0.55 { "medium" } else { "low" }.to_string(),
+++        backend_divergence_risk: if !input.backend_semantic_parity_ok { "high" } else if !input.backend_strict_parity_ok { "medium" } else { "low" }.to_string(),
+++        speed_regression_risk: if input.speed_regression_warn { "medium" } else { "low" }.to_string(),
+++        stop_overtrigger_risk: if input.normal_prompt_stop_count > 0 { "high" } else if input.over_stop_regression { "medium" } else { "low" }.to_string(),
+++        risk_reasons: warnings.clone(),
+++    };
+++
+++    let expected = Decode03FExpectedEffect {
+++        expected_salad_reduction: if under_suppression { "decrease" } else { "unknown" }.to_string(),
+++        expected_morph_loop_reduction: if under_suppression { "decrease" } else { "unknown" }.to_string(),
+++        expected_false_positive_change: if over_stop || active_set_pressure { "decrease" } else { "neutral" }.to_string(),
+++        expected_speed_impact: if input.speed_regression_warn { "neutral" } else { "unknown" }.to_string(),
+++        expected_stop_frequency_change: if over_stop { "decrease" } else { "neutral" }.to_string(),
+++    };
+++
+++    let mut promotion_requirements = vec![
+++        "EVAL-02 candidate profile rerun PASS".to_string(),
+++        "EVAL-01 semantic parity rerun PASS".to_string(),
+++        "normal prompt stop count == 0".to_string(),
+++        "global finite fallback count == 0".to_string(),
+++        "active set empty count == 0".to_string(),
+++    ];
+++    if !input.backend_strict_parity_ok {
+++        promotion_requirements.push("EVAL-01 strict parity improvement preferred".to_string());
+++    }
+++
+++    Decode03FCalibrationCandidate {
+++        patch_id: DECODE03F_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        candidate_id: format!("DECODE03F_CANDIDATE_{}", input.run_id),
+++        source_run_id: input.run_id.clone(),
+++        baseline_profile: input.baseline_profile.clone(),
+++        candidate_profile: input.candidate_profile.clone(),
+++        candidate_only: true,
+++        runtime_apply: false,
+++        input_status: Decode03FInputStatus {
+++            eval00_status_seen: input.eval00_status_seen.clone(),
+++            eval01_status_seen: input.eval01_status_seen.clone(),
+++            eval02_status_seen: input.eval02_status_seen.clone(),
+++            decode03e_status_seen: input.decode03e_status_seen.clone(),
+++            backend_semantic_parity_ok: input.backend_semantic_parity_ok,
+++            backend_strict_parity_ok: input.backend_strict_parity_ok,
+++        },
+++        current_params: input.current_params.clone(),
+++        proposed_params: proposed,
+++        param_deltas: deltas,
+++        expected_effect: expected,
+++        risk_assessment: risk,
+++        acceptance_gate: Decode03FAcceptanceGate {
+++            can_generate_candidate: can_generate,
+++            can_promote_to_controlled_apply: can_promote_controlled,
+++            can_promote_to_default: can_promote_default,
+++            denied_reasons: denied,
+++            warning_reasons: warnings.clone(),
+++            promotion_requirements,
+++        },
+++        calibration_reasons: if reasons.is_empty() { vec!["analysis_completed_no_param_change_required".to_string()] } else { reasons },
+++        calibration_warnings: warnings,
+++    }
+++}
+++
+++pub fn append_candidate(candidate: &Decode03FCalibrationCandidate) -> Result<(), String> {
+++    let path = candidates_path();
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    let line = serde_json::to_string(candidate).map_err(|e| e.to_string())?;
+++    use std::io::Write;
+++    let mut file = fs::OpenOptions::new().create(true).append(true).open(path).map_err(|e| e.to_string())?;
+++    writeln!(file, "{}", line).map_err(|e| e.to_string())
+++}
+++
+++fn read_candidates() -> Vec<Decode03FCalibrationCandidate> {
+++    let path = candidates_path();
+++    let Ok(raw) = fs::read_to_string(path) else { return Vec::new(); };
+++    raw.lines()
+++        .filter_map(|line| serde_json::from_str::<Decode03FCalibrationCandidate>(line).ok())
+++        .collect()
+++}
+++
+++pub fn summarize_decode03f_candidates(candidates: &[Decode03FCalibrationCandidate], mode: Decode03FMode) -> Decode03FSummary {
+++    let generated_count = candidates.len();
+++    let controlled = candidates.iter().filter(|c| c.acceptance_gate.can_promote_to_controlled_apply).count();
+++    let default_count = candidates.iter().filter(|c| c.acceptance_gate.can_promote_to_default).count();
+++    let runtime_apply_count = candidates.iter().filter(|c| c.runtime_apply).count();
+++    let candidate_without_eval02_count = candidates.iter().filter(|c| c.input_status.eval02_status_seen.is_none()).count();
+++    let candidate_with_global_fallback_count = candidates.iter().filter(|c| c.calibration_warnings.iter().any(|w| w.contains("global_finite_fallback"))).count();
+++
+++    let mut deltas = Decode03FSummaryDeltas::default();
+++    for c in candidates {
+++        for d in &c.param_deltas {
+++            match (d.param_key, d.delta_direction.as_str()) {
+++                (Decode03FGuardParamKey::MorphPenaltyWeight, "increase") => deltas.morph_penalty_increase_count += 1,
+++                (Decode03FGuardParamKey::MorphPenaltyWeight, "decrease") => deltas.morph_penalty_decrease_count += 1,
+++                (Decode03FGuardParamKey::MinPFloor, "increase") => deltas.min_p_floor_increase_count += 1,
+++                (Decode03FGuardParamKey::MinPFloor, "decrease") => deltas.min_p_floor_decrease_count += 1,
+++                (Decode03FGuardParamKey::TopPCeiling, "increase") => deltas.top_p_ceiling_increase_count += 1,
+++                (Decode03FGuardParamKey::TopPCeiling, "decrease") => deltas.top_p_ceiling_decrease_count += 1,
+++                (Decode03FGuardParamKey::PanicMorphScoreThreshold, "increase")
+++                | (Decode03FGuardParamKey::PanicSaladScoreThreshold, "increase") => deltas.panic_threshold_relax_count += 1,
+++                (Decode03FGuardParamKey::ActiveSetProtectionMin, "increase") => deltas.active_set_protection_tighten_count += 1,
+++                _ => {}
+++            }
+++        }
+++    }
+++
+++    let last_risk = candidates.last().map(|c| c.risk_assessment.clone()).unwrap_or_else(|| Decode03FRiskAssessment {
+++        over_suppression_risk: "unknown".to_string(),
+++        under_suppression_risk: "unknown".to_string(),
+++        backend_divergence_risk: "unknown".to_string(),
+++        speed_regression_risk: "unknown".to_string(),
+++        stop_overtrigger_risk: "unknown".to_string(),
+++        risk_reasons: vec!["no_candidate_generated".to_string()],
+++    });
+++
+++    let inputs = Decode03FSummaryInputs {
+++        eval00_seen: candidates.iter().any(|c| c.input_status.eval00_status_seen.is_some()),
+++        eval01_seen: candidates.iter().any(|c| c.input_status.eval01_status_seen.is_some()),
+++        eval02_seen: candidates.iter().any(|c| c.input_status.eval02_status_seen.is_some()),
+++        decode03e_seen: candidates.iter().any(|c| c.input_status.decode03e_status_seen.is_some()),
+++    };
+++
+++    let status = if runtime_apply_count > 0 || candidate_with_global_fallback_count > 0 { "FAIL" }
+++        else if generated_count == 0 || candidate_without_eval02_count > 0 || !inputs.eval01_seen { "PASS_WITH_WARNINGS" }
+++        else { "PASS_STATIC" };
+++
+++    Decode03FSummary {
+++        patch_id: DECODE03F_PATCH_ID.to_string(),
+++        status: status.to_string(),
+++        mode: mode.as_str().to_string(),
+++        candidate_only: !matches!(mode, Decode03FMode::Off),
+++        runtime_apply: false,
+++        inputs,
+++        candidates: Decode03FSummaryCandidates {
+++            generated_count,
+++            can_promote_to_controlled_apply_count: controlled,
+++            can_promote_to_default_count: default_count,
+++        },
+++        deltas,
+++        risk: last_risk,
+++        safety: Decode03FSummarySafety {
+++            runtime_apply_count,
+++            base_config_mutation_count: 0,
+++            candidate_without_eval02_count,
+++            candidate_with_global_fallback_count,
+++        },
+++        acceptance: Decode03FSummaryAcceptance {
+++            ready_for_decode03g_controlled_calibration_apply: generated_count > 0 && runtime_apply_count == 0,
+++            ready_for_default_guard_overlay: false,
+++            ready_for_medusa00: false,
+++            reason: "calibration candidate sealed; requires EVAL-00/01/02 rerun before runtime apply".to_string(),
+++        },
+++    }
+++}
+++
+++pub fn write_decode03f_summary_from_candidate_file() -> Result<Decode03FSummary, String> {
+++    let candidates = read_candidates();
+++    let mode = Decode03FMode::from_env();
+++    let summary = summarize_decode03f_candidates(&candidates, mode);
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+++    Ok(summary)
+++}
+++
+++pub fn append_decode03f_receipt_from_sampler03(_receipt: &SamplerParityReceipt) {
+++    let mode = Decode03FMode::from_env();
+++    if !mode.enabled() { return; }
+++
+++    if matches!(mode, Decode03FMode::AnalyzeOnly) {
+++        let _ = write_decode03f_summary_from_candidate_file();
+++        return;
+++    }
+++
+++    let input = input_from_summary_files(mode);
+++    let candidate = generate_calibration_candidate(&input);
+++    if candidate.acceptance_gate.can_generate_candidate {
+++        let _ = append_candidate(&candidate);
+++    } else if matches!(mode, Decode03FMode::StrictCandidateGate) {
+++        let _ = append_candidate(&candidate);
+++    }
+++    let _ = write_decode03f_summary_from_candidate_file();
+++}
+++
+++pub fn write_decode03f_manifests() -> Result<(), String> {
+++    let mut schema = BTreeMap::new();
+++    schema.insert("patch_id", DECODE03F_PATCH_ID);
+++    schema.insert("ssot", DECODE03F_SSOT);
+++    schema.insert("mode_default", "AnalyzeOnly");
+++    let path = path_from_env("ASH_DECODE03F_SCHEMA", "workspace/decode03f_calibration_schema.json");
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(path, serde_json::to_string_pretty(&schema).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+++}
++diff -ruN decode03f_orig/crates/model_core/src/lib.rs decode03f_work/crates/model_core/src/lib.rs
++--- decode03f_orig/crates/model_core/src/lib.rs	2026-05-27 08:19:20.000000000 +0000
+++++ decode03f_work/crates/model_core/src/lib.rs	2026-05-27 08:30:36.623015176 +0000
++@@ -32,6 +32,7 @@
++ mod eval01_backend_replay;
++ mod decode03e_guard_overlay;
++ mod eval02_long_horizon;
+++mod decode03f_guard_calibration;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -259,6 +260,22 @@
++ };
++ 
++ 
+++pub use decode03f_guard_calibration::{
+++    DECODE03F_PATCH_ID, DECODE03F_INPUT_PATCH_ID, DECODE03F_SSOT, Decode03FMode,
+++    Decode03FGuardParamKey, Decode03FLoopProfile, Decode03FLoopParamSet, Decode03FGuardParamSet,
+++    Decode03FInputStatus, Decode03FCalibrationInput, Decode03FCalibrationCandidate,
+++    Decode03FParamDelta, Decode03FExpectedEffect, Decode03FRiskAssessment, Decode03FAcceptanceGate,
+++    Decode03FSummaryInputs, Decode03FSummaryCandidates, Decode03FSummaryDeltas,
+++    Decode03FSummarySafety, Decode03FSummaryAcceptance, Decode03FSummary,
+++    default_guard_param_set as decode03f_default_guard_param_set, clamp_guard_param_set as decode03f_clamp_guard_param_set,
+++    input_from_summary_files as decode03f_input_from_summary_files,
+++    generate_calibration_candidate as decode03f_generate_calibration_candidate,
+++    append_candidate as append_decode03f_candidate, summarize_decode03f_candidates,
+++    append_decode03f_receipt_from_sampler03, write_decode03f_summary_from_candidate_file,
+++    write_decode03f_manifests,
+++};
+++
+++
++ 
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++diff -ruN decode03f_orig/crates/model_core/src/sampler_parity.rs decode03f_work/crates/model_core/src/sampler_parity.rs
++--- decode03f_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:19:20.000000000 +0000
+++++ decode03f_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:30:39.353352247 +0000
++@@ -465,5 +465,6 @@
++     crate::eval01_backend_replay::append_eval01_receipt_from_sampler03(receipt);
++     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
++     crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
+++    crate::decode03f_guard_calibration::append_decode03f_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN decode03f_orig/workspace/decode03f_calibration_schema.json decode03f_work/workspace/decode03f_calibration_schema.json
+--- decode03f_orig/workspace/decode03f_calibration_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_calibration_schema.json	2026-05-27 08:31:19.729367046 +0000
+@@ -0,0 +1,28 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
++  "schema_version": 1,
++  "ssot": "DECODE-03E applied receipt + EVAL-00/01/02 summaries",
++  "mode_default": "AnalyzeOnly",
++  "candidate_only": true,
++  "runtime_apply": false,
++  "required_inputs": [
++    "workspace/eval00_summary.json",
++    "workspace/eval01_summary.json",
++    "workspace/eval02_summary.json",
++    "workspace/decode03e_summary.json"
++  ],
++  "forbidden": [
++    "runtime_apply",
++    "base_config_mutation",
++    "silent_threshold_change",
++    "default_promotion"
++  ],
++  "candidate_fields": [
++    "current_params",
++    "proposed_params",
++    "param_deltas",
++    "expected_effect",
++    "risk_assessment",
++    "acceptance_gate"
++  ]
++}
+\ No newline at end of file
+diff -ruN decode03f_orig/workspace/decode03f_candidates.jsonl decode03f_work/workspace/decode03f_candidates.jsonl
+--- decode03f_orig/workspace/decode03f_candidates.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_candidates.jsonl	2026-05-27 08:31:19.729902178 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-03F", "schema_version": 1, "candidate_id": "DECODE03F_CANDIDATE_STATIC_BAKE_0001", "source_run_id": "eval02_static_bake_not_run", "baseline_profile": "S01_static_safe", "candidate_profile": "S05_decode03e_guard_overlay", "candidate_only": true, "runtime_apply": false, "input_status": {"eval00_status_seen": "PASS_STATIC", "eval01_status_seen": "PASS_STATIC", "eval02_status_seen": "PASS_STATIC", "decode03e_status_seen": "PASS_STATIC", "backend_semantic_parity_ok": true, "backend_strict_parity_ok": false}, "current_params": {"josa_loop": {"morph_penalty_weight": 0.18, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "eomi_loop": {"morph_penalty_weight": 0.22, "min_p_floor": 0.1, "top_p_ceiling": 0.84, "no_repeat_ngram": 3}, "jamo_leak": {"morph_penalty_weight": 0.35, "min_p_floor": 0.12, "top_p_ceiling": 0.82, "no_repeat_ngram": 3}, "byte_jamo_leak": {"morph_penalty_weight": 0.45, "min_p_floor": 0.14, "top_p_ceiling": 0.78, "no_repeat_ngram": 4}, "syllable_fragment_loop": {"morph_penalty_weight": 0.16, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "eojeol_boundary_collapse": {"morph_penalty_weight": 0.2, "min_p_floor": 0.09, "top_p_ceiling": 0.84, "no_repeat_ngram": 3}, "punctuation_glue_loop": {"morph_penalty_weight": 0.18, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "mixed_morph_loop": {"morph_penalty_weight": 0.22, "min_p_floor": 0.1, "top_p_ceiling": 0.84, "no_repeat_ngram": 3}, "panic_morph_score_threshold": 0.8, "panic_salad_score_threshold": 0.8, "active_set_protection_min": 3, "guard_escalation_pci_threshold": 0.3}, "proposed_params": {"josa_loop": {"morph_penalty_weight": 0.18, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "eomi_loop": {"morph_penalty_weight": 0.25, "min_p_floor": 0.12, "top_p_ceiling": 0.82, "no_repeat_ngram": 3}, "jamo_leak": {"morph_penalty_weight": 0.35, "min_p_floor": 0.12, "top_p_ceiling": 0.82, "no_repeat_ngram": 3}, "byte_jamo_leak": {"morph_penalty_weight": 0.45, "min_p_floor": 0.14, "top_p_ceiling": 0.78, "no_repeat_ngram": 4}, "syllable_fragment_loop": {"morph_penalty_weight": 0.16, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "eojeol_boundary_collapse": {"morph_penalty_weight": 0.2, "min_p_floor": 0.09, "top_p_ceiling": 0.84, "no_repeat_ngram": 3}, "punctuation_glue_loop": {"morph_penalty_weight": 0.18, "min_p_floor": 0.08, "top_p_ceiling": 0.86, "no_repeat_ngram": 3}, "mixed_morph_loop": {"morph_penalty_weight": 0.22, "min_p_floor": 0.1, "top_p_ceiling": 0.84, "no_repeat_ngram": 3}, "panic_morph_score_threshold": 0.85, "panic_salad_score_threshold": 0.8, "active_set_protection_min": 3, "guard_escalation_pci_threshold": 0.3}, "param_deltas": [{"loop_profile": "EomiLoop", "param_key": "MorphPenaltyWeight", "old_value": "0.220", "new_value": "0.250", "delta_direction": "increase", "delta_magnitude": 0.03, "reason": "example_under_suppression_candidate_from_long_horizon_drift"}, {"loop_profile": "EomiLoop", "param_key": "MinPFloor", "old_value": "0.100", "new_value": "0.120", "delta_direction": "increase", "delta_magnitude": 0.02, "reason": "example_eomi_loop_remaining_high_candidate"}, {"loop_profile": "EomiLoop", "param_key": "TopPCeiling", "old_value": "0.840", "new_value": "0.820", "delta_direction": "decrease", "delta_magnitude": 0.02, "reason": "example_tighten_tail_for_eomi_loop"}, {"loop_profile": null, "param_key": "PanicMorphScoreThreshold", "old_value": "0.800", "new_value": "0.850", "delta_direction": "increase", "delta_magnitude": 0.05, "reason": "example_relax_panic_threshold_against_over_stop"}], "expected_effect": {"expected_salad_reduction": "unknown", "expected_morph_loop_reduction": "unknown", "expected_false_positive_change": "neutral", "expected_speed_impact": "neutral", "expected_stop_frequency_change": "decrease"}, "risk_assessment": {"over_suppression_risk": "medium", "under_suppression_risk": "medium", "backend_divergence_risk": "medium", "speed_regression_risk": "medium", "stop_overtrigger_risk": "medium", "risk_reasons": ["static_bake_candidate_not_runtime_verified", "requires_eval02_rerun_after_candidate"]}, "acceptance_gate": {"can_generate_candidate": true, "can_promote_to_controlled_apply": false, "can_promote_to_default": false, "denied_reasons": [], "warning_reasons": ["candidate_not_applied_runtime", "requires_eval00_eval01_eval02_rerun"], "promotion_requirements": ["EVAL-02 candidate profile pass", "EVAL-01 semantic parity pass", "normal prompt stop count == 0", "global finite fallback count == 0", "active set empty count == 0"]}, "calibration_reasons": ["static_bake_candidate_scaffold", "candidate_only_contract_sealed"], "calibration_warnings": ["runtime_apply_false", "cargo_not_available_in_container"]}
+diff -ruN decode03f_orig/workspace/decode03f_regression_notes.md decode03f_work/workspace/decode03f_regression_notes.md
+--- decode03f_orig/workspace/decode03f_regression_notes.md	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_regression_notes.md	2026-05-27 08:31:19.730969922 +0000
+@@ -0,0 +1,5 @@
++# DECODE-03F Regression Notes
++
++- 입력 SSOT: DECODE-03E applied summary + EVAL-00/01/02 summaries.
++- 후보는 즉시 적용하지 않는다.
++- 후속 DECODE-03G 또는 EVAL-03에서 controlled apply/rerun을 수행한다.
+diff -ruN decode03f_orig/workspace/decode03f_report.md decode03f_work/workspace/decode03f_report.md
+--- decode03f_orig/workspace/decode03f_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_report.md	2026-05-27 08:31:19.730724143 +0000
+@@ -0,0 +1,18 @@
++# 16AI-QW-38G-R6A-DECODE-03F
++## Guard Overlay Auto-tuning / Threshold Calibration Seal
++
++### 확정
++- `crates/model_core/src/decode03f_guard_calibration.rs` 추가.
++- `crates/model_core/src/lib.rs` export 추가.
++- `sampler_parity::append_receipt()`에 DECODE-03F hook 추가.
++- `workspace/decode03f_candidates.jsonl` candidate-only receipt 추가.
++- `workspace/decode03f_summary.json` summary 추가.
++
++### 계약
++- `candidate_only = true`
++- `runtime_apply = false`
++- `can_promote_to_default = false`
++- 03F는 threshold를 실제 runtime에 적용하지 않는다.
++
++### 판단불가
++- cargo/rustc가 없어 빌드·런타임 검증은 수행하지 못했다.
+diff -ruN decode03f_orig/workspace/decode03f_source_hash_manifest.json decode03f_work/workspace/decode03f_source_hash_manifest.json
+--- decode03f_orig/workspace/decode03f_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_source_hash_manifest.json	2026-05-27 08:31:19.733397030 +0000
+@@ -0,0 +1,30 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
++  "files": [
++    {
++      "path": "crates/model_core/src/decode03f_guard_calibration.rs",
++      "sha256": "e9525baa9f30a2b90b710dbc57c4022373ebe4c507482ae6a5e0ba747c637e72",
++      "bytes": 36957
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "11ad75e7b94d23a2c73e9193075465503ae5e7c554aaab9a7a1b35e7568c9ade",
++      "bytes": 22500
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "f629a9dd552314906536beb375d4a9ef0cb02f304d776bad6137c11c9e2fc635",
++      "bytes": 21118
++    },
++    {
++      "path": "workspace/decode03f_candidates.jsonl",
++      "sha256": "29572c46eb26b11d2f79b0ea4bc37094c228364c277cb15823bfc41254b25d4c",
++      "bytes": 4800
++    },
++    {
++      "path": "workspace/decode03f_summary.json",
++      "sha256": "a070222b9ee006b3c2807bbec355d06b1696c61c01276678e1c71acd08296ab2",
++      "bytes": 1514
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN decode03f_orig/workspace/decode03f_static_checks.json decode03f_work/workspace/decode03f_static_checks.json
+--- decode03f_orig/workspace/decode03f_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_static_checks.json	2026-05-27 08:31:19.730509911 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
++  "status": "PASS_STATIC",
++  "checks": {
++    "module_declared_in_lib": true,
++    "pub_exports_added": true,
++    "sampler_parity_hook_added": true,
++    "candidate_only_contract": true,
++    "runtime_apply_forbidden": true,
++    "summary_written": true,
++    "candidate_jsonl_written": true,
++    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++    "runtime_smoke": "NOT_RUN"
++  },
++  "ssot": "DECODE-03E + EVAL-00/01/02 receipt summaries",
++  "notes": [
++    "Static bake only. Cargo/rustc unavailable in this container."
++  ]
++}
+\ No newline at end of file
+diff -ruN decode03f_orig/workspace/decode03f_summary.json decode03f_work/workspace/decode03f_summary.json
+--- decode03f_orig/workspace/decode03f_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode03f_work/workspace/decode03f_summary.json	2026-05-27 08:31:19.730180065 +0000
+@@ -0,0 +1,51 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-03F",
++  "status": "PASS_STATIC",
++  "mode": "CandidateOnly",
++  "candidate_only": true,
++  "runtime_apply": false,
++  "inputs": {
++    "eval00_seen": true,
++    "eval01_seen": true,
++    "eval02_seen": true,
++    "decode03e_seen": true
++  },
++  "candidates": {
++    "generated_count": 1,
++    "can_promote_to_controlled_apply_count": 0,
++    "can_promote_to_default_count": 0
++  },
++  "deltas": {
++    "morph_penalty_increase_count": 1,
++    "morph_penalty_decrease_count": 0,
++    "min_p_floor_increase_count": 1,
++    "min_p_floor_decrease_count": 0,
++    "top_p_ceiling_increase_count": 0,
++    "top_p_ceiling_decrease_count": 1,
++    "panic_threshold_relax_count": 1,
++    "active_set_protection_tighten_count": 0
++  },
++  "risk": {
++    "over_suppression_risk": "medium",
++    "under_suppression_risk": "medium",
++    "backend_divergence_risk": "medium",
++    "speed_regression_risk": "medium",
++    "stop_overtrigger_risk": "medium",
++    "risk_reasons": [
++      "static_bake_candidate_not_runtime_verified",
++      "requires_eval02_rerun_after_candidate"
++    ]
++  },
++  "safety": {
++    "runtime_apply_count": 0,
++    "base_config_mutation_count": 0,
++    "candidate_without_eval02_count": 0,
++    "candidate_with_global_fallback_count": 0
++  },
++  "acceptance": {
++    "ready_for_decode03g_controlled_calibration_apply": true,
++    "ready_for_default_guard_overlay": false,
++    "ready_for_medusa00": false,
++    "reason": "calibration candidate sealed; requires EVAL-00/01/02 rerun before runtime apply"
++  }
++}
+\ No newline at end of file

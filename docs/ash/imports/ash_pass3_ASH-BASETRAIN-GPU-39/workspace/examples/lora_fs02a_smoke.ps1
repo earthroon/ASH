@@ -1,0 +1,24 @@
+python .\workspace\scripts\lora_fs02_train_export.py `
+  --request-id "lora_fs02a_smoke_01" `
+  --feature-root ".\workspace\lora_runs\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\feature_store_work" `
+  --feature-manifest ".\workspace\lora_runs\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\feature_store_work\feature_store_manifest.json" `
+  --export-plan ".\workspace\lora_fs01_export_plan.json" `
+  --out ".\workspace\domain_adapters\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.smoke.safetensors" `
+  --manifest-out ".\workspace\domain_adapters\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192_shared_hidden_head_lora.smoke.manifest.json" `
+  --receipt-out ".\workspace\lora_fs02a_smoke_export_receipt.json" `
+  --trainer-receipt-out ".\workspace\lora_fs02a_smoke_trainer_receipt.json" `
+  --loss-ledger ".\workspace\lora_fs02a_smoke_loss_ledger.jsonl" `
+  --rank 8 `
+  --alpha 16 `
+  --max-shards 4 `
+  --max-batches 8 `
+  --batch-tokens 1024 `
+  --epochs 1 `
+  --negative-samples 64 `
+  --lr 0.0001 `
+  --weight-decay 0.0 `
+  --grad-clip-norm 1.0 `
+  --seed 42 `
+  --device cuda `
+  --dtype f16 `
+  --dry-run

@@ -1,0 +1,75 @@
+[
+  {
+    "case_id": "approved_profile_dry_run_pass",
+    "approved_profile": {
+      "profile_id": "reduced_dream_weight_v1",
+      "approval_status": "ApprovedButNotApplied"
+    },
+    "dry_run_result": {
+      "sample_count": 5,
+      "supervised_dry_run_eligible_count": 3,
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 0,
+      "stable_broken_count": 0,
+      "dry_run_confidence": 0.72
+    },
+    "expected": {
+      "dry_run_pass": true,
+      "proceed_to_commit_candidate": true,
+      "safe_profile_apply_allowed": false,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "dry_run_risky_diff_reintroduced",
+    "approved_profile": {
+      "profile_id": "reduced_dream_weight_v1",
+      "approval_status": "ApprovedButNotApplied"
+    },
+    "dry_run_result": {
+      "beneficial_diff_count": 1,
+      "risky_diff_count": 1,
+      "stable_broken_count": 0
+    },
+    "expected": {
+      "dry_run_pass": false,
+      "proceed_to_commit_candidate": false,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "pending_profile_skipped",
+    "approved_profile": {
+      "profile_id": "balanced_risk_support_v1",
+      "operator_decision": "Pending",
+      "approval_status": "AwaitingOperatorReview"
+    },
+    "expected": {
+      "profile_skipped": true,
+      "skip_reason": "NotApprovedButNotApplied",
+      "dry_run_status": "Partial"
+    }
+  },
+  {
+    "case_id": "rejected_profile_skipped",
+    "approved_profile": {
+      "profile_id": "balanced_risk_support_v1",
+      "operator_decision": "Rejected",
+      "approval_status": "Rejected"
+    },
+    "expected": {
+      "profile_skipped": true,
+      "candidate_deleted": false,
+      "runtime_apply_allowed": false
+    }
+  },
+  {
+    "case_id": "missing_r6_approval_receipt_unavailable",
+    "approval_receipt_available": false,
+    "expected": {
+      "dry_run_status": "Unavailable",
+      "dry_run_profile_count": 0,
+      "runtime_apply_allowed": false
+    }
+  }
+]

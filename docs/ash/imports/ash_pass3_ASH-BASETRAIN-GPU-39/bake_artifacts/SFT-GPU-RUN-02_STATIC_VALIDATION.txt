@@ -1,0 +1,35 @@
+SFT-GPU-RUN-02 static validation
+
+PASS file creation:
+- crates/ash_core/src/sft_gpu_artifact_intake.rs
+- crates/ash_core/tests/sft_gpu_run_02_artifact_intake.rs
+- crates/lora_train/src/strict_gpu_artifact_intake.rs
+- crates/lora_train/tests/strict_gpu_artifact_intake.rs
+- crates/burn_webgpu_backend/src/strict_gpu_artifact_registry.rs
+- crates/burn_webgpu_backend/tests/strict_gpu_artifact_registry.rs
+
+PASS module exports:
+- ash_core exports sft_gpu_artifact_intake
+- lora_train exports strict_gpu_artifact_intake
+- burn_webgpu_backend exports strict_gpu_artifact_registry
+
+PASS static guards:
+- source strict GPU train seal is required
+- CPU fallback source fails closed
+- CPU materialized source fails closed
+- manifest/payload/safetensors digest match required
+- save-reload parity required
+- adapter/slot/target identity match required
+- duplicate artifact fails closed
+- registry candidate binding required
+- promotion eligibility required
+- runtime current pointer update closed
+- promotion apply closed
+- lifecycle mutation closed
+- slot action apply closed
+- rollback execution closed
+- ASH current binding closed
+
+PENDING runtime:
+- cargo/rustc/rustfmt unavailable in this environment
+- actual RUN-01 artifact intake from target machine required

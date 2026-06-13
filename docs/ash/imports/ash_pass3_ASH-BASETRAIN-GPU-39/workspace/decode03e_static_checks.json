@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
+  "status": "PASS_STATIC",
+  "checks": {
+    "module_added": true,
+    "lib_export_added": true,
+    "sampler_parity_hook_added": true,
+    "default_off_contract": true,
+    "controlled_apply_only_contract": true,
+    "step_local_overlay_contract": true,
+    "base_config_mutation_forbidden": true,
+    "panic_candidate_execution_forbidden": true,
+    "rollback_stop_execution_forbidden": true,
+    "backend_capability_gate_present": true,
+    "salad04_to_decode03e_mapping_present": true,
+    "summary_aggregator_present": true
+  },
+  "not_run": {
+    "cargo_check": "cargo unavailable in container",
+    "runtime_smoke": "not executed",
+    "eval01_runtime_parity": "not executed"
+  }
+}

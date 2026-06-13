@@ -1,0 +1,23 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EOS-03A",
+  "status": "PASS_STATIC_CONDITIONAL_EOS_RESTORE_BAKED_PENDING_LOCAL_CARGO_BUILD",
+  "cargo_check_available_in_bake_env": false,
+  "modified_files": [
+    "crates/orchestrator_local/src/infer_entry.rs",
+    "crates/model_core/src/decode_state.rs"
+  ],
+  "checks": {
+    "eos03a_payload_flags_present": true,
+    "eos03a_receipt_paths_present": true,
+    "eos03a_output_embedding_present": true,
+    "model_core_step_local_eos_guard_present": true,
+    "request_wide_eos_ban_disabled_when_eos03a_enabled": true,
+    "model_files_modified": false
+  },
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

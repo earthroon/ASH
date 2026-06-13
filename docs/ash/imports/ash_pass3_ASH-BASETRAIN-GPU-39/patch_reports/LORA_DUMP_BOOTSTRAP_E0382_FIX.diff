@@ -1,0 +1,41 @@
+--- /mnt/data/ash_lora_original/crates/burn_webgpu_backend/src/existing_device_bootstrap.rs	2026-05-01 07:34:24.000000000 +0000
++++ /mnt/data/ash_lora_fix/crates/burn_webgpu_backend/src/existing_device_bootstrap.rs	2026-05-03 16:19:07.449538979 +0000
+@@ -61,13 +61,14 @@
+ 
+     let raw_device = Arc::new(raw_device_inner);
+     let raw_queue = Arc::new(raw_queue_inner);
++    let backend = adapter.get_info().backend;
+ 
+     let setup = WgpuSetup {
+         instance,
+         adapter,
+         device: raw_device.as_ref().clone(),
+         queue: raw_queue.as_ref().clone(),
+-        backend: adapter.get_info().backend,
++        backend,
+     };
+ 
+     let burn_device = init_device(setup, RuntimeOptions::default());
+@@ -79,17 +80,18 @@
+         ),
+     };
+ 
+-    let mut registry_registered = false;
+     #[cfg(feature = "burn-raw-access-local")]
+-    {
++    let mut registry_registered = {
+         register_runtime_handles_for_existing_device(
+             existing_id,
+             raw_device.clone(),
+             raw_queue.clone(),
+             source,
+         );
+-        registry_registered = true;
+-    }
++        true
++    };
++    #[cfg(not(feature = "burn-raw-access-local"))]
++    let registry_registered = false;
+ 
+     let runtime_handles = try_extract_runtime_handles(&burn_device).ok_or_else(|| {
+         #[cfg(feature = "burn-raw-access-local")]

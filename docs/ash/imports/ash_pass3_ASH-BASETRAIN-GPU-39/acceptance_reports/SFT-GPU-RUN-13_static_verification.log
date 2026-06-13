@@ -1,0 +1,32 @@
+SFT-GPU-RUN-13 static verification
+
+Performed:
+- Added ash_core SSOT module for operator-reviewed action apply.
+- Added lora_train receipt facade.
+- Added burn_webgpu_backend boundary shell.
+- Added tests for ash_core, lora_train, and burn_webgpu_backend.
+- Verified delimiter balance for all new Rust files.
+- Verified lib.rs export wiring for all three crates.
+
+Not performed:
+- cargo test: unavailable because cargo/rustc are not installed in this container.
+
+Contract checks encoded:
+- Missing RUN-12 lifecycle merge seal -> held.
+- Missing RUN-11 slot arbitration seal -> held.
+- Missing operator review receipt -> held.
+- Recommendation target mismatch -> held.
+- Runtime SFT training / gradient / optimizer -> held.
+- Silent registry correction -> held.
+- textureSample / sampler / normalized UV weight fetch -> held.
+- CPU fallback as success -> held.
+crates/ash_core/src/sft_gpu_operator_action_apply.rs {'{': 83, '}': 83, '[': 19, ']': 19, '(': 199, ')': 199}
+crates/ash_core/tests/sft_gpu_run_13_operator_action_apply.rs {'{': 19, '}': 19, '[': 9, ']': 9, '(': 143, ')': 143}
+crates/lora_train/src/gpu_trained_operator_action_apply.rs {'{': 11, '}': 11, '[': 3, ']': 3, '(': 39, ')': 39}
+crates/lora_train/tests/gpu_trained_operator_action_apply.rs {'{': 7, '}': 7, '[': 5, ']': 5, '(': 48, ')': 48}
+crates/burn_webgpu_backend/src/gpu_trained_operator_action_apply.rs {'{': 6, '}': 6, '[': 1, ']': 1, '(': 5, ')': 5}
+crates/burn_webgpu_backend/tests/gpu_trained_operator_action_apply.rs {'{': 5, '}': 5, '[': 5, ']': 5, '(': 23, ')': 23}
+[OK] delimiter balance for RUN-13 files
+[OK] export wiring: crates/ash_core/src/lib.rs -> sft_gpu_operator_action_apply
+[OK] export wiring: crates/lora_train/src/lib.rs -> gpu_trained_operator_action_apply
+[OK] export wiring: crates/burn_webgpu_backend/src/lib.rs -> gpu_trained_operator_action_apply

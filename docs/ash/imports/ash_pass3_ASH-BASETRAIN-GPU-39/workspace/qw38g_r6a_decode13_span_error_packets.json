@@ -1,0 +1,174 @@
+[
+  {
+    "action_hint": "RewriteRecommended",
+    "candidate_id": "candidate-span-omission",
+    "candidate_span": {
+      "candidate_ko_hash": "63a5e65696c8ebb17c0bd308f2d3bdf6edcbadf475962d0ad75760cb92e9563a",
+      "end_char": null,
+      "nullable_span": true,
+      "span_kind": "NoCandidateSpanForOmission",
+      "span_text_hash": null,
+      "start_char": null
+    },
+    "cue_id": "mock-cue-0001",
+    "error_type": "Omission",
+    "hard_fail_recommended": false,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "464cdf9203bb37c95a1cd7f417196e2a6ef3b7a161d3fdc08354a7ac86cc3303",
+    "packet_id": "span-packet-omission",
+    "qe_risk_reason_hash": "55364c0ab2366b39018fee9c2fa1dca68433dd65547c86a9f0b072eb074daa90",
+    "qe_score_snapshot_hash": "ca79c9a2047d828ed469021b8db4313e2eaf1bc8fe61111ac17ca4737b67c187",
+    "review_required": true,
+    "severity": "Major",
+    "source_span": {
+      "end_char": 36,
+      "nullable_span": false,
+      "source_en_hash": "75514e8940f227ab70401cf467b092c0ad3d43759e8bb1418fda74b803988ed0",
+      "span_kind": "OmittedSourceSegment",
+      "span_text_hash": "d47918d5b8e93260abfa33677dd1f3571153ac6e686a3c985df02a2fdabc6e29",
+      "start_char": 20
+    }
+  },
+  {
+    "action_hint": "ReviewRequired",
+    "candidate_id": "candidate-span-hallucination",
+    "candidate_span": {
+      "candidate_ko_hash": "b3a2aeedfcbba3fe86074883253f29dff5651ea94b6b9db4d26e934f3eb8f04d",
+      "end_char": 24,
+      "nullable_span": false,
+      "span_kind": "HallucinatedSegment",
+      "span_text_hash": "f09f7b944cdc918492610719f1efc34b4e3958fa7612c7728a4de2ae917cb8e7",
+      "start_char": 6
+    },
+    "cue_id": "mock-cue-0002",
+    "error_type": "Hallucination",
+    "hard_fail_recommended": false,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "855dd1c234bf0d7f6810fd586012b52497187d0a3b1692e461dcc7893cb9e43e",
+    "packet_id": "span-packet-hallucination",
+    "qe_risk_reason_hash": "08cbd764e551fe9d33c8868ce7edae2ddad683fa405222f643580b0fd2a25e5a",
+    "qe_score_snapshot_hash": "d92a4e6ac1ea5ddf45343094386b15f68609b315b260d6b58ca431636d4df510",
+    "review_required": true,
+    "severity": "Major",
+    "source_span": {
+      "end_char": null,
+      "nullable_span": true,
+      "source_en_hash": "9c06e90c362f7d60e3e00dc88feb420d098caa3992d6e7f0c70ea0aa5c27aef4",
+      "span_kind": "NoSourceSpanForHallucination",
+      "span_text_hash": null,
+      "start_char": null
+    }
+  },
+  {
+    "action_hint": "SourceAdequacyGateRequired",
+    "candidate_id": "candidate-span-polarity",
+    "candidate_span": {
+      "candidate_ko_hash": "2d96c7512688c87bdc3c3486d5b9aa264080bab3c7ec50eafa7cdb8bd003966b",
+      "end_char": 7,
+      "nullable_span": false,
+      "span_kind": "PolarityMismatchSegment",
+      "span_text_hash": "bb7749542ed3377657fd94cd2791d42ad231739c597c309d9b0f2c6eaf9b8e86",
+      "start_char": 5
+    },
+    "cue_id": "mock-cue-0003",
+    "error_type": "PolarityMismatch",
+    "hard_fail_recommended": false,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "fc50c4e25499f3ea0942f0c8e3e96d021a60e6241ff6164d058781755665d5b2",
+    "packet_id": "span-packet-polarity",
+    "qe_risk_reason_hash": "e0c5c80d0e27e799f85b9c9a1dab8bd4a1ca756e3c67b16b70efd794e893c51e",
+    "qe_score_snapshot_hash": "ea8785acb94dcdee051ed17599a752ed8c219410ba9a85ba78631da952b92398",
+    "review_required": true,
+    "severity": "Major",
+    "source_span": {
+      "end_char": 13,
+      "nullable_span": false,
+      "source_en_hash": "a30e4b10fbdd2e87d50820aa1cdc651921be320fa8b7a814dd9b382e319af3eb",
+      "span_kind": "NegationCue",
+      "span_text_hash": "a1b8dfc8978ff3c51f0fbedc8b02bd01d3024a20f2ffd74db5c0df1f2a11fc91",
+      "start_char": 2
+    }
+  },
+  {
+    "action_hint": "ReviewRequired",
+    "candidate_id": "candidate-span-number",
+    "candidate_span": {
+      "candidate_ko_hash": "f2d41f7d5e256e6ad5776a8f5ea895a20f1654aed85e4d6c70841b5bee678510",
+      "end_char": null,
+      "nullable_span": true,
+      "span_kind": "NoCandidateSpanForOmission",
+      "span_text_hash": null,
+      "start_char": null
+    },
+    "cue_id": "mock-cue-0004",
+    "error_type": "NumberMismatch",
+    "hard_fail_recommended": false,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "049c6d7ca4203a4c67a9f00e8c7f1d7347e935aeba19da15b88ba4eb534c8d12",
+    "packet_id": "span-packet-number_mismatch",
+    "qe_risk_reason_hash": "692691896b0807cdbd439b8fbf1e8a62510ea05767bcc5488fccd6218f36c498",
+    "qe_score_snapshot_hash": "3dbddac66a170a910135ec65bc3ce6d5b5f2612ccceb733ea6228c57e3166713",
+    "review_required": true,
+    "severity": "Major",
+    "source_span": {
+      "end_char": 27,
+      "nullable_span": false,
+      "source_en_hash": "ee94d6b2d253927cc4fe051948ae47f3e2c85a27e09f9945f67b3a7b0e865a1e",
+      "span_kind": "NumberExpression",
+      "span_text_hash": "b075b6e113fcf02aecc4e137449091a91a03426c303dbac028511136abe83797",
+      "start_char": 17
+    }
+  },
+  {
+    "action_hint": "GlossaryGateRequired",
+    "candidate_id": "candidate-span-entity",
+    "candidate_span": {
+      "candidate_ko_hash": "c5ac7dbfc2fd65e6552c90d81563a57de65e245a431cde503e7b8282522de2dc",
+      "end_char": 2,
+      "nullable_span": false,
+      "span_kind": "EntityMismatchSegment",
+      "span_text_hash": "906289e4c7b6b3022826885bbbafc4cda3a7e202c92397fe89f76c806333d521",
+      "start_char": 0
+    },
+    "cue_id": "mock-cue-0005",
+    "error_type": "NamedEntityMismatch",
+    "hard_fail_recommended": false,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "123986a20e4f94faa062a4d7f7fd96e06e6c41d9fc89093d8eec897f1df4823e",
+    "packet_id": "span-packet-entity_mismatch",
+    "qe_risk_reason_hash": "f17f436ada054d6ce4ff1b19e11c62b4a3c1a9f9727d46787aeefb49e1382dc4",
+    "qe_score_snapshot_hash": "bc7d16ac18490b70938a0645379e5934d36b601a93df2ad17e9c9f420dfe2e7f",
+    "review_required": true,
+    "severity": "Major",
+    "source_span": {
+      "end_char": 11,
+      "nullable_span": false,
+      "source_en_hash": "3ccff2d80e6af9e38caf5e4a76f40162c6cfaf885c271a73cb1d4103d549028f",
+      "span_kind": "NamedEntityHint",
+      "span_text_hash": "7297db81c2f7916e25b9593f8c8785e1aa1487fa9f3961c50b7cc5f1a541bc82",
+      "start_char": 5
+    }
+  },
+  {
+    "action_hint": "QeReceiptRequired",
+    "candidate_id": "candidate-span-missing-qe",
+    "candidate_span": null,
+    "cue_id": "mock-cue-0006",
+    "error_type": "MissingQeReceipt",
+    "hard_fail_recommended": true,
+    "localized_by_external_model": false,
+    "localized_by_stub": true,
+    "packet_hash": "b62067c1e43b5180f4073fceeead65f235e38c9740070ac9a7d3873607f36a92",
+    "packet_id": "span-packet-missing_qe",
+    "qe_risk_reason_hash": "d746e4e8be9633dc22ad943616b387bc90f9532a50cec561050d70051fb8c492",
+    "qe_score_snapshot_hash": "c953c7dde65a82dee9d251d55a996be67070095bb3b469f932a7f34430e91c6d",
+    "review_required": true,
+    "severity": "Critical",
+    "source_span": null
+  }
+]

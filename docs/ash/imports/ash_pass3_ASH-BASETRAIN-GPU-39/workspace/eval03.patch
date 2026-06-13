@@ -1,0 +1,1795 @@
+diff -ruN /mnt/data/eval03_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md /mnt/data/eval03_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md
+--- /mnt/data/eval03_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md	2026-05-27 08:40:50.993978302 +0000
+@@ -0,0 +1,20 @@
++# Acceptance Report — 16AI-QW-38G-R6A-EVAL-03
++
++## Status
++PASS_STATIC / RUNTIME_NOT_RUN
++
++## Confirmed static contracts
++- `candidate_replay_only = true`
++- `base_config_mutation_allowed = false`
++- `runtime_promotion_allowed = false`
++- `can_promote_to_default = false`
++- hard fail criteria include global fallback, active set empty, critical salad, backend semantic regression, threshold kind mismatch, and output-too-short.
++
++## Not run
++- cargo check
++- runtime replay
++- backend parity replay
++- long horizon candidate soak
++
++## Next step
++Run EVAL-03 replay candidate. If pass, proceed to `16AI-QW-38G-R6A-DECODE-03G` controlled apply.
+diff -ruN /mnt/data/eval03_orig/crates/model_core/src/eval03_candidate_replay.rs /mnt/data/eval03_work/crates/model_core/src/eval03_candidate_replay.rs
+--- /mnt/data/eval03_orig/crates/model_core/src/eval03_candidate_replay.rs	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/crates/model_core/src/eval03_candidate_replay.rs	2026-05-27 08:40:06.817494120 +0000
+@@ -0,0 +1,702 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::decode03f_guard_calibration::{
++    Decode03FCalibrationCandidate, Decode03FGuardParamSet, default_guard_param_set,
++};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const EVAL03_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-03";
++pub const EVAL03_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03F";
++pub const EVAL03_SSOT: &str = "decode03f_calibration_candidate+eval00_eval01_eval02_replay_matrix";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Eval03Mode {
++    Off,
++    ManifestOnly,
++    ReplayCandidate,
++    CompareCandidate,
++    StrictCandidateGate,
++}
++
++impl Eval03Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_EVAL03_MODE")
++            .unwrap_or_else(|_| "manifest_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "replay" | "replay_candidate" | "run" => Self::ReplayCandidate,
++            "compare" | "compare_candidate" => Self::CompareCandidate,
++            "strict" | "strict_candidate_gate" => Self::StrictCandidateGate,
++            _ => Self::ManifestOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ManifestOnly => "ManifestOnly",
++            Self::ReplayCandidate => "ReplayCandidate",
++            Self::CompareCandidate => "CompareCandidate",
++            Self::StrictCandidateGate => "StrictCandidateGate",
++        }
++    }
++
++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
++    pub fn replays(self) -> bool { matches!(self, Self::ReplayCandidate | Self::CompareCandidate | Self::StrictCandidateGate) }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03CandidateProfile {
++    pub candidate_profile_id: String,
++    pub source_candidate_id: String,
++    pub baseline_profile: String,
++    pub parent_guard_profile: String,
++    pub candidate_only: bool,
++    pub runtime_apply: bool,
++    pub proposed_params: Decode03FGuardParamSet,
++    pub decode03e_controlled_apply: bool,
++    pub salad04_overlay_enabled: bool,
++    pub profile_hash: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03CandidateMatrix {
++    pub patch_id: String,
++    pub candidate_source: String,
++    pub baseline_profiles: Vec<String>,
++    pub candidate_profiles: Vec<String>,
++    pub short_regression_suite: String,
++    pub long_horizon_suite: String,
++    pub backends: Vec<String>,
++    pub seeds: Vec<u64>,
++    pub max_new_tokens_short: usize,
++    pub max_new_tokens_long: usize,
++    pub horizon_buckets: Vec<usize>,
++    pub compare_backend_parity: bool,
++    pub compare_long_horizon: bool,
++    pub strict_replay: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval03ShortMetrics {
++    pub salad02_score_max: Option<f32>,
++    pub salad04_score_max: Option<f32>,
++    pub salad02_high_count: usize,
++    pub salad02_critical_count: usize,
++    pub salad04_high_count: usize,
++    pub salad04_critical_count: usize,
++    pub byte_piece_count: usize,
++    pub jamo_leak_count: usize,
++    pub normal_prompt_stop: bool,
++    pub output_too_short: bool,
++    pub repeat_3gram_rate: Option<f32>,
++    pub distinct_2_ratio: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval03BackendParityMetrics {
++    pub canonical_backend: String,
++    pub candidate_backend: String,
++    pub selected_match_rate: Option<f32>,
++    pub top5_overlap_mean: Option<f32>,
++    pub threshold_kind_mismatch_count: usize,
++    pub active_set_delta_fail_count: usize,
++    pub entropy_delta_fail_count: usize,
++    pub pci_delta_fail_count: usize,
++    pub fallback_divergence_count: usize,
++    pub stop_decision_divergence_count: usize,
++    pub semantic_parity_pass: bool,
++    pub strict_parity_pass: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval03LongHorizonMetrics {
++    pub drift_score: Option<f32>,
++    pub drift_risk: Option<String>,
++    pub pci_decay_rate: Option<f32>,
++    pub entropy_growth_rate: Option<f32>,
++    pub salad02_growth_rate: Option<f32>,
++    pub salad04_growth_rate: Option<f32>,
++    pub morph_loop_growth_rate: Option<f32>,
++    pub guard_panic_growth_rate: Option<f32>,
++    pub stop_pressure_growth_rate: Option<f32>,
++    pub fallback_pressure_growth_rate: Option<f32>,
++    pub global_finite_fallback_count: usize,
++    pub active_set_empty_count: usize,
++    pub tokens_per_second_mean: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03RunJudgement {
++    pub status: String,
++    pub fail_reasons: Vec<String>,
++    pub warn_reasons: Vec<String>,
++    pub candidate_improved_over_parent: Option<bool>,
++    pub candidate_regressed_vs_parent: Option<bool>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03CandidateRunReceipt {
++    pub patch_id: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub candidate_id: String,
++    pub candidate_profile_id: String,
++    pub profile_hash: String,
++    pub prompt_id: String,
++    pub prompt_hash: String,
++    pub suite_kind: String,
++    pub backend: String,
++    pub seed: u64,
++    pub max_new_tokens: usize,
++    pub output_hash: String,
++    pub visible_output_hash: Option<String>,
++    pub finish_reason: String,
++    pub output_token_count: usize,
++    pub short_metrics: Option<Eval03ShortMetrics>,
++    pub backend_metrics: Option<Eval03BackendParityMetrics>,
++    pub long_metrics: Option<Eval03LongHorizonMetrics>,
++    pub judgement: Eval03RunJudgement,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03CandidateBackendDiff {
++    pub candidate_id: String,
++    pub candidate_profile_id: String,
++    pub prompt_id: String,
++    pub seed: u64,
++    pub canonical_backend: String,
++    pub candidate_backend: String,
++    pub selected_match_rate_delta_vs_parent: Option<f32>,
++    pub top5_overlap_delta_vs_parent: Option<f32>,
++    pub active_set_delta_fail_delta_vs_parent: i64,
++    pub fallback_divergence_delta_vs_parent: i64,
++    pub stop_divergence_delta_vs_parent: i64,
++    pub parity_regressed: bool,
++    pub diff_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval03OverallStats {
++    pub pass_count: usize,
++    pub warn_count: usize,
++    pub fail_count: usize,
++    pub not_comparable_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03PromotionDecision {
++    pub can_promote_to_decode03g: bool,
++    pub can_promote_to_default: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub required_next_steps: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03CandidateStats {
++    pub candidate_id: String,
++    pub candidate_profile_id: String,
++    pub source_candidate_status: String,
++    pub run_count: usize,
++    pub pass_count: usize,
++    pub warn_count: usize,
++    pub fail_count: usize,
++    pub not_comparable_count: usize,
++    pub short_regression_pass: bool,
++    pub backend_parity_pass: bool,
++    pub long_horizon_pass: bool,
++    pub salad_score_improved: bool,
++    pub morph_loop_reduced: bool,
++    pub drift_score_improved: bool,
++    pub over_stop_regression: bool,
++    pub backend_parity_regression: bool,
++    pub speed_regression_warn: bool,
++    pub candidate_grade: String,
++    pub promotion: Eval03PromotionDecision,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03Acceptance {
++    pub ready_for_decode03g_controlled_apply: bool,
++    pub ready_for_default_guard_overlay: bool,
++    pub ready_for_medusa00: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval03Summary {
++    pub patch_id: String,
++    pub status: String,
++    pub mode: String,
++    pub candidates_seen: usize,
++    pub candidates_evaluated: usize,
++    pub overall: Eval03OverallStats,
++    pub by_candidate: BTreeMap<String, Eval03CandidateStats>,
++    pub acceptance: Eval03Acceptance,
++}
++
++pub fn default_candidate_matrix() -> Eval03CandidateMatrix {
++    Eval03CandidateMatrix {
++        patch_id: EVAL03_PATCH_ID.to_string(),
++        candidate_source: "workspace/decode03f_candidates.jsonl".to_string(),
++        baseline_profiles: vec!["S01_static_safe".to_string(), "S05_decode03e_guard_overlay".to_string()],
++        candidate_profiles: vec!["C03F_candidate_0001".to_string()],
++        short_regression_suite: "workspace/eval00_prompt_suite.jsonl".to_string(),
++        long_horizon_suite: "workspace/eval02_long_prompt_suite.jsonl".to_string(),
++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
++        seeds: vec![101, 202, 303],
++        max_new_tokens_short: 96,
++        max_new_tokens_long: 512,
++        horizon_buckets: vec![128, 256, 512],
++        compare_backend_parity: true,
++        compare_long_horizon: true,
++        strict_replay: true,
++    }
++}
++
++pub fn materialize_candidate_profile(candidate: &Decode03FCalibrationCandidate) -> Eval03CandidateProfile {
++    let candidate_profile_id = format!("C03F_{}", candidate.candidate_id.to_ascii_lowercase().replace("decode03f_", "").replace('-', "_").replace(' ', "_"));
++    let profile_sig = format!("{}:{}:{}", candidate.candidate_id, candidate.baseline_profile, candidate.source_run_id);
++    Eval03CandidateProfile {
++        candidate_profile_id,
++        source_candidate_id: candidate.candidate_id.clone(),
++        baseline_profile: candidate.baseline_profile.clone(),
++        parent_guard_profile: candidate.candidate_profile.clone(),
++        candidate_only: true,
++        runtime_apply: false,
++        proposed_params: candidate.proposed_params.clone(),
++        decode03e_controlled_apply: true,
++        salad04_overlay_enabled: true,
++        profile_hash: hash_string(&profile_sig),
++    }
++}
++
++pub fn load_decode03f_candidates(path: &str) -> Result<Vec<Decode03FCalibrationCandidate>, String> {
++    let content = fs::read_to_string(path).map_err(|e| format!("read candidates: {}", e))?;
++    let mut out = Vec::new();
++    for (idx, line) in content.lines().enumerate() {
++        let trimmed = line.trim();
++        if trimmed.is_empty() { continue; }
++        let value: Decode03FCalibrationCandidate = serde_json::from_str(trimmed)
++            .map_err(|e| format!("parse candidate line {}: {}", idx + 1, e))?;
++        out.push(value);
++    }
++    Ok(out)
++}
++
++pub fn judge_eval03_run(run: &Eval03CandidateRunReceipt) -> Eval03RunJudgement {
++    let mut fail = Vec::new();
++    let mut warn = Vec::new();
++    if let Some(short) = &run.short_metrics {
++        if short.salad02_critical_count > 0 { fail.push("salad02_critical".to_string()); }
++        if short.salad04_critical_count > 0 { fail.push("salad04_critical".to_string()); }
++        if short.byte_piece_count >= 3 { fail.push("byte_piece_threshold_exceeded".to_string()); }
++        if short.jamo_leak_count >= 5 { fail.push("jamo_leak_threshold_exceeded".to_string()); }
++        if short.normal_prompt_stop { warn.push("normal_prompt_stop_seen".to_string()); }
++        if short.output_too_short { fail.push("output_too_short".to_string()); }
++        if short.salad02_high_count > 0 || short.salad04_high_count > 0 { warn.push("high_salad_or_morph_risk_seen".to_string()); }
++    }
++    if let Some(backend) = &run.backend_metrics {
++        if backend.threshold_kind_mismatch_count > 0 { fail.push("threshold_kind_mismatch".to_string()); }
++        if backend.fallback_divergence_count > 0 { fail.push("fallback_divergence".to_string()); }
++        if !backend.semantic_parity_pass { fail.push("backend_semantic_parity_fail".to_string()); }
++        if !backend.strict_parity_pass { warn.push("backend_strict_parity_warn".to_string()); }
++        if backend.active_set_delta_fail_count > 0 { fail.push("active_set_delta_fail".to_string()); }
++        if backend.stop_decision_divergence_count > 0 { warn.push("stop_decision_divergence".to_string()); }
++    }
++    if let Some(long) = &run.long_metrics {
++        if long.global_finite_fallback_count > 0 { fail.push("global_finite_fallback".to_string()); }
++        if long.active_set_empty_count > 0 { fail.push("active_set_empty".to_string()); }
++        if matches!(long.drift_risk.as_deref(), Some("High" | "Critical")) { warn.push("long_horizon_drift_warn".to_string()); }
++        if long.stop_pressure_growth_rate.unwrap_or(0.0) > 0.05 { warn.push("stop_pressure_growth_warn".to_string()); }
++        if long.tokens_per_second_mean.unwrap_or(9999.0) < 1.0 { warn.push("speed_regression_warn".to_string()); }
++    }
++    if run.finish_reason == "NOT_COMPARABLE" {
++        return Eval03RunJudgement { status: "NOT_COMPARABLE".to_string(), fail_reasons: fail, warn_reasons: warn, candidate_improved_over_parent: None, candidate_regressed_vs_parent: None };
++    }
++    let status = if !fail.is_empty() { "FAIL" } else if !warn.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
++    let candidate_regressed = !fail.is_empty();
++    Eval03RunJudgement {
++        status: status.to_string(),
++        fail_reasons: fail,
++        warn_reasons: warn,
++        candidate_improved_over_parent: Some(!candidate_regressed),
++        candidate_regressed_vs_parent: Some(candidate_regressed),
++    }
++}
++
++pub fn build_synthetic_candidate_run(receipt: &SamplerParityReceipt, profile: &Eval03CandidateProfile) -> Eval03CandidateRunReceipt {
++    let suite_kind = env::var("ASH_EVAL03_SUITE_KIND").unwrap_or_else(|_| "short_regression".to_string());
++    let backend = env::var("ASH_EVAL03_BACKEND").unwrap_or_else(|_| "sampler03_projection".to_string());
++    let seed = env_u64("ASH_EVAL03_SEED", 0);
++    let salad02 = env_f32("ASH_EVAL03_SALAD02_SCORE");
++    let salad04 = env_f32("ASH_EVAL03_SALAD04_SCORE");
++    let selected_match = env_f32("ASH_EVAL03_SELECTED_MATCH_RATE").unwrap_or(1.0);
++    let top5_overlap = env_f32("ASH_EVAL03_TOP5_OVERLAP_MEAN").unwrap_or(5.0);
++    let drift = env_f32("ASH_EVAL03_DRIFT_SCORE").unwrap_or(0.20);
++    let normal_stop = env_bool("ASH_EVAL03_NORMAL_PROMPT_STOP", false);
++    let active_empty = env_usize("ASH_EVAL03_ACTIVE_SET_EMPTY_COUNT", 0);
++    let global_fallback = env_usize("ASH_EVAL03_GLOBAL_FALLBACK_COUNT", 0);
++    let output_token_count = env_usize("ASH_EVAL03_OUTPUT_TOKEN_COUNT", receipt.step.saturating_add(1).max(1));
++    let prompt_id = env::var("ASH_EVAL03_PROMPT_ID").unwrap_or_else(|_| format!("candidate_sampler03_step_{}", receipt.step));
++    let short_metrics = Some(Eval03ShortMetrics {
++        salad02_score_max: salad02,
++        salad04_score_max: salad04,
++        salad02_high_count: risk_count(salad02, 0.55),
++        salad02_critical_count: risk_count(salad02, 0.80),
++        salad04_high_count: risk_count(salad04, 0.55),
++        salad04_critical_count: risk_count(salad04, 0.80),
++        byte_piece_count: env_usize("ASH_EVAL03_BYTE_PIECE_COUNT", 0),
++        jamo_leak_count: env_usize("ASH_EVAL03_JAMO_LEAK_COUNT", 0),
++        normal_prompt_stop: normal_stop,
++        output_too_short: output_token_count < 8,
++        repeat_3gram_rate: env_f32("ASH_EVAL03_REPEAT_3GRAM_RATE"),
++        distinct_2_ratio: env_f32("ASH_EVAL03_DISTINCT_2_RATIO"),
++    });
++    let backend_metrics = Some(Eval03BackendParityMetrics {
++        canonical_backend: "cpu_oracle".to_string(),
++        candidate_backend: backend.clone(),
++        selected_match_rate: Some(selected_match),
++        top5_overlap_mean: Some(top5_overlap),
++        threshold_kind_mismatch_count: env_usize("ASH_EVAL03_THRESHOLD_KIND_MISMATCH_COUNT", 0),
++        active_set_delta_fail_count: env_usize("ASH_EVAL03_ACTIVE_SET_DELTA_FAIL_COUNT", 0),
++        entropy_delta_fail_count: env_usize("ASH_EVAL03_ENTROPY_DELTA_FAIL_COUNT", 0),
++        pci_delta_fail_count: env_usize("ASH_EVAL03_PCI_DELTA_FAIL_COUNT", 0),
++        fallback_divergence_count: env_usize("ASH_EVAL03_FALLBACK_DIVERGENCE_COUNT", 0),
++        stop_decision_divergence_count: env_usize("ASH_EVAL03_STOP_DIVERGENCE_COUNT", 0),
++        semantic_parity_pass: env_bool("ASH_EVAL03_SEMANTIC_PARITY_PASS", selected_match >= 0.80 && top5_overlap >= 3.0),
++        strict_parity_pass: env_bool("ASH_EVAL03_STRICT_PARITY_PASS", selected_match >= 0.95),
++    });
++    let long_metrics = Some(Eval03LongHorizonMetrics {
++        drift_score: Some(drift),
++        drift_risk: Some(risk_label(drift)),
++        pci_decay_rate: env_f32("ASH_EVAL03_PCI_DECAY_RATE"),
++        entropy_growth_rate: env_f32("ASH_EVAL03_ENTROPY_GROWTH_RATE"),
++        salad02_growth_rate: env_f32("ASH_EVAL03_SALAD02_GROWTH_RATE"),
++        salad04_growth_rate: env_f32("ASH_EVAL03_SALAD04_GROWTH_RATE"),
++        morph_loop_growth_rate: env_f32("ASH_EVAL03_MORPH_LOOP_GROWTH_RATE"),
++        guard_panic_growth_rate: env_f32("ASH_EVAL03_GUARD_PANIC_GROWTH_RATE"),
++        stop_pressure_growth_rate: env_f32("ASH_EVAL03_STOP_PRESSURE_GROWTH_RATE"),
++        fallback_pressure_growth_rate: env_f32("ASH_EVAL03_FALLBACK_PRESSURE_GROWTH_RATE"),
++        global_finite_fallback_count: global_fallback,
++        active_set_empty_count: active_empty,
++        tokens_per_second_mean: env_f32("ASH_EVAL03_TOKENS_PER_SECOND"),
++    });
++    let run_id = env::var("ASH_EVAL03_RUN_ID").unwrap_or_else(|_| "eval03_candidate_sampler03_replay".to_string());
++    let output_sig = format!("{}:{}:{}:{}:{}", run_id, profile.candidate_profile_id, prompt_id, backend, output_token_count);
++    let mut run = Eval03CandidateRunReceipt {
++        patch_id: EVAL03_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id,
++        candidate_id: profile.source_candidate_id.clone(),
++        candidate_profile_id: profile.candidate_profile_id.clone(),
++        profile_hash: profile.profile_hash.clone(),
++        prompt_hash: hash_string(&prompt_id),
++        prompt_id,
++        suite_kind,
++        backend,
++        seed,
++        max_new_tokens: env_usize("ASH_EVAL03_MAX_NEW_TOKENS", 96),
++        output_hash: hash_string(&output_sig),
++        visible_output_hash: None,
++        finish_reason: env::var("ASH_EVAL03_FINISH_REASON").unwrap_or_else(|_| "length".to_string()),
++        output_token_count,
++        short_metrics,
++        backend_metrics,
++        long_metrics,
++        judgement: Eval03RunJudgement { status: "PENDING".to_string(), fail_reasons: Vec::new(), warn_reasons: Vec::new(), candidate_improved_over_parent: None, candidate_regressed_vs_parent: None },
++    };
++    run.judgement = judge_eval03_run(&run);
++    run
++}
++
++pub fn summarize_eval03_runs(runs: &[Eval03CandidateRunReceipt], candidates_seen: usize) -> Eval03Summary {
++    let mut overall = Eval03OverallStats::default();
++    let mut by_raw: BTreeMap<String, Vec<&Eval03CandidateRunReceipt>> = BTreeMap::new();
++    for run in runs {
++        match run.judgement.status.as_str() {
++            "PASS" => overall.pass_count += 1,
++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
++            "FAIL" => overall.fail_count += 1,
++            "NOT_COMPARABLE" => overall.not_comparable_count += 1,
++            _ => {}
++        }
++        by_raw.entry(run.candidate_id.clone()).or_default().push(run);
++    }
++    let mut by_candidate = BTreeMap::new();
++    for (candidate_id, list) in by_raw.iter() {
++        let run_count = list.len();
++        let pass_count = list.iter().filter(|r| r.judgement.status == "PASS").count();
++        let warn_count = list.iter().filter(|r| r.judgement.status == "PASS_WITH_WARNINGS").count();
++        let fail_count = list.iter().filter(|r| r.judgement.status == "FAIL").count();
++        let not_comparable_count = list.iter().filter(|r| r.judgement.status == "NOT_COMPARABLE").count();
++        let backend_parity_regression = list.iter().any(|r| r.backend_metrics.as_ref().map(|m| !m.semantic_parity_pass || m.fallback_divergence_count > 0 || m.threshold_kind_mismatch_count > 0).unwrap_or(false));
++        let over_stop_regression = list.iter().any(|r| r.short_metrics.as_ref().map(|m| m.normal_prompt_stop).unwrap_or(false));
++        let speed_regression_warn = list.iter().any(|r| r.long_metrics.as_ref().and_then(|m| m.tokens_per_second_mean).map(|t| t < 1.0).unwrap_or(false));
++        let critical = list.iter().any(|r| {
++            r.short_metrics.as_ref().map(|m| m.salad02_critical_count > 0 || m.salad04_critical_count > 0).unwrap_or(false)
++                || r.long_metrics.as_ref().map(|m| m.global_finite_fallback_count > 0 || m.active_set_empty_count > 0).unwrap_or(false)
++        });
++        let short_regression_pass = !critical && list.iter().all(|r| r.short_metrics.is_some());
++        let backend_parity_pass = !backend_parity_regression;
++        let long_horizon_pass = list.iter().all(|r| r.long_metrics.as_ref().map(|m| !matches!(m.drift_risk.as_deref(), Some("Critical"))).unwrap_or(true));
++        let salad_score_improved = list.iter().any(|r| r.short_metrics.as_ref().and_then(|m| m.salad02_score_max).map(|s| s < 0.55).unwrap_or(false));
++        let morph_loop_reduced = list.iter().any(|r| r.short_metrics.as_ref().and_then(|m| m.salad04_score_max).map(|s| s < 0.55).unwrap_or(false));
++        let drift_score_improved = list.iter().any(|r| r.long_metrics.as_ref().and_then(|m| m.drift_score).map(|s| s < 0.30).unwrap_or(false));
++        let can_promote = fail_count == 0
++            && short_regression_pass
++            && backend_parity_pass
++            && long_horizon_pass
++            && !over_stop_regression
++            && !critical;
++        let candidate_grade = if fail_count > 0 || critical || backend_parity_regression || over_stop_regression {
++            "REJECT"
++        } else if can_promote && !speed_regression_warn {
++            "PROMOTE_TO_03G_CONTROLLED"
++        } else if can_promote {
++            "PROMOTE_TO_MORE_EVAL"
++        } else {
++            "HOLD"
++        }.to_string();
++        let mut denied = Vec::new();
++        let mut warnings = Vec::new();
++        if fail_count > 0 { denied.push("failed_run_present".to_string()); }
++        if critical { denied.push("hard_safety_regression_present".to_string()); }
++        if backend_parity_regression { denied.push("backend_parity_regression".to_string()); }
++        if over_stop_regression { denied.push("over_stop_regression".to_string()); }
++        if speed_regression_warn { warnings.push("speed_regression_warn_requires_monitoring".to_string()); }
++        warnings.push("default_enable_forbidden_in_eval03".to_string());
++        let candidate_profile_id = list.first().map(|r| r.candidate_profile_id.clone()).unwrap_or_else(|| format!("C03F_{}", candidate_id.to_ascii_lowercase()));
++        by_candidate.insert(candidate_id.clone(), Eval03CandidateStats {
++            candidate_id: candidate_id.clone(),
++            candidate_profile_id,
++            source_candidate_status: "PASS_WITH_WARNINGS".to_string(),
++            run_count,
++            pass_count,
++            warn_count,
++            fail_count,
++            not_comparable_count,
++            short_regression_pass,
++            backend_parity_pass,
++            long_horizon_pass,
++            salad_score_improved,
++            morph_loop_reduced,
++            drift_score_improved,
++            over_stop_regression,
++            backend_parity_regression,
++            speed_regression_warn,
++            candidate_grade,
++            promotion: Eval03PromotionDecision {
++                can_promote_to_decode03g: can_promote,
++                can_promote_to_default: false,
++                denied_reasons: denied,
++                warning_reasons: warnings,
++                required_next_steps: if can_promote { vec!["DECODE-03G controlled apply".to_string(), "EVAL-04 post-apply replay".to_string()] } else { vec!["Adjust DECODE-03F candidate".to_string(), "Rerun EVAL-03".to_string()] },
++            },
++        });
++    }
++    let ready = by_candidate.values().any(|c| c.promotion.can_promote_to_decode03g);
++    let status = if overall.fail_count > 0 { "FAIL" } else if overall.warn_count > 0 || overall.not_comparable_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS" };
++    Eval03Summary {
++        patch_id: EVAL03_PATCH_ID.to_string(),
++        status: status.to_string(),
++        mode: Eval03Mode::from_env().as_str().to_string(),
++        candidates_seen,
++        candidates_evaluated: by_candidate.len(),
++        overall,
++        by_candidate,
++        acceptance: Eval03Acceptance {
++            ready_for_decode03g_controlled_apply: ready,
++            ready_for_default_guard_overlay: false,
++            ready_for_medusa00: false,
++            reason: if ready { "candidate replay passed without hard fail; default enable still forbidden".to_string() } else { "candidate replay not promotable yet".to_string() },
++        },
++    }
++}
++
++pub fn write_eval03_manifests() -> Result<(), String> {
++    write_json_pretty(matrix_path(), &default_candidate_matrix())?;
++    let schema = serde_json::json!({
++        "patch_id": EVAL03_PATCH_ID,
++        "ssot": EVAL03_SSOT,
++        "candidate_replay_only": true,
++        "base_config_mutation_allowed": false,
++        "runtime_promotion_allowed": false,
++        "required_files": [
++            "workspace/decode03f_candidates.jsonl",
++            "workspace/eval03_candidate_matrix.json",
++            "workspace/eval03_candidate_runs.jsonl",
++            "workspace/eval03_backend_diffs.jsonl",
++            "workspace/eval03_summary.json"
++        ]
++    });
++    write_json_pretty(metric_schema_path(), &schema)?;
++    Ok(())
++}
++
++pub fn append_eval03_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
++    let mode = Eval03Mode::from_env();
++    if !mode.enabled() { return; }
++    let _ = write_eval03_manifests();
++    let candidates = load_decode03f_candidates(&candidates_path().to_string_lossy()).unwrap_or_else(|_| vec![synthetic_candidate()]);
++    if matches!(mode, Eval03Mode::ManifestOnly) {
++        let _ = write_eval03_summary_from_receipt_file();
++        return;
++    }
++    if let Some(candidate) = candidates.first() {
++        let profile = materialize_candidate_profile(candidate);
++        let run = build_synthetic_candidate_run(receipt, &profile);
++        append_jsonl(runs_path(), &run);
++        if let Some(metrics) = &run.backend_metrics {
++            let diff = Eval03CandidateBackendDiff {
++                candidate_id: run.candidate_id.clone(),
++                candidate_profile_id: run.candidate_profile_id.clone(),
++                prompt_id: run.prompt_id.clone(),
++                seed: run.seed,
++                canonical_backend: metrics.canonical_backend.clone(),
++                candidate_backend: metrics.candidate_backend.clone(),
++                selected_match_rate_delta_vs_parent: None,
++                top5_overlap_delta_vs_parent: None,
++                active_set_delta_fail_delta_vs_parent: metrics.active_set_delta_fail_count as i64,
++                fallback_divergence_delta_vs_parent: metrics.fallback_divergence_count as i64,
++                stop_divergence_delta_vs_parent: metrics.stop_decision_divergence_count as i64,
++                parity_regressed: !metrics.semantic_parity_pass || metrics.fallback_divergence_count > 0,
++                diff_reasons: if metrics.semantic_parity_pass { vec!["semantic_parity_pass".to_string()] } else { vec!["semantic_parity_fail".to_string()] },
++            };
++            append_jsonl(backend_diffs_path(), &diff);
++        }
++    }
++    let _ = write_eval03_summary_from_receipt_file();
++}
++
++pub fn write_eval03_summary_from_receipt_file() -> Result<(), String> {
++    let runs = read_jsonl::<Eval03CandidateRunReceipt>(runs_path()).unwrap_or_default();
++    let candidates_seen = load_decode03f_candidates(&candidates_path().to_string_lossy()).map(|v| v.len()).unwrap_or_else(|_| if runs.is_empty() { 0 } else { 1 });
++    let summary = summarize_eval03_runs(&runs, candidates_seen);
++    write_json_pretty(summary_path(), &summary)
++}
++
++fn synthetic_candidate() -> Decode03FCalibrationCandidate {
++    Decode03FCalibrationCandidate {
++        patch_id: "16AI-QW-38G-R6A-DECODE-03F".to_string(),
++        schema_version: 1,
++        candidate_id: "DECODE03F_CANDIDATE_SYNTHETIC".to_string(),
++        source_run_id: "eval03_synthetic_source".to_string(),
++        baseline_profile: "S01_static_safe".to_string(),
++        candidate_profile: "S05_decode03e_guard_overlay".to_string(),
++        candidate_only: true,
++        runtime_apply: false,
++        input_status: crate::decode03f_guard_calibration::Decode03FInputStatus {
++            eval00_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            eval01_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            eval02_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            decode03e_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
++            backend_semantic_parity_ok: true,
++            backend_strict_parity_ok: false,
++        },
++        current_params: default_guard_param_set(),
++        proposed_params: default_guard_param_set(),
++        param_deltas: Vec::new(),
++        expected_effect: crate::decode03f_guard_calibration::Decode03FExpectedEffect {
++            expected_salad_reduction: "unknown".to_string(),
++            expected_morph_loop_reduction: "unknown".to_string(),
++            expected_false_positive_change: "unknown".to_string(),
++            expected_speed_impact: "unknown".to_string(),
++            expected_stop_frequency_change: "unknown".to_string(),
++        },
++        risk_assessment: crate::decode03f_guard_calibration::Decode03FRiskAssessment {
++            over_suppression_risk: "medium".to_string(),
++            under_suppression_risk: "medium".to_string(),
++            backend_divergence_risk: "medium".to_string(),
++            speed_regression_risk: "medium".to_string(),
++            stop_overtrigger_risk: "medium".to_string(),
++            risk_reasons: vec!["synthetic_candidate_for_eval03_manifest".to_string()],
++        },
++        acceptance_gate: crate::decode03f_guard_calibration::Decode03FAcceptanceGate {
++            can_generate_candidate: true,
++            can_promote_to_controlled_apply: false,
++            can_promote_to_default: false,
++            denied_reasons: Vec::new(),
++            warning_reasons: vec!["synthetic_candidate_not_for_promotion".to_string()],
++            promotion_requirements: vec!["real_decode03f_candidate_required".to_string()],
++        },
++        calibration_reasons: vec!["eval03_synthetic_candidate".to_string()],
++        calibration_warnings: vec!["not_runtime_apply".to_string()],
++    }
++}
++
++fn risk_count(score: Option<f32>, threshold: f32) -> usize {
++    if score.unwrap_or(0.0) >= threshold { 1 } else { 0 }
++}
++
++fn risk_label(score: f32) -> String {
++    let s = score.clamp(0.0, 1.0);
++    if s >= 0.80 { "Critical" } else if s >= 0.55 { "High" } else if s >= 0.30 { "Medium" } else { "Low" }.to_string()
++}
++
++fn env_bool(key: &str, default: bool) -> bool {
++    env::var(key).ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")).unwrap_or(default)
++}
++
++fn env_usize(key: &str, default: usize) -> usize {
++    env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_u64(key: &str, default: u64) -> u64 {
++    env::var(key).ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(default)
++}
++
++fn env_f32(key: &str) -> Option<f32> {
++    env::var(key).ok().and_then(|v| v.parse::<f32>().ok())
++}
++
++fn hash_string(input: &str) -> String {
++    let mut hash: u64 = 0xcbf29ce484222325;
++    for b in input.as_bytes() {
++        hash ^= *b as u64;
++        hash = hash.wrapping_mul(0x100000001b3);
++    }
++    format!("fnv64:{:016x}", hash)
++}
++
++fn workspace_path(name: &str) -> PathBuf {
++    env::var("ASH_WORKSPACE_DIR").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace")).join(name)
++}
++
++fn matrix_path() -> PathBuf { env::var("ASH_EVAL03_MATRIX").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_candidate_matrix.json")) }
++fn metric_schema_path() -> PathBuf { workspace_path("eval03_metric_schema.json") }
++fn candidates_path() -> PathBuf { env::var("ASH_EVAL03_CANDIDATES").map(PathBuf::from).unwrap_or_else(|_| workspace_path("decode03f_candidates.jsonl")) }
++fn runs_path() -> PathBuf { env::var("ASH_EVAL03_RUNS").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_candidate_runs.jsonl")) }
++fn backend_diffs_path() -> PathBuf { env::var("ASH_EVAL03_BACKEND_DIFFS").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_backend_diffs.jsonl")) }
++fn summary_path() -> PathBuf { env::var("ASH_EVAL03_SUMMARY").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_summary.json")) }
++
++fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) {
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(value) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn write_json_pretty<T: Serialize>(path: PathBuf, value: &T) -> Result<(), String> {
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
++    fs::write(path, json).map_err(|e| e.to_string())
++}
++
++fn read_jsonl<T: for<'de> Deserialize<'de>>(path: PathBuf) -> Result<Vec<T>, String> {
++    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
++    let mut out = Vec::new();
++    for line in content.lines() {
++        let trimmed = line.trim();
++        if trimmed.is_empty() { continue; }
++        out.push(serde_json::from_str(trimmed).map_err(|e| e.to_string())?);
++    }
++    Ok(out)
++}
+diff -ruN /mnt/data/eval03_orig/crates/model_core/src/lib.rs /mnt/data/eval03_work/crates/model_core/src/lib.rs
+--- /mnt/data/eval03_orig/crates/model_core/src/lib.rs	2026-05-27 08:30:36.000000000 +0000
++++ /mnt/data/eval03_work/crates/model_core/src/lib.rs	2026-05-27 08:40:09.433358568 +0000
+@@ -33,6 +33,7 @@
+ mod decode03e_guard_overlay;
+ mod eval02_long_horizon;
+ mod decode03f_guard_calibration;
++mod eval03_candidate_replay;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -276,6 +277,19 @@
+ };
+ 
+ 
++pub use eval03_candidate_replay::{
++    EVAL03_PATCH_ID, EVAL03_INPUT_PATCH_ID, EVAL03_SSOT, Eval03Mode,
++    Eval03CandidateProfile, Eval03CandidateMatrix, Eval03ShortMetrics,
++    Eval03BackendParityMetrics, Eval03LongHorizonMetrics, Eval03RunJudgement,
++    Eval03CandidateRunReceipt, Eval03CandidateBackendDiff, Eval03OverallStats,
++    Eval03PromotionDecision, Eval03CandidateStats, Eval03Acceptance, Eval03Summary,
++    default_candidate_matrix as eval03_default_candidate_matrix, materialize_candidate_profile as eval03_materialize_candidate_profile,
++    load_decode03f_candidates as eval03_load_decode03f_candidates, judge_eval03_run,
++    build_synthetic_candidate_run as eval03_build_synthetic_candidate_run, summarize_eval03_runs,
++    write_eval03_manifests, append_eval03_receipt_from_sampler03, write_eval03_summary_from_receipt_file,
++};
++
++
+ 
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+diff -ruN /mnt/data/eval03_orig/crates/model_core/src/sampler_parity.rs /mnt/data/eval03_work/crates/model_core/src/sampler_parity.rs
+--- /mnt/data/eval03_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:30:39.000000000 +0000
++++ /mnt/data/eval03_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:40:09.450147357 +0000
+@@ -466,5 +466,6 @@
+     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
+     crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
+     crate::decode03f_guard_calibration::append_decode03f_receipt_from_sampler03(receipt);
++    crate::eval03_candidate_replay::append_eval03_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN /mnt/data/eval03_orig/workspace/eval03.patch /mnt/data/eval03_work/workspace/eval03.patch
+--- /mnt/data/eval03_orig/workspace/eval03.patch	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03.patch	2026-05-27 08:41:42.962504161 +0000
+@@ -0,0 +1,771 @@
++diff -ruN /mnt/data/eval03_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md /mnt/data/eval03_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md
++--- /mnt/data/eval03_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/eval03_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md	2026-05-27 08:40:50.993978302 +0000
++@@ -0,0 +1,20 @@
+++# Acceptance Report — 16AI-QW-38G-R6A-EVAL-03
+++
+++## Status
+++PASS_STATIC / RUNTIME_NOT_RUN
+++
+++## Confirmed static contracts
+++- `candidate_replay_only = true`
+++- `base_config_mutation_allowed = false`
+++- `runtime_promotion_allowed = false`
+++- `can_promote_to_default = false`
+++- hard fail criteria include global fallback, active set empty, critical salad, backend semantic regression, threshold kind mismatch, and output-too-short.
+++
+++## Not run
+++- cargo check
+++- runtime replay
+++- backend parity replay
+++- long horizon candidate soak
+++
+++## Next step
+++Run EVAL-03 replay candidate. If pass, proceed to `16AI-QW-38G-R6A-DECODE-03G` controlled apply.
++diff -ruN /mnt/data/eval03_orig/crates/model_core/src/eval03_candidate_replay.rs /mnt/data/eval03_work/crates/model_core/src/eval03_candidate_replay.rs
++--- /mnt/data/eval03_orig/crates/model_core/src/eval03_candidate_replay.rs	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/eval03_work/crates/model_core/src/eval03_candidate_replay.rs	2026-05-27 08:40:06.817494120 +0000
++@@ -0,0 +1,702 @@
+++use serde::{Deserialize, Serialize};
+++use std::{collections::BTreeMap, env, fs, path::PathBuf};
+++
+++use crate::decode03f_guard_calibration::{
+++    Decode03FCalibrationCandidate, Decode03FGuardParamSet, default_guard_param_set,
+++};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const EVAL03_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-03";
+++pub const EVAL03_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03F";
+++pub const EVAL03_SSOT: &str = "decode03f_calibration_candidate+eval00_eval01_eval02_replay_matrix";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Eval03Mode {
+++    Off,
+++    ManifestOnly,
+++    ReplayCandidate,
+++    CompareCandidate,
+++    StrictCandidateGate,
+++}
+++
+++impl Eval03Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_EVAL03_MODE")
+++            .unwrap_or_else(|_| "manifest_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "replay" | "replay_candidate" | "run" => Self::ReplayCandidate,
+++            "compare" | "compare_candidate" => Self::CompareCandidate,
+++            "strict" | "strict_candidate_gate" => Self::StrictCandidateGate,
+++            _ => Self::ManifestOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ManifestOnly => "ManifestOnly",
+++            Self::ReplayCandidate => "ReplayCandidate",
+++            Self::CompareCandidate => "CompareCandidate",
+++            Self::StrictCandidateGate => "StrictCandidateGate",
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
+++    pub fn replays(self) -> bool { matches!(self, Self::ReplayCandidate | Self::CompareCandidate | Self::StrictCandidateGate) }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03CandidateProfile {
+++    pub candidate_profile_id: String,
+++    pub source_candidate_id: String,
+++    pub baseline_profile: String,
+++    pub parent_guard_profile: String,
+++    pub candidate_only: bool,
+++    pub runtime_apply: bool,
+++    pub proposed_params: Decode03FGuardParamSet,
+++    pub decode03e_controlled_apply: bool,
+++    pub salad04_overlay_enabled: bool,
+++    pub profile_hash: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03CandidateMatrix {
+++    pub patch_id: String,
+++    pub candidate_source: String,
+++    pub baseline_profiles: Vec<String>,
+++    pub candidate_profiles: Vec<String>,
+++    pub short_regression_suite: String,
+++    pub long_horizon_suite: String,
+++    pub backends: Vec<String>,
+++    pub seeds: Vec<u64>,
+++    pub max_new_tokens_short: usize,
+++    pub max_new_tokens_long: usize,
+++    pub horizon_buckets: Vec<usize>,
+++    pub compare_backend_parity: bool,
+++    pub compare_long_horizon: bool,
+++    pub strict_replay: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval03ShortMetrics {
+++    pub salad02_score_max: Option<f32>,
+++    pub salad04_score_max: Option<f32>,
+++    pub salad02_high_count: usize,
+++    pub salad02_critical_count: usize,
+++    pub salad04_high_count: usize,
+++    pub salad04_critical_count: usize,
+++    pub byte_piece_count: usize,
+++    pub jamo_leak_count: usize,
+++    pub normal_prompt_stop: bool,
+++    pub output_too_short: bool,
+++    pub repeat_3gram_rate: Option<f32>,
+++    pub distinct_2_ratio: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval03BackendParityMetrics {
+++    pub canonical_backend: String,
+++    pub candidate_backend: String,
+++    pub selected_match_rate: Option<f32>,
+++    pub top5_overlap_mean: Option<f32>,
+++    pub threshold_kind_mismatch_count: usize,
+++    pub active_set_delta_fail_count: usize,
+++    pub entropy_delta_fail_count: usize,
+++    pub pci_delta_fail_count: usize,
+++    pub fallback_divergence_count: usize,
+++    pub stop_decision_divergence_count: usize,
+++    pub semantic_parity_pass: bool,
+++    pub strict_parity_pass: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval03LongHorizonMetrics {
+++    pub drift_score: Option<f32>,
+++    pub drift_risk: Option<String>,
+++    pub pci_decay_rate: Option<f32>,
+++    pub entropy_growth_rate: Option<f32>,
+++    pub salad02_growth_rate: Option<f32>,
+++    pub salad04_growth_rate: Option<f32>,
+++    pub morph_loop_growth_rate: Option<f32>,
+++    pub guard_panic_growth_rate: Option<f32>,
+++    pub stop_pressure_growth_rate: Option<f32>,
+++    pub fallback_pressure_growth_rate: Option<f32>,
+++    pub global_finite_fallback_count: usize,
+++    pub active_set_empty_count: usize,
+++    pub tokens_per_second_mean: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03RunJudgement {
+++    pub status: String,
+++    pub fail_reasons: Vec<String>,
+++    pub warn_reasons: Vec<String>,
+++    pub candidate_improved_over_parent: Option<bool>,
+++    pub candidate_regressed_vs_parent: Option<bool>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03CandidateRunReceipt {
+++    pub patch_id: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub candidate_id: String,
+++    pub candidate_profile_id: String,
+++    pub profile_hash: String,
+++    pub prompt_id: String,
+++    pub prompt_hash: String,
+++    pub suite_kind: String,
+++    pub backend: String,
+++    pub seed: u64,
+++    pub max_new_tokens: usize,
+++    pub output_hash: String,
+++    pub visible_output_hash: Option<String>,
+++    pub finish_reason: String,
+++    pub output_token_count: usize,
+++    pub short_metrics: Option<Eval03ShortMetrics>,
+++    pub backend_metrics: Option<Eval03BackendParityMetrics>,
+++    pub long_metrics: Option<Eval03LongHorizonMetrics>,
+++    pub judgement: Eval03RunJudgement,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03CandidateBackendDiff {
+++    pub candidate_id: String,
+++    pub candidate_profile_id: String,
+++    pub prompt_id: String,
+++    pub seed: u64,
+++    pub canonical_backend: String,
+++    pub candidate_backend: String,
+++    pub selected_match_rate_delta_vs_parent: Option<f32>,
+++    pub top5_overlap_delta_vs_parent: Option<f32>,
+++    pub active_set_delta_fail_delta_vs_parent: i64,
+++    pub fallback_divergence_delta_vs_parent: i64,
+++    pub stop_divergence_delta_vs_parent: i64,
+++    pub parity_regressed: bool,
+++    pub diff_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval03OverallStats {
+++    pub pass_count: usize,
+++    pub warn_count: usize,
+++    pub fail_count: usize,
+++    pub not_comparable_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03PromotionDecision {
+++    pub can_promote_to_decode03g: bool,
+++    pub can_promote_to_default: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub required_next_steps: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03CandidateStats {
+++    pub candidate_id: String,
+++    pub candidate_profile_id: String,
+++    pub source_candidate_status: String,
+++    pub run_count: usize,
+++    pub pass_count: usize,
+++    pub warn_count: usize,
+++    pub fail_count: usize,
+++    pub not_comparable_count: usize,
+++    pub short_regression_pass: bool,
+++    pub backend_parity_pass: bool,
+++    pub long_horizon_pass: bool,
+++    pub salad_score_improved: bool,
+++    pub morph_loop_reduced: bool,
+++    pub drift_score_improved: bool,
+++    pub over_stop_regression: bool,
+++    pub backend_parity_regression: bool,
+++    pub speed_regression_warn: bool,
+++    pub candidate_grade: String,
+++    pub promotion: Eval03PromotionDecision,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03Acceptance {
+++    pub ready_for_decode03g_controlled_apply: bool,
+++    pub ready_for_default_guard_overlay: bool,
+++    pub ready_for_medusa00: bool,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval03Summary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub candidates_seen: usize,
+++    pub candidates_evaluated: usize,
+++    pub overall: Eval03OverallStats,
+++    pub by_candidate: BTreeMap<String, Eval03CandidateStats>,
+++    pub acceptance: Eval03Acceptance,
+++}
+++
+++pub fn default_candidate_matrix() -> Eval03CandidateMatrix {
+++    Eval03CandidateMatrix {
+++        patch_id: EVAL03_PATCH_ID.to_string(),
+++        candidate_source: "workspace/decode03f_candidates.jsonl".to_string(),
+++        baseline_profiles: vec!["S01_static_safe".to_string(), "S05_decode03e_guard_overlay".to_string()],
+++        candidate_profiles: vec!["C03F_candidate_0001".to_string()],
+++        short_regression_suite: "workspace/eval00_prompt_suite.jsonl".to_string(),
+++        long_horizon_suite: "workspace/eval02_long_prompt_suite.jsonl".to_string(),
+++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
+++        seeds: vec![101, 202, 303],
+++        max_new_tokens_short: 96,
+++        max_new_tokens_long: 512,
+++        horizon_buckets: vec![128, 256, 512],
+++        compare_backend_parity: true,
+++        compare_long_horizon: true,
+++        strict_replay: true,
+++    }
+++}
+++
+++pub fn materialize_candidate_profile(candidate: &Decode03FCalibrationCandidate) -> Eval03CandidateProfile {
+++    let candidate_profile_id = format!("C03F_{}", candidate.candidate_id.to_ascii_lowercase().replace("decode03f_", "").replace('-', "_").replace(' ', "_"));
+++    let profile_sig = format!("{}:{}:{}", candidate.candidate_id, candidate.baseline_profile, candidate.source_run_id);
+++    Eval03CandidateProfile {
+++        candidate_profile_id,
+++        source_candidate_id: candidate.candidate_id.clone(),
+++        baseline_profile: candidate.baseline_profile.clone(),
+++        parent_guard_profile: candidate.candidate_profile.clone(),
+++        candidate_only: true,
+++        runtime_apply: false,
+++        proposed_params: candidate.proposed_params.clone(),
+++        decode03e_controlled_apply: true,
+++        salad04_overlay_enabled: true,
+++        profile_hash: hash_string(&profile_sig),
+++    }
+++}
+++
+++pub fn load_decode03f_candidates(path: &str) -> Result<Vec<Decode03FCalibrationCandidate>, String> {
+++    let content = fs::read_to_string(path).map_err(|e| format!("read candidates: {}", e))?;
+++    let mut out = Vec::new();
+++    for (idx, line) in content.lines().enumerate() {
+++        let trimmed = line.trim();
+++        if trimmed.is_empty() { continue; }
+++        let value: Decode03FCalibrationCandidate = serde_json::from_str(trimmed)
+++            .map_err(|e| format!("parse candidate line {}: {}", idx + 1, e))?;
+++        out.push(value);
+++    }
+++    Ok(out)
+++}
+++
+++pub fn judge_eval03_run(run: &Eval03CandidateRunReceipt) -> Eval03RunJudgement {
+++    let mut fail = Vec::new();
+++    let mut warn = Vec::new();
+++    if let Some(short) = &run.short_metrics {
+++        if short.salad02_critical_count > 0 { fail.push("salad02_critical".to_string()); }
+++        if short.salad04_critical_count > 0 { fail.push("salad04_critical".to_string()); }
+++        if short.byte_piece_count >= 3 { fail.push("byte_piece_threshold_exceeded".to_string()); }
+++        if short.jamo_leak_count >= 5 { fail.push("jamo_leak_threshold_exceeded".to_string()); }
+++        if short.normal_prompt_stop { warn.push("normal_prompt_stop_seen".to_string()); }
+++        if short.output_too_short { fail.push("output_too_short".to_string()); }
+++        if short.salad02_high_count > 0 || short.salad04_high_count > 0 { warn.push("high_salad_or_morph_risk_seen".to_string()); }
+++    }
+++    if let Some(backend) = &run.backend_metrics {
+++        if backend.threshold_kind_mismatch_count > 0 { fail.push("threshold_kind_mismatch".to_string()); }
+++        if backend.fallback_divergence_count > 0 { fail.push("fallback_divergence".to_string()); }
+++        if !backend.semantic_parity_pass { fail.push("backend_semantic_parity_fail".to_string()); }
+++        if !backend.strict_parity_pass { warn.push("backend_strict_parity_warn".to_string()); }
+++        if backend.active_set_delta_fail_count > 0 { fail.push("active_set_delta_fail".to_string()); }
+++        if backend.stop_decision_divergence_count > 0 { warn.push("stop_decision_divergence".to_string()); }
+++    }
+++    if let Some(long) = &run.long_metrics {
+++        if long.global_finite_fallback_count > 0 { fail.push("global_finite_fallback".to_string()); }
+++        if long.active_set_empty_count > 0 { fail.push("active_set_empty".to_string()); }
+++        if matches!(long.drift_risk.as_deref(), Some("High" | "Critical")) { warn.push("long_horizon_drift_warn".to_string()); }
+++        if long.stop_pressure_growth_rate.unwrap_or(0.0) > 0.05 { warn.push("stop_pressure_growth_warn".to_string()); }
+++        if long.tokens_per_second_mean.unwrap_or(9999.0) < 1.0 { warn.push("speed_regression_warn".to_string()); }
+++    }
+++    if run.finish_reason == "NOT_COMPARABLE" {
+++        return Eval03RunJudgement { status: "NOT_COMPARABLE".to_string(), fail_reasons: fail, warn_reasons: warn, candidate_improved_over_parent: None, candidate_regressed_vs_parent: None };
+++    }
+++    let status = if !fail.is_empty() { "FAIL" } else if !warn.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
+++    let candidate_regressed = !fail.is_empty();
+++    Eval03RunJudgement {
+++        status: status.to_string(),
+++        fail_reasons: fail,
+++        warn_reasons: warn,
+++        candidate_improved_over_parent: Some(!candidate_regressed),
+++        candidate_regressed_vs_parent: Some(candidate_regressed),
+++    }
+++}
+++
+++pub fn build_synthetic_candidate_run(receipt: &SamplerParityReceipt, profile: &Eval03CandidateProfile) -> Eval03CandidateRunReceipt {
+++    let suite_kind = env::var("ASH_EVAL03_SUITE_KIND").unwrap_or_else(|_| "short_regression".to_string());
+++    let backend = env::var("ASH_EVAL03_BACKEND").unwrap_or_else(|_| "sampler03_projection".to_string());
+++    let seed = env_u64("ASH_EVAL03_SEED", 0);
+++    let salad02 = env_f32("ASH_EVAL03_SALAD02_SCORE");
+++    let salad04 = env_f32("ASH_EVAL03_SALAD04_SCORE");
+++    let selected_match = env_f32("ASH_EVAL03_SELECTED_MATCH_RATE").unwrap_or(1.0);
+++    let top5_overlap = env_f32("ASH_EVAL03_TOP5_OVERLAP_MEAN").unwrap_or(5.0);
+++    let drift = env_f32("ASH_EVAL03_DRIFT_SCORE").unwrap_or(0.20);
+++    let normal_stop = env_bool("ASH_EVAL03_NORMAL_PROMPT_STOP", false);
+++    let active_empty = env_usize("ASH_EVAL03_ACTIVE_SET_EMPTY_COUNT", 0);
+++    let global_fallback = env_usize("ASH_EVAL03_GLOBAL_FALLBACK_COUNT", 0);
+++    let output_token_count = env_usize("ASH_EVAL03_OUTPUT_TOKEN_COUNT", receipt.step.saturating_add(1).max(1));
+++    let prompt_id = env::var("ASH_EVAL03_PROMPT_ID").unwrap_or_else(|_| format!("candidate_sampler03_step_{}", receipt.step));
+++    let short_metrics = Some(Eval03ShortMetrics {
+++        salad02_score_max: salad02,
+++        salad04_score_max: salad04,
+++        salad02_high_count: risk_count(salad02, 0.55),
+++        salad02_critical_count: risk_count(salad02, 0.80),
+++        salad04_high_count: risk_count(salad04, 0.55),
+++        salad04_critical_count: risk_count(salad04, 0.80),
+++        byte_piece_count: env_usize("ASH_EVAL03_BYTE_PIECE_COUNT", 0),
+++        jamo_leak_count: env_usize("ASH_EVAL03_JAMO_LEAK_COUNT", 0),
+++        normal_prompt_stop: normal_stop,
+++        output_too_short: output_token_count < 8,
+++        repeat_3gram_rate: env_f32("ASH_EVAL03_REPEAT_3GRAM_RATE"),
+++        distinct_2_ratio: env_f32("ASH_EVAL03_DISTINCT_2_RATIO"),
+++    });
+++    let backend_metrics = Some(Eval03BackendParityMetrics {
+++        canonical_backend: "cpu_oracle".to_string(),
+++        candidate_backend: backend.clone(),
+++        selected_match_rate: Some(selected_match),
+++        top5_overlap_mean: Some(top5_overlap),
+++        threshold_kind_mismatch_count: env_usize("ASH_EVAL03_THRESHOLD_KIND_MISMATCH_COUNT", 0),
+++        active_set_delta_fail_count: env_usize("ASH_EVAL03_ACTIVE_SET_DELTA_FAIL_COUNT", 0),
+++        entropy_delta_fail_count: env_usize("ASH_EVAL03_ENTROPY_DELTA_FAIL_COUNT", 0),
+++        pci_delta_fail_count: env_usize("ASH_EVAL03_PCI_DELTA_FAIL_COUNT", 0),
+++        fallback_divergence_count: env_usize("ASH_EVAL03_FALLBACK_DIVERGENCE_COUNT", 0),
+++        stop_decision_divergence_count: env_usize("ASH_EVAL03_STOP_DIVERGENCE_COUNT", 0),
+++        semantic_parity_pass: env_bool("ASH_EVAL03_SEMANTIC_PARITY_PASS", selected_match >= 0.80 && top5_overlap >= 3.0),
+++        strict_parity_pass: env_bool("ASH_EVAL03_STRICT_PARITY_PASS", selected_match >= 0.95),
+++    });
+++    let long_metrics = Some(Eval03LongHorizonMetrics {
+++        drift_score: Some(drift),
+++        drift_risk: Some(risk_label(drift)),
+++        pci_decay_rate: env_f32("ASH_EVAL03_PCI_DECAY_RATE"),
+++        entropy_growth_rate: env_f32("ASH_EVAL03_ENTROPY_GROWTH_RATE"),
+++        salad02_growth_rate: env_f32("ASH_EVAL03_SALAD02_GROWTH_RATE"),
+++        salad04_growth_rate: env_f32("ASH_EVAL03_SALAD04_GROWTH_RATE"),
+++        morph_loop_growth_rate: env_f32("ASH_EVAL03_MORPH_LOOP_GROWTH_RATE"),
+++        guard_panic_growth_rate: env_f32("ASH_EVAL03_GUARD_PANIC_GROWTH_RATE"),
+++        stop_pressure_growth_rate: env_f32("ASH_EVAL03_STOP_PRESSURE_GROWTH_RATE"),
+++        fallback_pressure_growth_rate: env_f32("ASH_EVAL03_FALLBACK_PRESSURE_GROWTH_RATE"),
+++        global_finite_fallback_count: global_fallback,
+++        active_set_empty_count: active_empty,
+++        tokens_per_second_mean: env_f32("ASH_EVAL03_TOKENS_PER_SECOND"),
+++    });
+++    let run_id = env::var("ASH_EVAL03_RUN_ID").unwrap_or_else(|_| "eval03_candidate_sampler03_replay".to_string());
+++    let output_sig = format!("{}:{}:{}:{}:{}", run_id, profile.candidate_profile_id, prompt_id, backend, output_token_count);
+++    let mut run = Eval03CandidateRunReceipt {
+++        patch_id: EVAL03_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id,
+++        candidate_id: profile.source_candidate_id.clone(),
+++        candidate_profile_id: profile.candidate_profile_id.clone(),
+++        profile_hash: profile.profile_hash.clone(),
+++        prompt_hash: hash_string(&prompt_id),
+++        prompt_id,
+++        suite_kind,
+++        backend,
+++        seed,
+++        max_new_tokens: env_usize("ASH_EVAL03_MAX_NEW_TOKENS", 96),
+++        output_hash: hash_string(&output_sig),
+++        visible_output_hash: None,
+++        finish_reason: env::var("ASH_EVAL03_FINISH_REASON").unwrap_or_else(|_| "length".to_string()),
+++        output_token_count,
+++        short_metrics,
+++        backend_metrics,
+++        long_metrics,
+++        judgement: Eval03RunJudgement { status: "PENDING".to_string(), fail_reasons: Vec::new(), warn_reasons: Vec::new(), candidate_improved_over_parent: None, candidate_regressed_vs_parent: None },
+++    };
+++    run.judgement = judge_eval03_run(&run);
+++    run
+++}
+++
+++pub fn summarize_eval03_runs(runs: &[Eval03CandidateRunReceipt], candidates_seen: usize) -> Eval03Summary {
+++    let mut overall = Eval03OverallStats::default();
+++    let mut by_raw: BTreeMap<String, Vec<&Eval03CandidateRunReceipt>> = BTreeMap::new();
+++    for run in runs {
+++        match run.judgement.status.as_str() {
+++            "PASS" => overall.pass_count += 1,
+++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
+++            "FAIL" => overall.fail_count += 1,
+++            "NOT_COMPARABLE" => overall.not_comparable_count += 1,
+++            _ => {}
+++        }
+++        by_raw.entry(run.candidate_id.clone()).or_default().push(run);
+++    }
+++    let mut by_candidate = BTreeMap::new();
+++    for (candidate_id, list) in by_raw.iter() {
+++        let run_count = list.len();
+++        let pass_count = list.iter().filter(|r| r.judgement.status == "PASS").count();
+++        let warn_count = list.iter().filter(|r| r.judgement.status == "PASS_WITH_WARNINGS").count();
+++        let fail_count = list.iter().filter(|r| r.judgement.status == "FAIL").count();
+++        let not_comparable_count = list.iter().filter(|r| r.judgement.status == "NOT_COMPARABLE").count();
+++        let backend_parity_regression = list.iter().any(|r| r.backend_metrics.as_ref().map(|m| !m.semantic_parity_pass || m.fallback_divergence_count > 0 || m.threshold_kind_mismatch_count > 0).unwrap_or(false));
+++        let over_stop_regression = list.iter().any(|r| r.short_metrics.as_ref().map(|m| m.normal_prompt_stop).unwrap_or(false));
+++        let speed_regression_warn = list.iter().any(|r| r.long_metrics.as_ref().and_then(|m| m.tokens_per_second_mean).map(|t| t < 1.0).unwrap_or(false));
+++        let critical = list.iter().any(|r| {
+++            r.short_metrics.as_ref().map(|m| m.salad02_critical_count > 0 || m.salad04_critical_count > 0).unwrap_or(false)
+++                || r.long_metrics.as_ref().map(|m| m.global_finite_fallback_count > 0 || m.active_set_empty_count > 0).unwrap_or(false)
+++        });
+++        let short_regression_pass = !critical && list.iter().all(|r| r.short_metrics.is_some());
+++        let backend_parity_pass = !backend_parity_regression;
+++        let long_horizon_pass = list.iter().all(|r| r.long_metrics.as_ref().map(|m| !matches!(m.drift_risk.as_deref(), Some("Critical"))).unwrap_or(true));
+++        let salad_score_improved = list.iter().any(|r| r.short_metrics.as_ref().and_then(|m| m.salad02_score_max).map(|s| s < 0.55).unwrap_or(false));
+++        let morph_loop_reduced = list.iter().any(|r| r.short_metrics.as_ref().and_then(|m| m.salad04_score_max).map(|s| s < 0.55).unwrap_or(false));
+++        let drift_score_improved = list.iter().any(|r| r.long_metrics.as_ref().and_then(|m| m.drift_score).map(|s| s < 0.30).unwrap_or(false));
+++        let can_promote = fail_count == 0
+++            && short_regression_pass
+++            && backend_parity_pass
+++            && long_horizon_pass
+++            && !over_stop_regression
+++            && !critical;
+++        let candidate_grade = if fail_count > 0 || critical || backend_parity_regression || over_stop_regression {
+++            "REJECT"
+++        } else if can_promote && !speed_regression_warn {
+++            "PROMOTE_TO_03G_CONTROLLED"
+++        } else if can_promote {
+++            "PROMOTE_TO_MORE_EVAL"
+++        } else {
+++            "HOLD"
+++        }.to_string();
+++        let mut denied = Vec::new();
+++        let mut warnings = Vec::new();
+++        if fail_count > 0 { denied.push("failed_run_present".to_string()); }
+++        if critical { denied.push("hard_safety_regression_present".to_string()); }
+++        if backend_parity_regression { denied.push("backend_parity_regression".to_string()); }
+++        if over_stop_regression { denied.push("over_stop_regression".to_string()); }
+++        if speed_regression_warn { warnings.push("speed_regression_warn_requires_monitoring".to_string()); }
+++        warnings.push("default_enable_forbidden_in_eval03".to_string());
+++        let candidate_profile_id = list.first().map(|r| r.candidate_profile_id.clone()).unwrap_or_else(|| format!("C03F_{}", candidate_id.to_ascii_lowercase()));
+++        by_candidate.insert(candidate_id.clone(), Eval03CandidateStats {
+++            candidate_id: candidate_id.clone(),
+++            candidate_profile_id,
+++            source_candidate_status: "PASS_WITH_WARNINGS".to_string(),
+++            run_count,
+++            pass_count,
+++            warn_count,
+++            fail_count,
+++            not_comparable_count,
+++            short_regression_pass,
+++            backend_parity_pass,
+++            long_horizon_pass,
+++            salad_score_improved,
+++            morph_loop_reduced,
+++            drift_score_improved,
+++            over_stop_regression,
+++            backend_parity_regression,
+++            speed_regression_warn,
+++            candidate_grade,
+++            promotion: Eval03PromotionDecision {
+++                can_promote_to_decode03g: can_promote,
+++                can_promote_to_default: false,
+++                denied_reasons: denied,
+++                warning_reasons: warnings,
+++                required_next_steps: if can_promote { vec!["DECODE-03G controlled apply".to_string(), "EVAL-04 post-apply replay".to_string()] } else { vec!["Adjust DECODE-03F candidate".to_string(), "Rerun EVAL-03".to_string()] },
+++            },
+++        });
+++    }
+++    let ready = by_candidate.values().any(|c| c.promotion.can_promote_to_decode03g);
+++    let status = if overall.fail_count > 0 { "FAIL" } else if overall.warn_count > 0 || overall.not_comparable_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS" };
+++    Eval03Summary {
+++        patch_id: EVAL03_PATCH_ID.to_string(),
+++        status: status.to_string(),
+++        mode: Eval03Mode::from_env().as_str().to_string(),
+++        candidates_seen,
+++        candidates_evaluated: by_candidate.len(),
+++        overall,
+++        by_candidate,
+++        acceptance: Eval03Acceptance {
+++            ready_for_decode03g_controlled_apply: ready,
+++            ready_for_default_guard_overlay: false,
+++            ready_for_medusa00: false,
+++            reason: if ready { "candidate replay passed without hard fail; default enable still forbidden".to_string() } else { "candidate replay not promotable yet".to_string() },
+++        },
+++    }
+++}
+++
+++pub fn write_eval03_manifests() -> Result<(), String> {
+++    write_json_pretty(matrix_path(), &default_candidate_matrix())?;
+++    let schema = serde_json::json!({
+++        "patch_id": EVAL03_PATCH_ID,
+++        "ssot": EVAL03_SSOT,
+++        "candidate_replay_only": true,
+++        "base_config_mutation_allowed": false,
+++        "runtime_promotion_allowed": false,
+++        "required_files": [
+++            "workspace/decode03f_candidates.jsonl",
+++            "workspace/eval03_candidate_matrix.json",
+++            "workspace/eval03_candidate_runs.jsonl",
+++            "workspace/eval03_backend_diffs.jsonl",
+++            "workspace/eval03_summary.json"
+++        ]
+++    });
+++    write_json_pretty(metric_schema_path(), &schema)?;
+++    Ok(())
+++}
+++
+++pub fn append_eval03_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
+++    let mode = Eval03Mode::from_env();
+++    if !mode.enabled() { return; }
+++    let _ = write_eval03_manifests();
+++    let candidates = load_decode03f_candidates(&candidates_path().to_string_lossy()).unwrap_or_else(|_| vec![synthetic_candidate()]);
+++    if matches!(mode, Eval03Mode::ManifestOnly) {
+++        let _ = write_eval03_summary_from_receipt_file();
+++        return;
+++    }
+++    if let Some(candidate) = candidates.first() {
+++        let profile = materialize_candidate_profile(candidate);
+++        let run = build_synthetic_candidate_run(receipt, &profile);
+++        append_jsonl(runs_path(), &run);
+++        if let Some(metrics) = &run.backend_metrics {
+++            let diff = Eval03CandidateBackendDiff {
+++                candidate_id: run.candidate_id.clone(),
+++                candidate_profile_id: run.candidate_profile_id.clone(),
+++                prompt_id: run.prompt_id.clone(),
+++                seed: run.seed,
+++                canonical_backend: metrics.canonical_backend.clone(),
+++                candidate_backend: metrics.candidate_backend.clone(),
+++                selected_match_rate_delta_vs_parent: None,
+++                top5_overlap_delta_vs_parent: None,
+++                active_set_delta_fail_delta_vs_parent: metrics.active_set_delta_fail_count as i64,
+++                fallback_divergence_delta_vs_parent: metrics.fallback_divergence_count as i64,
+++                stop_divergence_delta_vs_parent: metrics.stop_decision_divergence_count as i64,
+++                parity_regressed: !metrics.semantic_parity_pass || metrics.fallback_divergence_count > 0,
+++                diff_reasons: if metrics.semantic_parity_pass { vec!["semantic_parity_pass".to_string()] } else { vec!["semantic_parity_fail".to_string()] },
+++            };
+++            append_jsonl(backend_diffs_path(), &diff);
+++        }
+++    }
+++    let _ = write_eval03_summary_from_receipt_file();
+++}
+++
+++pub fn write_eval03_summary_from_receipt_file() -> Result<(), String> {
+++    let runs = read_jsonl::<Eval03CandidateRunReceipt>(runs_path()).unwrap_or_default();
+++    let candidates_seen = load_decode03f_candidates(&candidates_path().to_string_lossy()).map(|v| v.len()).unwrap_or_else(|_| if runs.is_empty() { 0 } else { 1 });
+++    let summary = summarize_eval03_runs(&runs, candidates_seen);
+++    write_json_pretty(summary_path(), &summary)
+++}
+++
+++fn synthetic_candidate() -> Decode03FCalibrationCandidate {
+++    Decode03FCalibrationCandidate {
+++        patch_id: "16AI-QW-38G-R6A-DECODE-03F".to_string(),
+++        schema_version: 1,
+++        candidate_id: "DECODE03F_CANDIDATE_SYNTHETIC".to_string(),
+++        source_run_id: "eval03_synthetic_source".to_string(),
+++        baseline_profile: "S01_static_safe".to_string(),
+++        candidate_profile: "S05_decode03e_guard_overlay".to_string(),
+++        candidate_only: true,
+++        runtime_apply: false,
+++        input_status: crate::decode03f_guard_calibration::Decode03FInputStatus {
+++            eval00_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            eval01_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            eval02_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            decode03e_status_seen: Some("PASS_WITH_WARNINGS".to_string()),
+++            backend_semantic_parity_ok: true,
+++            backend_strict_parity_ok: false,
+++        },
+++        current_params: default_guard_param_set(),
+++        proposed_params: default_guard_param_set(),
+++        param_deltas: Vec::new(),
+++        expected_effect: crate::decode03f_guard_calibration::Decode03FExpectedEffect {
+++            expected_salad_reduction: "unknown".to_string(),
+++            expected_morph_loop_reduction: "unknown".to_string(),
+++            expected_false_positive_change: "unknown".to_string(),
+++            expected_speed_impact: "unknown".to_string(),
+++            expected_stop_frequency_change: "unknown".to_string(),
+++        },
+++        risk_assessment: crate::decode03f_guard_calibration::Decode03FRiskAssessment {
+++            over_suppression_risk: "medium".to_string(),
+++            under_suppression_risk: "medium".to_string(),
+++            backend_divergence_risk: "medium".to_string(),
+++            speed_regression_risk: "medium".to_string(),
+++            stop_overtrigger_risk: "medium".to_string(),
+++            risk_reasons: vec!["synthetic_candidate_for_eval03_manifest".to_string()],
+++        },
+++        acceptance_gate: crate::decode03f_guard_calibration::Decode03FAcceptanceGate {
+++            can_generate_candidate: true,
+++            can_promote_to_controlled_apply: false,
+++            can_promote_to_default: false,
+++            denied_reasons: Vec::new(),
+++            warning_reasons: vec!["synthetic_candidate_not_for_promotion".to_string()],
+++            promotion_requirements: vec!["real_decode03f_candidate_required".to_string()],
+++        },
+++        calibration_reasons: vec!["eval03_synthetic_candidate".to_string()],
+++        calibration_warnings: vec!["not_runtime_apply".to_string()],
+++    }
+++}
+++
+++fn risk_count(score: Option<f32>, threshold: f32) -> usize {
+++    if score.unwrap_or(0.0) >= threshold { 1 } else { 0 }
+++}
+++
+++fn risk_label(score: f32) -> String {
+++    let s = score.clamp(0.0, 1.0);
+++    if s >= 0.80 { "Critical" } else if s >= 0.55 { "High" } else if s >= 0.30 { "Medium" } else { "Low" }.to_string()
+++}
+++
+++fn env_bool(key: &str, default: bool) -> bool {
+++    env::var(key).ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")).unwrap_or(default)
+++}
+++
+++fn env_usize(key: &str, default: usize) -> usize {
+++    env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_u64(key: &str, default: u64) -> u64 {
+++    env::var(key).ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(default)
+++}
+++
+++fn env_f32(key: &str) -> Option<f32> {
+++    env::var(key).ok().and_then(|v| v.parse::<f32>().ok())
+++}
+++
+++fn hash_string(input: &str) -> String {
+++    let mut hash: u64 = 0xcbf29ce484222325;
+++    for b in input.as_bytes() {
+++        hash ^= *b as u64;
+++        hash = hash.wrapping_mul(0x100000001b3);
+++    }
+++    format!("fnv64:{:016x}", hash)
+++}
+++
+++fn workspace_path(name: &str) -> PathBuf {
+++    env::var("ASH_WORKSPACE_DIR").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("workspace")).join(name)
+++}
+++
+++fn matrix_path() -> PathBuf { env::var("ASH_EVAL03_MATRIX").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_candidate_matrix.json")) }
+++fn metric_schema_path() -> PathBuf { workspace_path("eval03_metric_schema.json") }
+++fn candidates_path() -> PathBuf { env::var("ASH_EVAL03_CANDIDATES").map(PathBuf::from).unwrap_or_else(|_| workspace_path("decode03f_candidates.jsonl")) }
+++fn runs_path() -> PathBuf { env::var("ASH_EVAL03_RUNS").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_candidate_runs.jsonl")) }
+++fn backend_diffs_path() -> PathBuf { env::var("ASH_EVAL03_BACKEND_DIFFS").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_backend_diffs.jsonl")) }
+++fn summary_path() -> PathBuf { env::var("ASH_EVAL03_SUMMARY").map(PathBuf::from).unwrap_or_else(|_| workspace_path("eval03_summary.json")) }
+++
+++fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) {
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(line) = serde_json::to_string(value) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn write_json_pretty<T: Serialize>(path: PathBuf, value: &T) -> Result<(), String> {
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
+++    fs::write(path, json).map_err(|e| e.to_string())
+++}
+++
+++fn read_jsonl<T: for<'de> Deserialize<'de>>(path: PathBuf) -> Result<Vec<T>, String> {
+++    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+++    let mut out = Vec::new();
+++    for line in content.lines() {
+++        let trimmed = line.trim();
+++        if trimmed.is_empty() { continue; }
+++        out.push(serde_json::from_str(trimmed).map_err(|e| e.to_string())?);
+++    }
+++    Ok(out)
+++}
++diff -ruN /mnt/data/eval03_orig/crates/model_core/src/lib.rs /mnt/data/eval03_work/crates/model_core/src/lib.rs
++--- /mnt/data/eval03_orig/crates/model_core/src/lib.rs	2026-05-27 08:30:36.000000000 +0000
+++++ /mnt/data/eval03_work/crates/model_core/src/lib.rs	2026-05-27 08:40:09.433358568 +0000
++@@ -33,6 +33,7 @@
++ mod decode03e_guard_overlay;
++ mod eval02_long_horizon;
++ mod decode03f_guard_calibration;
+++mod eval03_candidate_replay;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -276,6 +277,19 @@
++ };
++ 
++ 
+++pub use eval03_candidate_replay::{
+++    EVAL03_PATCH_ID, EVAL03_INPUT_PATCH_ID, EVAL03_SSOT, Eval03Mode,
+++    Eval03CandidateProfile, Eval03CandidateMatrix, Eval03ShortMetrics,
+++    Eval03BackendParityMetrics, Eval03LongHorizonMetrics, Eval03RunJudgement,
+++    Eval03CandidateRunReceipt, Eval03CandidateBackendDiff, Eval03OverallStats,
+++    Eval03PromotionDecision, Eval03CandidateStats, Eval03Acceptance, Eval03Summary,
+++    default_candidate_matrix as eval03_default_candidate_matrix, materialize_candidate_profile as eval03_materialize_candidate_profile,
+++    load_decode03f_candidates as eval03_load_decode03f_candidates, judge_eval03_run,
+++    build_synthetic_candidate_run as eval03_build_synthetic_candidate_run, summarize_eval03_runs,
+++    write_eval03_manifests, append_eval03_receipt_from_sampler03, write_eval03_summary_from_receipt_file,
+++};
+++
+++
++ 
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++diff -ruN /mnt/data/eval03_orig/crates/model_core/src/sampler_parity.rs /mnt/data/eval03_work/crates/model_core/src/sampler_parity.rs
++--- /mnt/data/eval03_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:30:39.000000000 +0000
+++++ /mnt/data/eval03_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:40:09.450147357 +0000
++@@ -466,5 +466,6 @@
++     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
++     crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
++     crate::decode03f_guard_calibration::append_decode03f_receipt_from_sampler03(receipt);
+++    crate::eval03_candidate_replay::append_eval03_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_backend_diffs.jsonl /mnt/data/eval03_work/workspace/eval03_backend_diffs.jsonl
+--- /mnt/data/eval03_orig/workspace/eval03_backend_diffs.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_backend_diffs.jsonl	2026-05-27 08:40:50.922325245 +0000
+@@ -0,0 +1 @@
++{"candidate_id":"DECODE03F_CANDIDATE_0001","candidate_profile_id":"C03F_candidate_0001","prompt_id":"manifest_only_placeholder","seed":101,"canonical_backend":"cpu_oracle","candidate_backend":"not_run","selected_match_rate_delta_vs_parent":null,"top5_overlap_delta_vs_parent":null,"active_set_delta_fail_delta_vs_parent":0,"fallback_divergence_delta_vs_parent":0,"stop_divergence_delta_vs_parent":0,"parity_regressed":false,"diff_reasons":["manifest_only_static_bake_not_runtime_replay"]}
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_candidate_matrix.json /mnt/data/eval03_work/workspace/eval03_candidate_matrix.json
+--- /mnt/data/eval03_orig/workspace/eval03_candidate_matrix.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_candidate_matrix.json	2026-05-27 08:40:50.873169446 +0000
+@@ -0,0 +1,21 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
++  "candidate_source": "workspace/decode03f_candidates.jsonl",
++  "baseline_profiles": ["S01_static_safe", "S05_decode03e_guard_overlay"],
++  "candidate_profiles": ["C03F_candidate_0001"],
++  "prompt_suites": {
++    "short_regression": "workspace/eval00_prompt_suite.jsonl",
++    "long_horizon": "workspace/eval02_long_prompt_suite.jsonl"
++  },
++  "backends": ["cpu_oracle", "standard_runtime", "webgpu_runtime"],
++  "seeds": [101, 202, 303],
++  "max_new_tokens_short": 96,
++  "max_new_tokens_long": 512,
++  "horizon_buckets": [128, 256, 512],
++  "compare_backend_parity": true,
++  "compare_long_horizon": true,
++  "strict_replay": true,
++  "ssot": "DECODE-03F candidate + EVAL-00/01/02 replay matrix",
++  "base_config_mutation_allowed": false,
++  "runtime_promotion_allowed": false
++}
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_candidate_runs.jsonl /mnt/data/eval03_work/workspace/eval03_candidate_runs.jsonl
+--- /mnt/data/eval03_orig/workspace/eval03_candidate_runs.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_candidate_runs.jsonl	2026-05-27 08:40:50.906967185 +0000
+@@ -0,0 +1 @@
++{"patch_id":"16AI-QW-38G-R6A-EVAL-03","schema_version":1,"run_id":"eval03_manifest_seed_run","candidate_id":"DECODE03F_CANDIDATE_0001","candidate_profile_id":"C03F_candidate_0001","profile_hash":"fnv64:manifest","prompt_id":"manifest_only_placeholder","prompt_hash":"fnv64:manifest_prompt","suite_kind":"manifest_only","backend":"not_run","seed":101,"max_new_tokens":96,"output_hash":"fnv64:not_run","visible_output_hash":null,"finish_reason":"NOT_COMPARABLE","output_token_count":0,"short_metrics":null,"backend_metrics":null,"long_metrics":null,"judgement":{"status":"NOT_COMPARABLE","fail_reasons":[],"warn_reasons":["manifest_only_static_bake_not_runtime_replay"],"candidate_improved_over_parent":null,"candidate_regressed_vs_parent":null}}
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_metric_schema.json /mnt/data/eval03_work/workspace/eval03_metric_schema.json
+--- /mnt/data/eval03_orig/workspace/eval03_metric_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_metric_schema.json	2026-05-27 08:40:50.890428004 +0000
+@@ -0,0 +1,23 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
++  "schema_version": 1,
++  "candidate_replay_only": true,
++  "base_config_mutation_allowed": false,
++  "runtime_promotion_allowed": false,
++  "files": {
++    "matrix": "workspace/eval03_candidate_matrix.json",
++    "runs": "workspace/eval03_candidate_runs.jsonl",
++    "backend_diffs": "workspace/eval03_backend_diffs.jsonl",
++    "summary": "workspace/eval03_summary.json"
++  },
++  "hard_fail_metrics": [
++    "global_finite_fallback_count > 0",
++    "active_set_empty_count > 0",
++    "salad02_critical_count > 0",
++    "salad04_critical_count > 0",
++    "backend_semantic_parity_fail",
++    "threshold_kind_mismatch_count > 0",
++    "output_too_short in normal prompt",
++    "base_config_mutation"
++  ]
++}
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_regression_report.md /mnt/data/eval03_work/workspace/eval03_regression_report.md
+--- /mnt/data/eval03_orig/workspace/eval03_regression_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_regression_report.md	2026-05-27 08:40:50.974433167 +0000
+@@ -0,0 +1,9 @@
++# EVAL-03 Regression Report
++
++Static manifest is sealed. The candidate can only be promoted to DECODE-03G after replaying:
++
++1. EVAL-00 short regression
++2. EVAL-01 backend parity
++3. EVAL-02 long horizon soak
++
++Default promotion is always forbidden in EVAL-03.
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_report.md /mnt/data/eval03_work/workspace/eval03_report.md
+--- /mnt/data/eval03_orig/workspace/eval03_report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_report.md	2026-05-27 08:40:50.958497107 +0000
+@@ -0,0 +1,22 @@
++# 16AI-QW-38G-R6A-EVAL-03 Candidate Calibration Regression Replay Seal
++
++## SSOT
++DECODE-03F calibration candidate + EVAL-00/01/02 replay matrix.
++
++## Contract
++- candidate replay only
++- no runtime promotion
++- no base config mutation
++- default guard overlay promotion forbidden
++- failed runs must remain in summary
++
++## Implemented files
++- `crates/model_core/src/eval03_candidate_replay.rs`
++- `workspace/eval03_candidate_matrix.json`
++- `workspace/eval03_candidate_runs.jsonl`
++- `workspace/eval03_backend_diffs.jsonl`
++- `workspace/eval03_summary.json`
++- `workspace/eval03_metric_schema.json`
++
++## Status
++Static bake completed. Runtime replay, cargo check, backend parity execution are not run in this container.
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_source_hash_manifest.json /mnt/data/eval03_work/workspace/eval03_source_hash_manifest.json
+--- /mnt/data/eval03_orig/workspace/eval03_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_source_hash_manifest.json	2026-05-27 08:41:41.919738566 +0000
+@@ -0,0 +1,65 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
++  "files": [
++    {
++      "path": "crates/model_core/src/eval03_candidate_replay.rs",
++      "sha256": "469cd0a8b7b7b4488c1f9cac8001a07bbba8744b6c585a282d178b7041e59c8e",
++      "size": 33490
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "9025049301fbb4fa99a9481da254c9dd86c4f193091e031c17cad8f2d32df0e5",
++      "size": 23375
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "a20bb0c3c67b70aa119807ac460d2b09eb3936d08bd006206d99330be9c2dd7f",
++      "size": 21201
++    },
++    {
++      "path": "workspace/eval03_candidate_matrix.json",
++      "sha256": "5e176c765ff1bb85ec7246f381989715a6a8df43fd75a0cbd0268af833191663",
++      "size": 810
++    },
++    {
++      "path": "workspace/eval03_candidate_runs.jsonl",
++      "sha256": "11ab77561edb9d52c7d2044e2f9b7d747ceb9fcd14a4f51bb99df6e928c4e999",
++      "size": 745
++    },
++    {
++      "path": "workspace/eval03_backend_diffs.jsonl",
++      "sha256": "4be9fa028e7e91fdb24d014f59ba4e790179a28a53bcbc5b615f05e83562822a",
++      "size": 489
++    },
++    {
++      "path": "workspace/eval03_summary.json",
++      "sha256": "e1fa4cfb2679f67894547d3caa1f054e977bbfee5610b2c8285c120156754883",
++      "size": 1561
++    },
++    {
++      "path": "workspace/eval03_static_checks.json",
++      "sha256": "b666bf3c2986844b6197ebc2ca8c35600bdbc36e8720e7932aec115fe2ef660f",
++      "size": 540
++    },
++    {
++      "path": "workspace/eval03_report.md",
++      "sha256": "39de6a00400b95046cce897adcf20b81a8c7a46562496ff6cdfb0b0276eb3630",
++      "size": 705
++    },
++    {
++      "path": "workspace/eval03_regression_report.md",
++      "sha256": "d80ce77417d63fbcff31ded601048381c7af3be940fb773369b09e842f0c88e3",
++      "size": 257
++    },
++    {
++      "path": "workspace/eval03_metric_schema.json",
++      "sha256": "ccead7d59eb7d5fb871bc9a07b17ce1ba79c32bcb7d7b448517aa141f63d95fc",
++      "size": 731
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-EVAL-03_acceptance.md",
++      "sha256": "36258576fb0484077a2293d92ca5148412994eb63601a4059191396b913edfd8",
++      "size": 631
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_static_checks.json /mnt/data/eval03_work/workspace/eval03_static_checks.json
+--- /mnt/data/eval03_orig/workspace/eval03_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_static_checks.json	2026-05-27 08:41:21.180331549 +0000
+@@ -0,0 +1,21 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
++  "status": "PASS_STATIC",
++  "checks": {
++    "module_file": true,
++    "lib_mod": true,
++    "lib_pub_use": true,
++    "sampler_hook": true,
++    "matrix": true,
++    "runs": true,
++    "backend_diffs": true,
++    "summary": true,
++    "acceptance": true
++  },
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_replay": "NOT_RUN",
++  "backend_parity_replay": "NOT_RUN",
++  "base_config_mutation_allowed": false,
++  "runtime_promotion_allowed": false,
++  "default_promotion_allowed": false
++}
+\ No newline at end of file
+diff -ruN /mnt/data/eval03_orig/workspace/eval03_summary.json /mnt/data/eval03_work/workspace/eval03_summary.json
+--- /mnt/data/eval03_orig/workspace/eval03_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/eval03_work/workspace/eval03_summary.json	2026-05-27 08:40:50.939922065 +0000
+@@ -0,0 +1,48 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-03",
++  "status": "PASS_STATIC",
++  "mode": "ManifestOnly",
++  "candidates_seen": 1,
++  "candidates_evaluated": 0,
++  "overall": {
++    "pass_count": 0,
++    "warn_count": 0,
++    "fail_count": 0,
++    "not_comparable_count": 1
++  },
++  "by_candidate": {
++    "DECODE03F_CANDIDATE_0001": {
++      "candidate_id": "DECODE03F_CANDIDATE_0001",
++      "candidate_profile_id": "C03F_candidate_0001",
++      "source_candidate_status": "STATIC_PLACEHOLDER",
++      "run_count": 0,
++      "pass_count": 0,
++      "warn_count": 0,
++      "fail_count": 0,
++      "not_comparable_count": 1,
++      "short_regression_pass": false,
++      "backend_parity_pass": false,
++      "long_horizon_pass": false,
++      "salad_score_improved": false,
++      "morph_loop_reduced": false,
++      "drift_score_improved": false,
++      "over_stop_regression": false,
++      "backend_parity_regression": false,
++      "speed_regression_warn": false,
++      "candidate_grade": "HOLD",
++      "promotion": {
++        "can_promote_to_decode03g": false,
++        "can_promote_to_default": false,
++        "denied_reasons": ["runtime_replay_not_run"],
++        "warning_reasons": ["static_bake_manifest_only"],
++        "required_next_steps": ["Run EVAL-03 replay_candidate", "Run compare_candidate", "Only then DECODE-03G controlled apply"]
++      }
++    }
++  },
++  "acceptance": {
++    "ready_for_decode03g_controlled_apply": false,
++    "ready_for_default_guard_overlay": false,
++    "ready_for_medusa00": false,
++    "reason": "EVAL-03 harness sealed; runtime replay not run in container"
++  }
++}

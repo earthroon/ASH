@@ -1,0 +1,47 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
+  "title": "Dynamic Guard Strength Runtime Overlay Apply Seal",
+  "schema_version": 1,
+  "ssot": "salad04_overlay_recommendation+decode03d_applied_config+eval01_backend_parity_status",
+  "contracts": {
+    "default_mode": "Off",
+    "controlled_apply_only": true,
+    "step_local_overlay": true,
+    "base_config_mutation_allowed": false,
+    "panic_candidate_execution_allowed": false,
+    "rollback_execution_allowed": false,
+    "stop_execution_allowed": false
+  },
+  "required_receipt_fields": [
+    "patch_id",
+    "input_patch",
+    "schema_version",
+    "run_id",
+    "step",
+    "backend",
+    "mode",
+    "controlled_apply",
+    "input",
+    "backend_capability",
+    "gate",
+    "overlay"
+  ],
+  "overlay_fields": [
+    "guard_strength_before",
+    "guard_strength_after",
+    "morph_guard_target",
+    "morph_penalty_enabled",
+    "morph_penalty_weight",
+    "no_repeat_ngram_applied",
+    "min_p_floor_applied",
+    "top_p_ceiling_applied",
+    "panic_candidate_seen",
+    "panic_candidate_executed"
+  ],
+  "clamps": {
+    "morph_penalty_weight": [0.0, 0.5],
+    "min_p_floor": [0.0, 0.2],
+    "top_p_ceiling": [0.6, 0.98],
+    "no_repeat_ngram": [0, 6]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37R",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-37Q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel_baked.zip",
+  "baked_zip": "ash_pass3_ASH-BASETRAIN-GPU-37R_selected_group_row_block_multi_workgroup_reduction_readback_parity_gate_baked.zip",
+  "files_added": [
+    "crates/base_train/src/bin/ash_basetrain_gpu_37r_selected_group_row_block_multi_workgroup_reduction_readback_parity_gate.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37R.md",
+    "patch_reports/ASH-BASETRAIN-GPU-37R_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_37R_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE.json",
+    "artifacts/ASH_BASETRAIN_GPU_37R_STATIC_CHECKS.txt",
+    "artifacts/ASH_BASETRAIN_GPU_37R_STATIC_CHECKS.json",
+    "artifacts/ASH_BASETRAIN_GPU_37R_BAKE_MANIFEST.json"
+  ],
+  "runtime_artifacts_excluded_to_avoid_local_receipt_overwrite": [
+    "artifacts/ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json"
+  ],
+  "cargo_build_executed_in_container": false,
+  "cargo_unavailable_in_container": true,
+  "static_scan_executed": true,
+  "sha256_files_included": false
+}

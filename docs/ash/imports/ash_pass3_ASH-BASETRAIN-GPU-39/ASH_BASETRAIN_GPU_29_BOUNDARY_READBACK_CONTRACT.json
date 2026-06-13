@@ -1,0 +1,17 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-29",
+  "boundary_readback_created": true,
+  "readback_scope": "audit_only_zero_state_boundary_check",
+  "readback_source_buffer": "logits_gradient_candidate_buffer",
+  "readback_size_bytes": 8192,
+  "readback_element_count": 2048,
+  "readback_dtype_interpretation": "f32_zero_state_only",
+  "copy_buffer_to_buffer_for_readback": true,
+  "map_async_read_for_audit": true,
+  "readback_digest_created": true,
+  "readback_size_verified": "RUNTIME_ASSERT_TRUE",
+  "map_read_for_training_decision": false,
+  "readback_used_as_gradient_value": false,
+  "readback_used_for_optimizer": false,
+  "pass": "RUNTIME_ASSERT_TRUE"
+}

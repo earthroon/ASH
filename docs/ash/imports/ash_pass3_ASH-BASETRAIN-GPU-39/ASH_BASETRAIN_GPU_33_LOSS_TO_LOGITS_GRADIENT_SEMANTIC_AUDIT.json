@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-33",
+  "loss_to_logits_gradient_semantic_audit_created": true,
+  "semantic_chain": [
+    "local_window_nll_loss",
+    "softmax(logits)",
+    "softmax_minus_one_hot_target",
+    "logits_gradient_candidate"
+  ],
+  "gradient_formula": "dL_dlogits_i = softmax_i(logits) - one_hot_i(target)",
+  "target_index": 1,
+  "target_index_gradient_expected_negative": true,
+  "non_target_gradient_expected_non_negative": true,
+  "candidate_sum_close_to_zero": true,
+  "candidate_finite": true,
+  "semantic_audit_scope": "local_window_2048_target_1_only",
+  "loss_to_logits_gradient_semantic_binding_valid": true,
+  "semantic_audit_is_backward_graph_execution": false,
+  "semantic_audit_is_model_weight_gradient": false,
+  "pass": true
+}

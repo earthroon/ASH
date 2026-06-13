@@ -1,0 +1,21 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12I-R2-R1",
+  "status": "PASS_STATIC_VALIDATION",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12I_R2_R1_runtime_capture_raw_hook.ps1",
+  "script_sha256": "b590c8c8d61e31020dd457c0ab02c86d17f21bcb25438d1fcae6879efd7d8006",
+  "source_required_status": "PARTIAL_CAPTURE_INPUT_ROW_WIRING",
+  "outputs_prefix": "workspace/qw38g_r6a_r12i_r2_r1_*",
+  "runtime_capture_raw_output_path": "workspace/qw38g_r6a_r12i_r2_runtime_capture_raw.json",
+  "supports_partial_raw": true,
+  "fixture_mode_default": false,
+  "mock_positive_forbidden": true,
+  "mutation_safety_default": {
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "recommended_command": ".\\scripts\\run_16AI_QW_38G_R6A_R12A_R12I_R2_R1_runtime_capture_raw_hook.ps1 -Build -Strict -TargetLikeCount 3 -NegativeControlCount 3 -AllowPartialRaw"
+}

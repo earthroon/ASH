@@ -1,0 +1,100 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-04",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-03",
+  "fixtures": [
+    {
+      "name": "basic_min_p",
+      "logits": [
+        10.0,
+        9.0,
+        8.0,
+        2.0,
+        -1.0
+      ],
+      "config": {
+        "temperature": 1.0,
+        "top_k": 0,
+        "min_p": 0.1,
+        "top_p": 1.0
+      },
+      "expected_active_ids": [
+        0,
+        1,
+        2
+      ],
+      "expected_status": "PASS"
+    },
+    {
+      "name": "active_top_p",
+      "logits": [
+        10.0,
+        9.0,
+        8.0,
+        2.0,
+        -1.0
+      ],
+      "config": {
+        "temperature": 1.0,
+        "top_k": 0,
+        "min_p": 0.1,
+        "top_p": 0.9
+      },
+      "expected_active_ids": [
+        0,
+        1,
+        2
+      ],
+      "expected_status": "PASS"
+    },
+    {
+      "name": "top_k_min_p",
+      "logits": [
+        10.0,
+        9.0,
+        8.0,
+        7.0,
+        6.0
+      ],
+      "config": {
+        "temperature": 1.0,
+        "top_k": 2,
+        "min_p": 0.01,
+        "top_p": 1.0
+      },
+      "expected_active_ids": [
+        0,
+        1
+      ],
+      "expected_status": "PASS"
+    },
+    {
+      "name": "trace_overflow",
+      "trace_top_n": 2,
+      "logits": [
+        10.0,
+        9.8,
+        9.6,
+        9.4,
+        9.2
+      ],
+      "config": {
+        "temperature": 1.0,
+        "top_k": 0,
+        "min_p": 0.01,
+        "top_p": 1.0
+      },
+      "expected_status": "WARN_TRACE_TRUNCATED"
+    },
+    {
+      "name": "final_mask_recovery",
+      "config": {
+        "temperature": 1.0,
+        "top_k": 1,
+        "min_p": 0.95,
+        "top_p": 0.01
+      },
+      "expected_recovery_allowed": true,
+      "expected_selected_not_pad": true
+    }
+  ]
+}

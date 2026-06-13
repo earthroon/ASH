@@ -1,0 +1,39 @@
+{
+  "patch_id": "ASH-REBASE-00",
+  "title": "Legacy Decode / WCTX / LoRA / TCU Receipt Rebind Seal",
+  "base_patch": "QW-50-R0V",
+  "next_patch": "QW-50-R0W",
+  "mutation_policy": {
+    "model_weights": "no_write",
+    "runtime_mutation": false,
+    "lora_scale": "no_change",
+    "decode_policy": "no_change",
+    "guard_policy": "no_change",
+    "runtime_default_apply": false
+  },
+  "legacy_families": [
+    "QW-38G-R6A-DECODE",
+    "QW-38G-R6A-EVAL",
+    "QW-38G-R6A-WCTX-MOCK",
+    "QW-38G-R6A-LORA-RT",
+    "QW-38G-R6A-R12",
+    "TCU"
+  ],
+  "outputs": {
+    "scan_result": "workspace/rebase/ash_rebase_00_scan_result.json",
+    "legacy_index": "workspace/rebase/ash_rebase_00_legacy_index.json",
+    "policy_candidates": "workspace/rebase/ash_rebase_00_policy_candidates.json",
+    "missing_artifacts": "workspace/rebase/ash_rebase_00_missing_artifacts.json",
+    "receipt": "workspace/rebase/ash_rebase_00_receipt.json",
+    "report": "workspace/rebase/ash_rebase_00_rebind_report.md"
+  },
+  "blocked_actions": [
+    "enable_legacy_decode_guard_by_default",
+    "apply_r12_head_direction",
+    "change_lora_scale",
+    "change_guard_threshold",
+    "ban_attractor_tokens",
+    "enable_qwave_cheonjiin_detector",
+    "enable_webgpu_inference_policy"
+  ]
+}

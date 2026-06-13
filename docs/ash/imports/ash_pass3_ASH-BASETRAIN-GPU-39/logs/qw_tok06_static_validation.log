@@ -1,0 +1,42 @@
+QW-TOK-06 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok06SubtitlePromptFixtureSmokeConfig: PASS
+QwTok06SubtitlePromptFixtureCase: PASS
+QwTok06SubtitleControlTokenContractReport: PASS
+QwTok06CueBrStructureProbe: PASS
+QwTok06SubtitleSmokeOutput: PASS
+QwTok06NoQualityScoreSeal: PASS
+QwTok06NoRewardTrainingMutationSeal: PASS
+QwTok06SubtitlePromptFixtureSmokeReport: PASS
+build_qw_tok06_subtitle_prompt_fixture_smoke_report: PASS
+build_qw_tok06_default_subtitle_prompt_fixture_smoke_report: PASS
+expected vocab const 48259: PASS
+expected max token id const 48258: PASS
+default blocks quality score: PASS
+default blocks translation quality evaluation: PASS
+default blocks subtitle quality evaluation: PASS
+default blocks value network scoring: PASS
+default blocks reward evaluation: PASS
+default blocks QW selector execution: PASS
+default blocks MCTS execution: PASS
+default blocks training mutation: PASS
+default blocks dataset export: PASS
+default blocks checkpoint write: PASS
+default blocks runtime spec write: PASS
+default blocks tokenizer rewrite: PASS
+crates/model_core/tests/qw_tok06_subtitle_prompt_fixture_smoke.rs exists: PASS
+crates/model_core/tests/qw_tok06_subtitle_control_token_contract.rs exists: PASS
+crates/model_core/tests/qw_tok06_no_quality_score.rs exists: PASS
+crates/model_core/tests/qw_tok06_no_training_no_reward.rs exists: PASS
+artifacts/qw_tok06_subtitle_prompt_fixture_smoke_report.json exists: PASS
+artifacts/qw_tok06_subtitle_prompt_fixtures.json exists: PASS
+artifacts/qw_tok06_subtitle_smoke_output_ids.json exists: PASS
+artifacts/qw_tok06_subtitle_decoded_outputs.json exists: PASS
+artifacts/qw_tok06_no_quality_score_receipt.json exists: PASS
+workspace/runtime_traces/qw_tok06_subtitle_prompt_fixture_smoke_trace.jsonl exists: PASS
+workspace/trace/qw_tok06_subtitle_prompt_fixture_smoke_receipt.json exists: PASS
+no artifacts/qw_tok06_model.safetensors packaged: PASS
+no artifacts/qw_tok06_tokenizer_v5.model packaged: PASS
+no artifacts/qw_tok06_tokenizer_v5.vocab packaged: PASS
+overall: PASS

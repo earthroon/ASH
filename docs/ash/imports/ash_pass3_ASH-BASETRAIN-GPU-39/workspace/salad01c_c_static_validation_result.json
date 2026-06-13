@@ -1,0 +1,22 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01C-C",
+  "source_patch_id": "16AI-QW-38G-R6A-SALAD-01C-B",
+  "status": "PASS_STATIC_POST_INFER_RECEIPT_FINALIZATION_BAKED_PENDING_LOCAL_CARGO_BUILD",
+  "adjudication": "POST_INFER_RECEIPT_FIELDS_ADDED_AND_PATCH_ID_SEALED",
+  "modified_files": [
+    "crates/orchestrator_local/src/infer_entry.rs"
+  ],
+  "static_checks": {
+    "patch_id_updated": true,
+    "pre_infer_receipt_kept": true,
+    "post_infer_finalized_field_added": true,
+    "generated_tail_head_after_infer_recorded": true,
+    "generic_short_collapse_detected_recorded": true,
+    "collapse_retry_attempted_recorded": true,
+    "canonical_and_payload_receipt_paths_preserved": true,
+    "model_files_modified": false
+  },
+  "build_executed": false,
+  "build_blocker": "cargo not available in bake container",
+  "next_local_command": "cargo build -p orchestrator_local --bin orchestrator_local"
+}

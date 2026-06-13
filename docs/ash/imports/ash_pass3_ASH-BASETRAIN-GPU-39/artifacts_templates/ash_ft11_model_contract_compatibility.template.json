@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-FT-11",
+  "kind": "model_contract_compatibility",
+  "expected": {
+    "model_vocab_size": 48259,
+    "tokenizer_vocab_size": 48259,
+    "hidden_size": 2048,
+    "embed_shape": [
+      48259,
+      2048
+    ],
+    "lm_head_shape": [
+      48259,
+      2048
+    ]
+  },
+  "observed": {
+    "embed_shape": [],
+    "lm_head_shape": [],
+    "embed_dtype": "",
+    "lm_head_dtype": ""
+  },
+  "tokenizer_model_vocab_match": false,
+  "embed_shape_matches": false,
+  "lm_head_shape_matches": false,
+  "dtype_allowed": false,
+  "compatibility_status": "PENDING"
+}

@@ -1,0 +1,33 @@
+QW-TOK-00-R3 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok00R3EmbeddingLmHeadRowParityConfig: PASS
+QwTok00R3TokenizerReferenceSeal: PASS
+QwTok00R3ModelConfigVocabProbe: PASS
+QwTok00R3TensorRowProbe: PASS
+QwTok00R3RuntimeVocabProjectionProbe: PASS
+QwTok00R3CheckpointSpecDriftProbe: PASS
+QwTok00R3NoResizeMutationSeal: PASS
+QwTok00R3EmbeddingLmHeadRowParityReport: PASS
+build_qw_tok00_r3_embedding_lmhead_row_parity_report: PASS
+build_qw_tok00_r3_default_embedding_lmhead_row_parity_report: PASS
+QW_TOK00_R3_EXPECTED_VOCAB_SIZE: usize = 48_259: PASS
+QW_TOK00_R3_EXPECTED_MAX_TOKEN_ID: usize = 48_258: PASS
+allow_weight_tensor_full_load: false: PASS
+allow_embedding_resize: false: PASS
+allow_lm_head_resize: false: PASS
+allow_model_weight_mutation: false: PASS
+allow_checkpoint_write: false: PASS
+allow_checkpoint_repack: false: PASS
+allow_runtime_decode_bind: false: PASS
+allow_sampler_mutation: false: PASS
+allow_qw_selector_mutation: false: PASS
+allow_mcts_mutation: false: PASS
+qw_tok00_r3_embedding_lmhead_row_parity.rs present: PASS
+qw_tok00_r3_no_resize_no_checkpoint_mutation.rs present: PASS
+qw_tok00_r3_runtime_vocab_projection_cap.rs present: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+checkpoint files not packaged: FAIL
+overall: FAIL

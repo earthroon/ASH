@@ -1,0 +1,94 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-02E",
+  "fixtures": [
+    {
+      "name": "gate_blocked_without_decode02d_ready",
+      "input": {
+        "decode02d_status": "NOT_RUN",
+        "mode": "controlled"
+      },
+      "expected": {
+        "effective": false,
+        "action": "GateBlocked",
+        "reason": "DECODE02D_NOT_READY"
+      }
+    },
+    {
+      "name": "eos_before_min_new_tokens_hardblock",
+      "input": {
+        "candidate": "<eos>",
+        "step": 2,
+        "min_new_tokens": 8,
+        "profile": "safe_v1"
+      },
+      "expected": {
+        "action": "HardBlock",
+        "candidate_removed": true
+      }
+    },
+    {
+      "name": "pad_token_hardblock",
+      "input": {
+        "candidate": "<pad>"
+      },
+      "expected": {
+        "action": "HardBlock",
+        "candidate_removed": true
+      }
+    },
+    {
+      "name": "generic_continuation_eos_soft_penalty",
+      "input": {
+        "prev": "▁이어가고",
+        "candidate": "<eos>",
+        "risk": 0.95
+      },
+      "expected": {
+        "action": "SoftPenalty",
+        "candidate_removed": false,
+        "penalty": 0.475
+      }
+    },
+    {
+      "name": "emotional_repeat_observe_only",
+      "input": {
+        "recent": [
+          "ㅠ",
+          "ㅠ"
+        ],
+        "candidate": "ㅠ"
+      },
+      "expected": {
+        "action": "Observe",
+        "candidate_removed": false,
+        "penalty_applied": 0.0
+      }
+    },
+    {
+      "name": "normal_korean_transition_allow",
+      "input": {
+        "prev": "사람",
+        "candidate": "은"
+      },
+      "expected": {
+        "hard_block": false,
+        "candidate_removed": false
+      }
+    },
+    {
+      "name": "repeated_punctuation_soft_penalty",
+      "input": {
+        "recent": [
+          "!",
+          "!",
+          "!"
+        ],
+        "candidate": "!"
+      },
+      "expected": {
+        "action": "SoftPenalty",
+        "candidate_removed": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft28_sequential_delta_stack_ledger_append.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft28_sequential_delta_stack_ledger_append.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft28_sequential_delta_stack_ledger_append.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft28_sequential_delta_stack_ledger_append.rs	2026-06-08 15:38:40.749316107 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-28\",\"status\":\"FAIL_ASH_FT28_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-28","status":"FAIL_ASH_FT28_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft29_shadow_candidate_replay_from_delta_stack.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft29_shadow_candidate_replay_from_delta_stack.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft29_shadow_candidate_replay_from_delta_stack.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft29_shadow_candidate_replay_from_delta_stack.rs	2026-06-08 15:38:40.749785429 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-29\",\"status\":\"FAIL_ASH_FT29_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-29","status":"FAIL_ASH_FT29_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft30_shadow_candidate_numeric_drift_probe.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft30_shadow_candidate_numeric_drift_probe.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft30_shadow_candidate_numeric_drift_probe.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft30_shadow_candidate_numeric_drift_probe.rs	2026-06-08 15:38:40.750211356 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-30\",\"status\":\"FAIL_ASH_FT30_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-30","status":"FAIL_ASH_FT30_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft32_shadow_candidate_approval_gate.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft32_shadow_candidate_approval_gate.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft32_shadow_candidate_approval_gate.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft32_shadow_candidate_approval_gate.rs	2026-06-08 15:38:40.750873759 +0000
+@@ -24,7 +24,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-32\",\"status\":\"FAIL_ASH_FT32_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-32","status":"FAIL_ASH_FT32_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft33_training_corpus_pack_registry.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft33_training_corpus_pack_registry.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft33_training_corpus_pack_registry.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft33_training_corpus_pack_registry.rs	2026-06-08 15:38:40.751377434 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-33\",\"status\":\"FAIL_ASH_FT33_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-33","status":"FAIL_ASH_FT33_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft34_tokenizer_encode_cache_builder.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft34_tokenizer_encode_cache_builder.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft34_tokenizer_encode_cache_builder.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft34_tokenizer_encode_cache_builder.rs	2026-06-08 15:38:40.751699251 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-34\",\"status\":\"FAIL_ASH_FT34_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-34","status":"FAIL_ASH_FT34_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft35_training_sample_window_sequence_pack_builder.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft35_training_sample_window_sequence_pack_builder.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft35_training_sample_window_sequence_pack_builder.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft35_training_sample_window_sequence_pack_builder.rs	2026-06-08 15:38:40.752124735 +0000
+@@ -25,7 +25,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-35\",\"status\":\"FAIL_ASH_FT35_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-35","status":"FAIL_ASH_FT35_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft36_loss_objective_contract.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft36_loss_objective_contract.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft36_loss_objective_contract.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft36_loss_objective_contract.rs	2026-06-08 15:38:40.752379197 +0000
+@@ -21,7 +21,7 @@
+             std::process::exit(1);
+         }
+         Err(_) => {
+-            eprintln!("{\"patch_id\":\"ASH-FT-36\",\"status\":\"FAIL_ASH_FT36_WORKER_PANIC\"}");
++            eprintln!("{}", r#"{"patch_id":"ASH-FT-36","status":"FAIL_ASH_FT36_WORKER_PANIC"}"#);
+             std::process::exit(1);
+         }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft38_optimizer_state_staging.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft38_optimizer_state_staging.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft38_optimizer_state_staging.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft38_optimizer_state_staging.rs	2026-06-08 15:39:02.728052498 +0000
+@@ -19,9 +19,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", ash_ft38_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-38\",\"status\":\"BLOCKED_ASH_FT38_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-38","status":"BLOCKED_ASH_FT38_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-38\",\"status\":\"BLOCKED_ASH_FT38_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-38","status":"BLOCKED_ASH_FT38_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft40_first_group_training_step_dryrun.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft40_first_group_training_step_dryrun.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft40_first_group_training_step_dryrun.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft40_first_group_training_step_dryrun.rs	2026-06-08 15:39:02.728496127 +0000
+@@ -14,9 +14,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft40_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-40\",\"status\":\"BLOCKED_ASH_FT40_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-40","status":"BLOCKED_ASH_FT40_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-40\",\"status\":\"BLOCKED_ASH_FT40_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-40","status":"BLOCKED_ASH_FT40_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft41_gradient_receipt_selected_group_finite_delta_candidate.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft41_gradient_receipt_selected_group_finite_delta_candidate.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft41_gradient_receipt_selected_group_finite_delta_candidate.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft41_gradient_receipt_selected_group_finite_delta_candidate.rs	2026-06-08 15:39:02.728663083 +0000
+@@ -14,9 +14,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft41_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-41\",\"status\":\"BLOCKED_ASH_FT41_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-41","status":"BLOCKED_ASH_FT41_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-41\",\"status\":\"BLOCKED_ASH_FT41_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-41","status":"BLOCKED_ASH_FT41_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft42_delta_candidate_artifact_staging.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft42_delta_candidate_artifact_staging.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft42_delta_candidate_artifact_staging.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft42_delta_candidate_artifact_staging.rs	2026-06-08 15:39:02.728877299 +0000
+@@ -14,9 +14,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft42_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-42\",\"status\":\"BLOCKED_ASH_FT42_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-42","status":"BLOCKED_ASH_FT42_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-42\",\"status\":\"BLOCKED_ASH_FT42_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-42","status":"BLOCKED_ASH_FT42_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft43_delta_candidate_integrity_audit.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft43_delta_candidate_integrity_audit.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft43_delta_candidate_integrity_audit.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft43_delta_candidate_integrity_audit.rs	2026-06-08 15:39:02.729148103 +0000
+@@ -13,9 +13,9 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft43_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-43\",\"status\":\"BLOCKED_ASH_FT43_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-43","status":"BLOCKED_ASH_FT43_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+-        Err(err) => { eprintln!("{\"patch_id\":\"ASH-FT-43\",\"status\":\"BLOCKED_ASH_FT43_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}", err); std::process::exit(4); }
++        Err(err) => { eprintln!("{}", serde_json::json!({"patch_id":"ASH-FT-43","status":"BLOCKED_ASH_FT43_WORKER_SPAWN_FAILED","error": err.to_string(),"next_stage_allowed": false})); std::process::exit(4); }
+     }
+ }
+ 
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft45_materialized_delta_payload_integrity_audit.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft45_materialized_delta_payload_integrity_audit.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft45_materialized_delta_payload_integrity_audit.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft45_materialized_delta_payload_integrity_audit.rs	2026-06-08 15:39:02.729387965 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft45_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-45\",\"status\":\"BLOCKED_ASH_FT45_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-45","status":"BLOCKED_ASH_FT45_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-45\",\"status\":\"BLOCKED_ASH_FT45_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft46_official_delta_packet_envelope_draft.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft46_official_delta_packet_envelope_draft.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft46_official_delta_packet_envelope_draft.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft46_official_delta_packet_envelope_draft.rs	2026-06-08 15:39:02.729549718 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft46_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-46\",\"status\":\"BLOCKED_ASH_FT46_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-46","status":"BLOCKED_ASH_FT46_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-46\",\"status\":\"BLOCKED_ASH_FT46_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft47_official_delta_packet_envelope_integrity_audit.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft47_official_delta_packet_envelope_integrity_audit.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft47_official_delta_packet_envelope_integrity_audit.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft47_official_delta_packet_envelope_integrity_audit.rs	2026-06-08 15:39:02.729744770 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft47_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-47\",\"status\":\"BLOCKED_ASH_FT47_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-47","status":"BLOCKED_ASH_FT47_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-47\",\"status\":\"BLOCKED_ASH_FT47_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft48_official_delta_packet_finalization.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft48_official_delta_packet_finalization.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft48_official_delta_packet_finalization.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft48_official_delta_packet_finalization.rs	2026-06-08 15:39:02.729906559 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft48_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-48\",\"status\":\"BLOCKED_ASH_FT48_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-48","status":"BLOCKED_ASH_FT48_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-48\",\"status\":\"BLOCKED_ASH_FT48_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft49a_real_atlas_group_training_backend_bind.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft49a_real_atlas_group_training_backend_bind.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft49a_real_atlas_group_training_backend_bind.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft49a_real_atlas_group_training_backend_bind.rs	2026-06-08 15:39:02.730056526 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft49a_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-49A\",\"status\":\"BLOCKED_ASH_FT49A_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-49A","status":"BLOCKED_ASH_FT49A_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-49A\",\"status\":\"BLOCKED_ASH_FT49A_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }
+diff -ruN /mnt/data/r4_work/crates/model_core/src/bin/ash_ft49b_real_optimizer_candidate_update.rs /mnt/data/r5_work/crates/model_core/src/bin/ash_ft49b_real_optimizer_candidate_update.rs
+--- /mnt/data/r4_work/crates/model_core/src/bin/ash_ft49b_real_optimizer_candidate_update.rs	2026-06-08 13:14:22.000000000 +0000
++++ /mnt/data/r5_work/crates/model_core/src/bin/ash_ft49b_real_optimizer_candidate_update.rs	2026-06-08 15:39:02.730185000 +0000
+@@ -13,7 +13,7 @@
+         Ok(joined) => match joined.join() {
+             Ok(Ok(())) => {},
+             Ok(Err(err)) => { eprintln!("{}", model_core::ash_ft49b_failure_summary_json(&err)); std::process::exit(2); },
+-            Err(_) => { eprintln!("{\"patch_id\":\"ASH-FT-49B\",\"status\":\"BLOCKED_ASH_FT49B_WORKER_PANIC\",\"next_stage_allowed\":false}"); std::process::exit(3); }
++            Err(_) => { eprintln!("{}", r#"{"patch_id":"ASH-FT-49B","status":"BLOCKED_ASH_FT49B_WORKER_PANIC","next_stage_allowed":false}"#); std::process::exit(3); }
+         },
+         Err(err) => { eprintln!("{{\"patch_id\":\"ASH-FT-49B\",\"status\":\"BLOCKED_ASH_FT49B_WORKER_SPAWN_FAILED\",\"error\":\"{}\",\"next_stage_allowed\":false}}", err); std::process::exit(4); }
+     }

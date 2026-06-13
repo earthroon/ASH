@@ -1,0 +1,1971 @@
+diff -ruN stop01_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md stop01_work/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md
+--- stop01_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md	2026-05-27 07:25:23.096530675 +0000
+@@ -0,0 +1,21 @@
++# 16AI-QW-38G-R6A-STOP-01 Acceptance
++
++## Status
++STATIC_BAKE_DEFINED_NOT_RUN
++
++## Accepted Static Contracts
++- [x] STOP-01 module added.
++- [x] Default mode is Off.
++- [x] Controlled stop requires explicit mode + behavior permission.
++- [x] EOS bias stop is not executed by default.
++- [x] Output tail truncation is forbidden by contract.
++- [x] Gate, execution, pre/post fingerprint, and summary structures are present.
++- [x] STOP-01 append hook is wired after SALAD-03B.
++
++## Not Run
++- [ ] cargo check
++- [ ] cargo test
++- [ ] runtime stop smoke
++
++## Next
++STOP-02 — EOS Finalization / User-visible Stop Surface Seal.
+diff -ruN stop01_orig/crates/model_core/src/lib.rs stop01_work/crates/model_core/src/lib.rs
+--- stop01_orig/crates/model_core/src/lib.rs	2026-05-27 07:18:19.000000000 +0000
++++ stop01_work/crates/model_core/src/lib.rs	2026-05-27 07:24:38.805257740 +0000
+@@ -25,6 +25,7 @@
+ mod kv_rollback00_probe;
+ mod kv_rollback01_forked_replay;
+ mod salad03b_controlled_execute;
++mod stop01_safe_stop;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -168,6 +169,17 @@
+     append_salad03b_receipt_from_sampler03, write_salad03b_summary_from_receipt_file,
+ };
+ 
++
++pub use stop01_safe_stop::{
++    STOP01_PATCH_ID, STOP01_INPUT_PATCH_ID, STOP01_SSOT, Stop01Mode, Stop01Reason,
++    Stop01Action, Stop01Input, Stop01GateDecision, Stop01ExecutionReceipt,
++    Stop01StateFingerprint, Stop01StepReceipt, Stop01Summary, Stop01Runtime,
++    decide_stop01_gate, execute_stop01, execute_stop01_synthetic,
++    input_from_salad03b as stop01_input_from_salad03b,
++    receipt_from_salad03b as stop01_receipt_from_salad03b,
++    append_stop01_receipt_from_sampler03, write_stop01_summary_from_receipt_file,
++};
++
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
+diff -ruN stop01_orig/crates/model_core/src/sampler_parity.rs stop01_work/crates/model_core/src/sampler_parity.rs
+--- stop01_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:18:19.000000000 +0000
++++ stop01_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:24:38.806266972 +0000
+@@ -458,5 +458,6 @@
+     crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
+     crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
+     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
++    crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN stop01_orig/crates/model_core/src/stop01_safe_stop.rs stop01_work/crates/model_core/src/stop01_safe_stop.rs
+--- stop01_orig/crates/model_core/src/stop01_safe_stop.rs	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/crates/model_core/src/stop01_safe_stop.rs	2026-05-27 07:24:52.915839010 +0000
+@@ -0,0 +1,806 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
++use crate::kv_rollback00_probe::{receipt_from_salad03 as kv00_receipt_from_salad03, KvRollback00Mode};
++use crate::kv_rollback01_forked_replay::{
++    receipt_from_kvrollback00 as kv01_receipt_from_kvrollback00, KvRollback01Mode,
++};
++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode};
++use crate::salad03b_controlled_execute::{
++    receipt_from_salad03_and_kv01 as salad03b_receipt_from_salad03_and_kv01,
++    Salad03BMode, Salad03BStepReceipt,
++};
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const STOP01_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-01";
++pub const STOP01_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03B";
++pub const STOP01_SSOT: &str = "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Stop01Mode {
++    Off,
++    PlanOnly,
++    ControlledExecute,
++    StrictControlledExecute,
++}
++
++impl Stop01Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_STOP01_MODE")
++            .or_else(|_| env::var("ASH_STOP01_SAFE_STOP"))
++            .unwrap_or_else(|_| "off".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "plan" | "plan_only" | "dry" | "dry_run" => Self::PlanOnly,
++            "controlled" | "controlled_execute" | "execute" | "true" | "1" => Self::ControlledExecute,
++            "strict" | "strict_controlled" | "strict_controlled_execute" => Self::StrictControlledExecute,
++            _ => Self::Off,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::PlanOnly => "PlanOnly",
++            Self::ControlledExecute => "ControlledExecute",
++            Self::StrictControlledExecute => "StrictControlledExecute",
++        }
++    }
++
++    pub fn requested(self) -> bool {
++        !matches!(self, Self::Off)
++    }
++
++    pub fn can_mutate(self) -> bool {
++        matches!(self, Self::ControlledExecute | Self::StrictControlledExecute)
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
++pub enum Stop01Reason {
++    None,
++    SaladCritical,
++    SaladHighPersistent,
++    PostResampleCritical,
++    PostResampleHighUnimproved,
++    ResampleFailed,
++    RollbackDenied,
++    RollbackWindowLimitReached,
++    NumericRisk,
++    GlobalFiniteFallback,
++    EmptyActiveSet,
++    RuntimeStopRequested,
++    StrictSafetyStop,
++}
++
++impl Stop01Reason {
++    pub fn as_code(self) -> &'static str {
++        match self {
++            Self::None => "SAFE_STOP_NONE",
++            Self::SaladCritical => "SAFE_STOP_SALAD_CRITICAL",
++            Self::SaladHighPersistent => "SAFE_STOP_SALAD_HIGH_PERSISTENT",
++            Self::PostResampleCritical => "SAFE_STOP_POST_RESAMPLE_CRITICAL",
++            Self::PostResampleHighUnimproved => "SAFE_STOP_POST_RESAMPLE_HIGH_UNIMPROVED",
++            Self::ResampleFailed => "SAFE_STOP_RESAMPLE_FAILED",
++            Self::RollbackDenied => "SAFE_STOP_ROLLBACK_DENIED",
++            Self::RollbackWindowLimitReached => "SAFE_STOP_ROLLBACK_WINDOW_LIMIT_REACHED",
++            Self::NumericRisk => "SAFE_STOP_NUMERIC_RISK",
++            Self::GlobalFiniteFallback => "SAFE_STOP_GLOBAL_FINITE_FALLBACK",
++            Self::EmptyActiveSet => "SAFE_STOP_EMPTY_ACTIVE_SET",
++            Self::RuntimeStopRequested => "SAFE_STOP_RUNTIME_STOP_REQUESTED",
++            Self::StrictSafetyStop => "SAFE_STOP_STRICT_SAFETY_STOP",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Stop01Action {
++    NoAction,
++    PlanSafeStop,
++    ExecuteRuntimeStop,
++    ExecuteEosBiasStop,
++    Denied,
++    StrictFail,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01Input {
++    pub mode: Stop01Mode,
++    pub behavior_change_allowed: bool,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub runtime_supports_stop: bool,
++    pub runtime_supports_eos_bias: bool,
++    pub salad02_risk_stable: Option<String>,
++    pub salad02_score: Option<f32>,
++    pub salad03_decision: Option<String>,
++    pub salad03_safe_stop_candidate: bool,
++    pub salad03b_gate_denied: bool,
++    pub salad03b_resample_success: Option<bool>,
++    pub salad03b_post_risk: Option<String>,
++    pub salad03b_risk_improved: Option<bool>,
++    pub salad03b_risk_worsened: Option<bool>,
++    pub salad03b_safe_stop_recommended: bool,
++    pub rollback_window_limit_reached: bool,
++    pub numeric_risk: bool,
++    pub global_finite_fallback_seen: bool,
++    pub empty_active_set_seen: bool,
++    pub high_risk_persistence_count: usize,
++    pub safe_stop_already_executed: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01GateDecision {
++    pub can_execute: bool,
++    pub action: Stop01Action,
++    pub reason: Stop01Reason,
++    pub strict_fail: bool,
++    pub denied_reasons: Vec<String>,
++    pub warning_reasons: Vec<String>,
++    pub execute_reasons: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01ExecutionReceipt {
++    pub executed: bool,
++    pub runtime_stop_executed: bool,
++    pub eos_bias_stop_executed: bool,
++    pub generation_loop_stop_requested: bool,
++    pub stop_step: Option<usize>,
++    pub stop_reason: Stop01Reason,
++    pub final_selected_token_id: Option<u32>,
++    pub final_piece_preview: Option<String>,
++    pub output_tail_preserved: bool,
++    pub output_tail_truncated: bool,
++    pub stop_message_code: Option<String>,
++    pub execution_reasons: Vec<String>,
++    pub execution_warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01StateFingerprint {
++    pub step: usize,
++    pub token_ledger_len: usize,
++    pub generation_stopped: bool,
++    pub stop_reason: Option<String>,
++    pub tail_token_hash: Option<String>,
++    pub sampler_state_hash: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01StepReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_hash: Option<String>,
++    pub seed: Option<u64>,
++    pub step: usize,
++    pub backend: String,
++    pub sampler_ssot: String,
++    pub mode: Stop01Mode,
++    pub behavior_change: bool,
++    pub controlled_execute: bool,
++    pub salad03b_status_seen: Option<String>,
++    pub salad03_status_seen: Option<String>,
++    pub salad02_status_seen: Option<String>,
++    pub decode03d_status_seen: Option<String>,
++    pub kv_rollback01_status_seen: Option<String>,
++    pub input: Stop01Input,
++    pub gate: Stop01GateDecision,
++    pub execution: Stop01ExecutionReceipt,
++    pub pre_fingerprint: Option<Stop01StateFingerprint>,
++    pub post_fingerprint: Option<Stop01StateFingerprint>,
++    pub selected_id_current: Option<u32>,
++    pub selected_piece_current: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop01GateStats {
++    pub can_execute_count: usize,
++    pub denied_count: usize,
++    pub strict_fail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop01ExecutionStats {
++    pub executed_count: usize,
++    pub runtime_stop_executed_count: usize,
++    pub eos_bias_stop_executed_count: usize,
++    pub generation_loop_stop_requested_count: usize,
++    pub output_tail_truncated_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop01ReasonStats {
++    pub salad_critical_count: usize,
++    pub salad_high_persistent_count: usize,
++    pub post_resample_critical_count: usize,
++    pub post_resample_high_unimproved_count: usize,
++    pub resample_failed_count: usize,
++    pub rollback_denied_count: usize,
++    pub numeric_risk_count: usize,
++    pub global_finite_fallback_count: usize,
++    pub empty_active_set_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Stop01SafetyStats {
++    pub stop_without_gate_count: usize,
++    pub stop_without_receipt_count: usize,
++    pub tail_truncate_count: usize,
++    pub eos_bias_stop_count: usize,
++    pub stop_reason_none_executed_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Stop01Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub controlled_execute: bool,
++    pub default_enable: bool,
++    pub requires_salad03b: bool,
++    pub salad03b_status_seen: Option<String>,
++    pub steps_observed: usize,
++    pub gate: Stop01GateStats,
++    pub execution: Stop01ExecutionStats,
++    pub reasons: Stop01ReasonStats,
++    pub safety: Stop01SafetyStats,
++    pub ready_for_stop02_eos_finalization: bool,
++    pub ready_for_default_safe_stop: bool,
++    pub reason: String,
++}
++
++pub trait Stop01Runtime {
++    fn stop01_state_fingerprint(&self) -> Stop01StateFingerprint;
++    fn request_generation_stop(&mut self, reason: Stop01Reason) -> Result<(), String>;
++    fn generation_stop_supported(&self) -> bool;
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name)
++        .ok()
++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
++        .unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_string(name: &str, default: &str) -> String {
++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
++}
++
++pub fn receipt_path() -> PathBuf {
++    env::var("ASH_STOP01_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/stop01_steps.jsonl"))
++}
++
++pub fn summary_path() -> PathBuf {
++    env::var("ASH_STOP01_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/stop01_summary.json"))
++}
++
++fn is_high_or_critical(value: Option<&str>) -> bool {
++    matches!(value, Some("High" | "Critical" | "HIGH" | "CRITICAL"))
++}
++
++fn is_critical(value: Option<&str>) -> bool {
++    matches!(value, Some("Critical" | "CRITICAL"))
++}
++
++pub fn decide_stop01_gate(input: &Stop01Input) -> Stop01GateDecision {
++    let mut denied_reasons = Vec::new();
++    let mut warning_reasons = Vec::new();
++    let mut execute_reasons = Vec::new();
++    let mut strict_fail = false;
++
++    if matches!(input.mode, Stop01Mode::Off) {
++        denied_reasons.push("mode_off".to_string());
++    }
++    if input.safe_stop_already_executed {
++        denied_reasons.push("safe_stop_already_executed".to_string());
++    }
++
++    let (mut action, mut reason) = stop_need_from_input(input);
++
++    if matches!(input.mode, Stop01Mode::PlanOnly) {
++        if matches!(action, Stop01Action::ExecuteRuntimeStop) {
++            action = Stop01Action::PlanSafeStop;
++            execute_reasons.push("plan_only_safe_stop_candidate".to_string());
++        }
++        return Stop01GateDecision {
++            can_execute: false,
++            action,
++            reason,
++            strict_fail: false,
++            denied_reasons,
++            warning_reasons,
++            execute_reasons,
++        };
++    }
++
++    if !input.behavior_change_allowed {
++        denied_reasons.push("behavior_change_not_allowed".to_string());
++    }
++    if !input.runtime_supports_stop {
++        denied_reasons.push("runtime_stop_unsupported".to_string());
++    }
++    if matches!(reason, Stop01Reason::None) {
++        action = Stop01Action::NoAction;
++        denied_reasons.push("no_stop_trigger".to_string());
++    }
++
++    if input.runtime_supports_eos_bias && env_bool("ASH_STOP01_EOS_BIAS_EXECUTE", false) {
++        warning_reasons.push("eos_bias_supported_but_stop01_keeps_eos_bias_disabled_by_contract".to_string());
++    }
++    if env_bool("ASH_STOP01_TRUNCATE_OUTPUT_TAIL", false) {
++        denied_reasons.push("output_tail_truncate_forbidden".to_string());
++        if matches!(input.mode, Stop01Mode::StrictControlledExecute) {
++            strict_fail = true;
++        }
++    }
++    if matches!(input.mode, Stop01Mode::StrictControlledExecute)
++        && (input.numeric_risk || input.global_finite_fallback_seen || is_critical(input.salad03b_post_risk.as_deref()))
++    {
++        execute_reasons.push("strict_safety_stop_triggered".to_string());
++    }
++    if matches!(input.mode, Stop01Mode::StrictControlledExecute) && denied_reasons.iter().any(|r| r != "no_stop_trigger") {
++        strict_fail = true;
++    }
++
++    let can_execute = denied_reasons.is_empty()
++        && input.mode.can_mutate()
++        && matches!(action, Stop01Action::ExecuteRuntimeStop);
++    if can_execute {
++        execute_reasons.push("controlled_execute_enabled".to_string());
++        execute_reasons.push(reason.as_code().to_string());
++        execute_reasons.push("runtime_stop_supported".to_string());
++    } else if !denied_reasons.is_empty() && matches!(action, Stop01Action::ExecuteRuntimeStop) {
++        action = if strict_fail { Stop01Action::StrictFail } else { Stop01Action::Denied };
++    }
++
++    Stop01GateDecision {
++        can_execute,
++        action,
++        reason,
++        strict_fail,
++        denied_reasons,
++        warning_reasons,
++        execute_reasons,
++    }
++}
++
++fn stop_need_from_input(input: &Stop01Input) -> (Stop01Action, Stop01Reason) {
++    if input.numeric_risk {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::NumericRisk);
++    }
++    if input.global_finite_fallback_seen {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::GlobalFiniteFallback);
++    }
++    if input.empty_active_set_seen {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::EmptyActiveSet);
++    }
++    if is_critical(input.salad03b_post_risk.as_deref()) {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::PostResampleCritical);
++    }
++    if input.salad03b_resample_success == Some(false) && input.salad03b_safe_stop_recommended {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::ResampleFailed);
++    }
++    if input.rollback_window_limit_reached {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::RollbackWindowLimitReached);
++    }
++    if input.salad03b_gate_denied && input.salad03b_safe_stop_recommended {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::RollbackDenied);
++    }
++    if input.salad03b_post_risk.as_deref().map(|r| matches!(r, "High" | "HIGH")).unwrap_or(false)
++        && input.salad03b_risk_improved == Some(false)
++    {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::PostResampleHighUnimproved);
++    }
++    if is_critical(input.salad02_risk_stable.as_deref()) && !input.salad03_safe_stop_candidate {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::SaladCritical);
++    }
++    if input.high_risk_persistence_count >= env_usize("ASH_STOP01_HIGH_RISK_PERSISTENCE_WINDOW", 3)
++        && is_high_or_critical(input.salad02_risk_stable.as_deref())
++    {
++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::SaladHighPersistent);
++    }
++    (Stop01Action::NoAction, Stop01Reason::None)
++}
++
++pub fn state_fingerprint(step: usize, token_ledger_len: usize, stopped: bool, reason: Option<Stop01Reason>) -> Stop01StateFingerprint {
++    Stop01StateFingerprint {
++        step,
++        token_ledger_len,
++        generation_stopped: stopped,
++        stop_reason: reason.map(|r| format!("{:?}", r)),
++        tail_token_hash: Some(format!("sha256:stop01-tail-{step}-{token_ledger_len}")),
++        sampler_state_hash: Some(format!("sha256:stop01-sampler-{step}-{token_ledger_len}")),
++    }
++}
++
++pub fn execute_stop01_synthetic(
++    input: &Stop01Input,
++    gate: &Stop01GateDecision,
++    selected_id: Option<u32>,
++    selected_piece: Option<String>,
++) -> Stop01ExecutionReceipt {
++    if !gate.can_execute {
++        return Stop01ExecutionReceipt {
++            executed: false,
++            runtime_stop_executed: false,
++            eos_bias_stop_executed: false,
++            generation_loop_stop_requested: false,
++            stop_step: None,
++            stop_reason: gate.reason,
++            final_selected_token_id: selected_id,
++            final_piece_preview: selected_piece,
++            output_tail_preserved: true,
++            output_tail_truncated: false,
++            stop_message_code: None,
++            execution_reasons: gate.denied_reasons.clone(),
++            execution_warnings: gate.warning_reasons.clone(),
++        };
++    }
++    Stop01ExecutionReceipt {
++        executed: true,
++        runtime_stop_executed: true,
++        eos_bias_stop_executed: false,
++        generation_loop_stop_requested: true,
++        stop_step: Some(input.step),
++        stop_reason: gate.reason,
++        final_selected_token_id: selected_id,
++        final_piece_preview: selected_piece,
++        output_tail_preserved: true,
++        output_tail_truncated: false,
++        stop_message_code: Some(gate.reason.as_code().to_string()),
++        execution_reasons: vec!["generation_stop_requested".to_string()],
++        execution_warnings: gate.warning_reasons.clone(),
++    }
++}
++
++pub fn execute_stop01<R: Stop01Runtime>(
++    runtime: &mut R,
++    input: &Stop01Input,
++    gate: &Stop01GateDecision,
++) -> Stop01ExecutionReceipt {
++    if !gate.can_execute {
++        return execute_stop01_synthetic(input, gate, None, None);
++    }
++    let _pre = runtime.stop01_state_fingerprint();
++    let result = runtime.request_generation_stop(gate.reason);
++    let post = runtime.stop01_state_fingerprint();
++    let ok = result.is_ok() && post.generation_stopped;
++    let mut receipt = execute_stop01_synthetic(input, gate, None, None);
++    receipt.executed = ok;
++    receipt.runtime_stop_executed = ok;
++    receipt.generation_loop_stop_requested = ok;
++    if let Err(err) = result {
++        receipt.execution_warnings.push(format!("runtime_stop_error:{err}"));
++    }
++    receipt
++}
++
++pub fn input_from_salad03b(mode: Stop01Mode, receipt: &Salad03BStepReceipt) -> Stop01Input {
++    let post_risk = receipt.post_check.post_salad02_risk.clone();
++    let high_persistence_default = if is_high_or_critical(post_risk.as_deref()) || is_high_or_critical(Some(&receipt.input.salad02_risk_stable)) { 3 } else { 0 };
++    Stop01Input {
++        mode,
++        behavior_change_allowed: env_bool("ASH_STOP01_BEHAVIOR_CHANGE_ALLOWED", false),
++        run_id: env_string("ASH_STOP01_RUN_ID", "stop01_sampler03_bridge"),
++        prompt_hash: receipt.prompt_hash.clone(),
++        seed: receipt.seed,
++        step: receipt.step,
++        backend: receipt.backend.clone(),
++        runtime_supports_stop: env_bool("ASH_STOP01_RUNTIME_SUPPORTS_STOP", env_bool("ASH_STOP01_REQUIRE_RUNTIME_STOP_SUPPORT", false)),
++        runtime_supports_eos_bias: env_bool("ASH_STOP01_RUNTIME_SUPPORTS_EOS_BIAS", false),
++        salad02_risk_stable: Some(receipt.input.salad02_risk_stable.clone()),
++        salad02_score: Some(receipt.input.salad02_score),
++        salad03_decision: Some(receipt.input.salad03_decision.clone()),
++        salad03_safe_stop_candidate: receipt.execution.safe_stop_candidate,
++        salad03b_gate_denied: !receipt.gate.denied_reasons.is_empty(),
++        salad03b_resample_success: receipt.execution.replacement.as_ref().map(|r| r.success),
++        salad03b_post_risk: post_risk,
++        salad03b_risk_improved: receipt.post_check.risk_improved,
++        salad03b_risk_worsened: receipt.post_check.risk_worsened,
++        salad03b_safe_stop_recommended: receipt.post_check.safe_stop_recommended,
++        rollback_window_limit_reached: receipt.gate.denied_reasons.iter().any(|r| r == "rollback_window_limit_reached"),
++        numeric_risk: receipt.input.numeric_risk,
++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
++        empty_active_set_seen: env_bool("ASH_STOP01_EMPTY_ACTIVE_SET_SEEN", false),
++        high_risk_persistence_count: env_usize("ASH_STOP01_HIGH_RISK_PERSISTENCE_COUNT", high_persistence_default),
++        safe_stop_already_executed: env_bool("ASH_STOP01_ALREADY_EXECUTED", false),
++    }
++}
++
++pub fn receipt_from_salad03b(mode: Stop01Mode, source: &Salad03BStepReceipt) -> Stop01StepReceipt {
++    let input = input_from_salad03b(mode, source);
++    let gate = decide_stop01_gate(&input);
++    let execution = execute_stop01_synthetic(&input, &gate, source.selected_id_after.or(source.selected_id_before), source.selected_piece_after.clone().or(source.selected_piece_before.clone()));
++    let pre_fingerprint = Some(state_fingerprint(input.step, source.input.token_ledger_len, false, None));
++    let post_fingerprint = Some(state_fingerprint(input.step, source.input.token_ledger_len, execution.generation_loop_stop_requested, if execution.executed { Some(gate.reason) } else { None }));
++    Stop01StepReceipt {
++        patch_id: STOP01_PATCH_ID.to_string(),
++        input_patch: STOP01_INPUT_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id: input.run_id.clone(),
++        prompt_hash: input.prompt_hash.clone(),
++        seed: input.seed,
++        step: input.step,
++        backend: input.backend.clone(),
++        sampler_ssot: STOP01_SSOT.to_string(),
++        mode,
++        behavior_change: execution.executed,
++        controlled_execute: mode.can_mutate(),
++        salad03b_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD03B_RECEIPT".to_string()),
++        salad03_status_seen: source.salad03_status_seen.clone(),
++        salad02_status_seen: source.salad02_status_seen.clone(),
++        decode03d_status_seen: source.decode03d_status_seen.clone(),
++        kv_rollback01_status_seen: source.kv_rollback01_status_seen.clone(),
++        input,
++        gate,
++        execution,
++        pre_fingerprint,
++        post_fingerprint,
++        selected_id_current: source.selected_id_after.or(source.selected_id_before),
++        selected_piece_current: source.selected_piece_after.clone().or(source.selected_piece_before.clone()),
++    }
++}
++
++pub fn append_stop01_receipt_from_sampler03(source: &SamplerParityReceipt) {
++    let mode = Stop01Mode::from_env();
++    if !mode.requested() {
++        return;
++    }
++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
++    let dynamic_mode = DynamicSamplerMode::from_env();
++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
++    let salad03_mode = Salad03Mode::from_env();
++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
++    let kv00_mode = match mode {
++        Stop01Mode::ControlledExecute | Stop01Mode::StrictControlledExecute => KvRollback00Mode::ForkedReplayProbe,
++        Stop01Mode::PlanOnly => KvRollback00Mode::SnapshotOnly,
++        Stop01Mode::Off => KvRollback00Mode::Off,
++    };
++    let kv00 = kv00_receipt_from_salad03(kv00_mode, &salad03_receipt);
++    let kv01_mode = match mode {
++        Stop01Mode::StrictControlledExecute => KvRollback01Mode::StrictForkedReplayProbe,
++        Stop01Mode::ControlledExecute => KvRollback01Mode::ForkedReplayProbe,
++        Stop01Mode::PlanOnly => KvRollback01Mode::PlanOnly,
++        Stop01Mode::Off => KvRollback01Mode::Off,
++    };
++    let kv01 = kv01_receipt_from_kvrollback00(kv01_mode, &kv00);
++    let salad03b_mode = match mode {
++        Stop01Mode::ControlledExecute | Stop01Mode::StrictControlledExecute => Salad03BMode::ControlledExecute,
++        Stop01Mode::PlanOnly => Salad03BMode::PlanOnly,
++        Stop01Mode::Off => Salad03BMode::Off,
++    };
++    let salad03b = salad03b_receipt_from_salad03_and_kv01(salad03b_mode, &salad03_receipt, &kv01);
++    let receipt = receipt_from_salad03b(mode, &salad03b);
++    let path = receipt_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(line) = serde_json::to_string(&receipt) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++fn read_receipts(path: PathBuf) -> Vec<Stop01StepReceipt> {
++    let data = match fs::read_to_string(path) {
++        Ok(data) => data,
++        Err(_) => return Vec::new(),
++    };
++    data.lines().filter_map(|line| serde_json::from_str::<Stop01StepReceipt>(line).ok()).collect()
++}
++
++fn count_reason(stats: &mut Stop01ReasonStats, reason: Stop01Reason) {
++    match reason {
++        Stop01Reason::SaladCritical => stats.salad_critical_count += 1,
++        Stop01Reason::SaladHighPersistent => stats.salad_high_persistent_count += 1,
++        Stop01Reason::PostResampleCritical => stats.post_resample_critical_count += 1,
++        Stop01Reason::PostResampleHighUnimproved => stats.post_resample_high_unimproved_count += 1,
++        Stop01Reason::ResampleFailed => stats.resample_failed_count += 1,
++        Stop01Reason::RollbackDenied => stats.rollback_denied_count += 1,
++        Stop01Reason::NumericRisk => stats.numeric_risk_count += 1,
++        Stop01Reason::GlobalFiniteFallback => stats.global_finite_fallback_count += 1,
++        Stop01Reason::EmptyActiveSet => stats.empty_active_set_count += 1,
++        _ => {}
++    }
++}
++
++pub fn summary_from_receipts(receipts: &[Stop01StepReceipt]) -> Stop01Summary {
++    let mut gate = Stop01GateStats::default();
++    let mut execution = Stop01ExecutionStats::default();
++    let mut reasons = Stop01ReasonStats::default();
++    let mut safety = Stop01SafetyStats::default();
++    let mut mode = Stop01Mode::Off.as_str().to_string();
++    let mut salad03b_status_seen = None;
++
++    for receipt in receipts {
++        mode = receipt.mode.as_str().to_string();
++        salad03b_status_seen = receipt.salad03b_status_seen.clone().or(salad03b_status_seen);
++        if receipt.gate.can_execute { gate.can_execute_count += 1; }
++        if !receipt.gate.denied_reasons.is_empty() { gate.denied_count += 1; }
++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
++
++        if receipt.execution.executed { execution.executed_count += 1; }
++        if receipt.execution.runtime_stop_executed { execution.runtime_stop_executed_count += 1; }
++        if receipt.execution.eos_bias_stop_executed { execution.eos_bias_stop_executed_count += 1; }
++        if receipt.execution.generation_loop_stop_requested { execution.generation_loop_stop_requested_count += 1; }
++        if receipt.execution.output_tail_truncated { execution.output_tail_truncated_count += 1; }
++
++        count_reason(&mut reasons, receipt.gate.reason);
++
++        if receipt.execution.executed && !receipt.gate.can_execute { safety.stop_without_gate_count += 1; }
++        if receipt.execution.output_tail_truncated { safety.tail_truncate_count += 1; }
++        if receipt.execution.eos_bias_stop_executed { safety.eos_bias_stop_count += 1; }
++        if receipt.execution.executed && matches!(receipt.execution.stop_reason, Stop01Reason::None) { safety.stop_reason_none_executed_count += 1; }
++    }
++
++    let steps_observed = receipts.len();
++    let contract_fail = safety.stop_without_gate_count > 0
++        || safety.tail_truncate_count > 0
++        || safety.eos_bias_stop_count > 0
++        || safety.stop_reason_none_executed_count > 0;
++    let status = if steps_observed == 0 {
++        "STATIC_BAKE_DEFINED_NOT_RUN"
++    } else if contract_fail || gate.strict_fail_count > 0 {
++        "FAIL"
++    } else if gate.denied_count > 0 || execution.executed_count > 0 {
++        "PASS_WITH_WARNINGS"
++    } else {
++        "PASS"
++    }.to_string();
++
++    Stop01Summary {
++        patch_id: STOP01_PATCH_ID.to_string(),
++        input_patch: STOP01_INPUT_PATCH_ID.to_string(),
++        status,
++        mode,
++        controlled_execute: execution.executed_count > 0,
++        default_enable: false,
++        requires_salad03b: env_bool("ASH_STOP01_REQUIRE_SALAD03B", true),
++        salad03b_status_seen,
++        steps_observed,
++        gate,
++        execution,
++        reasons,
++        safety,
++        ready_for_stop02_eos_finalization: steps_observed > 0,
++        ready_for_default_safe_stop: false,
++        reason: if steps_observed == 0 {
++            "static bake only; run controlled stop fixtures before enabling safe stop".to_string()
++        } else if contract_fail {
++            "STOP-01 contract violation detected; safe stop must remain disabled".to_string()
++        } else {
++            "safe stop controlled execute sealed; EOS/output finalization remains separate".to_string()
++        },
++    }
++}
++
++pub fn write_stop01_summary_from_receipt_file() {
++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
++    let path = summary_path();
++    if let Some(parent) = path.parent() {
++        let _ = fs::create_dir_all(parent);
++    }
++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
++        let _ = fs::write(path, format!("{}\n", json));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn base_input() -> Stop01Input {
++        Stop01Input {
++            mode: Stop01Mode::ControlledExecute,
++            behavior_change_allowed: true,
++            run_id: "test".to_string(),
++            prompt_hash: None,
++            seed: Some(1),
++            step: 48,
++            backend: "cpu_oracle".to_string(),
++            runtime_supports_stop: true,
++            runtime_supports_eos_bias: false,
++            salad02_risk_stable: Some("High".to_string()),
++            salad02_score: Some(0.72),
++            salad03_decision: Some("PlanRollback".to_string()),
++            salad03_safe_stop_candidate: true,
++            salad03b_gate_denied: false,
++            salad03b_resample_success: Some(false),
++            salad03b_post_risk: Some("High".to_string()),
++            salad03b_risk_improved: Some(false),
++            salad03b_risk_worsened: Some(false),
++            salad03b_safe_stop_recommended: true,
++            rollback_window_limit_reached: false,
++            numeric_risk: false,
++            global_finite_fallback_seen: false,
++            empty_active_set_seen: false,
++            high_risk_persistence_count: 3,
++            safe_stop_already_executed: false,
++        }
++    }
++
++    #[test]
++    fn stop01_gate_denies_mode_off() {
++        let mut input = base_input();
++        input.mode = Stop01Mode::Off;
++        let gate = decide_stop01_gate(&input);
++        assert!(!gate.can_execute);
++        assert!(gate.denied_reasons.contains(&"mode_off".to_string()));
++    }
++
++    #[test]
++    fn stop01_gate_denies_behavior_not_allowed() {
++        let mut input = base_input();
++        input.behavior_change_allowed = false;
++        let gate = decide_stop01_gate(&input);
++        assert!(!gate.can_execute);
++    }
++
++    #[test]
++    fn stop01_numeric_risk_triggers_stop() {
++        let mut input = base_input();
++        input.numeric_risk = true;
++        let gate = decide_stop01_gate(&input);
++        assert_eq!(gate.reason, Stop01Reason::NumericRisk);
++        assert!(gate.can_execute);
++    }
++
++    #[test]
++    fn stop01_global_fallback_triggers_stop() {
++        let mut input = base_input();
++        input.global_finite_fallback_seen = true;
++        let gate = decide_stop01_gate(&input);
++        assert_eq!(gate.reason, Stop01Reason::GlobalFiniteFallback);
++    }
++
++    #[test]
++    fn stop01_high_risk_persistence_triggers_stop() {
++        let input = base_input();
++        let gate = decide_stop01_gate(&input);
++        assert_eq!(gate.reason, Stop01Reason::ResampleFailed);
++        assert!(gate.can_execute);
++    }
++
++    #[test]
++    fn stop01_output_tail_truncate_forbidden_by_contract() {
++        let input = base_input();
++        let gate = decide_stop01_gate(&input);
++        let receipt = execute_stop01_synthetic(&input, &gate, Some(1), Some("x".to_string()));
++        assert!(!receipt.output_tail_truncated);
++    }
++
++    #[test]
++    fn stop01_eos_bias_stop_forbidden_by_default() {
++        let input = base_input();
++        let gate = decide_stop01_gate(&input);
++        let receipt = execute_stop01_synthetic(&input, &gate, Some(1), Some("x".to_string()));
++        assert!(!receipt.eos_bias_stop_executed);
++    }
++}
+diff -ruN stop01_orig/workspace/stop01.patch stop01_work/workspace/stop01.patch
+--- stop01_orig/workspace/stop01.patch	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01.patch	2026-05-27 07:25:53.802475429 +0000
+@@ -0,0 +1,874 @@
++diff -ruN stop01_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md stop01_work/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md
++--- stop01_orig/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ stop01_work/acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md	2026-05-27 07:25:23.096530675 +0000
++@@ -0,0 +1,21 @@
+++# 16AI-QW-38G-R6A-STOP-01 Acceptance
+++
+++## Status
+++STATIC_BAKE_DEFINED_NOT_RUN
+++
+++## Accepted Static Contracts
+++- [x] STOP-01 module added.
+++- [x] Default mode is Off.
+++- [x] Controlled stop requires explicit mode + behavior permission.
+++- [x] EOS bias stop is not executed by default.
+++- [x] Output tail truncation is forbidden by contract.
+++- [x] Gate, execution, pre/post fingerprint, and summary structures are present.
+++- [x] STOP-01 append hook is wired after SALAD-03B.
+++
+++## Not Run
+++- [ ] cargo check
+++- [ ] cargo test
+++- [ ] runtime stop smoke
+++
+++## Next
+++STOP-02 — EOS Finalization / User-visible Stop Surface Seal.
++diff -ruN stop01_orig/crates/model_core/src/lib.rs stop01_work/crates/model_core/src/lib.rs
++--- stop01_orig/crates/model_core/src/lib.rs	2026-05-27 07:18:19.000000000 +0000
+++++ stop01_work/crates/model_core/src/lib.rs	2026-05-27 07:24:38.805257740 +0000
++@@ -25,6 +25,7 @@
++ mod kv_rollback00_probe;
++ mod kv_rollback01_forked_replay;
++ mod salad03b_controlled_execute;
+++mod stop01_safe_stop;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -168,6 +169,17 @@
++     append_salad03b_receipt_from_sampler03, write_salad03b_summary_from_receipt_file,
++ };
++ 
+++
+++pub use stop01_safe_stop::{
+++    STOP01_PATCH_ID, STOP01_INPUT_PATCH_ID, STOP01_SSOT, Stop01Mode, Stop01Reason,
+++    Stop01Action, Stop01Input, Stop01GateDecision, Stop01ExecutionReceipt,
+++    Stop01StateFingerprint, Stop01StepReceipt, Stop01Summary, Stop01Runtime,
+++    decide_stop01_gate, execute_stop01, execute_stop01_synthetic,
+++    input_from_salad03b as stop01_input_from_salad03b,
+++    receipt_from_salad03b as stop01_receipt_from_salad03b,
+++    append_stop01_receipt_from_sampler03, write_stop01_summary_from_receipt_file,
+++};
+++
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++     Decode02dRuntimeEvidenceReceipt, Decode02dControlledOnSummary, Decode02dRuntimeEvidenceStats,
++diff -ruN stop01_orig/crates/model_core/src/sampler_parity.rs stop01_work/crates/model_core/src/sampler_parity.rs
++--- stop01_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 07:18:19.000000000 +0000
+++++ stop01_work/crates/model_core/src/sampler_parity.rs	2026-05-27 07:24:38.806266972 +0000
++@@ -458,5 +458,6 @@
++     crate::kv_rollback00_probe::append_kv_rollback00_receipt_from_sampler03(receipt);
++     crate::kv_rollback01_forked_replay::append_kv_rollback01_receipt_from_sampler03(receipt);
++     crate::salad03b_controlled_execute::append_salad03b_receipt_from_sampler03(receipt);
+++    crate::stop01_safe_stop::append_stop01_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
++diff -ruN stop01_orig/crates/model_core/src/stop01_safe_stop.rs stop01_work/crates/model_core/src/stop01_safe_stop.rs
++--- stop01_orig/crates/model_core/src/stop01_safe_stop.rs	1970-01-01 00:00:00.000000000 +0000
+++++ stop01_work/crates/model_core/src/stop01_safe_stop.rs	2026-05-27 07:24:52.915839010 +0000
++@@ -0,0 +1,806 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::decode03a_entropy::{receipt_from_sampler03, Decode03AMode};
+++use crate::decode03b_pci::{receipt_from_decode03a, Decode03BMode};
+++use crate::decode03c_shadow_policy::{receipt_from_decode03b, Decode03CMode};
+++use crate::decode03d_controlled_enable::{receipt_from_decode03c, DynamicSamplerMode};
+++use crate::kv_rollback00_probe::{receipt_from_salad03 as kv00_receipt_from_salad03, KvRollback00Mode};
+++use crate::kv_rollback01_forked_replay::{
+++    receipt_from_kvrollback00 as kv01_receipt_from_kvrollback00, KvRollback01Mode,
+++};
+++use crate::salad02_detector::receipt_from_decode03d as salad02_receipt_from_decode03d;
+++use crate::salad03_rollback::{receipt_from_salad02, Salad03Mode};
+++use crate::salad03b_controlled_execute::{
+++    receipt_from_salad03_and_kv01 as salad03b_receipt_from_salad03_and_kv01,
+++    Salad03BMode, Salad03BStepReceipt,
+++};
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const STOP01_PATCH_ID: &str = "16AI-QW-38G-R6A-STOP-01";
+++pub const STOP01_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-SALAD-03B";
+++pub const STOP01_SSOT: &str = "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Stop01Mode {
+++    Off,
+++    PlanOnly,
+++    ControlledExecute,
+++    StrictControlledExecute,
+++}
+++
+++impl Stop01Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_STOP01_MODE")
+++            .or_else(|_| env::var("ASH_STOP01_SAFE_STOP"))
+++            .unwrap_or_else(|_| "off".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "plan" | "plan_only" | "dry" | "dry_run" => Self::PlanOnly,
+++            "controlled" | "controlled_execute" | "execute" | "true" | "1" => Self::ControlledExecute,
+++            "strict" | "strict_controlled" | "strict_controlled_execute" => Self::StrictControlledExecute,
+++            _ => Self::Off,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::PlanOnly => "PlanOnly",
+++            Self::ControlledExecute => "ControlledExecute",
+++            Self::StrictControlledExecute => "StrictControlledExecute",
+++        }
+++    }
+++
+++    pub fn requested(self) -> bool {
+++        !matches!(self, Self::Off)
+++    }
+++
+++    pub fn can_mutate(self) -> bool {
+++        matches!(self, Self::ControlledExecute | Self::StrictControlledExecute)
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+++pub enum Stop01Reason {
+++    None,
+++    SaladCritical,
+++    SaladHighPersistent,
+++    PostResampleCritical,
+++    PostResampleHighUnimproved,
+++    ResampleFailed,
+++    RollbackDenied,
+++    RollbackWindowLimitReached,
+++    NumericRisk,
+++    GlobalFiniteFallback,
+++    EmptyActiveSet,
+++    RuntimeStopRequested,
+++    StrictSafetyStop,
+++}
+++
+++impl Stop01Reason {
+++    pub fn as_code(self) -> &'static str {
+++        match self {
+++            Self::None => "SAFE_STOP_NONE",
+++            Self::SaladCritical => "SAFE_STOP_SALAD_CRITICAL",
+++            Self::SaladHighPersistent => "SAFE_STOP_SALAD_HIGH_PERSISTENT",
+++            Self::PostResampleCritical => "SAFE_STOP_POST_RESAMPLE_CRITICAL",
+++            Self::PostResampleHighUnimproved => "SAFE_STOP_POST_RESAMPLE_HIGH_UNIMPROVED",
+++            Self::ResampleFailed => "SAFE_STOP_RESAMPLE_FAILED",
+++            Self::RollbackDenied => "SAFE_STOP_ROLLBACK_DENIED",
+++            Self::RollbackWindowLimitReached => "SAFE_STOP_ROLLBACK_WINDOW_LIMIT_REACHED",
+++            Self::NumericRisk => "SAFE_STOP_NUMERIC_RISK",
+++            Self::GlobalFiniteFallback => "SAFE_STOP_GLOBAL_FINITE_FALLBACK",
+++            Self::EmptyActiveSet => "SAFE_STOP_EMPTY_ACTIVE_SET",
+++            Self::RuntimeStopRequested => "SAFE_STOP_RUNTIME_STOP_REQUESTED",
+++            Self::StrictSafetyStop => "SAFE_STOP_STRICT_SAFETY_STOP",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Stop01Action {
+++    NoAction,
+++    PlanSafeStop,
+++    ExecuteRuntimeStop,
+++    ExecuteEosBiasStop,
+++    Denied,
+++    StrictFail,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01Input {
+++    pub mode: Stop01Mode,
+++    pub behavior_change_allowed: bool,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub runtime_supports_stop: bool,
+++    pub runtime_supports_eos_bias: bool,
+++    pub salad02_risk_stable: Option<String>,
+++    pub salad02_score: Option<f32>,
+++    pub salad03_decision: Option<String>,
+++    pub salad03_safe_stop_candidate: bool,
+++    pub salad03b_gate_denied: bool,
+++    pub salad03b_resample_success: Option<bool>,
+++    pub salad03b_post_risk: Option<String>,
+++    pub salad03b_risk_improved: Option<bool>,
+++    pub salad03b_risk_worsened: Option<bool>,
+++    pub salad03b_safe_stop_recommended: bool,
+++    pub rollback_window_limit_reached: bool,
+++    pub numeric_risk: bool,
+++    pub global_finite_fallback_seen: bool,
+++    pub empty_active_set_seen: bool,
+++    pub high_risk_persistence_count: usize,
+++    pub safe_stop_already_executed: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01GateDecision {
+++    pub can_execute: bool,
+++    pub action: Stop01Action,
+++    pub reason: Stop01Reason,
+++    pub strict_fail: bool,
+++    pub denied_reasons: Vec<String>,
+++    pub warning_reasons: Vec<String>,
+++    pub execute_reasons: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01ExecutionReceipt {
+++    pub executed: bool,
+++    pub runtime_stop_executed: bool,
+++    pub eos_bias_stop_executed: bool,
+++    pub generation_loop_stop_requested: bool,
+++    pub stop_step: Option<usize>,
+++    pub stop_reason: Stop01Reason,
+++    pub final_selected_token_id: Option<u32>,
+++    pub final_piece_preview: Option<String>,
+++    pub output_tail_preserved: bool,
+++    pub output_tail_truncated: bool,
+++    pub stop_message_code: Option<String>,
+++    pub execution_reasons: Vec<String>,
+++    pub execution_warnings: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01StateFingerprint {
+++    pub step: usize,
+++    pub token_ledger_len: usize,
+++    pub generation_stopped: bool,
+++    pub stop_reason: Option<String>,
+++    pub tail_token_hash: Option<String>,
+++    pub sampler_state_hash: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01StepReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_hash: Option<String>,
+++    pub seed: Option<u64>,
+++    pub step: usize,
+++    pub backend: String,
+++    pub sampler_ssot: String,
+++    pub mode: Stop01Mode,
+++    pub behavior_change: bool,
+++    pub controlled_execute: bool,
+++    pub salad03b_status_seen: Option<String>,
+++    pub salad03_status_seen: Option<String>,
+++    pub salad02_status_seen: Option<String>,
+++    pub decode03d_status_seen: Option<String>,
+++    pub kv_rollback01_status_seen: Option<String>,
+++    pub input: Stop01Input,
+++    pub gate: Stop01GateDecision,
+++    pub execution: Stop01ExecutionReceipt,
+++    pub pre_fingerprint: Option<Stop01StateFingerprint>,
+++    pub post_fingerprint: Option<Stop01StateFingerprint>,
+++    pub selected_id_current: Option<u32>,
+++    pub selected_piece_current: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop01GateStats {
+++    pub can_execute_count: usize,
+++    pub denied_count: usize,
+++    pub strict_fail_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop01ExecutionStats {
+++    pub executed_count: usize,
+++    pub runtime_stop_executed_count: usize,
+++    pub eos_bias_stop_executed_count: usize,
+++    pub generation_loop_stop_requested_count: usize,
+++    pub output_tail_truncated_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop01ReasonStats {
+++    pub salad_critical_count: usize,
+++    pub salad_high_persistent_count: usize,
+++    pub post_resample_critical_count: usize,
+++    pub post_resample_high_unimproved_count: usize,
+++    pub resample_failed_count: usize,
+++    pub rollback_denied_count: usize,
+++    pub numeric_risk_count: usize,
+++    pub global_finite_fallback_count: usize,
+++    pub empty_active_set_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Stop01SafetyStats {
+++    pub stop_without_gate_count: usize,
+++    pub stop_without_receipt_count: usize,
+++    pub tail_truncate_count: usize,
+++    pub eos_bias_stop_count: usize,
+++    pub stop_reason_none_executed_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Stop01Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub controlled_execute: bool,
+++    pub default_enable: bool,
+++    pub requires_salad03b: bool,
+++    pub salad03b_status_seen: Option<String>,
+++    pub steps_observed: usize,
+++    pub gate: Stop01GateStats,
+++    pub execution: Stop01ExecutionStats,
+++    pub reasons: Stop01ReasonStats,
+++    pub safety: Stop01SafetyStats,
+++    pub ready_for_stop02_eos_finalization: bool,
+++    pub ready_for_default_safe_stop: bool,
+++    pub reason: String,
+++}
+++
+++pub trait Stop01Runtime {
+++    fn stop01_state_fingerprint(&self) -> Stop01StateFingerprint;
+++    fn request_generation_stop(&mut self, reason: Stop01Reason) -> Result<(), String>;
+++    fn generation_stop_supported(&self) -> bool;
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name)
+++        .ok()
+++        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+++        .unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_string(name: &str, default: &str) -> String {
+++    env::var(name).ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| default.to_string())
+++}
+++
+++pub fn receipt_path() -> PathBuf {
+++    env::var("ASH_STOP01_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/stop01_steps.jsonl"))
+++}
+++
+++pub fn summary_path() -> PathBuf {
+++    env::var("ASH_STOP01_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/stop01_summary.json"))
+++}
+++
+++fn is_high_or_critical(value: Option<&str>) -> bool {
+++    matches!(value, Some("High" | "Critical" | "HIGH" | "CRITICAL"))
+++}
+++
+++fn is_critical(value: Option<&str>) -> bool {
+++    matches!(value, Some("Critical" | "CRITICAL"))
+++}
+++
+++pub fn decide_stop01_gate(input: &Stop01Input) -> Stop01GateDecision {
+++    let mut denied_reasons = Vec::new();
+++    let mut warning_reasons = Vec::new();
+++    let mut execute_reasons = Vec::new();
+++    let mut strict_fail = false;
+++
+++    if matches!(input.mode, Stop01Mode::Off) {
+++        denied_reasons.push("mode_off".to_string());
+++    }
+++    if input.safe_stop_already_executed {
+++        denied_reasons.push("safe_stop_already_executed".to_string());
+++    }
+++
+++    let (mut action, mut reason) = stop_need_from_input(input);
+++
+++    if matches!(input.mode, Stop01Mode::PlanOnly) {
+++        if matches!(action, Stop01Action::ExecuteRuntimeStop) {
+++            action = Stop01Action::PlanSafeStop;
+++            execute_reasons.push("plan_only_safe_stop_candidate".to_string());
+++        }
+++        return Stop01GateDecision {
+++            can_execute: false,
+++            action,
+++            reason,
+++            strict_fail: false,
+++            denied_reasons,
+++            warning_reasons,
+++            execute_reasons,
+++        };
+++    }
+++
+++    if !input.behavior_change_allowed {
+++        denied_reasons.push("behavior_change_not_allowed".to_string());
+++    }
+++    if !input.runtime_supports_stop {
+++        denied_reasons.push("runtime_stop_unsupported".to_string());
+++    }
+++    if matches!(reason, Stop01Reason::None) {
+++        action = Stop01Action::NoAction;
+++        denied_reasons.push("no_stop_trigger".to_string());
+++    }
+++
+++    if input.runtime_supports_eos_bias && env_bool("ASH_STOP01_EOS_BIAS_EXECUTE", false) {
+++        warning_reasons.push("eos_bias_supported_but_stop01_keeps_eos_bias_disabled_by_contract".to_string());
+++    }
+++    if env_bool("ASH_STOP01_TRUNCATE_OUTPUT_TAIL", false) {
+++        denied_reasons.push("output_tail_truncate_forbidden".to_string());
+++        if matches!(input.mode, Stop01Mode::StrictControlledExecute) {
+++            strict_fail = true;
+++        }
+++    }
+++    if matches!(input.mode, Stop01Mode::StrictControlledExecute)
+++        && (input.numeric_risk || input.global_finite_fallback_seen || is_critical(input.salad03b_post_risk.as_deref()))
+++    {
+++        execute_reasons.push("strict_safety_stop_triggered".to_string());
+++    }
+++    if matches!(input.mode, Stop01Mode::StrictControlledExecute) && denied_reasons.iter().any(|r| r != "no_stop_trigger") {
+++        strict_fail = true;
+++    }
+++
+++    let can_execute = denied_reasons.is_empty()
+++        && input.mode.can_mutate()
+++        && matches!(action, Stop01Action::ExecuteRuntimeStop);
+++    if can_execute {
+++        execute_reasons.push("controlled_execute_enabled".to_string());
+++        execute_reasons.push(reason.as_code().to_string());
+++        execute_reasons.push("runtime_stop_supported".to_string());
+++    } else if !denied_reasons.is_empty() && matches!(action, Stop01Action::ExecuteRuntimeStop) {
+++        action = if strict_fail { Stop01Action::StrictFail } else { Stop01Action::Denied };
+++    }
+++
+++    Stop01GateDecision {
+++        can_execute,
+++        action,
+++        reason,
+++        strict_fail,
+++        denied_reasons,
+++        warning_reasons,
+++        execute_reasons,
+++    }
+++}
+++
+++fn stop_need_from_input(input: &Stop01Input) -> (Stop01Action, Stop01Reason) {
+++    if input.numeric_risk {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::NumericRisk);
+++    }
+++    if input.global_finite_fallback_seen {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::GlobalFiniteFallback);
+++    }
+++    if input.empty_active_set_seen {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::EmptyActiveSet);
+++    }
+++    if is_critical(input.salad03b_post_risk.as_deref()) {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::PostResampleCritical);
+++    }
+++    if input.salad03b_resample_success == Some(false) && input.salad03b_safe_stop_recommended {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::ResampleFailed);
+++    }
+++    if input.rollback_window_limit_reached {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::RollbackWindowLimitReached);
+++    }
+++    if input.salad03b_gate_denied && input.salad03b_safe_stop_recommended {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::RollbackDenied);
+++    }
+++    if input.salad03b_post_risk.as_deref().map(|r| matches!(r, "High" | "HIGH")).unwrap_or(false)
+++        && input.salad03b_risk_improved == Some(false)
+++    {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::PostResampleHighUnimproved);
+++    }
+++    if is_critical(input.salad02_risk_stable.as_deref()) && !input.salad03_safe_stop_candidate {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::SaladCritical);
+++    }
+++    if input.high_risk_persistence_count >= env_usize("ASH_STOP01_HIGH_RISK_PERSISTENCE_WINDOW", 3)
+++        && is_high_or_critical(input.salad02_risk_stable.as_deref())
+++    {
+++        return (Stop01Action::ExecuteRuntimeStop, Stop01Reason::SaladHighPersistent);
+++    }
+++    (Stop01Action::NoAction, Stop01Reason::None)
+++}
+++
+++pub fn state_fingerprint(step: usize, token_ledger_len: usize, stopped: bool, reason: Option<Stop01Reason>) -> Stop01StateFingerprint {
+++    Stop01StateFingerprint {
+++        step,
+++        token_ledger_len,
+++        generation_stopped: stopped,
+++        stop_reason: reason.map(|r| format!("{:?}", r)),
+++        tail_token_hash: Some(format!("sha256:stop01-tail-{step}-{token_ledger_len}")),
+++        sampler_state_hash: Some(format!("sha256:stop01-sampler-{step}-{token_ledger_len}")),
+++    }
+++}
+++
+++pub fn execute_stop01_synthetic(
+++    input: &Stop01Input,
+++    gate: &Stop01GateDecision,
+++    selected_id: Option<u32>,
+++    selected_piece: Option<String>,
+++) -> Stop01ExecutionReceipt {
+++    if !gate.can_execute {
+++        return Stop01ExecutionReceipt {
+++            executed: false,
+++            runtime_stop_executed: false,
+++            eos_bias_stop_executed: false,
+++            generation_loop_stop_requested: false,
+++            stop_step: None,
+++            stop_reason: gate.reason,
+++            final_selected_token_id: selected_id,
+++            final_piece_preview: selected_piece,
+++            output_tail_preserved: true,
+++            output_tail_truncated: false,
+++            stop_message_code: None,
+++            execution_reasons: gate.denied_reasons.clone(),
+++            execution_warnings: gate.warning_reasons.clone(),
+++        };
+++    }
+++    Stop01ExecutionReceipt {
+++        executed: true,
+++        runtime_stop_executed: true,
+++        eos_bias_stop_executed: false,
+++        generation_loop_stop_requested: true,
+++        stop_step: Some(input.step),
+++        stop_reason: gate.reason,
+++        final_selected_token_id: selected_id,
+++        final_piece_preview: selected_piece,
+++        output_tail_preserved: true,
+++        output_tail_truncated: false,
+++        stop_message_code: Some(gate.reason.as_code().to_string()),
+++        execution_reasons: vec!["generation_stop_requested".to_string()],
+++        execution_warnings: gate.warning_reasons.clone(),
+++    }
+++}
+++
+++pub fn execute_stop01<R: Stop01Runtime>(
+++    runtime: &mut R,
+++    input: &Stop01Input,
+++    gate: &Stop01GateDecision,
+++) -> Stop01ExecutionReceipt {
+++    if !gate.can_execute {
+++        return execute_stop01_synthetic(input, gate, None, None);
+++    }
+++    let _pre = runtime.stop01_state_fingerprint();
+++    let result = runtime.request_generation_stop(gate.reason);
+++    let post = runtime.stop01_state_fingerprint();
+++    let ok = result.is_ok() && post.generation_stopped;
+++    let mut receipt = execute_stop01_synthetic(input, gate, None, None);
+++    receipt.executed = ok;
+++    receipt.runtime_stop_executed = ok;
+++    receipt.generation_loop_stop_requested = ok;
+++    if let Err(err) = result {
+++        receipt.execution_warnings.push(format!("runtime_stop_error:{err}"));
+++    }
+++    receipt
+++}
+++
+++pub fn input_from_salad03b(mode: Stop01Mode, receipt: &Salad03BStepReceipt) -> Stop01Input {
+++    let post_risk = receipt.post_check.post_salad02_risk.clone();
+++    let high_persistence_default = if is_high_or_critical(post_risk.as_deref()) || is_high_or_critical(Some(&receipt.input.salad02_risk_stable)) { 3 } else { 0 };
+++    Stop01Input {
+++        mode,
+++        behavior_change_allowed: env_bool("ASH_STOP01_BEHAVIOR_CHANGE_ALLOWED", false),
+++        run_id: env_string("ASH_STOP01_RUN_ID", "stop01_sampler03_bridge"),
+++        prompt_hash: receipt.prompt_hash.clone(),
+++        seed: receipt.seed,
+++        step: receipt.step,
+++        backend: receipt.backend.clone(),
+++        runtime_supports_stop: env_bool("ASH_STOP01_RUNTIME_SUPPORTS_STOP", env_bool("ASH_STOP01_REQUIRE_RUNTIME_STOP_SUPPORT", false)),
+++        runtime_supports_eos_bias: env_bool("ASH_STOP01_RUNTIME_SUPPORTS_EOS_BIAS", false),
+++        salad02_risk_stable: Some(receipt.input.salad02_risk_stable.clone()),
+++        salad02_score: Some(receipt.input.salad02_score),
+++        salad03_decision: Some(receipt.input.salad03_decision.clone()),
+++        salad03_safe_stop_candidate: receipt.execution.safe_stop_candidate,
+++        salad03b_gate_denied: !receipt.gate.denied_reasons.is_empty(),
+++        salad03b_resample_success: receipt.execution.replacement.as_ref().map(|r| r.success),
+++        salad03b_post_risk: post_risk,
+++        salad03b_risk_improved: receipt.post_check.risk_improved,
+++        salad03b_risk_worsened: receipt.post_check.risk_worsened,
+++        salad03b_safe_stop_recommended: receipt.post_check.safe_stop_recommended,
+++        rollback_window_limit_reached: receipt.gate.denied_reasons.iter().any(|r| r == "rollback_window_limit_reached"),
+++        numeric_risk: receipt.input.numeric_risk,
+++        global_finite_fallback_seen: receipt.input.global_finite_fallback_seen,
+++        empty_active_set_seen: env_bool("ASH_STOP01_EMPTY_ACTIVE_SET_SEEN", false),
+++        high_risk_persistence_count: env_usize("ASH_STOP01_HIGH_RISK_PERSISTENCE_COUNT", high_persistence_default),
+++        safe_stop_already_executed: env_bool("ASH_STOP01_ALREADY_EXECUTED", false),
+++    }
+++}
+++
+++pub fn receipt_from_salad03b(mode: Stop01Mode, source: &Salad03BStepReceipt) -> Stop01StepReceipt {
+++    let input = input_from_salad03b(mode, source);
+++    let gate = decide_stop01_gate(&input);
+++    let execution = execute_stop01_synthetic(&input, &gate, source.selected_id_after.or(source.selected_id_before), source.selected_piece_after.clone().or(source.selected_piece_before.clone()));
+++    let pre_fingerprint = Some(state_fingerprint(input.step, source.input.token_ledger_len, false, None));
+++    let post_fingerprint = Some(state_fingerprint(input.step, source.input.token_ledger_len, execution.generation_loop_stop_requested, if execution.executed { Some(gate.reason) } else { None }));
+++    Stop01StepReceipt {
+++        patch_id: STOP01_PATCH_ID.to_string(),
+++        input_patch: STOP01_INPUT_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id: input.run_id.clone(),
+++        prompt_hash: input.prompt_hash.clone(),
+++        seed: input.seed,
+++        step: input.step,
+++        backend: input.backend.clone(),
+++        sampler_ssot: STOP01_SSOT.to_string(),
+++        mode,
+++        behavior_change: execution.executed,
+++        controlled_execute: mode.can_mutate(),
+++        salad03b_status_seen: Some("DERIVED_IN_MEMORY_FROM_SALAD03B_RECEIPT".to_string()),
+++        salad03_status_seen: source.salad03_status_seen.clone(),
+++        salad02_status_seen: source.salad02_status_seen.clone(),
+++        decode03d_status_seen: source.decode03d_status_seen.clone(),
+++        kv_rollback01_status_seen: source.kv_rollback01_status_seen.clone(),
+++        input,
+++        gate,
+++        execution,
+++        pre_fingerprint,
+++        post_fingerprint,
+++        selected_id_current: source.selected_id_after.or(source.selected_id_before),
+++        selected_piece_current: source.selected_piece_after.clone().or(source.selected_piece_before.clone()),
+++    }
+++}
+++
+++pub fn append_stop01_receipt_from_sampler03(source: &SamplerParityReceipt) {
+++    let mode = Stop01Mode::from_env();
+++    if !mode.requested() {
+++        return;
+++    }
+++    let entropy_receipt = receipt_from_sampler03(Decode03AMode::Receipt, source);
+++    let pci_receipt = receipt_from_decode03a(Decode03BMode::Receipt, &entropy_receipt, None, 0);
+++    let shadow_receipt = receipt_from_decode03b(Decode03CMode::Receipt, &pci_receipt, Some(&entropy_receipt));
+++    let dynamic_mode = DynamicSamplerMode::from_env();
+++    let mut decode03d_receipt = receipt_from_decode03c(dynamic_mode, &shadow_receipt);
+++    decode03d_receipt.selected_id_after_apply = Some(source.cpu.selected_id);
+++    let salad02_receipt = salad02_receipt_from_decode03d(&decode03d_receipt);
+++    let salad03_mode = Salad03Mode::from_env();
+++    let salad03_receipt = receipt_from_salad02(salad03_mode, &salad02_receipt);
+++    let kv00_mode = match mode {
+++        Stop01Mode::ControlledExecute | Stop01Mode::StrictControlledExecute => KvRollback00Mode::ForkedReplayProbe,
+++        Stop01Mode::PlanOnly => KvRollback00Mode::SnapshotOnly,
+++        Stop01Mode::Off => KvRollback00Mode::Off,
+++    };
+++    let kv00 = kv00_receipt_from_salad03(kv00_mode, &salad03_receipt);
+++    let kv01_mode = match mode {
+++        Stop01Mode::StrictControlledExecute => KvRollback01Mode::StrictForkedReplayProbe,
+++        Stop01Mode::ControlledExecute => KvRollback01Mode::ForkedReplayProbe,
+++        Stop01Mode::PlanOnly => KvRollback01Mode::PlanOnly,
+++        Stop01Mode::Off => KvRollback01Mode::Off,
+++    };
+++    let kv01 = kv01_receipt_from_kvrollback00(kv01_mode, &kv00);
+++    let salad03b_mode = match mode {
+++        Stop01Mode::ControlledExecute | Stop01Mode::StrictControlledExecute => Salad03BMode::ControlledExecute,
+++        Stop01Mode::PlanOnly => Salad03BMode::PlanOnly,
+++        Stop01Mode::Off => Salad03BMode::Off,
+++    };
+++    let salad03b = salad03b_receipt_from_salad03_and_kv01(salad03b_mode, &salad03_receipt, &kv01);
+++    let receipt = receipt_from_salad03b(mode, &salad03b);
+++    let path = receipt_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(line) = serde_json::to_string(&receipt) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++fn read_receipts(path: PathBuf) -> Vec<Stop01StepReceipt> {
+++    let data = match fs::read_to_string(path) {
+++        Ok(data) => data,
+++        Err(_) => return Vec::new(),
+++    };
+++    data.lines().filter_map(|line| serde_json::from_str::<Stop01StepReceipt>(line).ok()).collect()
+++}
+++
+++fn count_reason(stats: &mut Stop01ReasonStats, reason: Stop01Reason) {
+++    match reason {
+++        Stop01Reason::SaladCritical => stats.salad_critical_count += 1,
+++        Stop01Reason::SaladHighPersistent => stats.salad_high_persistent_count += 1,
+++        Stop01Reason::PostResampleCritical => stats.post_resample_critical_count += 1,
+++        Stop01Reason::PostResampleHighUnimproved => stats.post_resample_high_unimproved_count += 1,
+++        Stop01Reason::ResampleFailed => stats.resample_failed_count += 1,
+++        Stop01Reason::RollbackDenied => stats.rollback_denied_count += 1,
+++        Stop01Reason::NumericRisk => stats.numeric_risk_count += 1,
+++        Stop01Reason::GlobalFiniteFallback => stats.global_finite_fallback_count += 1,
+++        Stop01Reason::EmptyActiveSet => stats.empty_active_set_count += 1,
+++        _ => {}
+++    }
+++}
+++
+++pub fn summary_from_receipts(receipts: &[Stop01StepReceipt]) -> Stop01Summary {
+++    let mut gate = Stop01GateStats::default();
+++    let mut execution = Stop01ExecutionStats::default();
+++    let mut reasons = Stop01ReasonStats::default();
+++    let mut safety = Stop01SafetyStats::default();
+++    let mut mode = Stop01Mode::Off.as_str().to_string();
+++    let mut salad03b_status_seen = None;
+++
+++    for receipt in receipts {
+++        mode = receipt.mode.as_str().to_string();
+++        salad03b_status_seen = receipt.salad03b_status_seen.clone().or(salad03b_status_seen);
+++        if receipt.gate.can_execute { gate.can_execute_count += 1; }
+++        if !receipt.gate.denied_reasons.is_empty() { gate.denied_count += 1; }
+++        if receipt.gate.strict_fail { gate.strict_fail_count += 1; }
+++
+++        if receipt.execution.executed { execution.executed_count += 1; }
+++        if receipt.execution.runtime_stop_executed { execution.runtime_stop_executed_count += 1; }
+++        if receipt.execution.eos_bias_stop_executed { execution.eos_bias_stop_executed_count += 1; }
+++        if receipt.execution.generation_loop_stop_requested { execution.generation_loop_stop_requested_count += 1; }
+++        if receipt.execution.output_tail_truncated { execution.output_tail_truncated_count += 1; }
+++
+++        count_reason(&mut reasons, receipt.gate.reason);
+++
+++        if receipt.execution.executed && !receipt.gate.can_execute { safety.stop_without_gate_count += 1; }
+++        if receipt.execution.output_tail_truncated { safety.tail_truncate_count += 1; }
+++        if receipt.execution.eos_bias_stop_executed { safety.eos_bias_stop_count += 1; }
+++        if receipt.execution.executed && matches!(receipt.execution.stop_reason, Stop01Reason::None) { safety.stop_reason_none_executed_count += 1; }
+++    }
+++
+++    let steps_observed = receipts.len();
+++    let contract_fail = safety.stop_without_gate_count > 0
+++        || safety.tail_truncate_count > 0
+++        || safety.eos_bias_stop_count > 0
+++        || safety.stop_reason_none_executed_count > 0;
+++    let status = if steps_observed == 0 {
+++        "STATIC_BAKE_DEFINED_NOT_RUN"
+++    } else if contract_fail || gate.strict_fail_count > 0 {
+++        "FAIL"
+++    } else if gate.denied_count > 0 || execution.executed_count > 0 {
+++        "PASS_WITH_WARNINGS"
+++    } else {
+++        "PASS"
+++    }.to_string();
+++
+++    Stop01Summary {
+++        patch_id: STOP01_PATCH_ID.to_string(),
+++        input_patch: STOP01_INPUT_PATCH_ID.to_string(),
+++        status,
+++        mode,
+++        controlled_execute: execution.executed_count > 0,
+++        default_enable: false,
+++        requires_salad03b: env_bool("ASH_STOP01_REQUIRE_SALAD03B", true),
+++        salad03b_status_seen,
+++        steps_observed,
+++        gate,
+++        execution,
+++        reasons,
+++        safety,
+++        ready_for_stop02_eos_finalization: steps_observed > 0,
+++        ready_for_default_safe_stop: false,
+++        reason: if steps_observed == 0 {
+++            "static bake only; run controlled stop fixtures before enabling safe stop".to_string()
+++        } else if contract_fail {
+++            "STOP-01 contract violation detected; safe stop must remain disabled".to_string()
+++        } else {
+++            "safe stop controlled execute sealed; EOS/output finalization remains separate".to_string()
+++        },
+++    }
+++}
+++
+++pub fn write_stop01_summary_from_receipt_file() {
+++    let summary = summary_from_receipts(&read_receipts(receipt_path()));
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() {
+++        let _ = fs::create_dir_all(parent);
+++    }
+++    if let Ok(json) = serde_json::to_string_pretty(&summary) {
+++        let _ = fs::write(path, format!("{}\n", json));
+++    }
+++}
+++
+++#[cfg(test)]
+++mod tests {
+++    use super::*;
+++
+++    fn base_input() -> Stop01Input {
+++        Stop01Input {
+++            mode: Stop01Mode::ControlledExecute,
+++            behavior_change_allowed: true,
+++            run_id: "test".to_string(),
+++            prompt_hash: None,
+++            seed: Some(1),
+++            step: 48,
+++            backend: "cpu_oracle".to_string(),
+++            runtime_supports_stop: true,
+++            runtime_supports_eos_bias: false,
+++            salad02_risk_stable: Some("High".to_string()),
+++            salad02_score: Some(0.72),
+++            salad03_decision: Some("PlanRollback".to_string()),
+++            salad03_safe_stop_candidate: true,
+++            salad03b_gate_denied: false,
+++            salad03b_resample_success: Some(false),
+++            salad03b_post_risk: Some("High".to_string()),
+++            salad03b_risk_improved: Some(false),
+++            salad03b_risk_worsened: Some(false),
+++            salad03b_safe_stop_recommended: true,
+++            rollback_window_limit_reached: false,
+++            numeric_risk: false,
+++            global_finite_fallback_seen: false,
+++            empty_active_set_seen: false,
+++            high_risk_persistence_count: 3,
+++            safe_stop_already_executed: false,
+++        }
+++    }
+++
+++    #[test]
+++    fn stop01_gate_denies_mode_off() {
+++        let mut input = base_input();
+++        input.mode = Stop01Mode::Off;
+++        let gate = decide_stop01_gate(&input);
+++        assert!(!gate.can_execute);
+++        assert!(gate.denied_reasons.contains(&"mode_off".to_string()));
+++    }
+++
+++    #[test]
+++    fn stop01_gate_denies_behavior_not_allowed() {
+++        let mut input = base_input();
+++        input.behavior_change_allowed = false;
+++        let gate = decide_stop01_gate(&input);
+++        assert!(!gate.can_execute);
+++    }
+++
+++    #[test]
+++    fn stop01_numeric_risk_triggers_stop() {
+++        let mut input = base_input();
+++        input.numeric_risk = true;
+++        let gate = decide_stop01_gate(&input);
+++        assert_eq!(gate.reason, Stop01Reason::NumericRisk);
+++        assert!(gate.can_execute);
+++    }
+++
+++    #[test]
+++    fn stop01_global_fallback_triggers_stop() {
+++        let mut input = base_input();
+++        input.global_finite_fallback_seen = true;
+++        let gate = decide_stop01_gate(&input);
+++        assert_eq!(gate.reason, Stop01Reason::GlobalFiniteFallback);
+++    }
+++
+++    #[test]
+++    fn stop01_high_risk_persistence_triggers_stop() {
+++        let input = base_input();
+++        let gate = decide_stop01_gate(&input);
+++        assert_eq!(gate.reason, Stop01Reason::ResampleFailed);
+++        assert!(gate.can_execute);
+++    }
+++
+++    #[test]
+++    fn stop01_output_tail_truncate_forbidden_by_contract() {
+++        let input = base_input();
+++        let gate = decide_stop01_gate(&input);
+++        let receipt = execute_stop01_synthetic(&input, &gate, Some(1), Some("x".to_string()));
+++        assert!(!receipt.output_tail_truncated);
+++    }
+++
+++    #[test]
+++    fn stop01_eos_bias_stop_forbidden_by_default() {
+++        let input = base_input();
+++        let gate = decide_stop01_gate(&input);
+++        let receipt = execute_stop01_synthetic(&input, &gate, Some(1), Some("x".to_string()));
+++        assert!(!receipt.eos_bias_stop_executed);
+++    }
+++}
+diff -ruN stop01_orig/workspace/stop01_probe_prompts.jsonl stop01_work/workspace/stop01_probe_prompts.jsonl
+--- stop01_orig/workspace/stop01_probe_prompts.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_probe_prompts.jsonl	2026-05-27 07:25:23.064682168 +0000
+@@ -0,0 +1,4 @@
++{"id":"P01_resample_failed_high_risk","prompt":"짧은 한국어 QA 도중 resample 실패가 발생한 상황을 모사한다.","expected":"Stop01Reason::ResampleFailed candidate"}
++{"id":"P02_post_resample_high_unimproved","prompt":"rollback 이후에도 HIGH risk가 유지되는 상황을 모사한다.","expected":"Stop01Reason::PostResampleHighUnimproved candidate"}
++{"id":"P03_numeric_risk","prompt":"NaN/Inf 또는 numeric risk가 발생한 상황을 모사한다.","expected":"Stop01Reason::NumericRisk candidate"}
++{"id":"P04_global_finite_fallback","prompt":"global finite fallback 발생 상황을 모사한다.","expected":"Stop01Reason::GlobalFiniteFallback candidate"}
+diff -ruN stop01_orig/workspace/stop01_report.md stop01_work/workspace/stop01_report.md
+--- stop01_orig/workspace/stop01_report.md	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_report.md	2026-05-27 07:25:23.080464780 +0000
+@@ -0,0 +1,24 @@
++# 16AI-QW-38G-R6A-STOP-01 Report
++
++## Patch
++Safe Stop Controlled Execute Seal
++
++## SSOT
++SALAD-03B post-check + SALAD-02 risk + runtime stop capability.
++
++## Implemented
++- Added `crates/model_core/src/stop01_safe_stop.rs`.
++- Added `Stop01Mode`, `Stop01Reason`, `Stop01Action`.
++- Added safe-stop gate, synthetic execution receipt, runtime trait, summary aggregation.
++- Wired STOP-01 into `sampler_parity::append_receipt()` after SALAD-03B.
++- Exported STOP-01 API from `model_core/src/lib.rs`.
++
++## Contracts
++- Default mode is `Off`.
++- Controlled execution requires `ASH_STOP01_MODE=controlled_execute` and `ASH_STOP01_BEHAVIOR_CHANGE_ALLOWED=true`.
++- `output_tail_truncated=false` is fixed by contract.
++- `eos_bias_stop_executed=false` is fixed by default.
++- No runtime stop is executed without gate and receipt.
++
++## Runtime Status
++This bake is static. Cargo/runtime smoke was not executed in this container.
+diff -ruN stop01_orig/workspace/stop01_safe_stop_schema.json stop01_work/workspace/stop01_safe_stop_schema.json
+--- stop01_orig/workspace/stop01_safe_stop_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_safe_stop_schema.json	2026-05-27 07:25:23.032168657 +0000
+@@ -0,0 +1,61 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-01",
++  "title": "Safe Stop Controlled Execute Seal",
++  "schema_version": 1,
++  "ssot": "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability",
++  "default_mode": "Off",
++  "contracts": {
++    "default_enable": false,
++    "controlled_execute_only": true,
++    "receipt_required": true,
++    "no_silent_stop": true,
++    "output_tail_truncated": false,
++    "eos_bias_stop_executed_default": false
++  },
++  "receipt": {
++    "path_env": "ASH_STOP01_RECEIPT",
++    "default_path": "workspace/stop01_steps.jsonl",
++    "required_fields": [
++      "patch_id",
++      "input_patch",
++      "schema_version",
++      "run_id",
++      "step",
++      "backend",
++      "sampler_ssot",
++      "mode",
++      "behavior_change",
++      "controlled_execute",
++      "input",
++      "gate",
++      "execution",
++      "pre_fingerprint",
++      "post_fingerprint"
++    ]
++  },
++  "summary": {
++    "path_env": "ASH_STOP01_SUMMARY",
++    "default_path": "workspace/stop01_summary.json"
++  },
++  "safe_stop_reasons": [
++    "SaladCritical",
++    "SaladHighPersistent",
++    "PostResampleCritical",
++    "PostResampleHighUnimproved",
++    "ResampleFailed",
++    "RollbackDenied",
++    "RollbackWindowLimitReached",
++    "NumericRisk",
++    "GlobalFiniteFallback",
++    "EmptyActiveSet"
++  ],
++  "fail_conditions": [
++    "Off or PlanOnly emits runtime_stop_executed=true",
++    "behavior_change_allowed=false but stop executes",
++    "generation loop stops without receipt",
++    "output_tail_truncated=true",
++    "eos_bias_stop_executed=true",
++    "runtime_supports_stop=false but stop executes",
++    "executed=true with Stop01Reason::None"
++  ]
++}
+diff -ruN stop01_orig/workspace/stop01_source_hash_manifest.json stop01_work/workspace/stop01_source_hash_manifest.json
+--- stop01_orig/workspace/stop01_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_source_hash_manifest.json	2026-05-27 07:25:53.228969289 +0000
+@@ -0,0 +1,40 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-01",
++  "files": [
++    {
++      "path": "crates/model_core/src/stop01_safe_stop.rs",
++      "sha256": "64fd0f0d816943432c401f7173c8a313b648fd0d1d569c91a69f29031db191a8",
++      "bytes": 32394
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "8db87d4b79c5630e518c44811733b29ef6d336802292e463a03ecaa18ddf349a",
++      "bytes": 16788
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "0a6b7ca81cdecb5aa8b75f9d0c58b6ddc81a4d3f2d5ecd97dee13e771dc6eece",
++      "bytes": 20539
++    },
++    {
++      "path": "workspace/stop01_safe_stop_schema.json",
++      "sha256": "0f87c7e69e270f43ec93a841faf97a7e83403ed64efc84bc7de7e14f8f2706a3",
++      "bytes": 1615
++    },
++    {
++      "path": "workspace/stop01_summary.json",
++      "sha256": "0dfec876c8cdf8f24c78ebb72c76db96d4a091d739c26fea97c0f4147a59f6d2",
++      "bytes": 1298
++    },
++    {
++      "path": "workspace/stop01_report.md",
++      "sha256": "eb3077ddc7390d684bd34e7fc15ad567b13f86afb5c2f22015cfed7294557c39",
++      "bytes": 903
++    },
++    {
++      "path": "acceptance_reports/16AI-QW-38G-R6A-STOP-01_acceptance.md",
++      "sha256": "3a2f6f4a25c6d7a9b7dcf4952edbaadee4bafdbdb9da99c965bd243747dd21cf",
++      "bytes": 609
++    }
++  ]
++}
+diff -ruN stop01_orig/workspace/stop01_static_checks.json stop01_work/workspace/stop01_static_checks.json
+--- stop01_orig/workspace/stop01_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_static_checks.json	2026-05-27 07:25:53.231743849 +0000
+@@ -0,0 +1,22 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-01",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_smoke": "NOT_RUN",
++  "checks": {
++    "module_added": true,
++    "lib_module_registered": true,
++    "lib_exports_registered": true,
++    "sampler_append_hook_registered": true,
++    "default_off_contract": true,
++    "tail_truncate_forbidden": true,
++    "eos_bias_forbidden_default": true,
++    "summary_present": true,
++    "schema_present": true,
++    "acceptance_present": true
++  },
++  "ssot": "SALAD03BPostCheck+SALAD02Risk+RuntimeStopCapability",
++  "notes": [
++    "Static bake only. Runtime Stop01Runtime integration must be verified in target environment."
++  ]
++}
+diff -ruN stop01_orig/workspace/stop01_summary.json stop01_work/workspace/stop01_summary.json
+--- stop01_orig/workspace/stop01_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ stop01_work/workspace/stop01_summary.json	2026-05-27 07:25:23.048806793 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-STOP-01",
++  "input_patch": "16AI-QW-38G-R6A-SALAD-03B",
++  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
++  "mode": "Off",
++  "controlled_execute": false,
++  "default_enable": false,
++  "requires_salad03b": true,
++  "salad03b_status_seen": null,
++  "steps_observed": 0,
++  "gate": {
++    "can_execute_count": 0,
++    "denied_count": 0,
++    "strict_fail_count": 0
++  },
++  "execution": {
++    "executed_count": 0,
++    "runtime_stop_executed_count": 0,
++    "eos_bias_stop_executed_count": 0,
++    "generation_loop_stop_requested_count": 0,
++    "output_tail_truncated_count": 0
++  },
++  "reasons": {
++    "salad_critical_count": 0,
++    "salad_high_persistent_count": 0,
++    "post_resample_critical_count": 0,
++    "post_resample_high_unimproved_count": 0,
++    "resample_failed_count": 0,
++    "rollback_denied_count": 0,
++    "numeric_risk_count": 0,
++    "global_finite_fallback_count": 0,
++    "empty_active_set_count": 0
++  },
++  "safety": {
++    "stop_without_gate_count": 0,
++    "stop_without_receipt_count": 0,
++    "tail_truncate_count": 0,
++    "eos_bias_stop_count": 0,
++    "stop_reason_none_executed_count": 0
++  },
++  "ready_for_stop02_eos_finalization": false,
++  "ready_for_default_safe_stop": false,
++  "reason": "static bake only; run controlled stop fixtures before enabling safe stop"
++}

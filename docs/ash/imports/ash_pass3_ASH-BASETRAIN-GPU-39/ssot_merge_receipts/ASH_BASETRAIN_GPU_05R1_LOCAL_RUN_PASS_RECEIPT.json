@@ -1,0 +1,289 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-05R1",
+  "title": "Atlas Group Forward Candidate Readiness Re-Audit / Actual GPU Buffer State Dispatch Ready Probe No Dispatch Seal",
+  "source_gpu_buffer_state_audit": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "source_patch_id": "ASH-BASETRAIN-GPU-04R2-R2",
+    "source_verdict": "PASS_ASH_BASETRAIN_GPU_04R2_R2_ATLAS_GROUP_SHARD_GPU_UPLOAD_EXECUTION_RETRY_RUNTIME_BOUND_REPAIRED_CANDIDATE_TO_ACTUAL_GPU_BUFFER_STATE_NO_FORWARD_NO_OPTIMIZER",
+    "source_pass": true,
+    "actual_gpu_buffer_state_created_from_source": true,
+    "actual_gpu_upload_retry_executed": true,
+    "chunk_count_uploaded": 3,
+    "chunks": [
+      {
+        "chunk_id": "embed_lmhead_0000_chunk_0000",
+        "tensor_key": "model.embed_tokens.weight",
+        "estimated_bytes": 8388608,
+        "payload_slice_bytes": 8388608,
+        "gpu_buffer_created_in_source": true,
+        "queue_write_executed_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "forward_bind_ready_in_source": false,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true
+      },
+      {
+        "chunk_id": "embed_lmhead_0000_chunk_0001",
+        "tensor_key": "lm_head.weight",
+        "estimated_bytes": 8388608,
+        "payload_slice_bytes": 8388608,
+        "gpu_buffer_created_in_source": true,
+        "queue_write_executed_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "forward_bind_ready_in_source": false,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true
+      },
+      {
+        "chunk_id": "block_0000_attention_chunk_0000",
+        "tensor_key": "model.layers.0.self_attn.q_proj.weight",
+        "estimated_bytes": 16777216,
+        "payload_slice_bytes": 16777216,
+        "gpu_buffer_created_in_source": true,
+        "queue_write_executed_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "forward_bind_ready_in_source": false,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true
+      }
+    ],
+    "all_gpu_buffer_created": true,
+    "all_queue_write_executed": true,
+    "all_uploaded_bytes_match_estimated_bytes": true,
+    "source_compute_dispatch_executed": false,
+    "source_forward_dispatch_executed": false,
+    "source_optimizer_step_executed": false,
+    "source_safetensors_mutation_present": false,
+    "runtime_gpu_handle_reuse_claimed": false,
+    "actual_gpu_handle_claimed_from_json": false,
+    "pass": true
+  },
+  "forward_buffer_set_candidate": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "candidate_scope": "receipt_based_forward_buffer_set_candidate_only",
+    "runtime_gpu_handle_reuse_claimed": false,
+    "actual_gpu_handle_claimed_from_json": false,
+    "required_forward_input_buffers": [
+      {
+        "chunk_id": "embed_lmhead_0000_chunk_0000",
+        "tensor_key": "model.embed_tokens.weight",
+        "buffer_role": "storage_read_only_weight",
+        "source_upload_patch": "ASH-BASETRAIN-GPU-04R2-R2",
+        "gpu_buffer_created_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true,
+        "estimated_bytes": 8388608,
+        "shape": [
+          48259,
+          2048
+        ],
+        "dtype": "f32"
+      },
+      {
+        "chunk_id": "embed_lmhead_0000_chunk_0001",
+        "tensor_key": "lm_head.weight",
+        "buffer_role": "storage_read_only_weight",
+        "source_upload_patch": "ASH-BASETRAIN-GPU-04R2-R2",
+        "gpu_buffer_created_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true,
+        "estimated_bytes": 8388608,
+        "shape": [
+          48259,
+          2048
+        ],
+        "dtype": "f32"
+      },
+      {
+        "chunk_id": "block_0000_attention_chunk_0000",
+        "tensor_key": "model.layers.0.self_attn.q_proj.weight",
+        "buffer_role": "storage_read_only_weight",
+        "source_upload_patch": "ASH-BASETRAIN-GPU-04R2-R2",
+        "gpu_buffer_created_in_source": true,
+        "uploaded_bytes_match_estimated_bytes": true,
+        "reuse_runtime_handle_claimed": false,
+        "requires_reupload_for_new_process": true,
+        "estimated_bytes": 16777216,
+        "shape": [
+          2048,
+          2048
+        ],
+        "dtype": "f32"
+      }
+    ],
+    "forward_required_buffer_set_resolved": true
+  },
+  "bind_group_layout_candidate": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "layout_scope": "candidate_only",
+    "bind_group_layout_created": false,
+    "entries": [
+      {
+        "binding": 0,
+        "visibility": "COMPUTE",
+        "resource": "model.embed_tokens.weight",
+        "buffer_role": "read_only_storage",
+        "required": true
+      },
+      {
+        "binding": 1,
+        "visibility": "COMPUTE",
+        "resource": "lm_head.weight",
+        "buffer_role": "read_only_storage",
+        "required": true
+      },
+      {
+        "binding": 2,
+        "visibility": "COMPUTE",
+        "resource": "model.layers.0.self_attn.q_proj.weight",
+        "buffer_role": "read_only_storage",
+        "required": true
+      }
+    ],
+    "forward_bind_group_layout_candidate_created": true
+  },
+  "pipeline_layout_candidate": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "layout_scope": "candidate_only",
+    "pipeline_layout_created": false,
+    "compute_pipeline_created": false,
+    "required_bind_group_layouts": [
+      "atlas_group_forward_weight_buffers_layout_candidate"
+    ],
+    "compute_pipeline_required_next_stage": true,
+    "forward_pipeline_layout_candidate_created": true
+  },
+  "shader_entry_contract_candidate": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "shader_contract_scope": "candidate_only",
+    "shader_module_created": false,
+    "entry_point": "main",
+    "expected_inputs": [
+      {
+        "binding": 0,
+        "tensor_key": "model.embed_tokens.weight",
+        "shape": [
+          48259,
+          2048
+        ],
+        "dtype": "f32"
+      },
+      {
+        "binding": 1,
+        "tensor_key": "lm_head.weight",
+        "shape": [
+          48259,
+          2048
+        ],
+        "dtype": "f32"
+      },
+      {
+        "binding": 2,
+        "tensor_key": "model.layers.0.self_attn.q_proj.weight",
+        "shape": [
+          2048,
+          2048
+        ],
+        "dtype": "f32"
+      }
+    ],
+    "expected_output": {
+      "created_in_05r1": false,
+      "required_in_06": true,
+      "dtype": "f32",
+      "shape": "FORWARD_STAGE_DEFINED"
+    },
+    "forward_shader_entry_contract_candidate_created": true
+  },
+  "dispatch_dimension_candidate": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "dispatch_dimension_scope": "candidate_only",
+    "compute_dispatch_executed": false,
+    "workgroup_size_candidate": [
+      16,
+      16,
+      1
+    ],
+    "q_proj_weight": {
+      "logical_shape": [
+        2048,
+        2048
+      ],
+      "dispatch_x": 128,
+      "dispatch_y": 128,
+      "dispatch_z": 1
+    },
+    "forward_dispatch_dimension_candidate_created": true
+  },
+  "no_dispatch_no_optimizer_contract": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "wgpu_bind_group_created": false,
+    "wgpu_bind_group_layout_created": false,
+    "wgpu_pipeline_layout_created": false,
+    "wgpu_compute_pipeline_created": false,
+    "shader_module_created": false,
+    "compute_encoder_created": false,
+    "compute_pass_created": false,
+    "compute_dispatch_executed": false,
+    "queue_submit_executed": false,
+    "forward_output_tensor_created": false,
+    "loss_computed": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "delta_materialized": false,
+    "weight_commit_executed": false,
+    "safetensors_mutation_present": false,
+    "checkpoint_finalization_present": false,
+    "dummy_gpu_handle_created": false,
+    "contract_fixture_used_as_actual": false,
+    "pass": true
+  },
+  "forward_readiness_receipt": {
+    "patch_id": "ASH-BASETRAIN-GPU-05R1",
+    "title": "Atlas Group Forward Candidate Readiness Re-Audit / Actual GPU Buffer State Dispatch Ready Probe No Dispatch Seal",
+    "source_04r2_r2_verdict": "PASS_ASH_BASETRAIN_GPU_04R2_R2_ATLAS_GROUP_SHARD_GPU_UPLOAD_EXECUTION_RETRY_RUNTIME_BOUND_REPAIRED_CANDIDATE_TO_ACTUAL_GPU_BUFFER_STATE_NO_FORWARD_NO_OPTIMIZER",
+    "forward_readiness_reaudit_executed": true,
+    "source_04r2_r2_upload_state_validated": true,
+    "source_04r2_r2_byte_parity_validated": true,
+    "source_04r2_r2_no_forward_contract_validated": true,
+    "actual_gpu_buffer_state_created_from_source": true,
+    "all_required_forward_input_buffers_present_in_receipt": true,
+    "all_gpu_buffer_created": true,
+    "all_queue_write_executed": true,
+    "all_uploaded_bytes_match_estimated_bytes": true,
+    "runtime_gpu_handle_reuse_claimed": false,
+    "actual_gpu_handle_claimed_from_json": false,
+    "dispatch_ready_probe_executed": true,
+    "forward_required_buffer_set_resolved": true,
+    "forward_bind_group_layout_candidate_created": true,
+    "forward_pipeline_layout_candidate_created": true,
+    "forward_shader_entry_contract_candidate_created": true,
+    "forward_dispatch_dimension_candidate_created": true,
+    "forward_dispatch_ready": true,
+    "readiness_class": "READY_FOR_ASH_BASETRAIN_GPU_06",
+    "wgpu_bind_group_created": false,
+    "wgpu_bind_group_layout_created": false,
+    "wgpu_pipeline_layout_created": false,
+    "wgpu_compute_pipeline_created": false,
+    "shader_module_created": false,
+    "compute_dispatch_executed": false,
+    "queue_submit_executed": false,
+    "forward_output_tensor_created": false,
+    "optimizer_step_executed": false,
+    "safetensors_mutation_present": false,
+    "operator_run_packet": {
+      "patch_id": "ASH-BASETRAIN-GPU-05R1",
+      "next_patch_if_ready": "ASH-BASETRAIN-GPU-06",
+      "next_patch_if_blocked": "ASH-BASETRAIN-GPU-05R1A",
+      "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_05r1_atlas_group_forward_candidate_readiness_reaudit --jobs 1",
+      "recommended_readiness_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_05r1_atlas_group_forward_candidate_readiness_reaudit"
+    },
+    "pass": true,
+    "verdict": "PASS_ASH_BASETRAIN_GPU_05R1_ATLAS_GROUP_FORWARD_CANDIDATE_READINESS_REAUDIT_ACTUAL_GPU_BUFFER_STATE_DISPATCH_READY_PROBE_NO_DISPATCH"
+  },
+  "pass": true,
+  "verdict": "PASS_ASH_BASETRAIN_GPU_05R1_ATLAS_GROUP_FORWARD_CANDIDATE_READINESS_REAUDIT_ACTUAL_GPU_BUFFER_STATE_DISPATCH_READY_PROBE_NO_DISPATCH"
+}
+PS D:\1111113232\DUST\1\ash_pass3>

@@ -1,0 +1,20 @@
+--- modules ---
+416:pub mod sft_gpu_strict_train_run;
+417:pub use sft_gpu_strict_train_run::*;
+290:pub mod strict_native_gpu_run;
+249:pub mod strict_gpu_train_receipt;
+250:pub use strict_gpu_train_receipt::*;
+--- closed defaults ---
+294:            allow_cpu_fallback: false,
+295:            allow_cpu_materialization: false,
+296:            allow_runtime_current_pointer_update: false,
+297:            allow_promotion_apply: false,
+298:            allow_lifecycle_mutation: false,
+299:            allow_slot_action_apply: false,
+28:            cpu_fallback_allowed: false,
+29:            cpu_materialization_allowed: false,
+31:            runtime_current_pointer_update_allowed: false,
+32:            promotion_apply_allowed: false,
+33:            lifecycle_mutation_allowed: false,
+34:            slot_action_apply_allowed: false,
+35:            ash_binding_allowed: false,

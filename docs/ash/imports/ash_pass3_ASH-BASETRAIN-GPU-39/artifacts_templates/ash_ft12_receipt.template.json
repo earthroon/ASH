@@ -1,0 +1,25 @@
+{
+  "patch_id": "ASH-FT-12",
+  "title": "Shadow Candidate Runtime Bind Dry-run / No Decode No Generation Seal",
+  "status": "PASS",
+  "guards": {
+    "metadata_only_bind": true,
+    "temporary_candidate_slot_only": true,
+    "actual_model_construction_executed": false,
+    "gpu_upload_executed": false,
+    "full_model_forward_executed": false,
+    "inference_executed": false,
+    "decode_executed": false,
+    "generation_executed": false,
+    "sampling_executed": false,
+    "kv_cache_created": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "promotion_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "real_corpus_train_executed": false,
+    "multi_group_train_executed": false
+  },
+  "verdict": "PASS_ASH_FT12_SHADOW_CANDIDATE_RUNTIME_BIND_DRYRUN_NO_DECODE_NO_GENERATION"
+}

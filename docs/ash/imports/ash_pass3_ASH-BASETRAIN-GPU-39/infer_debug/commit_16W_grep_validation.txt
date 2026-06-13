@@ -1,0 +1,16 @@
+--- remaining FFN gate sigmoid scan ---
+
+--- SiLU/SwiGLU scan ---
+crates/model_core/src/lib.rs:563:fn silu_tensor<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
+crates/model_core/src/lib.rs:642:        let gate_pre = self.gate_proj.forward(normed.clone(), runtime_loras, trainable_loras);
+crates/model_core/src/lib.rs:643:        let gate = silu_tensor(gate_pre);
+crates/model_core/src/lib.rs:645:        let ff = self.down_proj.forward(gate * up, runtime_loras, trainable_loras);
+crates/model_core/src/lib.rs:682:        let gate_pre = self.gate_proj.forward_prepared(normed.clone(), runtime_loras, trainable_loras);
+crates/model_core/src/lib.rs:683:        let gate = silu_tensor(gate_pre);
+crates/model_core/src/lib.rs:1763:        let gate_pre = layer.gate_proj.forward(normed.clone(), &self.attached_loras, &[]);
+crates/model_core/src/lib.rs:1764:        let gate = silu_tensor(gate_pre);
+crates/model_core/src/lib.rs:1766:        let ff = layer.down_proj.forward(gate * up, &self.attached_loras, &[]);
+crates/model_core/src/lib.rs:1810:        let gate_pre = layer.gate_proj.forward(normed.clone(), &self.attached_loras, &[]);
+crates/model_core/src/lib.rs:1811:        let gate = silu_tensor(gate_pre);
+crates/model_core/src/lib.rs:1813:        let ff = layer.down_proj.forward(gate * up, &self.attached_loras, &[]);
+crates/model_core/src/lib.rs:2070:                for i in 0..fused.len() { fused[i] = silu(gate[i]) * up[i]; }

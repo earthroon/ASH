@@ -1,0 +1,899 @@
+{
+  "patch_id": "16AI-QW-BUILD-04",
+  "patch_name": "Orchestrator Audit Bin Feature-gated Reentry / Required Features Seal",
+  "status": "STATIC_PASS_ORCHESTRATOR_AUDIT_BIN_FEATURE_GATED_REENTRY",
+  "autobins": false,
+  "main_bins": [
+    {
+      "name": "orchestrator_local",
+      "path": "src/main.rs",
+      "required_features": []
+    }
+  ],
+  "audit_feature": "orchestrator_audit_bins",
+  "audit_bins_count": 73,
+  "audit_bins": [
+    {
+      "name": "ash_10_persistence_audit",
+      "path": "src/bin/ash_10_persistence_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_11_runtime_pointer_audit",
+      "path": "src/bin/ash_11_runtime_pointer_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_12_lora_attach_audit",
+      "path": "src/bin/ash_12_lora_attach_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_13_inference_attachment_audit",
+      "path": "src/bin/ash_13_inference_attachment_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_14_direct_inference_audit",
+      "path": "src/bin/ash_14_direct_inference_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_15_output_merge_audit",
+      "path": "src/bin/ash_15_output_merge_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_16_weighted_synapse_audit",
+      "path": "src/bin/ash_16_weighted_synapse_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_17_path_integral_synapse_audit",
+      "path": "src/bin/ash_17_path_integral_synapse_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_18_coactivation_ledger_audit",
+      "path": "src/bin/ash_18_coactivation_ledger_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_19_synapse_apply_soft_ensemble_audit",
+      "path": "src/bin/ash_19_synapse_apply_soft_ensemble_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_20_phase_field_synapse_audit",
+      "path": "src/bin/ash_20_phase_field_synapse_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_21_composite_promotion_rollback_audit",
+      "path": "src/bin/ash_21_composite_promotion_rollback_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_22_hard_negative_replay_audit",
+      "path": "src/bin/ash_22_hard_negative_replay_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_23_lora_weight_telemetry_audit",
+      "path": "src/bin/ash_23_lora_weight_telemetry_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_24_phase_hint_registry_audit",
+      "path": "src/bin/ash_24_phase_hint_registry_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_25_composite_artifact_planner_audit",
+      "path": "src/bin/ash_25_composite_artifact_planner_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_26_composite_artifact_bake_audit",
+      "path": "src/bin/ash_26_composite_artifact_bake_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_27_hard_negative_replay_eval_audit",
+      "path": "src/bin/ash_27_hard_negative_replay_eval_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_28_runtime_composite_smoke_audit",
+      "path": "src/bin/ash_28_runtime_composite_smoke_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_29_phase_hint_aging_audit",
+      "path": "src/bin/ash_29_phase_hint_aging_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_30_composite_artifact_registry_audit",
+      "path": "src/bin/ash_30_composite_artifact_registry_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_31_composite_rank_compression_audit",
+      "path": "src/bin/ash_31_composite_rank_compression_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_32_replay_hebbian_feedback_audit",
+      "path": "src/bin/ash_32_replay_hebbian_feedback_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_33_runtime_composite_perf_guard_audit",
+      "path": "src/bin/ash_33_runtime_composite_perf_guard_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_34_event_driven_lora_audit",
+      "path": "src/bin/ash_34_event_driven_lora_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_35_event_sft_sample_ledger_audit",
+      "path": "src/bin/ash_35_event_sft_sample_ledger_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_36_selective_plasticity_curriculum_audit",
+      "path": "src/bin/ash_36_selective_plasticity_curriculum_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_37_event_weighted_lora_sft_planner_audit",
+      "path": "src/bin/ash_37_event_weighted_lora_sft_planner_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_38_adapter_specialization_audit",
+      "path": "src/bin/ash_38_adapter_specialization_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_39_sft_outcome_evaluation_audit",
+      "path": "src/bin/ash_39_sft_outcome_evaluation_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_40_plasticity_promotion_gate_audit",
+      "path": "src/bin/ash_40_plasticity_promotion_gate_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_41_plasticity_dataset_export_audit",
+      "path": "src/bin/ash_41_plasticity_dataset_export_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_42_event_weighted_lora_sft_executor_audit",
+      "path": "src/bin/ash_42_event_weighted_lora_sft_executor_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_43_event_tag_runtime_router_audit",
+      "path": "src/bin/ash_43_event_tag_runtime_router_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_44_plasticity_rollback_lineage_audit",
+      "path": "src/bin/ash_44_plasticity_rollback_lineage_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_45_event_tag_router_calibration_audit",
+      "path": "src/bin/ash_45_event_tag_router_calibration_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_46_plasticity_dataset_sanitizer_audit",
+      "path": "src/bin/ash_46_plasticity_dataset_sanitizer_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_47_hard_negative_preference_dataset_audit",
+      "path": "src/bin/ash_47_hard_negative_preference_dataset_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_48_runtime_lora_apply_gate_audit",
+      "path": "src/bin/ash_48_runtime_lora_apply_gate_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_49_runtime_emergency_rollback_audit",
+      "path": "src/bin/ash_49_runtime_emergency_rollback_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_50_online_calibration_ledger_audit",
+      "path": "src/bin/ash_50_online_calibration_ledger_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "ash_9_integration_audit",
+      "path": "src/bin/ash_9_integration_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "ash",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_12_tensorcube_health_ash_bridge_audit",
+      "path": "src/bin/tcu_12_tensorcube_health_ash_bridge_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_13_tensorcube_telemetry_snapshot_audit",
+      "path": "src/bin/tcu_13_tensorcube_telemetry_snapshot_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_14_tensorcube_native_path_preflight_audit",
+      "path": "src/bin/tcu_14_tensorcube_native_path_preflight_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_15_tensorcube_fallback_pressure_guard_audit",
+      "path": "src/bin/tcu_15_tensorcube_fallback_pressure_guard_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_16_tensorcube_hot_reload_buffer_lease_audit",
+      "path": "src/bin/tcu_16_tensorcube_hot_reload_buffer_lease_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_17_tensorcube_runtime_splice_replay_audit",
+      "path": "src/bin/tcu_17_tensorcube_runtime_splice_replay_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_18_tensorcube_perf_guard_integration_audit",
+      "path": "src/bin/tcu_18_tensorcube_perf_guard_integration_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_19_tensorcube_emergency_demotion_audit",
+      "path": "src/bin/tcu_19_tensorcube_emergency_demotion_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_20_tensorcube_long_horizon_health_audit",
+      "path": "src/bin/tcu_20_tensorcube_long_horizon_health_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_21_tensorcube_health_recommendation_review_audit",
+      "path": "src/bin/tcu_21_tensorcube_health_recommendation_review_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_22_tensorcube_backend_policy_update_candidate_audit",
+      "path": "src/bin/tcu_22_tensorcube_backend_policy_update_candidate_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_23a_tensorcube_atlas_microtile_audit",
+      "path": "src/bin/tcu_23a_tensorcube_atlas_microtile_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_23b_tensorcube_microtile_parity_audit",
+      "path": "src/bin/tcu_23b_tensorcube_microtile_parity_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_23c_tensorcube_microtile_native_smoke_audit",
+      "path": "src/bin/tcu_23c_tensorcube_microtile_native_smoke_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_23d_tensorcube_microtile_dispatch_telemetry_audit",
+      "path": "src/bin/tcu_23d_tensorcube_microtile_dispatch_telemetry_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_23e_tensorcube_microtile_timing_probe_audit",
+      "path": "src/bin/tcu_23e_tensorcube_microtile_timing_probe_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24a_qwave_mega_atlas_audit",
+      "path": "src/bin/tcu_24a_qwave_mega_atlas_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24b_qwave_tile_atlas_audit",
+      "path": "src/bin/tcu_24b_qwave_tile_atlas_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24c_qwave_vec4_tile_atlas_audit",
+      "path": "src/bin/tcu_24c_qwave_vec4_tile_atlas_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24d_qwave_stencil_staging_audit",
+      "path": "src/bin/tcu_24d_qwave_stencil_staging_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24e_qwave_atlas_parity_audit",
+      "path": "src/bin/tcu_24e_qwave_atlas_parity_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24f_qwave_atlas_telemetry_audit",
+      "path": "src/bin/tcu_24f_qwave_atlas_telemetry_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24g_qwave_atlas_timing_probe_audit",
+      "path": "src/bin/tcu_24g_qwave_atlas_timing_probe_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24h_qwave_backend_router_audit",
+      "path": "src/bin/tcu_24h_qwave_backend_router_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24i_qwave_backend_switch_dryrun_audit",
+      "path": "src/bin/tcu_24i_qwave_backend_switch_dryrun_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24j_qwave_backend_apply_candidate_audit",
+      "path": "src/bin/tcu_24j_qwave_backend_apply_candidate_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24k_qwave_apply_sandbox_audit",
+      "path": "src/bin/tcu_24k_qwave_apply_sandbox_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24l_qwave_rollback_ledger_audit",
+      "path": "src/bin/tcu_24l_qwave_rollback_ledger_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24m_qwave_recovery_candidate_audit",
+      "path": "src/bin/tcu_24m_qwave_recovery_candidate_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24n_qwave_apply_preflight_audit",
+      "path": "src/bin/tcu_24n_qwave_apply_preflight_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    },
+    {
+      "name": "tcu_24o_qwave_shadow_commit_audit",
+      "path": "src/bin/tcu_24o_qwave_shadow_commit_audit.rs",
+      "required_features": [
+        "orchestrator_audit_bins"
+      ],
+      "category": "tcu",
+      "source_preserved": true,
+      "default_build_target": false,
+      "reentry_feature": "orchestrator_audit_bins",
+      "repair_status": "reentry_repair_pending_or_unverified"
+    }
+  ],
+  "source_policy": {
+    "audit_bins_deleted": false,
+    "audit_bin_sources_preserved": true,
+    "script_only_bypass_used": false,
+    "default_build_contamination_guard": "autobins_false_plus_required_features"
+  }
+}

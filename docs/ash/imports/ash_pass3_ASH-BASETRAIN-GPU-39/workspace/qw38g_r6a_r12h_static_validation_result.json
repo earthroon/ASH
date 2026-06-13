@@ -1,0 +1,49 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-R12A-R12H",
+  "patch_name": "Guard-Locked Limited Apply Trial / Reversible Overlay Effect Probe Seal",
+  "status": "PASS_STATIC_VALIDATION",
+  "validation_scope": "script_and_artifact_contract_static_only",
+  "r12g_r1_cumulative_repair_included": true,
+  "r12g_script_sha256": "2896da302b2bfe475b182adf5a8903cf42439bc62b701631e94c42bd17c384ef",
+  "r12h_script_sha256": "0e9e79eb6bf7eb1e37a4a3a340cd1aaaa5465b2ed395beac58117e625451f3ff",
+  "script_path": "scripts/run_16AI_QW_38G_R6A_R12A_R12H_guard_locked_limited_apply_trial.ps1",
+  "expected_command": ".\\scripts\\run_16AI_QW_38G_R6A_R12A_R12H_guard_locked_limited_apply_trial.ps1 -Build -Strict -TrialPromptVariantCount 3 -TrialNegativeControlCount 3",
+  "expected_outputs": [
+    "workspace/qw38g_r6a_r12h_limited_apply_trial_receipt.json",
+    "workspace/qw38g_r6a_r12h_limited_apply_trial_summary.json",
+    "workspace/qw38g_r6a_r12h_source_guard_lock_load_audit.json",
+    "workspace/qw38g_r6a_r12h_trial_case_manifest.json",
+    "workspace/qw38g_r6a_r12h_overlay_application_audit.json",
+    "workspace/qw38g_r6a_r12h_effect_probe_audit.json",
+    "workspace/qw38g_r6a_r12h_negative_control_overlay_block_audit.json",
+    "workspace/qw38g_r6a_r12h_reversibility_audit.json",
+    "workspace/qw38g_r6a_r12h_output_stability_probe.json",
+    "workspace/qw38g_r6a_r12h_mutation_safety_audit.json",
+    "workspace/qw38g_r6a_r12h_trial_decision.json",
+    "workspace/qw38g_r6a_r12h_limited_apply_trial_report.md"
+  ],
+  "source_ssot_required": [
+    "workspace/qw38g_r6a_r12g_threshold_edge_decision.json",
+    "workspace/qw38g_r6a_r12g_boundary_drift_audit.json",
+    "workspace/qw38g_r6a_r12g_policy_lock_preservation_audit.json",
+    "workspace/qw38g_r6a_r12g_margin_boundary_sweep_audit.json",
+    "workspace/qw38g_r6a_r12g_negative_control_boundary_audit.json",
+    "workspace/qw38g_r6a_r12g_mutation_safety_audit.json"
+  ],
+  "forbidden_mutations": {
+    "runtime_default_apply": false,
+    "production_safe_confirmed": false,
+    "root_cause_confirmed": false,
+    "checkpoint_modified": false,
+    "tokenizer_modified": false,
+    "safetensors_modified": false,
+    "lm_head_modified": false,
+    "final_norm_modified": false,
+    "ban_mask_modified": false
+  },
+  "notes": [
+    "PowerShell runtime was not available in this environment, so validation is static only.",
+    "R12H uses reversible runtime-only overlay trial and does not write checkpoint/tokenizer/safetensors artifacts.",
+    "R12G-R1 final artifact normalization is included cumulatively to avoid resurrecting the pre-repair R12G FAIL aggregator."
+  ]
+}

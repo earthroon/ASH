@@ -1,0 +1,26 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-01B",
+  "checks": [
+    {
+      "id": "NO_GATE_AUDIT_REFERENCE_IN_THREAD_EVENT",
+      "status": "PASS",
+      "evidence": "grep -R \"gate.audit\" crates/runtime/src/engine/generation_runner.rs returned no active reference."
+    },
+    {
+      "id": "DECODE_PROFILE_CAPTURED_BEFORE_CLOSURE",
+      "status": "PASS",
+      "evidence": "decode_profile is cloned immediately after derive_gate and returned in the tuple moved into the generation thread."
+    },
+    {
+      "id": "WORD_SALAD_GUARD_CAPTURED_BEFORE_CLOSURE",
+      "status": "PASS",
+      "evidence": "word_salad_guard is copied immediately after derive_gate and returned in the tuple moved into the generation thread."
+    },
+    {
+      "id": "CARGO_BUILD",
+      "status": "PENDING_LOCAL",
+      "evidence": "cargo is not installed in this bake container."
+    }
+  ],
+  "adjudication": "PASS_STATIC_SCOPE_HOTFIX_PENDING_LOCAL_CARGO_BUILD"
+}

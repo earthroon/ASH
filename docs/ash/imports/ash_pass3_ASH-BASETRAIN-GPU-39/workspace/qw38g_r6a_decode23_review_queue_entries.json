@@ -1,0 +1,46 @@
+[
+  {
+    "candidate_id": "candidate-enqueue-granted",
+    "created_by_patch_id": "16AI-QW-38G-R6A-DECODE-23",
+    "cue_id": "mock-cue-0001",
+    "decode_session_id": "mock-decode-session-decode23-approval-granted-enqueue",
+    "entry_status": "Enqueued",
+    "external_queue_entry": false,
+    "idempotency_key": "sha256:24935a2ebf42067e85e2bdc69e1fed6891ca1d91de2d520f716130a390718e7e",
+    "internal_ledger_entry": true,
+    "queue_candidate_id": "queue-candidate-0001",
+    "queue_entry_id": "review-queue-entry-0001",
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "source_receipt_hashes": [
+      "mock-human-review-approval-dry-run-receipt-hash-0001",
+      "mock-human-review-queue-candidate-receipt-hash-0001",
+      "mock-score-threshold-calibration-receipt-hash-0001",
+      "mock-final-quality-score-receipt-hash-0001",
+      "mock-final-commit-receipt-hash-0001",
+      "mock-candidate-quality-receipt-hash-0001"
+    ]
+  },
+  {
+    "candidate_id": "candidate-duplicate-entry",
+    "created_by_patch_id": "16AI-QW-38G-R6A-DECODE-23",
+    "cue_id": "mock-cue-0007",
+    "decode_session_id": "mock-decode-session-decode23-duplicate-queue-entry-idempotent",
+    "entry_status": "DuplicateSkipped",
+    "external_queue_entry": false,
+    "idempotency_key": "sha256:be9729cfe757e18b493344af7514f39296121d198390b64ab200b1a3463ae07b",
+    "internal_ledger_entry": false,
+    "queue_candidate_id": "queue-candidate-duplicate",
+    "queue_entry_id": "review-queue-entry-0007",
+    "review_queue_priority_hash": "sha256:863603b1fc1a3595712797aea6a1f2f7b25f4eafd800f9be6c3f99c74ceb1ae5",
+    "review_queue_target_hash": "sha256:03192a1ab1c3d7b435170c4960108b99b1997285e601ff68d0f8da2c38ca8b93",
+    "source_receipt_hashes": [
+      "mock-human-review-approval-dry-run-receipt-hash-0007",
+      "mock-human-review-queue-candidate-receipt-hash-0007",
+      "mock-score-threshold-calibration-receipt-hash-0007",
+      "mock-final-quality-score-receipt-hash-0007",
+      "mock-final-commit-receipt-hash-0007",
+      "mock-candidate-quality-receipt-hash-0007"
+    ]
+  }
+]

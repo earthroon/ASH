@@ -1,0 +1,23 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36B",
+  "title": "Bounded Weight Slice F32 Window Sanity / Limited Window Bytes To F32 Sample Stats No Full Tensor No GPU Upload Seal",
+  "baked_static_status": "BLOCKED_36A_RECEIPT_NOT_FOUND",
+  "lookup_table_control_flow_required": true,
+  "rust_if_keyword_used": false,
+  "rust_match_keyword_used": false,
+  "path_isolation": {
+    "previous_r3b_receipt_same_path_included": false,
+    "previous_36_receipt_same_path_included": false,
+    "previous_36a_receipt_same_path_included": false,
+    "static_samples_use_isolated_paths": true
+  },
+  "files": {
+    "rust_src_sha256": "c1ab6c946c6fe5c15703418384e836df4639d02ae8e6f61dc9d4c7829170944b",
+    "rust_bin_sha256": "dee0ee853e5549235a9b732ac22aa7c86d588222c05ab878d112f390fdf96670",
+    "static_receipt_sha256": "7ef81182515e282682f615ec22c8746af277f8f9a5851fa76526231403ae6e54"
+  },
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-36C",
+  "buildfix_applied": "ASH-BASETRAIN-GPU-36B-R1",
+  "hex_crate_dependency_removed": true,
+  "local_lower_hex_encoder_present": true
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "case_id": "pending_receipt_preserves_no_apply",
+    "expected_status": "PASS",
+    "expected_operator_decision": "Pending",
+    "expected_approval_status": "AwaitingOperatorReview",
+    "expected_proceed_to_dry_run_replay": false
+  },
+  {
+    "case_id": "approved_but_not_applied_receipt",
+    "expected_status": "PASS",
+    "expected_operator_decision": "Approved",
+    "expected_approval_status": "ApprovedButNotApplied",
+    "expected_proceed_to_dry_run_replay": true
+  },
+  {
+    "case_id": "rejected_receipt_no_delete",
+    "expected_status": "PASS",
+    "expected_operator_decision": "Rejected",
+    "expected_approval_status": "Rejected",
+    "expected_proceed_to_dry_run_replay": false
+  },
+  {
+    "case_id": "needs_more_evidence_receipt",
+    "expected_status": "PASS",
+    "expected_operator_decision": "NeedsMoreEvidence",
+    "expected_approval_status": "ApprovalPending",
+    "expected_proceed_to_dry_run_replay": false
+  },
+  {
+    "case_id": "missing_r5_queue_unavailable",
+    "expected_status": "PASS",
+    "expected_operator_decision": null,
+    "expected_approval_status": "Unavailable",
+    "expected_proceed_to_dry_run_replay": false
+  }
+]

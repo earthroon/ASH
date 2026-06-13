@@ -1,0 +1,17 @@
+SFT-FFN-LORA-13 STATIC VALIDATION
+
+[PASS] crates/ash_core/src/sft_ffn_lora_rollback_drill.rs exists
+[PASS] crates/ash_core/tests/sft_ffn_lora_13_rollback_drill.rs exists
+[PASS] crates/burn_webgpu_backend/src/ffn_lora_rollback_drill.rs exists
+[PASS] crates/burn_webgpu_backend/tests/ffn_lora_rollback_drill.rs exists
+[PASS] ash_core lib.rs exports sft_ffn_lora_rollback_drill
+[PASS] burn_webgpu_backend lib.rs exports ffn_lora_rollback_drill
+[PASS] rollback drill config opens simulation/candidates only
+[PASS] rollback drill config keeps production rollback/current pointer/promotion/demotion/quarantine apply closed
+[PASS] rollback drill texture guard keeps textureSample weight fetch closed
+[PASS] tests cover success, missing source seal, missing failure detection, unresolved rollback, failed simulation, production rollback, applied demotion/quarantine, textureSample regression
+[PASS] acceptance report generated
+[PASS] bake report generated
+
+[PENDING] cargo test -p ash_core sft_ffn_lora_13 -- --nocapture
+[PENDING] cargo test -p burn_webgpu_backend ffn_lora_rollback_drill -- --nocapture

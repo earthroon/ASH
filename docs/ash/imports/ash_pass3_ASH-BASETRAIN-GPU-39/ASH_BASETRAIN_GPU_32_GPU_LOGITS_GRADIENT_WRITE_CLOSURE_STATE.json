@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-32",
+  "title": "GPU Logits Gradient Write Closure / Written Candidate Persistence Digest And Replay Stability Audit No Backward No Optimizer Seal",
+  "pass": true,
+  "verdict": "PASS_ASH_BASETRAIN_GPU_32_GPU_LOGITS_GRADIENT_WRITE_CLOSURE_WRITTEN_CANDIDATE_PERSISTENCE_DIGEST_AND_REPLAY_STABILITY_AUDIT_NO_BACKWARD_NO_OPTIMIZER",
+  "source_31_validation": {
+    "source_31_pass": true,
+    "source_31_gpu_written_candidate_digest_match": true,
+    "source_31_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+    "source_31_gpu_written_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+    "source_31_gpu_compute_dispatch_executed": false,
+    "source_31_backward_executed": false,
+    "source_31_optimizer_step_executed": false
+  },
+  "write_replay_plan": {
+    "replay_iteration_count": 3,
+    "replay_scope": "gpu_logits_gradient_write_readback_digest_stability_only"
+  },
+  "closure_contract": {
+    "runtime_buffer_object_persistence_claimed": false,
+    "persistence_kind": "digest_and_stats_replay_stability_not_gpu_object_persistence",
+    "expected_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+    "gpu_compute_dispatch_executed": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "model_weight_gradient_contract_created": false
+  }
+}

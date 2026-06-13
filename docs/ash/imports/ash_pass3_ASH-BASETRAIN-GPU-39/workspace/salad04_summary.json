@@ -1,0 +1,44 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SALAD-04",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-02",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "ObserveOnly",
+  "behavior_change": false,
+  "guard_overlay_only": true,
+  "steps_observed": 0,
+  "risk_counts": {
+    "low": 0,
+    "medium": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "loop_kinds": {
+    "josa_repeat_count": 0,
+    "josa_chain_count": 0,
+    "eomi_repeat_count": 0,
+    "eomi_punctuation_loop_count": 0,
+    "jamo_leak_count": 0,
+    "byte_jamo_mixed_leak_count": 0,
+    "syllable_fragment_loop_count": 0,
+    "eojeol_boundary_collapse_count": 0,
+    "punctuation_glue_loop_count": 0,
+    "mixed_morph_loop_count": 0
+  },
+  "overlay": {
+    "raise_salad02_risk_candidate_count": 0,
+    "rollback_candidate_boost_count": 0,
+    "safe_stop_candidate_boost_count": 0,
+    "panic_guard_hint_count": 0,
+    "no_repeat_ngram_hint_count": 0
+  },
+  "safety": {
+    "behavior_change_count": 0,
+    "guard_execution_count": 0,
+    "rollback_execution_count": 0,
+    "stop_execution_count": 0,
+    "score_out_of_range_count": 0
+  },
+  "ready_for_eval00_decode_regression": true,
+  "ready_for_decode03e_guard_overlay_apply": false,
+  "reason": "Korean morph loop guard schema baked; run SALAD-02 fixtures before overlay promotion"
+}

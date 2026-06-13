@@ -1,0 +1,43 @@
+[
+  {
+    "case_id": "riskydiff_attribution_detects_dream_weight",
+    "expected_status": "Attributed",
+    "expected_suspected_cause_contains": [
+      "DreamCollapseWeightTooHigh"
+    ]
+  },
+  {
+    "case_id": "reduced_dream_weight_clears_risky_diff",
+    "profile_id": "reduced_dream_weight_v1",
+    "expected": {
+      "safe_profile_candidate": true,
+      "promotion_allowed": false,
+      "weight_commit_allowed": false
+    }
+  },
+  {
+    "case_id": "reduced_cji_cairo_preserves_beneficial",
+    "profile_id": "reduced_cji_cairo_weight_v1",
+    "expected": {
+      "safe_profile_candidate": true,
+      "policy_promotion": false
+    }
+  },
+  {
+    "case_id": "low_penalty_loses_beneficial",
+    "profile_id": "low_penalty_audit_v1",
+    "expected": {
+      "safe_profile_candidate": false,
+      "reason": "beneficial_diff_not_preserved"
+    }
+  },
+  {
+    "case_id": "missing_r1_audit_unavailable",
+    "audit_available": false,
+    "expected": {
+      "sweep_status": "Unavailable",
+      "policy_promotion": false,
+      "weight_commit": false
+    }
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-LORA-FS-01",
+  "status": "PASS_STATIC_LORA_FS01_AUDIT_BAKE_PENDING_LOCAL_CARGO_BUILD",
+  "checks": {
+    "command_route_registered": true,
+    "module_registered": true,
+    "handler_imported": true,
+    "patch_id_present": true,
+    "safetensors_header_only_reader": true,
+    "no_full_tensor_deserialize_dependency": true,
+    "map_insert_receipt_builder": true,
+    "export_plan_writer": true,
+    "audit_receipt_writer": true,
+    "model_mutation_false_fields": true
+  },
+  "cargo_check": "NOT_RUN_CARGO_NOT_AVAILABLE_IN_BAKE_ENV"
+}

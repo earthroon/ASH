@@ -1,0 +1,47 @@
+# 16AI-QW-33 Static Validation Result
+
+STATIC_VALIDATION: PASS
+NATIVE_RUST_TEST: NOT_RUN_TOOLCHAIN_UNAVAILABLE
+
+## Files checked
+- crates/lora_train/src/qwave_runtime_canary_apply_execution_gate.rs
+- crates/lora_train/tests/qwave_runtime_canary_apply_execution_gate.rs
+- crates/lora_train/src/lib.rs
+- acceptance_reports/16AI-QW-33_qwave_runtime_canary_apply_execution_gate.md
+- bake_artifacts/16AI-QW-33_BAKE_REPORT.md
+
+## Required symbols checked
+- QWaveRuntimeCanaryApplyExecutionGateReceipt
+- QWaveRuntimeCanaryExecutionCandidateRef
+- QWaveRuntimeCanaryExecutionRollbackDisableRef
+- QWaveRuntimeOperatorToggleReceipt
+- QWaveRuntimeCanaryFeatureFlagExecutionSnapshot
+- QWaveRuntimeCanaryTelemetryWindow
+- QWaveRuntimeCanaryAppliedPercentageReport
+- QWaveRuntimeCanaryExecutionNoMutationReport
+- QWaveRuntimeCanaryExecutionSafetyReport
+- QWaveRuntimeCanaryExecutionQueueEntry
+- QWaveRuntimeCanaryExecutionEligibilityReport
+- QWaveRuntimeCanaryExecutionReviewStatus
+- QWaveRuntimeCanaryExecutionScope
+- QWaveRuntimeCanaryExecutionNextStage
+- AcceptedCanaryApplyExecutionGate
+- RejectedMissingQw32CanaryCandidateReceipt
+- RejectedCanaryCandidateSourceInvalid
+- RejectedRollbackDisableNotReady
+- RejectedMissingOperatorToggleReceipt
+- RejectedOperatorToggleNotExplicit
+- RejectedSilentToggle
+- RejectedAutoToggle
+- RejectedFeatureFlagNotCanaryEnabled
+- RejectedCanaryExecutionNotApplied
+- RejectedFullProductionEnabled
+- RejectedActualCanaryPercentageZero
+- RejectedActualCanaryPercentageAboveApproved
+- RejectedTelemetryNotActiveDuringCanary
+- RejectedProductionSamplerMutation
+- RejectedBackendSwitch
+- RejectedCurrentPointerMutation
+
+## Test count
+- qwave_runtime_canary_apply_execution_gate tests: 55

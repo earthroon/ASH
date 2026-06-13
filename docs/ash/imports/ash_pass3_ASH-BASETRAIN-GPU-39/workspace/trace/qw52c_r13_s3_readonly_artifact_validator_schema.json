@@ -1,0 +1,41 @@
+{
+  "patch_id": "QW-52C-R13-S3",
+  "title": "Readonly Artifact Validator / No Regeneration Seal",
+  "readonly_validator": true,
+  "required_top_level_keys": [
+    "patch_id",
+    "base_patch",
+    "parent_ssot",
+    "status",
+    "readonly_mode",
+    "summary",
+    "records"
+  ],
+  "record_required_keys": [
+    "path",
+    "scope",
+    "required",
+    "exists",
+    "parse_ok",
+    "read_mode",
+    "before_sha256",
+    "after_sha256",
+    "hash_unchanged",
+    "decision",
+    "errors",
+    "warnings"
+  ],
+  "no_regeneration_invariant": "before_sha256 must equal after_sha256 for every required input artifact",
+  "forbidden_permissions": [
+    "runtime_apply",
+    "runtime_default_apply",
+    "promotion",
+    "weight_commit",
+    "safe_profile_apply",
+    "policy_promotion",
+    "token_selection_mutation",
+    "token_rank_mutation",
+    "logit_mutation",
+    "sampler_mutation"
+  ]
+}

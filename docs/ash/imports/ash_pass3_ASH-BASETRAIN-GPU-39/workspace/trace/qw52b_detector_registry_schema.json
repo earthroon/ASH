@@ -1,0 +1,110 @@
+{
+  "patch_id": "QW-52B",
+  "title": "Decode Detector Registry / Word Salad Risk Seal",
+  "base_patch": "QW-52A-R4-M0",
+  "semantic_base": "QW-52A-R4",
+  "detector_order": [
+    "token_repeat_detector",
+    "piece_repeat_detector",
+    "ngram_repeat_detector",
+    "korean_morph_loop_detector",
+    "hangul_structure_detector",
+    "cheonjiin_qwave_detector",
+    "context_attractor_detector",
+    "projection_alignment_detector",
+    "gated_fusion_candidate_policy_detector"
+  ],
+  "risk_levels": [
+    "Unavailable",
+    "None",
+    "Low",
+    "Medium",
+    "High",
+    "Critical"
+  ],
+  "required_invariant": {
+    "runtime_apply": false,
+    "action_allowed": false,
+    "mutation_allowed": false,
+    "token_ban": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_selection_mutation": false
+  },
+  "required_detectors": [
+    {
+      "detector_id": "token_repeat_detector",
+      "detector_family": "lexical_repeat",
+      "input_sources": [
+        "R0W.generatedTokenIds",
+        "R0W.top1Trace"
+      ]
+    },
+    {
+      "detector_id": "piece_repeat_detector",
+      "detector_family": "surface_repeat",
+      "input_sources": [
+        "R0W.generatedPieces",
+        "R0W.generatedPieceTrace"
+      ]
+    },
+    {
+      "detector_id": "ngram_repeat_detector",
+      "detector_family": "sequence_repeat",
+      "input_sources": [
+        "R0W.generatedTokenIds",
+        "R0W.generatedPieces"
+      ]
+    },
+    {
+      "detector_id": "korean_morph_loop_detector",
+      "detector_family": "korean_surface_morph_loop",
+      "input_sources": [
+        "R0W.generatedPieces",
+        "QW-52A.HangulFeatureRow"
+      ]
+    },
+    {
+      "detector_id": "hangul_structure_detector",
+      "detector_family": "hangul_integrity",
+      "input_sources": [
+        "QW-52A.HangulFeatureRow",
+        "QW-52A.candidateSurface"
+      ]
+    },
+    {
+      "detector_id": "cheonjiin_qwave_detector",
+      "detector_family": "structural_qwave",
+      "input_sources": [
+        "QW-52A-R1.CheonjiinJasoStrokeFacade",
+        "QW-52A.QWavePulseVector",
+        "QW-52A.QWaveSyllableTransition"
+      ]
+    },
+    {
+      "detector_id": "context_attractor_detector",
+      "detector_family": "semantic_surface_attractor",
+      "input_sources": [
+        "R0W.generatedPieces",
+        "R0W.topKCandidatesByStep",
+        "R0W.repeatAnalysis"
+      ]
+    },
+    {
+      "detector_id": "projection_alignment_detector",
+      "detector_family": "projection_hidden_alignment",
+      "input_sources": [
+        "QW-52A-R3.CheonjiinProjectionAlignmentTrace"
+      ]
+    },
+    {
+      "detector_id": "gated_fusion_candidate_policy_detector",
+      "detector_family": "gated_fusion_policy",
+      "input_sources": [
+        "QW-52A-R4.CheonjiinGatedFusionCandidateTrace",
+        "QW-52A-R4.mutationPolicy"
+      ]
+    }
+  ]
+}

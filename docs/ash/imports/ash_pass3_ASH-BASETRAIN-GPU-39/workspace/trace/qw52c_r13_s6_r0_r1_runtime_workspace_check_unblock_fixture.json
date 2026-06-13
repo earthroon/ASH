@@ -1,0 +1,9 @@
+{
+  "patch_id": "QW-52C-R13-S6-R0-R1",
+  "legacy_example_feature": "legacy-runtime-example",
+  "runtime_profile_path_drift_sample": {
+    "before": "req.runtime_profile_path.as_ref().map(|p| p.display().to_string())",
+    "after": "req.runtime_profile.as_ref().map(|profile| profile.profile_path.display().to_string())"
+  },
+  "fixture_only": true
+}

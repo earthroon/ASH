@@ -1,0 +1,50 @@
+{
+  "schema_id": "qw52c_r13_s5_runtime_topk_trace_schema",
+  "schema_version": "1.0.0",
+  "patch_id": "QW-52C-R13-S5",
+  "base_patch": "QW-52C-R13-S4",
+  "schema_only": true,
+  "record_required_fields": [
+    "trace_id",
+    "session_id",
+    "prompt_id",
+    "model_id",
+    "model_vocab_cap",
+    "backend",
+    "decode_step",
+    "rank_base",
+    "topk_limit",
+    "actual_topk",
+    "selected_token_id",
+    "selected_token_piece",
+    "shadow_result_applied",
+    "runtime_apply_allowed",
+    "token_selection_mutated",
+    "token_rank_mutated",
+    "logit_mutated",
+    "sampler_mutated",
+    "evidence_kind"
+  ],
+  "forbidden_true_fields": [
+    "shadow_result_applied",
+    "runtime_apply_allowed",
+    "token_selection_mutated",
+    "token_rank_mutated",
+    "logit_mutated",
+    "sampler_mutated"
+  ],
+  "real_evidence_kinds": [
+    "RealRuntimeTopKTrace",
+    "RealRuntimeShadowTrace"
+  ],
+  "fixture_evidence_kinds": [
+    "StaticFixture",
+    "MockReplay",
+    "ParsedReceiptOnly"
+  ],
+  "runtime_apply_allowed": false,
+  "promotion_eligible": false,
+  "weight_commit_allowed": false,
+  "safe_profile_apply_allowed": false,
+  "policy_promotion_allowed": false
+}

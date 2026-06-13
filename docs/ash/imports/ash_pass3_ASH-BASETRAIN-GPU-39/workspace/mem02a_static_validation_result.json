@@ -1,0 +1,13 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MEM-02A",
+  "status": "PASS_STATIC_MACRO_RECURSION_HOTFIX_PENDING_LOCAL_CARGO_BUILD",
+  "cargo_available_in_bake_env": false,
+  "fixed_error": "recursion limit reached while expanding serde_json::json_internal in mem02_build_cache_lifecycle_receipt",
+  "fix": "replaced large json! object with serde_json::Map incremental inserts",
+  "checkpoint_modified": false,
+  "tokenizer_modified": false,
+  "safetensors_modified": false,
+  "lm_head_modified": false,
+  "final_norm_modified": false,
+  "ban_mask_modified": false
+}

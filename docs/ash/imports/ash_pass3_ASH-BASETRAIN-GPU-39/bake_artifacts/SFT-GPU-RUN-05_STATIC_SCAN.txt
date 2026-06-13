@@ -1,0 +1,22 @@
+SFT-GPU-RUN-05 STATIC SCAN
+
+Required module paths:
+- crates/ash_core/src/sft_gpu_operator_approval.rs
+- crates/lora_train/src/gpu_trained_operator_approval.rs
+- crates/burn_webgpu_backend/src/gpu_trained_operator_approval.rs
+
+Boundary checks:
+- operator_approval_allowed = true
+- promotion_intent_creation_allowed = true
+- review_queue_transition_allowed = true
+- promotion_apply_allowed = false
+- runtime_current_pointer_update_allowed = false
+- runtime_attach_allowed = false
+- lifecycle_mutation_allowed = false
+- slot_action_apply_allowed = false
+- rollback_execution_allowed = false
+- ash_binding_allowed = false
+
+Runtime checks:
+- compile validation pending
+- target operator approval runtime pending

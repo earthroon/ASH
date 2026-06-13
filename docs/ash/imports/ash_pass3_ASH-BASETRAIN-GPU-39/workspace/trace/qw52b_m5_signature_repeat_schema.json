@@ -1,0 +1,52 @@
+{
+  "patch_id": "QW-52B-M5",
+  "title": "QWave Signature Repeat Guard / Diversity Hash Trace Seal",
+  "base_patch": "QW-52B-M4",
+  "detector_id": "qwave_signature_repeat_guard",
+  "detector_family": "structural_diversity_hash_guard",
+  "config_default": {
+    "recent_window_size": 12,
+    "token_ngram_min": 2,
+    "token_ngram_max": 4,
+    "piece_ngram_min": 2,
+    "piece_ngram_max": 4,
+    "qwave_signature_weight": 0.3,
+    "cji_xyz_weight": 0.15,
+    "transition_hash_weight": 0.2,
+    "token_ngram_weight": 0.15,
+    "piece_ngram_weight": 0.2,
+    "low_risk_threshold": 0.2,
+    "medium_risk_threshold": 0.4,
+    "high_risk_threshold": 0.65,
+    "critical_risk_threshold": 0.85,
+    "min_available_signals": 2
+  },
+  "hash_policy": {
+    "hash_policy_version": "fnv1a64_v1",
+    "normalization_policy_version": "piece_norm_v1",
+    "cryptographic": false,
+    "deterministic": true,
+    "external_dependency_added": false
+  },
+  "mutation_policy_required": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "rerank_execution": false,
+    "memory_mutation": false
+  },
+  "implementation_language_policy": {
+    "frontend_js_ts_allowed": true,
+    "desktop_js_ts_allowed": true,
+    "crate_js_ts_allowed": false,
+    "core_detector_language": "Rust",
+    "validator_language": "Rust",
+    "gpu_compute_language": "WGPU/WGSL",
+    "python_judgment_allowed": false,
+    "node_judgment_allowed": false
+  }
+}

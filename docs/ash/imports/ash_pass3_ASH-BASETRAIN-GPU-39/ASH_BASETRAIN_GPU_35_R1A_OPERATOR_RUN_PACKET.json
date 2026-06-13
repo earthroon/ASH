@@ -1,0 +1,12 @@
+{
+  "manifest_env": "ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-35-R1AF",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-35-R2",
+  "operator_manifest_template_path": "target/selected_atlas_group_slot_0_manifest.template.json",
+  "pass": true,
+  "patch_id": "ASH-BASETRAIN-GPU-35-R1A",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_35_r1a_selected_group_manifest_binding_failure_triage --jobs 1",
+  "recommended_manifest_failure_triage_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r1a_selected_group_manifest_binding_failure_triage",
+  "runtime_gpu_required": false,
+  "selected_group_weight_load_required": false
+}

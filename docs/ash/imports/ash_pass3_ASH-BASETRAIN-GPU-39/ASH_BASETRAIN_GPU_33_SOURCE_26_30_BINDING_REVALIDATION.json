@@ -1,0 +1,30 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-33",
+  "source_26_binding_revalidated": true,
+  "source_26_stable_gpu_local_nll_loss": 7.624625205993652,
+  "source_26_cpu_reference_loss": 7.624619041439192,
+  "source_26_loss_kind": "local_window_nll_smoke_loss_candidate",
+  "source_26_loss_window_start": 0,
+  "source_26_loss_window_end": 2048,
+  "source_26_loss_window_size": 2048,
+  "source_26_target_token_id": 1,
+  "source_26_target_index_inside_local_window": 1,
+  "source_26_payload_digest_hex": "856552759fc5e7f0b0b7c7b2de78fe0f1e59f82b2ff7c935f819758572878052",
+  "source_30_binding_revalidated": true,
+  "source_30_formula_kind": "local_window_softmax_minus_target",
+  "source_30_gradient_formula": "dL_dlogits_i = softmax_i(logits) - one_hot_i(target)",
+  "source_30_cpu_candidate_digest_hex": "4a9f3db1bb85a18497a99b42b7eb0b19394bbaee68b751a968f1ae22b97ba1d8",
+  "source_30_candidate_dtype": "f32",
+  "source_30_candidate_shape": [
+    1,
+    1,
+    2048
+  ],
+  "source_30_candidate_element_count": 2048,
+  "source_30_candidate_bytes": 8192,
+  "source_30_candidate_sum_close_to_zero": true,
+  "source_30_candidate_finite": true,
+  "source_30_candidate_nan_count": 0,
+  "source_30_candidate_inf_count": 0,
+  "pass": true
+}

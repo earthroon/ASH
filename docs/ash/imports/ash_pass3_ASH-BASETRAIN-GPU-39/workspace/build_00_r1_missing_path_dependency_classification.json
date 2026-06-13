@@ -1,0 +1,32 @@
+{
+  "all_missing_paths_classified": true,
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "generated_at_utc": "2026-05-29T07:06:32Z",
+  "missing_path_dependencies": [
+    {
+      "classification": "optional_sidecar_dependency_missing",
+      "confirmed_by_cargo": false,
+      "default_features": false,
+      "default_member": false,
+      "dependency": "sherpa-rs",
+      "directly_required_by_default_member": false,
+      "features": [
+        "download-binaries"
+      ],
+      "from_member": "crates/asr_sidecar",
+      "from_package": "asr_sidecar",
+      "optional": true,
+      "path": "../../vendor/sherpa-rs-main/crates/sherpa-rs",
+      "path_exists": false,
+      "recommended_action": "restore_vendor_for_speech_sherpa_or_keep_asr_sidecar_non_default_and_gate_explicit_sherpa_build",
+      "resolved_path": "/mnt/data/build00r1_work/vendor/sherpa-rs-main/crates/sherpa-rs",
+      "resolved_path_relative_to_root": "vendor/sherpa-rs-main/crates/sherpa-rs",
+      "section": "dependencies",
+      "vendor_expected_but_absent": true,
+      "workspace_member": true
+    }
+  ],
+  "missing_path_dependency_count": 1,
+  "patch_id": "16AI-QW-38G-R6A-BUILD-00-R1",
+  "preceded_by": "16AI-QW-38G-R6A-BUILD-ENV-01"
+}

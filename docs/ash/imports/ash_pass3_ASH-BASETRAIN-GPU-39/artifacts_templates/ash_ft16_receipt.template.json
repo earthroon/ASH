@@ -1,0 +1,26 @@
+{
+  "patch_id": "ASH-FT-16",
+  "title": "Shadow Candidate Token ID Selection Smoke / No Decode No Generation Seal",
+  "status": "PASS_ASH_FT16_SHADOW_CANDIDATE_TOKEN_ID_SELECTION_SMOKE_NO_DECODE_NO_GENERATION",
+  "guards": {
+    "selection_mode": "deterministic_argmax_smoke",
+    "selected_token_id_created": true,
+    "token_id_committed": false,
+    "argmax_executed": true,
+    "sampling_executed": false,
+    "token_decode_executed": false,
+    "token_string_lookup_executed": false,
+    "decoded_text_created": false,
+    "generation_executed": false,
+    "user_prompt_evaluated": false,
+    "real_corpus_eval_executed": false,
+    "runtime_default_apply_executed": false,
+    "checkpoint_alias_rebind_executed": false,
+    "promotion_executed": false,
+    "model_config_mutation_executed": false,
+    "tokenizer_mutation_executed": false,
+    "optimizer_step_executed": false,
+    "train_executed": false
+  },
+  "verdict": "PASS_ASH_FT16_SHADOW_CANDIDATE_TOKEN_ID_SELECTION_SMOKE_NO_DECODE_NO_GENERATION"
+}

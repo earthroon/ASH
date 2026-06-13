@@ -1,0 +1,45 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-DECODE-03E",
+  "input_patch": "16AI-QW-38G-R6A-SALAD-04",
+  "status": "STATIC_BAKE_DEFINED_NOT_RUN",
+  "mode": "Off",
+  "default_enable": false,
+  "steps_observed": 0,
+  "gate": {
+    "can_apply_count": 0,
+    "denied_count": 0,
+    "strict_fail_count": 0
+  },
+  "overlay": {
+    "applied_count": 0,
+    "strict_guard_count": 0,
+    "panic_guard_count": 0,
+    "morph_penalty_enabled_count": 0,
+    "no_repeat_ngram_applied_count": 0,
+    "min_p_floor_applied_count": 0,
+    "top_p_ceiling_applied_count": 0
+  },
+  "targets": {
+    "josa_loop_count": 0,
+    "eomi_loop_count": 0,
+    "jamo_leak_count": 0,
+    "byte_jamo_leak_count": 0,
+    "syllable_fragment_loop_count": 0,
+    "eojeol_boundary_collapse_count": 0,
+    "punctuation_glue_loop_count": 0,
+    "mixed_morph_loop_count": 0
+  },
+  "safety": {
+    "unsupported_applied_count": 0,
+    "panic_candidate_executed_count": 0,
+    "rollback_executed_count": 0,
+    "stop_executed_count": 0,
+    "active_set_too_small_skip_count": 0,
+    "base_config_mutation_count": 0,
+    "clamp_violation_count": 0
+  },
+  "ready_for_eval02_long_horizon_soak": true,
+  "ready_for_default_guard_overlay": false,
+  "ready_for_medusa00": false,
+  "reason": "guard overlay controlled apply schema baked; runtime receipt not yet collected"
+}

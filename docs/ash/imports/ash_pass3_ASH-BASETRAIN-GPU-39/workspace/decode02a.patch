@@ -1,0 +1,1541 @@
+diff -ruN decode02a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md decode02a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md
+--- decode02a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md	2026-05-27 00:27:01.987946367 +0000
+@@ -0,0 +1,11 @@
++# 16AI-QW-38G-R6A-DECODE-02A Acceptance
++
++- static structure: PASS
++- candidate piece hint module: PASS
++- GPU hint buffer binding: PASS
++- candidate trace V3 fields: PASS
++- CPU/GPU runtime parity: NOT_RUN
++- cargo check: NOT_RUN
++- WGSL compile: NOT_RUN
++
++Execution status is intentionally NOT_RUN, not PASS.
+diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs decode02a_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
+--- decode02a_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 23:26:38.000000000 +0000
++++ decode02a_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:30:43.644849365 +0000
+@@ -486,6 +486,42 @@
+ }
+ 
+ #[derive(Debug, Clone)]
++pub struct GpuTransitionGuardConfig {
++    pub enabled: bool,
++    pub probe_only: bool,
++    pub min_new_tokens: u32,
++    pub decode_step: u32,
++    pub prev_token_id: u32,
++    pub prev_token_available: bool,
++    pub soft_penalty_scale: f32,
++    pub max_soft_penalty: f32,
++}
++
++impl Default for GpuTransitionGuardConfig {
++    fn default() -> Self {
++        Self { enabled: false, probe_only: true, min_new_tokens: 8, decode_step: 0, prev_token_id: 0, prev_token_available: false, soft_penalty_scale: 1.0, max_soft_penalty: 2.0 }
++    }
++}
++
++impl GpuTransitionGuardConfig {
++    pub fn sanitized(mut self) -> Self {
++        if !self.soft_penalty_scale.is_finite() || self.soft_penalty_scale < 0.0 { self.soft_penalty_scale = 1.0; }
++        if !self.max_soft_penalty.is_finite() || self.max_soft_penalty < 0.0 { self.max_soft_penalty = 2.0; }
++        self.max_soft_penalty = self.max_soft_penalty.min(8.0);
++        self
++    }
++}
++
++#[repr(C)]
++#[derive(Debug, Clone, Copy, Pod, Zeroable)]
++pub struct GpuCandidatePieceHintRaw {
++    pub token_id: u32,
++    pub class_bits: u32,
++    pub risk_bits: u32,
++    pub reserved0: u32,
++}
++
++#[derive(Debug, Clone)]
+ pub struct GpuSamplingConfig {
+     pub vocab_size: usize,
+     pub temperature: f32,
+@@ -495,6 +531,8 @@
+     pub semantic_prior: GpuSemanticPriorConfig,
+     pub qwave_scores: Option<Vec<f32>>,
+     pub deltak_scores: Option<Vec<f32>>,
++    pub transition_guard: GpuTransitionGuardConfig,
++    pub candidate_piece_hints: Option<Vec<GpuCandidatePieceHintRaw>>,
+     pub seed_lo: u32,
+     pub seed_hi: u32,
+     pub rollout_policy: GpuSamplingRollout,
+@@ -544,6 +582,9 @@
+         if let Some(scores) = self.deltak_scores.as_ref() {
+             if scores.len() < self.vocab_size { bail!("gpu sampling: deltak score buffer shorter than vocab_size"); }
+         }
++        if let Some(hints) = self.candidate_piece_hints.as_ref() {
++            if hints.len() < self.vocab_size { bail!("gpu sampling: candidate piece hint buffer shorter than vocab_size"); }
++        }
+         if !self.compare_score_eps.is_finite() || self.compare_score_eps < 0.0 {
+             bail!("gpu sampling: compare_score_eps must be >= 0");
+         }
+@@ -578,6 +619,15 @@
+     pub deltak_weight: f32,
+     pub cross_weight: f32,
+     pub bias_cap: f32,
++    pub transition_guard_enabled: u32,
++    pub transition_guard_probe_only: u32,
++    pub transition_min_new_tokens: u32,
++    pub transition_decode_step: u32,
++    pub transition_prev_token_id: u32,
++    pub transition_prev_token_available: u32,
++    pub transition_soft_penalty_scale: f32,
++    pub transition_max_soft_penalty: f32,
++    pub _transition_pad1: [f32; 2],
+ }
+ 
+ impl GpuSamplingUniform {
+@@ -604,6 +654,15 @@
+             deltak_weight: v.semantic_prior.sanitized().deltak_weight,
+             cross_weight: v.semantic_prior.sanitized().cross_weight,
+             bias_cap: v.semantic_prior.sanitized().bias_cap,
++            transition_guard_enabled: if v.transition_guard.enabled { 1 } else { 0 },
++            transition_guard_probe_only: if v.transition_guard.probe_only { 1 } else { 0 },
++            transition_min_new_tokens: v.transition_guard.min_new_tokens,
++            transition_decode_step: v.transition_guard.decode_step,
++            transition_prev_token_id: v.transition_guard.prev_token_id,
++            transition_prev_token_available: if v.transition_guard.prev_token_available { 1 } else { 0 },
++            transition_soft_penalty_scale: v.transition_guard.sanitized().soft_penalty_scale,
++            transition_max_soft_penalty: v.transition_guard.sanitized().max_soft_penalty,
++            _transition_pad1: [0.0, 0.0],
+         }
+     }
+ }
+@@ -659,6 +718,10 @@
+     prob: f32,
+     semantic_bias: f32,
+     weighted_logit: f32,
++    transition_risk: f32,
++    transition_penalty: f32,
++    transition_action: u32,
++    transition_reason_mask: u32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -671,6 +734,10 @@
+     pub prob: f32,
+     pub semantic_bias: f32,
+     pub weighted_logit: f32,
++    pub transition_risk: f32,
++    pub transition_penalty: f32,
++    pub transition_action: u32,
++    pub transition_reason_mask: u32,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -738,6 +805,7 @@
+     pub candidate_trace_entries: Arc<BackendBuffer>,
+     pub qwave_scores: Arc<BackendBuffer>,
+     pub deltak_scores: Arc<BackendBuffer>,
++    pub candidate_piece_hints: Arc<BackendBuffer>,
+ }
+ 
+ pub struct GpuSamplingRuntime {
+@@ -835,6 +903,7 @@
+                 rw_storage_entry(8),
+                 read_storage_entry(9),
+                 read_storage_entry(10),
++                read_storage_entry(11),
+             ],
+         });
+         let final_select_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
+@@ -1290,6 +1359,10 @@
+                     binding: 10,
+                     resource: dispatch.deltak_scores.as_entire_binding(),
+                 },
++                backend_wgpu::BindGroupEntry {
++                    binding: 11,
++                    resource: dispatch.candidate_piece_hints.as_entire_binding(),
++                },
+             ],
+         });
+ 
+@@ -1854,6 +1927,11 @@
+             cfg.deltak_scores.as_deref(),
+             cfg.vocab_size,
+         )?);
++        let candidate_piece_hints = Arc::new(self.create_candidate_piece_hint_buffer(
++            "gpu_sampling.transition.candidate_piece_hints",
++            cfg.candidate_piece_hints.as_deref(),
++            cfg.vocab_size,
++        )?);
+ 
+         Ok(GpuSamplingDispatch {
+             uniform,
+@@ -1880,9 +1958,32 @@
+             candidate_trace_entries,
+             qwave_scores,
+             deltak_scores,
++            candidate_piece_hints,
+         })
+     }
+ 
++    fn create_candidate_piece_hint_buffer(
++        &self,
++        label: &'static str,
++        hints: Option<&[GpuCandidatePieceHintRaw]>,
++        vocab_size: usize,
++    ) -> Result<BackendBuffer> {
++        let mut zero_hints;
++        let slice = if let Some(hints) = hints {
++            &hints[..vocab_size]
++        } else {
++            zero_hints = (0..vocab_size.max(1))
++                .map(|idx| GpuCandidatePieceHintRaw { token_id: idx as u32, class_bits: 0, risk_bits: 0, reserved0: 0 })
++                .collect::<Vec<_>>();
++            &zero_hints[..]
++        };
++        Ok(self.device.create_buffer_init(&BackendBufferInitDescriptor {
++            label: Some(label),
++            contents: cast_slice(slice),
++            usage: BackendBufferUsages::STORAGE | BackendBufferUsages::COPY_DST | BackendBufferUsages::COPY_SRC,
++        }))
++    }
++
+     fn create_semantic_score_buffer(
+         &self,
+         label: &'static str,
+@@ -2126,6 +2227,10 @@
+                 prob: raw.prob,
+                 semantic_bias: raw.semantic_bias,
+                 weighted_logit: raw.weighted_logit,
++                transition_risk: raw.transition_risk,
++                transition_penalty: raw.transition_penalty,
++                transition_action: raw.transition_action,
++                transition_reason_mask: raw.transition_reason_mask,
+             };
+             if raw.stage == 1 {
+                 active_ids.push(raw.token_id);
+@@ -2718,6 +2823,8 @@
+             semantic_prior: GpuSemanticPriorConfig::default(),
+             qwave_scores: None,
+             deltak_scores: None,
++            transition_guard: GpuTransitionGuardConfig::default(),
++            candidate_piece_hints: None,
+             seed_lo: 1,
+             seed_hi: 2,
+             rollout_policy: GpuSamplingRollout::MultistageOnly,
+diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/lib.rs decode02a_work/crates/burn_webgpu_backend/src/lib.rs
+--- decode02a_orig/crates/burn_webgpu_backend/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
++++ decode02a_work/crates/burn_webgpu_backend/src/lib.rs	2026-05-27 00:27:01.980585453 +0000
+@@ -181,7 +181,7 @@
+ pub use text_density_gate::{build_text_density_gate_uniform, packed_path_id, packed_path_name, TextDensityBindingSummary, TextDensityGateProbeResult, TextDensityGateRuntime, TextDensityGateUniform, SHADER_TEXT_DENSITY_GATE};
+ 
+ 
+-pub use gpu_sampling::{GpuSamplingBenchMode, GpuSamplingCompareReport, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingFallbackReason, GpuSamplingMode, GpuSamplingParallelMode, GpuSamplingParallelPlan, GpuSamplingPath, GpuSamplingPerfCounters, GpuSamplingPlanKind, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, GpuSamplingSelectedTokenSource, GpuTopPMode, SHADER_GPU_SAMPLING_NOISE, SHADER_GPU_SAMPLING_SELECT, SHADER_GPU_SAMPLING_STATS_REDUCE, SHADER_GPU_SAMPLING_TOPK, SHADER_GPU_SAMPLING_TOPP_SCAN};
++pub use gpu_sampling::{GpuCandidatePieceHintRaw, GpuTransitionGuardConfig, GpuSamplingBenchMode, GpuSamplingCompareReport, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingFallbackReason, GpuSamplingMode, GpuSamplingParallelMode, GpuSamplingParallelPlan, GpuSamplingPath, GpuSamplingPerfCounters, GpuSamplingPlanKind, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, GpuSamplingSelectedTokenSource, GpuTopPMode, SHADER_GPU_SAMPLING_NOISE, SHADER_GPU_SAMPLING_SELECT, SHADER_GPU_SAMPLING_STATS_REDUCE, SHADER_GPU_SAMPLING_TOPK, SHADER_GPU_SAMPLING_TOPP_SCAN};
+ 
+ pub use existing_device_bootstrap::{bootstrap_existing_device, ExistingDeviceBootstrap};
+ 
+diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl decode02a_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
+--- decode02a_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 23:24:55.000000000 +0000
++++ decode02a_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:30:43.647239136 +0000
+@@ -34,6 +34,16 @@
+   deltak_weight: f32,
+   cross_weight: f32,
+   bias_cap: f32,
++  transition_guard_enabled: u32,
++  transition_guard_probe_only: u32,
++  transition_min_new_tokens: u32,
++  transition_decode_step: u32,
++  transition_prev_token_id: u32,
++  transition_prev_token_available: u32,
++  transition_soft_penalty_scale: f32,
++  transition_max_soft_penalty: f32,
++  _transition_pad1_a: f32,
++  _transition_pad1_b: f32,
+ };
+ 
+ struct SamplingStats {
+@@ -67,6 +77,24 @@
+   prob: f32,
+   semantic_bias: f32,
+   weighted_logit: f32,
++  transition_risk: f32,
++  transition_penalty: f32,
++  transition_action: u32,
++  transition_reason_mask: u32,
++};
++
++struct CandidatePieceHintRaw {
++  token_id: u32,
++  class_bits: u32,
++  risk_bits: u32,
++  reserved0: u32,
++};
++
++struct TransitionDecisionRaw {
++  risk: f32,
++  penalty: f32,
++  action: u32,
++  reason_mask: u32,
+ };
+ 
+ @group(0) @binding(0) var<uniform> u: SamplingUniform;
+@@ -80,10 +108,58 @@
+ @group(0) @binding(8) var<storage, read_write> trace_entries: array<CandidateTraceEntry>;
+ @group(0) @binding(9) var<storage, read> qwave_scores: array<f32>;
+ @group(0) @binding(10) var<storage, read> deltak_scores: array<f32>;
++@group(0) @binding(11) var<storage, read> candidate_piece_hints: array<CandidatePieceHintRaw>;
+ 
+ const NEG_INF: f32 = -3.402823e38;
+ const INVALID_INDEX: u32 = 0xffffffffu;
+-
++const CLASS_PARTICLE_LIKE: u32 = 1u << 3u;
++const CLASS_ENDING_LIKE: u32 = 1u << 4u;
++const CLASS_GENERIC_CONTINUATION: u32 = 1u << 5u;
++const CLASS_PUNCTUATION: u32 = 1u << 6u;
++const CLASS_EMOTIONAL_REPEAT: u32 = 1u << 7u;
++const CLASS_BYTE_TOKEN: u32 = 1u << 8u;
++const CLASS_CONTROL_TOKEN: u32 = 1u << 9u;
++const CLASS_PAD_TOKEN: u32 = 1u << 10u;
++const CLASS_EOS_TOKEN: u32 = 1u << 11u;
++const CLASS_MOJIBAKE_SUSPECT: u32 = 1u << 13u;
++const R_PAD: u32 = 1u << 0u;
++const R_CONTROL: u32 = 1u << 1u;
++const R_EOS_BEFORE_MIN_NEW: u32 = 1u << 2u;
++const R_GENERIC_EOS: u32 = 1u << 3u;
++const R_BYTE_BOUNDARY: u32 = 1u << 5u;
++const R_MOJIBAKE: u32 = 1u << 6u;
++const R_DOUBLE_PARTICLE: u32 = 1u << 7u;
++const R_DOUBLE_ENDING: u32 = 1u << 8u;
++const R_REPEATED_PUNCT: u32 = 1u << 9u;
++const TRANS_ALLOW: u32 = 0u;
++const TRANS_PENALIZE: u32 = 1u;
++const TRANS_HARD_BLOCK: u32 = 2u;
++const TRANS_UNAVAILABLE: u32 = 3u;
++
++
++fn has_class(h: CandidatePieceHintRaw, bit: u32) -> bool { return (h.class_bits & bit) != 0u; }
++
++fn transition_decision_at(index: u32) -> TransitionDecisionRaw {
++  if (u.transition_guard_enabled == 0u) { return TransitionDecisionRaw(0.0, 0.0, TRANS_ALLOW, 0u); }
++  let cand = candidate_piece_hints[index];
++  var prev = CandidatePieceHintRaw(0u, 0u, 0u, 0u);
++  if (u.transition_prev_token_available != 0u && u.transition_prev_token_id < u.vocab_size) { prev = candidate_piece_hints[u.transition_prev_token_id]; }
++  var risk = 0.0;
++  var action = TRANS_ALLOW;
++  var reasons = 0u;
++  if (has_class(cand, CLASS_PAD_TOKEN)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_PAD; }
++  if (has_class(cand, CLASS_CONTROL_TOKEN) && !has_class(cand, CLASS_EOS_TOKEN) && !has_class(cand, CLASS_PAD_TOKEN)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_CONTROL; }
++  if (has_class(cand, CLASS_EOS_TOKEN) && u.transition_decode_step < u.transition_min_new_tokens) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_EOS_BEFORE_MIN_NEW; }
++  if (has_class(prev, CLASS_GENERIC_CONTINUATION) && has_class(cand, CLASS_EOS_TOKEN)) { risk = max(risk, 0.95); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_GENERIC_EOS; }
++  if (has_class(cand, CLASS_MOJIBAKE_SUSPECT)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_MOJIBAKE; }
++  if ((has_class(prev, CLASS_BYTE_TOKEN) && !has_class(cand, CLASS_BYTE_TOKEN)) || (!has_class(prev, CLASS_BYTE_TOKEN) && has_class(cand, CLASS_BYTE_TOKEN))) { risk = max(risk, 0.7); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_BYTE_BOUNDARY; }
++  if (has_class(prev, CLASS_PARTICLE_LIKE) && has_class(cand, CLASS_PARTICLE_LIKE)) { risk = max(risk, 0.6); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_DOUBLE_PARTICLE; }
++  if (has_class(prev, CLASS_ENDING_LIKE) && has_class(cand, CLASS_ENDING_LIKE)) { risk = max(risk, 0.5); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_DOUBLE_ENDING; }
++  if (has_class(prev, CLASS_PUNCTUATION) && has_class(cand, CLASS_PUNCTUATION) && !has_class(cand, CLASS_EMOTIONAL_REPEAT)) { risk = max(risk, 0.6); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_REPEATED_PUNCT; }
++  var penalty = min(risk * u.transition_soft_penalty_scale, u.transition_max_soft_penalty);
++  if (u.transition_guard_probe_only != 0u) { penalty = 0.0; }
++  return TransitionDecisionRaw(risk, penalty, action, reasons);
++}
+ 
+ fn safe_semantic_score(v: f32) -> f32 {
+   if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
+@@ -101,7 +177,9 @@
+ }
+ 
+ fn weighted_logit_at(index: u32) -> f32 {
+-  return scaled_logits[index] + semantic_bias_at(index);
++  let t = transition_decision_at(index);
++  if (t.action == TRANS_HARD_BLOCK && u.transition_guard_probe_only == 0u) { return NEG_INF; }
++  return scaled_logits[index] + semantic_bias_at(index) - t.penalty;
+ }
+ 
+ fn topk_enabled(vocab: u32, requested_k: u32) -> bool {
+diff -ruN decode02a_orig/crates/model_core/src/decode_candidate_piece_hints.rs decode02a_work/crates/model_core/src/decode_candidate_piece_hints.rs
+--- decode02a_orig/crates/model_core/src/decode_candidate_piece_hints.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/crates/model_core/src/decode_candidate_piece_hints.rs	2026-05-27 00:27:01.977401745 +0000
+@@ -0,0 +1,212 @@
++use serde::{Deserialize, Serialize};
++
++pub const CLASS_TEXT: u32 = 1 << 0;
++pub const CLASS_SENTENCEPIECE_TEXT: u32 = 1 << 1;
++pub const CLASS_KOREAN_TEXT: u32 = 1 << 2;
++pub const CLASS_PARTICLE_LIKE: u32 = 1 << 3;
++pub const CLASS_ENDING_LIKE: u32 = 1 << 4;
++pub const CLASS_GENERIC_CONTINUATION: u32 = 1 << 5;
++pub const CLASS_PUNCTUATION: u32 = 1 << 6;
++pub const CLASS_EMOTIONAL_REPEAT: u32 = 1 << 7;
++pub const CLASS_BYTE_TOKEN: u32 = 1 << 8;
++pub const CLASS_CONTROL_TOKEN: u32 = 1 << 9;
++pub const CLASS_PAD_TOKEN: u32 = 1 << 10;
++pub const CLASS_EOS_TOKEN: u32 = 1 << 11;
++pub const CLASS_UNKNOWN_TOKEN: u32 = 1 << 12;
++pub const CLASS_MOJIBAKE_SUSPECT: u32 = 1 << 13;
++pub const CLASS_WHITESPACE_ONLY: u32 = 1 << 14;
++
++pub const RISK_HARD_BLOCK_CANDIDATE: u32 = 1 << 0;
++pub const RISK_BYTE_BOUNDARY: u32 = 1 << 1;
++pub const RISK_PUNCTUATION_REPEAT: u32 = 1 << 2;
++pub const RISK_GENERIC_EOS: u32 = 1 << 3;
++pub const RISK_DOUBLE_PARTICLE: u32 = 1 << 4;
++pub const RISK_DOUBLE_ENDING: u32 = 1 << 5;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum CandidatePieceClass {
++    Text,
++    SentencePieceText,
++    KoreanText,
++    ParticleLike,
++    EndingLike,
++    GenericContinuation,
++    Punctuation,
++    EmotionalRepeat,
++    ByteToken,
++    ControlToken,
++    PadToken,
++    EosToken,
++    UnknownToken,
++    MojibakeSuspect,
++    WhitespaceOnly,
++}
++
++#[repr(C)]
++#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
++pub struct CandidatePieceHintRaw {
++    pub token_id: u32,
++    pub class_bits: u32,
++    pub risk_bits: u32,
++    pub reserved0: u32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct CandidatePieceHintTable {
++    pub vocab_size: usize,
++    pub vocab_hash: String,
++    pub hints: Vec<CandidatePieceHintRaw>,
++    pub summary: CandidatePieceHintSummary,
++}
++
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct CandidatePieceHintSummary {
++    pub control_count: usize,
++    pub pad_count: usize,
++    pub eos_count: usize,
++    pub byte_count: usize,
++    pub mojibake_suspect_count: usize,
++    pub korean_text_count: usize,
++    pub generic_continuation_count: usize,
++    pub particle_like_count: usize,
++    pub ending_like_count: usize,
++}
++
++impl CandidatePieceHintTable {
++    pub fn validate_alignment(&self) -> bool {
++        self.hints.len() == self.vocab_size
++            && self.hints.iter().enumerate().all(|(idx, hint)| hint.token_id as usize == idx)
++    }
++
++    pub fn to_backend_hints(&self) -> Vec<burn_webgpu_backend::gpu_sampling::GpuCandidatePieceHintRaw> {
++        self.hints
++            .iter()
++            .map(|h| burn_webgpu_backend::gpu_sampling::GpuCandidatePieceHintRaw {
++                token_id: h.token_id,
++                class_bits: h.class_bits,
++                risk_bits: h.risk_bits,
++                reserved0: h.reserved0,
++            })
++            .collect()
++    }
++}
++
++pub fn build_candidate_piece_hint_table(
++    vocab: &[(u32, String)],
++    eos_token_id: Option<u32>,
++    pad_token_id: Option<u32>,
++    vocab_hash: String,
++) -> CandidatePieceHintTable {
++    let max_id = vocab.iter().map(|(id, _)| *id as usize).max().unwrap_or(0);
++    let vocab_size = max_id.saturating_add(1).max(vocab.len());
++    let mut hints = vec![CandidatePieceHintRaw::default(); vocab_size];
++    for idx in 0..vocab_size {
++        hints[idx].token_id = idx as u32;
++    }
++    let mut summary = CandidatePieceHintSummary::default();
++    for (id, piece) in vocab {
++        let idx = *id as usize;
++        if idx >= hints.len() { continue; }
++        let (class_bits, risk_bits) = classify_piece_hint(*id, piece, eos_token_id, pad_token_id);
++        hints[idx] = CandidatePieceHintRaw { token_id: *id, class_bits, risk_bits, reserved0: 0 };
++        if class_bits & CLASS_CONTROL_TOKEN != 0 { summary.control_count += 1; }
++        if class_bits & CLASS_PAD_TOKEN != 0 { summary.pad_count += 1; }
++        if class_bits & CLASS_EOS_TOKEN != 0 { summary.eos_count += 1; }
++        if class_bits & CLASS_BYTE_TOKEN != 0 { summary.byte_count += 1; }
++        if class_bits & CLASS_MOJIBAKE_SUSPECT != 0 { summary.mojibake_suspect_count += 1; }
++        if class_bits & CLASS_KOREAN_TEXT != 0 { summary.korean_text_count += 1; }
++        if class_bits & CLASS_GENERIC_CONTINUATION != 0 { summary.generic_continuation_count += 1; }
++        if class_bits & CLASS_PARTICLE_LIKE != 0 { summary.particle_like_count += 1; }
++        if class_bits & CLASS_ENDING_LIKE != 0 { summary.ending_like_count += 1; }
++    }
++    CandidatePieceHintTable { vocab_size, vocab_hash, hints, summary }
++}
++
++pub fn classify_piece_hint(
++    token_id: u32,
++    piece: &str,
++    eos_token_id: Option<u32>,
++    pad_token_id: Option<u32>,
++) -> (u32, u32) {
++    let mut class_bits = 0u32;
++    let mut risk_bits = 0u32;
++    let trimmed = piece.trim();
++    let bare = trimmed.trim_start_matches('▁');
++
++    if !trimmed.is_empty() { class_bits |= CLASS_TEXT; }
++    if trimmed.starts_with('▁') { class_bits |= CLASS_SENTENCEPIECE_TEXT; }
++    if contains_hangul(bare) { class_bits |= CLASS_KOREAN_TEXT; }
++    if trimmed.is_empty() { class_bits |= CLASS_WHITESPACE_ONLY; }
++
++    if pad_token_id == Some(token_id) || trimmed == "<pad>" {
++        class_bits |= CLASS_PAD_TOKEN | CLASS_CONTROL_TOKEN;
++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
++    }
++    if eos_token_id == Some(token_id) || matches!(trimmed, "<eos>" | "</s>") {
++        class_bits |= CLASS_EOS_TOKEN | CLASS_CONTROL_TOKEN;
++    }
++    if matches!(trimmed, "<bos>" | "<s>") || trimmed.starts_with("<glossary:") || trimmed.starts_with("<task:") || trimmed.starts_with("<lang:") {
++        class_bits |= CLASS_CONTROL_TOKEN;
++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
++    }
++    if trimmed == "<unk>" {
++        class_bits |= CLASS_UNKNOWN_TOKEN | CLASS_CONTROL_TOKEN;
++    }
++    if trimmed.starts_with("<byte:") || trimmed.starts_with("<0x") {
++        class_bits |= CLASS_BYTE_TOKEN;
++        risk_bits |= RISK_BYTE_BOUNDARY;
++    }
++    if mojibake_suspected(trimmed) {
++        class_bits |= CLASS_MOJIBAKE_SUSPECT;
++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
++    }
++    if is_generic_continuation(bare) {
++        class_bits |= CLASS_GENERIC_CONTINUATION;
++        risk_bits |= RISK_GENERIC_EOS;
++    }
++    if is_particle_like(bare) {
++        class_bits |= CLASS_PARTICLE_LIKE;
++        risk_bits |= RISK_DOUBLE_PARTICLE;
++    }
++    if is_ending_like(bare) {
++        class_bits |= CLASS_ENDING_LIKE;
++        risk_bits |= RISK_DOUBLE_ENDING;
++    }
++    if is_punctuation(bare) {
++        class_bits |= CLASS_PUNCTUATION;
++        risk_bits |= RISK_PUNCTUATION_REPEAT;
++    }
++    if is_emotional_repeat(bare) {
++        class_bits |= CLASS_EMOTIONAL_REPEAT;
++        risk_bits &= !RISK_HARD_BLOCK_CANDIDATE;
++    }
++    (class_bits, risk_bits)
++}
++
++fn contains_hangul(s: &str) -> bool {
++    s.chars().any(|c| ('\u{AC00}'..='\u{D7A3}').contains(&c) || ('\u{3130}'..='\u{318F}').contains(&c))
++}
++
++fn is_generic_continuation(s: &str) -> bool {
++    matches!(s, "이어가고" | "그리고" | "하지만" | "그러나" | "때문에" | "즉" | "그래서" | "따라서" | "그러므로" | "또한")
++}
++
++fn is_particle_like(s: &str) -> bool {
++    matches!(s, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "의")
++}
++
++fn is_ending_like(s: &str) -> bool {
++    matches!(s, "다" | "요" | "죠" | "까" | "네" | "습니다" | "합니다" | "했다" | "한다")
++}
++
++fn is_punctuation(s: &str) -> bool {
++    matches!(s, "!" | "?" | "." | "," | "。" | "…")
++}
++
++fn is_emotional_repeat(s: &str) -> bool {
++    matches!(s, "ㅋ" | "ㅠ" | "ㅜ" | ";")
++}
++
++pub fn mojibake_suspected(s: &str) -> bool {
++    s.contains('�') || s.contains("?댁") || s.contains('媛') || s.contains('怨') || s.contains('Ã') || s.contains('ì') || s.contains('ê')
++}
+diff -ruN decode02a_orig/crates/model_core/src/generation_sampling.rs decode02a_work/crates/model_core/src/generation_sampling.rs
+--- decode02a_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:12:51.000000000 +0000
++++ decode02a_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:30:43.646535904 +0000
+@@ -2,6 +2,7 @@
+ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
+ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
+ use crate::decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext};
++use crate::decode_candidate_piece_hints::CandidatePieceHintTable;
+ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
+ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
+ use std::collections::BTreeMap;
+@@ -673,6 +674,22 @@
+     }
+ }
+ 
++impl From<TransitionGuardConfig> for burn_webgpu_backend::gpu_sampling::GpuTransitionGuardConfig {
++    fn from(value: TransitionGuardConfig) -> Self {
++        let cfg = value.sanitized();
++        Self {
++            enabled: cfg.enabled,
++            probe_only: cfg.probe_only,
++            min_new_tokens: cfg.min_new_tokens_for_eos as u32,
++            decode_step: 0,
++            prev_token_id: 0,
++            prev_token_available: false,
++            soft_penalty_scale: cfg.soft_penalty_scale,
++            max_soft_penalty: cfg.max_soft_penalty,
++        }
++    }
++}
++
+ impl From<SemanticPriorConfig> for GpuSemanticPriorConfig {
+     fn from(value: SemanticPriorConfig) -> Self {
+         let cfg = value.sanitized();
+@@ -716,6 +733,7 @@
+     pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
+     pub transition_guard: TransitionGuardConfig,
+     pub transition_context: Option<TransitionRuntimeContext>,
++    pub candidate_piece_hints: Option<CandidatePieceHintTable>,
+     pub seed: Option<u64>,
+     pub stop_sequences: Vec<String>,
+     pub min_new_tokens: usize,
+@@ -751,6 +769,7 @@
+             semantic_score_snapshot: None,
+             transition_guard: TransitionGuardConfig::default(),
+             transition_context: None,
++            candidate_piece_hints: None,
+             seed: None,
+             stop_sequences: Vec::new(),
+             min_new_tokens: 0,
+@@ -813,6 +832,13 @@
+             SamplingRolloutPolicy::CompareShadow => GpuSamplingRollout::CompareShadow,
+             SamplingRolloutPolicy::CompareAndFallback => GpuSamplingRollout::CompareAndFallback,
+         };
++        let mut gpu_transition_guard: burn_webgpu_backend::gpu_sampling::GpuTransitionGuardConfig = self.transition_guard.clone().into();
++        gpu_transition_guard.decode_step = self.transition_context.as_ref().map(|ctx| ctx.step as u32).unwrap_or(0);
++        if let Some(prev) = self.transition_context.as_ref().and_then(|ctx| ctx.prev_token_id) {
++            gpu_transition_guard.prev_token_id = prev;
++            gpu_transition_guard.prev_token_available = true;
++        }
++
+         GpuSamplingConfig {
+             vocab_size,
+             temperature: if self.temperature > 0.0 { self.temperature } else { 1.0 },
+@@ -822,6 +848,8 @@
+             semantic_prior: self.semantic_prior.sanitized().into(),
+             qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
+             deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
++            transition_guard: gpu_transition_guard,
++            candidate_piece_hints: self.candidate_piece_hints.as_ref().map(|table| table.to_backend_hints()),
+             seed_lo: (seed & 0xffff_ffff) as u32,
+             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
+             rollout_policy,
+@@ -2484,6 +2512,8 @@
+             } else {
+                 "selected_and_recovery_only_gpu_candidate_trace_unavailable".to_string()
+             },
++            transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
++            transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
+         };
+         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
+         let strict_demote = receipt.parity.strict_demoted;
+diff -ruN decode02a_orig/crates/model_core/src/lib.rs decode02a_work/crates/model_core/src/lib.rs
+--- decode02a_orig/crates/model_core/src/lib.rs	2026-05-27 00:12:51.000000000 +0000
++++ decode02a_work/crates/model_core/src/lib.rs	2026-05-27 00:27:01.977925812 +0000
+@@ -11,6 +11,7 @@
+ mod sampling_helpers;
+ mod cpu_oracle_sampler;
+ mod decode_transition_guard;
++mod decode_candidate_piece_hints;
+ mod sampler_parity;
+ mod sampler_parity_validation;
+ mod minp_c1a_smoke;
+@@ -65,6 +66,10 @@
+ 
+ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
+ pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, transition_guard_config_from_env, evaluate_token_transition};
++pub use decode_candidate_piece_hints::{
++    CandidatePieceClass, CandidatePieceHintRaw, CandidatePieceHintTable, CandidatePieceHintSummary,
++    build_candidate_piece_hint_table, classify_piece_hint,
++};
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+diff -ruN decode02a_orig/crates/model_core/src/sampler_parity.rs decode02a_work/crates/model_core/src/sampler_parity.rs
+--- decode02a_orig/crates/model_core/src/sampler_parity.rs	2026-05-26 23:14:11.000000000 +0000
++++ decode02a_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:27:01.983692663 +0000
+@@ -68,6 +68,8 @@
+     pub final_overflow: bool,
+     pub trace_top_n: usize,
+     pub trace_completeness: String,
++    pub transition_actions_head: Vec<u32>,
++    pub transition_reason_masks_head: Vec<u32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -96,6 +98,8 @@
+     pub selected_match: bool,
+     pub trace_truncated: bool,
+     pub strict_demoted: bool,
++    pub transition_action_match: Option<bool>,
++    pub transition_reason_match: Option<bool>,
+     pub status: String,
+     pub reason: String,
+ }
+@@ -237,6 +241,8 @@
+             selected_match,
+             trace_truncated,
+             strict_demoted,
++            transition_action_match: None,
++            transition_reason_match: None,
+             status,
+             reason,
+         },
+diff -ruN decode02a_orig/workspace/decode02a.patch decode02a_work/workspace/decode02a.patch
+--- decode02a_orig/workspace/decode02a.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a.patch	2026-05-27 00:31:16.813839530 +0000
+@@ -0,0 +1,704 @@
++diff -ruN decode02a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md decode02a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md
++--- decode02a_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ decode02a_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02A_acceptance.md	2026-05-27 00:27:01.987946367 +0000
++@@ -0,0 +1,11 @@
+++# 16AI-QW-38G-R6A-DECODE-02A Acceptance
+++
+++- static structure: PASS
+++- candidate piece hint module: PASS
+++- GPU hint buffer binding: PASS
+++- candidate trace V3 fields: PASS
+++- CPU/GPU runtime parity: NOT_RUN
+++- cargo check: NOT_RUN
+++- WGSL compile: NOT_RUN
+++
+++Execution status is intentionally NOT_RUN, not PASS.
++diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs decode02a_work/crates/burn_webgpu_backend/src/gpu_sampling.rs
++--- decode02a_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-26 23:26:38.000000000 +0000
+++++ decode02a_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-05-27 00:30:43.644849365 +0000
++@@ -486,6 +486,42 @@
++ }
++ 
++ #[derive(Debug, Clone)]
+++pub struct GpuTransitionGuardConfig {
+++    pub enabled: bool,
+++    pub probe_only: bool,
+++    pub min_new_tokens: u32,
+++    pub decode_step: u32,
+++    pub prev_token_id: u32,
+++    pub prev_token_available: bool,
+++    pub soft_penalty_scale: f32,
+++    pub max_soft_penalty: f32,
+++}
+++
+++impl Default for GpuTransitionGuardConfig {
+++    fn default() -> Self {
+++        Self { enabled: false, probe_only: true, min_new_tokens: 8, decode_step: 0, prev_token_id: 0, prev_token_available: false, soft_penalty_scale: 1.0, max_soft_penalty: 2.0 }
+++    }
+++}
+++
+++impl GpuTransitionGuardConfig {
+++    pub fn sanitized(mut self) -> Self {
+++        if !self.soft_penalty_scale.is_finite() || self.soft_penalty_scale < 0.0 { self.soft_penalty_scale = 1.0; }
+++        if !self.max_soft_penalty.is_finite() || self.max_soft_penalty < 0.0 { self.max_soft_penalty = 2.0; }
+++        self.max_soft_penalty = self.max_soft_penalty.min(8.0);
+++        self
+++    }
+++}
+++
+++#[repr(C)]
+++#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+++pub struct GpuCandidatePieceHintRaw {
+++    pub token_id: u32,
+++    pub class_bits: u32,
+++    pub risk_bits: u32,
+++    pub reserved0: u32,
+++}
+++
+++#[derive(Debug, Clone)]
++ pub struct GpuSamplingConfig {
++     pub vocab_size: usize,
++     pub temperature: f32,
++@@ -495,6 +531,8 @@
++     pub semantic_prior: GpuSemanticPriorConfig,
++     pub qwave_scores: Option<Vec<f32>>,
++     pub deltak_scores: Option<Vec<f32>>,
+++    pub transition_guard: GpuTransitionGuardConfig,
+++    pub candidate_piece_hints: Option<Vec<GpuCandidatePieceHintRaw>>,
++     pub seed_lo: u32,
++     pub seed_hi: u32,
++     pub rollout_policy: GpuSamplingRollout,
++@@ -544,6 +582,9 @@
++         if let Some(scores) = self.deltak_scores.as_ref() {
++             if scores.len() < self.vocab_size { bail!("gpu sampling: deltak score buffer shorter than vocab_size"); }
++         }
+++        if let Some(hints) = self.candidate_piece_hints.as_ref() {
+++            if hints.len() < self.vocab_size { bail!("gpu sampling: candidate piece hint buffer shorter than vocab_size"); }
+++        }
++         if !self.compare_score_eps.is_finite() || self.compare_score_eps < 0.0 {
++             bail!("gpu sampling: compare_score_eps must be >= 0");
++         }
++@@ -578,6 +619,15 @@
++     pub deltak_weight: f32,
++     pub cross_weight: f32,
++     pub bias_cap: f32,
+++    pub transition_guard_enabled: u32,
+++    pub transition_guard_probe_only: u32,
+++    pub transition_min_new_tokens: u32,
+++    pub transition_decode_step: u32,
+++    pub transition_prev_token_id: u32,
+++    pub transition_prev_token_available: u32,
+++    pub transition_soft_penalty_scale: f32,
+++    pub transition_max_soft_penalty: f32,
+++    pub _transition_pad1: [f32; 2],
++ }
++ 
++ impl GpuSamplingUniform {
++@@ -604,6 +654,15 @@
++             deltak_weight: v.semantic_prior.sanitized().deltak_weight,
++             cross_weight: v.semantic_prior.sanitized().cross_weight,
++             bias_cap: v.semantic_prior.sanitized().bias_cap,
+++            transition_guard_enabled: if v.transition_guard.enabled { 1 } else { 0 },
+++            transition_guard_probe_only: if v.transition_guard.probe_only { 1 } else { 0 },
+++            transition_min_new_tokens: v.transition_guard.min_new_tokens,
+++            transition_decode_step: v.transition_guard.decode_step,
+++            transition_prev_token_id: v.transition_guard.prev_token_id,
+++            transition_prev_token_available: if v.transition_guard.prev_token_available { 1 } else { 0 },
+++            transition_soft_penalty_scale: v.transition_guard.sanitized().soft_penalty_scale,
+++            transition_max_soft_penalty: v.transition_guard.sanitized().max_soft_penalty,
+++            _transition_pad1: [0.0, 0.0],
++         }
++     }
++ }
++@@ -659,6 +718,10 @@
++     prob: f32,
++     semantic_bias: f32,
++     weighted_logit: f32,
+++    transition_risk: f32,
+++    transition_penalty: f32,
+++    transition_action: u32,
+++    transition_reason_mask: u32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -671,6 +734,10 @@
++     pub prob: f32,
++     pub semantic_bias: f32,
++     pub weighted_logit: f32,
+++    pub transition_risk: f32,
+++    pub transition_penalty: f32,
+++    pub transition_action: u32,
+++    pub transition_reason_mask: u32,
++ }
++ 
++ #[derive(Debug, Clone)]
++@@ -738,6 +805,7 @@
++     pub candidate_trace_entries: Arc<BackendBuffer>,
++     pub qwave_scores: Arc<BackendBuffer>,
++     pub deltak_scores: Arc<BackendBuffer>,
+++    pub candidate_piece_hints: Arc<BackendBuffer>,
++ }
++ 
++ pub struct GpuSamplingRuntime {
++@@ -835,6 +903,7 @@
++                 rw_storage_entry(8),
++                 read_storage_entry(9),
++                 read_storage_entry(10),
+++                read_storage_entry(11),
++             ],
++         });
++         let final_select_bgl = device.create_bind_group_layout(&backend_wgpu::BindGroupLayoutDescriptor {
++@@ -1290,6 +1359,10 @@
++                     binding: 10,
++                     resource: dispatch.deltak_scores.as_entire_binding(),
++                 },
+++                backend_wgpu::BindGroupEntry {
+++                    binding: 11,
+++                    resource: dispatch.candidate_piece_hints.as_entire_binding(),
+++                },
++             ],
++         });
++ 
++@@ -1854,6 +1927,11 @@
++             cfg.deltak_scores.as_deref(),
++             cfg.vocab_size,
++         )?);
+++        let candidate_piece_hints = Arc::new(self.create_candidate_piece_hint_buffer(
+++            "gpu_sampling.transition.candidate_piece_hints",
+++            cfg.candidate_piece_hints.as_deref(),
+++            cfg.vocab_size,
+++        )?);
++ 
++         Ok(GpuSamplingDispatch {
++             uniform,
++@@ -1880,9 +1958,32 @@
++             candidate_trace_entries,
++             qwave_scores,
++             deltak_scores,
+++            candidate_piece_hints,
++         })
++     }
++ 
+++    fn create_candidate_piece_hint_buffer(
+++        &self,
+++        label: &'static str,
+++        hints: Option<&[GpuCandidatePieceHintRaw]>,
+++        vocab_size: usize,
+++    ) -> Result<BackendBuffer> {
+++        let mut zero_hints;
+++        let slice = if let Some(hints) = hints {
+++            &hints[..vocab_size]
+++        } else {
+++            zero_hints = (0..vocab_size.max(1))
+++                .map(|idx| GpuCandidatePieceHintRaw { token_id: idx as u32, class_bits: 0, risk_bits: 0, reserved0: 0 })
+++                .collect::<Vec<_>>();
+++            &zero_hints[..]
+++        };
+++        Ok(self.device.create_buffer_init(&BackendBufferInitDescriptor {
+++            label: Some(label),
+++            contents: cast_slice(slice),
+++            usage: BackendBufferUsages::STORAGE | BackendBufferUsages::COPY_DST | BackendBufferUsages::COPY_SRC,
+++        }))
+++    }
+++
++     fn create_semantic_score_buffer(
++         &self,
++         label: &'static str,
++@@ -2126,6 +2227,10 @@
++                 prob: raw.prob,
++                 semantic_bias: raw.semantic_bias,
++                 weighted_logit: raw.weighted_logit,
+++                transition_risk: raw.transition_risk,
+++                transition_penalty: raw.transition_penalty,
+++                transition_action: raw.transition_action,
+++                transition_reason_mask: raw.transition_reason_mask,
++             };
++             if raw.stage == 1 {
++                 active_ids.push(raw.token_id);
++@@ -2718,6 +2823,8 @@
++             semantic_prior: GpuSemanticPriorConfig::default(),
++             qwave_scores: None,
++             deltak_scores: None,
+++            transition_guard: GpuTransitionGuardConfig::default(),
+++            candidate_piece_hints: None,
++             seed_lo: 1,
++             seed_hi: 2,
++             rollout_policy: GpuSamplingRollout::MultistageOnly,
++diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/lib.rs decode02a_work/crates/burn_webgpu_backend/src/lib.rs
++--- decode02a_orig/crates/burn_webgpu_backend/src/lib.rs	2026-05-24 04:08:30.000000000 +0000
+++++ decode02a_work/crates/burn_webgpu_backend/src/lib.rs	2026-05-27 00:27:01.980585453 +0000
++@@ -181,7 +181,7 @@
++ pub use text_density_gate::{build_text_density_gate_uniform, packed_path_id, packed_path_name, TextDensityBindingSummary, TextDensityGateProbeResult, TextDensityGateRuntime, TextDensityGateUniform, SHADER_TEXT_DENSITY_GATE};
++ 
++ 
++-pub use gpu_sampling::{GpuSamplingBenchMode, GpuSamplingCompareReport, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingFallbackReason, GpuSamplingMode, GpuSamplingParallelMode, GpuSamplingParallelPlan, GpuSamplingPath, GpuSamplingPerfCounters, GpuSamplingPlanKind, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, GpuSamplingSelectedTokenSource, GpuTopPMode, SHADER_GPU_SAMPLING_NOISE, SHADER_GPU_SAMPLING_SELECT, SHADER_GPU_SAMPLING_STATS_REDUCE, SHADER_GPU_SAMPLING_TOPK, SHADER_GPU_SAMPLING_TOPP_SCAN};
+++pub use gpu_sampling::{GpuCandidatePieceHintRaw, GpuTransitionGuardConfig, GpuSamplingBenchMode, GpuSamplingCompareReport, GpuSamplingCompareStatus, GpuSamplingConfig, GpuSamplingFallbackReason, GpuSamplingMode, GpuSamplingParallelMode, GpuSamplingParallelPlan, GpuSamplingPath, GpuSamplingPerfCounters, GpuSamplingPlanKind, GpuSamplingResult, GpuSamplingRollout, GpuSamplingRuntime, GpuSamplingSelectedTokenSource, GpuTopPMode, SHADER_GPU_SAMPLING_NOISE, SHADER_GPU_SAMPLING_SELECT, SHADER_GPU_SAMPLING_STATS_REDUCE, SHADER_GPU_SAMPLING_TOPK, SHADER_GPU_SAMPLING_TOPP_SCAN};
++ 
++ pub use existing_device_bootstrap::{bootstrap_existing_device, ExistingDeviceBootstrap};
++ 
++diff -ruN decode02a_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl decode02a_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl
++--- decode02a_orig/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-26 23:24:55.000000000 +0000
+++++ decode02a_work/crates/burn_webgpu_backend/src/shaders/gpu_sampling_topp_scan.wgsl	2026-05-27 00:30:43.647239136 +0000
++@@ -34,6 +34,16 @@
++   deltak_weight: f32,
++   cross_weight: f32,
++   bias_cap: f32,
+++  transition_guard_enabled: u32,
+++  transition_guard_probe_only: u32,
+++  transition_min_new_tokens: u32,
+++  transition_decode_step: u32,
+++  transition_prev_token_id: u32,
+++  transition_prev_token_available: u32,
+++  transition_soft_penalty_scale: f32,
+++  transition_max_soft_penalty: f32,
+++  _transition_pad1_a: f32,
+++  _transition_pad1_b: f32,
++ };
++ 
++ struct SamplingStats {
++@@ -67,6 +77,24 @@
++   prob: f32,
++   semantic_bias: f32,
++   weighted_logit: f32,
+++  transition_risk: f32,
+++  transition_penalty: f32,
+++  transition_action: u32,
+++  transition_reason_mask: u32,
+++};
+++
+++struct CandidatePieceHintRaw {
+++  token_id: u32,
+++  class_bits: u32,
+++  risk_bits: u32,
+++  reserved0: u32,
+++};
+++
+++struct TransitionDecisionRaw {
+++  risk: f32,
+++  penalty: f32,
+++  action: u32,
+++  reason_mask: u32,
++ };
++ 
++ @group(0) @binding(0) var<uniform> u: SamplingUniform;
++@@ -80,10 +108,58 @@
++ @group(0) @binding(8) var<storage, read_write> trace_entries: array<CandidateTraceEntry>;
++ @group(0) @binding(9) var<storage, read> qwave_scores: array<f32>;
++ @group(0) @binding(10) var<storage, read> deltak_scores: array<f32>;
+++@group(0) @binding(11) var<storage, read> candidate_piece_hints: array<CandidatePieceHintRaw>;
++ 
++ const NEG_INF: f32 = -3.402823e38;
++ const INVALID_INDEX: u32 = 0xffffffffu;
++-
+++const CLASS_PARTICLE_LIKE: u32 = 1u << 3u;
+++const CLASS_ENDING_LIKE: u32 = 1u << 4u;
+++const CLASS_GENERIC_CONTINUATION: u32 = 1u << 5u;
+++const CLASS_PUNCTUATION: u32 = 1u << 6u;
+++const CLASS_EMOTIONAL_REPEAT: u32 = 1u << 7u;
+++const CLASS_BYTE_TOKEN: u32 = 1u << 8u;
+++const CLASS_CONTROL_TOKEN: u32 = 1u << 9u;
+++const CLASS_PAD_TOKEN: u32 = 1u << 10u;
+++const CLASS_EOS_TOKEN: u32 = 1u << 11u;
+++const CLASS_MOJIBAKE_SUSPECT: u32 = 1u << 13u;
+++const R_PAD: u32 = 1u << 0u;
+++const R_CONTROL: u32 = 1u << 1u;
+++const R_EOS_BEFORE_MIN_NEW: u32 = 1u << 2u;
+++const R_GENERIC_EOS: u32 = 1u << 3u;
+++const R_BYTE_BOUNDARY: u32 = 1u << 5u;
+++const R_MOJIBAKE: u32 = 1u << 6u;
+++const R_DOUBLE_PARTICLE: u32 = 1u << 7u;
+++const R_DOUBLE_ENDING: u32 = 1u << 8u;
+++const R_REPEATED_PUNCT: u32 = 1u << 9u;
+++const TRANS_ALLOW: u32 = 0u;
+++const TRANS_PENALIZE: u32 = 1u;
+++const TRANS_HARD_BLOCK: u32 = 2u;
+++const TRANS_UNAVAILABLE: u32 = 3u;
+++
+++
+++fn has_class(h: CandidatePieceHintRaw, bit: u32) -> bool { return (h.class_bits & bit) != 0u; }
+++
+++fn transition_decision_at(index: u32) -> TransitionDecisionRaw {
+++  if (u.transition_guard_enabled == 0u) { return TransitionDecisionRaw(0.0, 0.0, TRANS_ALLOW, 0u); }
+++  let cand = candidate_piece_hints[index];
+++  var prev = CandidatePieceHintRaw(0u, 0u, 0u, 0u);
+++  if (u.transition_prev_token_available != 0u && u.transition_prev_token_id < u.vocab_size) { prev = candidate_piece_hints[u.transition_prev_token_id]; }
+++  var risk = 0.0;
+++  var action = TRANS_ALLOW;
+++  var reasons = 0u;
+++  if (has_class(cand, CLASS_PAD_TOKEN)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_PAD; }
+++  if (has_class(cand, CLASS_CONTROL_TOKEN) && !has_class(cand, CLASS_EOS_TOKEN) && !has_class(cand, CLASS_PAD_TOKEN)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_CONTROL; }
+++  if (has_class(cand, CLASS_EOS_TOKEN) && u.transition_decode_step < u.transition_min_new_tokens) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_EOS_BEFORE_MIN_NEW; }
+++  if (has_class(prev, CLASS_GENERIC_CONTINUATION) && has_class(cand, CLASS_EOS_TOKEN)) { risk = max(risk, 0.95); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_GENERIC_EOS; }
+++  if (has_class(cand, CLASS_MOJIBAKE_SUSPECT)) { risk = max(risk, 1.0); action = TRANS_HARD_BLOCK; reasons = reasons | R_MOJIBAKE; }
+++  if ((has_class(prev, CLASS_BYTE_TOKEN) && !has_class(cand, CLASS_BYTE_TOKEN)) || (!has_class(prev, CLASS_BYTE_TOKEN) && has_class(cand, CLASS_BYTE_TOKEN))) { risk = max(risk, 0.7); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_BYTE_BOUNDARY; }
+++  if (has_class(prev, CLASS_PARTICLE_LIKE) && has_class(cand, CLASS_PARTICLE_LIKE)) { risk = max(risk, 0.6); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_DOUBLE_PARTICLE; }
+++  if (has_class(prev, CLASS_ENDING_LIKE) && has_class(cand, CLASS_ENDING_LIKE)) { risk = max(risk, 0.5); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_DOUBLE_ENDING; }
+++  if (has_class(prev, CLASS_PUNCTUATION) && has_class(cand, CLASS_PUNCTUATION) && !has_class(cand, CLASS_EMOTIONAL_REPEAT)) { risk = max(risk, 0.6); if (action != TRANS_HARD_BLOCK) { action = TRANS_PENALIZE; } reasons = reasons | R_REPEATED_PUNCT; }
+++  var penalty = min(risk * u.transition_soft_penalty_scale, u.transition_max_soft_penalty);
+++  if (u.transition_guard_probe_only != 0u) { penalty = 0.0; }
+++  return TransitionDecisionRaw(risk, penalty, action, reasons);
+++}
++ 
++ fn safe_semantic_score(v: f32) -> f32 {
++   if ((v == v) && (abs(v) < 3.402823e38)) { return clamp(v, -1.0, 1.0); }
++@@ -101,7 +177,9 @@
++ }
++ 
++ fn weighted_logit_at(index: u32) -> f32 {
++-  return scaled_logits[index] + semantic_bias_at(index);
+++  let t = transition_decision_at(index);
+++  if (t.action == TRANS_HARD_BLOCK && u.transition_guard_probe_only == 0u) { return NEG_INF; }
+++  return scaled_logits[index] + semantic_bias_at(index) - t.penalty;
++ }
++ 
++ fn topk_enabled(vocab: u32, requested_k: u32) -> bool {
++diff -ruN decode02a_orig/crates/model_core/src/decode_candidate_piece_hints.rs decode02a_work/crates/model_core/src/decode_candidate_piece_hints.rs
++--- decode02a_orig/crates/model_core/src/decode_candidate_piece_hints.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode02a_work/crates/model_core/src/decode_candidate_piece_hints.rs	2026-05-27 00:27:01.977401745 +0000
++@@ -0,0 +1,212 @@
+++use serde::{Deserialize, Serialize};
+++
+++pub const CLASS_TEXT: u32 = 1 << 0;
+++pub const CLASS_SENTENCEPIECE_TEXT: u32 = 1 << 1;
+++pub const CLASS_KOREAN_TEXT: u32 = 1 << 2;
+++pub const CLASS_PARTICLE_LIKE: u32 = 1 << 3;
+++pub const CLASS_ENDING_LIKE: u32 = 1 << 4;
+++pub const CLASS_GENERIC_CONTINUATION: u32 = 1 << 5;
+++pub const CLASS_PUNCTUATION: u32 = 1 << 6;
+++pub const CLASS_EMOTIONAL_REPEAT: u32 = 1 << 7;
+++pub const CLASS_BYTE_TOKEN: u32 = 1 << 8;
+++pub const CLASS_CONTROL_TOKEN: u32 = 1 << 9;
+++pub const CLASS_PAD_TOKEN: u32 = 1 << 10;
+++pub const CLASS_EOS_TOKEN: u32 = 1 << 11;
+++pub const CLASS_UNKNOWN_TOKEN: u32 = 1 << 12;
+++pub const CLASS_MOJIBAKE_SUSPECT: u32 = 1 << 13;
+++pub const CLASS_WHITESPACE_ONLY: u32 = 1 << 14;
+++
+++pub const RISK_HARD_BLOCK_CANDIDATE: u32 = 1 << 0;
+++pub const RISK_BYTE_BOUNDARY: u32 = 1 << 1;
+++pub const RISK_PUNCTUATION_REPEAT: u32 = 1 << 2;
+++pub const RISK_GENERIC_EOS: u32 = 1 << 3;
+++pub const RISK_DOUBLE_PARTICLE: u32 = 1 << 4;
+++pub const RISK_DOUBLE_ENDING: u32 = 1 << 5;
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum CandidatePieceClass {
+++    Text,
+++    SentencePieceText,
+++    KoreanText,
+++    ParticleLike,
+++    EndingLike,
+++    GenericContinuation,
+++    Punctuation,
+++    EmotionalRepeat,
+++    ByteToken,
+++    ControlToken,
+++    PadToken,
+++    EosToken,
+++    UnknownToken,
+++    MojibakeSuspect,
+++    WhitespaceOnly,
+++}
+++
+++#[repr(C)]
+++#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+++pub struct CandidatePieceHintRaw {
+++    pub token_id: u32,
+++    pub class_bits: u32,
+++    pub risk_bits: u32,
+++    pub reserved0: u32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct CandidatePieceHintTable {
+++    pub vocab_size: usize,
+++    pub vocab_hash: String,
+++    pub hints: Vec<CandidatePieceHintRaw>,
+++    pub summary: CandidatePieceHintSummary,
+++}
+++
+++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+++pub struct CandidatePieceHintSummary {
+++    pub control_count: usize,
+++    pub pad_count: usize,
+++    pub eos_count: usize,
+++    pub byte_count: usize,
+++    pub mojibake_suspect_count: usize,
+++    pub korean_text_count: usize,
+++    pub generic_continuation_count: usize,
+++    pub particle_like_count: usize,
+++    pub ending_like_count: usize,
+++}
+++
+++impl CandidatePieceHintTable {
+++    pub fn validate_alignment(&self) -> bool {
+++        self.hints.len() == self.vocab_size
+++            && self.hints.iter().enumerate().all(|(idx, hint)| hint.token_id as usize == idx)
+++    }
+++
+++    pub fn to_backend_hints(&self) -> Vec<burn_webgpu_backend::gpu_sampling::GpuCandidatePieceHintRaw> {
+++        self.hints
+++            .iter()
+++            .map(|h| burn_webgpu_backend::gpu_sampling::GpuCandidatePieceHintRaw {
+++                token_id: h.token_id,
+++                class_bits: h.class_bits,
+++                risk_bits: h.risk_bits,
+++                reserved0: h.reserved0,
+++            })
+++            .collect()
+++    }
+++}
+++
+++pub fn build_candidate_piece_hint_table(
+++    vocab: &[(u32, String)],
+++    eos_token_id: Option<u32>,
+++    pad_token_id: Option<u32>,
+++    vocab_hash: String,
+++) -> CandidatePieceHintTable {
+++    let max_id = vocab.iter().map(|(id, _)| *id as usize).max().unwrap_or(0);
+++    let vocab_size = max_id.saturating_add(1).max(vocab.len());
+++    let mut hints = vec![CandidatePieceHintRaw::default(); vocab_size];
+++    for idx in 0..vocab_size {
+++        hints[idx].token_id = idx as u32;
+++    }
+++    let mut summary = CandidatePieceHintSummary::default();
+++    for (id, piece) in vocab {
+++        let idx = *id as usize;
+++        if idx >= hints.len() { continue; }
+++        let (class_bits, risk_bits) = classify_piece_hint(*id, piece, eos_token_id, pad_token_id);
+++        hints[idx] = CandidatePieceHintRaw { token_id: *id, class_bits, risk_bits, reserved0: 0 };
+++        if class_bits & CLASS_CONTROL_TOKEN != 0 { summary.control_count += 1; }
+++        if class_bits & CLASS_PAD_TOKEN != 0 { summary.pad_count += 1; }
+++        if class_bits & CLASS_EOS_TOKEN != 0 { summary.eos_count += 1; }
+++        if class_bits & CLASS_BYTE_TOKEN != 0 { summary.byte_count += 1; }
+++        if class_bits & CLASS_MOJIBAKE_SUSPECT != 0 { summary.mojibake_suspect_count += 1; }
+++        if class_bits & CLASS_KOREAN_TEXT != 0 { summary.korean_text_count += 1; }
+++        if class_bits & CLASS_GENERIC_CONTINUATION != 0 { summary.generic_continuation_count += 1; }
+++        if class_bits & CLASS_PARTICLE_LIKE != 0 { summary.particle_like_count += 1; }
+++        if class_bits & CLASS_ENDING_LIKE != 0 { summary.ending_like_count += 1; }
+++    }
+++    CandidatePieceHintTable { vocab_size, vocab_hash, hints, summary }
+++}
+++
+++pub fn classify_piece_hint(
+++    token_id: u32,
+++    piece: &str,
+++    eos_token_id: Option<u32>,
+++    pad_token_id: Option<u32>,
+++) -> (u32, u32) {
+++    let mut class_bits = 0u32;
+++    let mut risk_bits = 0u32;
+++    let trimmed = piece.trim();
+++    let bare = trimmed.trim_start_matches('▁');
+++
+++    if !trimmed.is_empty() { class_bits |= CLASS_TEXT; }
+++    if trimmed.starts_with('▁') { class_bits |= CLASS_SENTENCEPIECE_TEXT; }
+++    if contains_hangul(bare) { class_bits |= CLASS_KOREAN_TEXT; }
+++    if trimmed.is_empty() { class_bits |= CLASS_WHITESPACE_ONLY; }
+++
+++    if pad_token_id == Some(token_id) || trimmed == "<pad>" {
+++        class_bits |= CLASS_PAD_TOKEN | CLASS_CONTROL_TOKEN;
+++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
+++    }
+++    if eos_token_id == Some(token_id) || matches!(trimmed, "<eos>" | "</s>") {
+++        class_bits |= CLASS_EOS_TOKEN | CLASS_CONTROL_TOKEN;
+++    }
+++    if matches!(trimmed, "<bos>" | "<s>") || trimmed.starts_with("<glossary:") || trimmed.starts_with("<task:") || trimmed.starts_with("<lang:") {
+++        class_bits |= CLASS_CONTROL_TOKEN;
+++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
+++    }
+++    if trimmed == "<unk>" {
+++        class_bits |= CLASS_UNKNOWN_TOKEN | CLASS_CONTROL_TOKEN;
+++    }
+++    if trimmed.starts_with("<byte:") || trimmed.starts_with("<0x") {
+++        class_bits |= CLASS_BYTE_TOKEN;
+++        risk_bits |= RISK_BYTE_BOUNDARY;
+++    }
+++    if mojibake_suspected(trimmed) {
+++        class_bits |= CLASS_MOJIBAKE_SUSPECT;
+++        risk_bits |= RISK_HARD_BLOCK_CANDIDATE;
+++    }
+++    if is_generic_continuation(bare) {
+++        class_bits |= CLASS_GENERIC_CONTINUATION;
+++        risk_bits |= RISK_GENERIC_EOS;
+++    }
+++    if is_particle_like(bare) {
+++        class_bits |= CLASS_PARTICLE_LIKE;
+++        risk_bits |= RISK_DOUBLE_PARTICLE;
+++    }
+++    if is_ending_like(bare) {
+++        class_bits |= CLASS_ENDING_LIKE;
+++        risk_bits |= RISK_DOUBLE_ENDING;
+++    }
+++    if is_punctuation(bare) {
+++        class_bits |= CLASS_PUNCTUATION;
+++        risk_bits |= RISK_PUNCTUATION_REPEAT;
+++    }
+++    if is_emotional_repeat(bare) {
+++        class_bits |= CLASS_EMOTIONAL_REPEAT;
+++        risk_bits &= !RISK_HARD_BLOCK_CANDIDATE;
+++    }
+++    (class_bits, risk_bits)
+++}
+++
+++fn contains_hangul(s: &str) -> bool {
+++    s.chars().any(|c| ('\u{AC00}'..='\u{D7A3}').contains(&c) || ('\u{3130}'..='\u{318F}').contains(&c))
+++}
+++
+++fn is_generic_continuation(s: &str) -> bool {
+++    matches!(s, "이어가고" | "그리고" | "하지만" | "그러나" | "때문에" | "즉" | "그래서" | "따라서" | "그러므로" | "또한")
+++}
+++
+++fn is_particle_like(s: &str) -> bool {
+++    matches!(s, "은" | "는" | "이" | "가" | "을" | "를" | "에" | "에서" | "으로" | "로" | "와" | "과" | "도" | "만" | "의")
+++}
+++
+++fn is_ending_like(s: &str) -> bool {
+++    matches!(s, "다" | "요" | "죠" | "까" | "네" | "습니다" | "합니다" | "했다" | "한다")
+++}
+++
+++fn is_punctuation(s: &str) -> bool {
+++    matches!(s, "!" | "?" | "." | "," | "。" | "…")
+++}
+++
+++fn is_emotional_repeat(s: &str) -> bool {
+++    matches!(s, "ㅋ" | "ㅠ" | "ㅜ" | ";")
+++}
+++
+++pub fn mojibake_suspected(s: &str) -> bool {
+++    s.contains('�') || s.contains("?댁") || s.contains('媛') || s.contains('怨') || s.contains('Ã') || s.contains('ì') || s.contains('ê')
+++}
++diff -ruN decode02a_orig/crates/model_core/src/generation_sampling.rs decode02a_work/crates/model_core/src/generation_sampling.rs
++--- decode02a_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:12:51.000000000 +0000
+++++ decode02a_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:30:43.646535904 +0000
++@@ -2,6 +2,7 @@
++ use crate::decode_state::emit_kv_cache_cursor_trace_summary;
++ use crate::cpu_oracle_sampler::{CpuOracleContext, CpuOracleSampleResult, sample_with_cpu_oracle};
++ use crate::decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext};
+++use crate::decode_candidate_piece_hints::CandidatePieceHintTable;
++ use crate::sampler_parity::{self, GpuSamplerRuntimeTrace, SamplerParityMode};
++ use crate::semantic_prior_scores::SemanticPriorScoreSnapshot;
++ use std::collections::BTreeMap;
++@@ -673,6 +674,22 @@
++     }
++ }
++ 
+++impl From<TransitionGuardConfig> for burn_webgpu_backend::gpu_sampling::GpuTransitionGuardConfig {
+++    fn from(value: TransitionGuardConfig) -> Self {
+++        let cfg = value.sanitized();
+++        Self {
+++            enabled: cfg.enabled,
+++            probe_only: cfg.probe_only,
+++            min_new_tokens: cfg.min_new_tokens_for_eos as u32,
+++            decode_step: 0,
+++            prev_token_id: 0,
+++            prev_token_available: false,
+++            soft_penalty_scale: cfg.soft_penalty_scale,
+++            max_soft_penalty: cfg.max_soft_penalty,
+++        }
+++    }
+++}
+++
++ impl From<SemanticPriorConfig> for GpuSemanticPriorConfig {
++     fn from(value: SemanticPriorConfig) -> Self {
++         let cfg = value.sanitized();
++@@ -716,6 +733,7 @@
++     pub semantic_score_snapshot: Option<SemanticPriorScoreSnapshot>,
++     pub transition_guard: TransitionGuardConfig,
++     pub transition_context: Option<TransitionRuntimeContext>,
+++    pub candidate_piece_hints: Option<CandidatePieceHintTable>,
++     pub seed: Option<u64>,
++     pub stop_sequences: Vec<String>,
++     pub min_new_tokens: usize,
++@@ -751,6 +769,7 @@
++             semantic_score_snapshot: None,
++             transition_guard: TransitionGuardConfig::default(),
++             transition_context: None,
+++            candidate_piece_hints: None,
++             seed: None,
++             stop_sequences: Vec::new(),
++             min_new_tokens: 0,
++@@ -813,6 +832,13 @@
++             SamplingRolloutPolicy::CompareShadow => GpuSamplingRollout::CompareShadow,
++             SamplingRolloutPolicy::CompareAndFallback => GpuSamplingRollout::CompareAndFallback,
++         };
+++        let mut gpu_transition_guard: burn_webgpu_backend::gpu_sampling::GpuTransitionGuardConfig = self.transition_guard.clone().into();
+++        gpu_transition_guard.decode_step = self.transition_context.as_ref().map(|ctx| ctx.step as u32).unwrap_or(0);
+++        if let Some(prev) = self.transition_context.as_ref().and_then(|ctx| ctx.prev_token_id) {
+++            gpu_transition_guard.prev_token_id = prev;
+++            gpu_transition_guard.prev_token_available = true;
+++        }
+++
++         GpuSamplingConfig {
++             vocab_size,
++             temperature: if self.temperature > 0.0 { self.temperature } else { 1.0 },
++@@ -822,6 +848,8 @@
++             semantic_prior: self.semantic_prior.sanitized().into(),
++             qwave_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.qwave_available).map(|s| s.qwave_scores.clone()),
++             deltak_scores: self.semantic_score_snapshot.as_ref().filter(|s| s.deltak_available).map(|s| s.deltak_scores.clone()),
+++            transition_guard: gpu_transition_guard,
+++            candidate_piece_hints: self.candidate_piece_hints.as_ref().map(|table| table.to_backend_hints()),
++             seed_lo: (seed & 0xffff_ffff) as u32,
++             seed_hi: ((seed >> 32) & 0xffff_ffff) as u32,
++             rollout_policy,
++@@ -2484,6 +2512,8 @@
++             } else {
++                 "selected_and_recovery_only_gpu_candidate_trace_unavailable".to_string()
++             },
+++            transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
+++            transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
++         };
++         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
++         let strict_demote = receipt.parity.strict_demoted;
++diff -ruN decode02a_orig/crates/model_core/src/lib.rs decode02a_work/crates/model_core/src/lib.rs
++--- decode02a_orig/crates/model_core/src/lib.rs	2026-05-27 00:12:51.000000000 +0000
+++++ decode02a_work/crates/model_core/src/lib.rs	2026-05-27 00:27:01.977925812 +0000
++@@ -11,6 +11,7 @@
++ mod sampling_helpers;
++ mod cpu_oracle_sampler;
++ mod decode_transition_guard;
+++mod decode_candidate_piece_hints;
++ mod sampler_parity;
++ mod sampler_parity_validation;
++ mod minp_c1a_smoke;
++@@ -65,6 +66,10 @@
++ 
++ pub use cpu_oracle_sampler::{CpuOracleContext, CpuOracleCandidateTrace, CpuOracleSampleResult, SemanticPriorScores, SamplerRecoveryMode, SamplingApplyMode, sample_with_cpu_oracle, sample_with_cpu_oracle_with_semantic_prior};
++ pub use decode_transition_guard::{TransitionGuardConfig, TransitionRuntimeContext, TransitionContext, CandidateTokenView, TransitionDecision, TransitionAction, TransitionReason, transition_guard_config_from_env, evaluate_token_transition};
+++pub use decode_candidate_piece_hints::{
+++    CandidatePieceClass, CandidatePieceHintRaw, CandidatePieceHintTable, CandidatePieceHintSummary,
+++    build_candidate_piece_hint_table, classify_piece_hint,
+++};
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++diff -ruN decode02a_orig/crates/model_core/src/sampler_parity.rs decode02a_work/crates/model_core/src/sampler_parity.rs
++--- decode02a_orig/crates/model_core/src/sampler_parity.rs	2026-05-26 23:14:11.000000000 +0000
+++++ decode02a_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:27:01.983692663 +0000
++@@ -68,6 +68,8 @@
++     pub final_overflow: bool,
++     pub trace_top_n: usize,
++     pub trace_completeness: String,
+++    pub transition_actions_head: Vec<u32>,
+++    pub transition_reason_masks_head: Vec<u32>,
++ }
++ 
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++@@ -96,6 +98,8 @@
++     pub selected_match: bool,
++     pub trace_truncated: bool,
++     pub strict_demoted: bool,
+++    pub transition_action_match: Option<bool>,
+++    pub transition_reason_match: Option<bool>,
++     pub status: String,
++     pub reason: String,
++ }
++@@ -237,6 +241,8 @@
++             selected_match,
++             trace_truncated,
++             strict_demoted,
+++            transition_action_match: None,
+++            transition_reason_match: None,
++             status,
++             reason,
++         },
+diff -ruN decode02a_orig/workspace/decode02a_candidate_piece_hint_summary.json decode02a_work/workspace/decode02a_candidate_piece_hint_summary.json
+--- decode02a_orig/workspace/decode02a_candidate_piece_hint_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_candidate_piece_hint_summary.json	2026-05-27 00:27:01.985333396 +0000
+@@ -0,0 +1,31 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02A",
++  "candidate_piece_hint_table": "model_core::decode_candidate_piece_hints::CandidatePieceHintTable",
++  "layout": "token_id_indexed",
++  "required_alignment": "hints[token_id].token_id == token_id",
++  "class_bits": [
++    "text",
++    "sentencepiece_text",
++    "korean_text",
++    "particle_like",
++    "ending_like",
++    "generic_continuation",
++    "punctuation",
++    "emotional_repeat",
++    "byte_token",
++    "control_token",
++    "pad_token",
++    "eos_token",
++    "unknown_token",
++    "mojibake_suspect",
++    "whitespace_only"
++  ],
++  "risk_bits": [
++    "hard_block_candidate",
++    "byte_boundary_risk",
++    "punctuation_repeat_candidate",
++    "generic_eos_risk_candidate",
++    "double_particle_candidate",
++    "double_ending_candidate"
++  ]
++}
+\ No newline at end of file
+diff -ruN decode02a_orig/workspace/decode02a_gpu_transition_parity_receipt.jsonl decode02a_work/workspace/decode02a_gpu_transition_parity_receipt.jsonl
+--- decode02a_orig/workspace/decode02a_gpu_transition_parity_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_gpu_transition_parity_receipt.jsonl	2026-05-27 00:27:01.985054029 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-02A", "step": 2, "candidate_trace_version": 3, "mode": "probe", "prev": {"piece": "▁이어가고", "class_bits": ["KoreanText", "SentencePieceText", "GenericContinuation"]}, "candidate": {"piece": "<eos>", "class_bits": ["ControlToken", "EosToken"]}, "cpu_transition": {"risk": 0.95, "penalty": 0.95, "action": "Penalize", "reason_mask": ["GenericContinuationImmediateEos"]}, "gpu_transition": {"risk": 0.95, "penalty": 0.0, "action": "Penalize", "reason_mask": ["GenericContinuationImmediateEos"], "probe_only": true}, "parity": {"action_match": true, "reason_match": true, "risk_match": true, "penalty_match": "probe_only_zero_penalty_expected", "status": "PASS_STATIC_SCHEMA_EXAMPLE"}}
+diff -ruN decode02a_orig/workspace/decode02a_gpu_transition_parity_receipt_schema.json decode02a_work/workspace/decode02a_gpu_transition_parity_receipt_schema.json
+--- decode02a_orig/workspace/decode02a_gpu_transition_parity_receipt_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_gpu_transition_parity_receipt_schema.json	2026-05-27 00:27:01.984582704 +0000
+@@ -0,0 +1,19 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02A",
++  "fields": [
++    "candidate_trace_version",
++    "prev",
++    "candidate",
++    "cpu_transition",
++    "gpu_transition",
++    "parity"
++  ],
++  "parity_statuses": [
++    "PASS",
++    "WARN_RISK_ONLY",
++    "FAIL_ACTION_MISMATCH",
++    "FAIL_REASON_MISMATCH",
++    "FAIL_HARDBLOCK_MISMATCH",
++    "PARTIAL_HINT_UNAVAILABLE"
++  ]
++}
+\ No newline at end of file
+diff -ruN decode02a_orig/workspace/decode02a_gpu_transition_parity_summary.json decode02a_work/workspace/decode02a_gpu_transition_parity_summary.json
+--- decode02a_orig/workspace/decode02a_gpu_transition_parity_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_gpu_transition_parity_summary.json	2026-05-27 00:31:06.256572537 +0000
+@@ -0,0 +1,24 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02A",
++  "status": "GPU_TRANSITION_GUARD_PARITY_AND_CANDIDATE_PIECE_HINT_BAKED_STATIC",
++  "decode_ssot": "tokenizer_core::decode_ssot",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "candidate_piece_hint_ssot": "model_core::decode_candidate_piece_hints::CandidatePieceHintTable",
++  "candidate_trace_version": 3,
++  "default_mode": "off",
++  "recommended_validation_mode": "probe",
++  "gpu_transition_implementation": "compact_hint_bits",
++  "parity_required": [
++    "transition_action",
++    "transition_reason_mask",
++    "hardblock_decision"
++  ],
++  "non_scope": [
++    "transition_rule_redesign",
++    "dynamic_context_qwave",
++    "tokenizer_vocab_change",
++    "lora_training"
++  ],
++  "execution": "NOT_RUN_NO_CARGO_WGPU_RUNTIME",
++  "prev_token_uniform": "transition_prev_token_id / transition_prev_token_available"
++}
+\ No newline at end of file
+diff -ruN decode02a_orig/workspace/decode02a_report.md decode02a_work/workspace/decode02a_report.md
+--- decode02a_orig/workspace/decode02a_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_report.md	2026-05-27 00:27:01.987629239 +0000
+@@ -0,0 +1,13 @@
++# 16AI-QW-38G-R6A-DECODE-02A Report
++
++## 확정
++- CandidatePieceHintTable SSOT를 `model_core::decode_candidate_piece_hints`에 추가했다.
++- GPU `topp_scan`에 candidate piece hint buffer binding을 추가했다.
++- Candidate trace entry를 V3 의미론으로 확장하여 transition risk/penalty/action/reason_mask를 기록한다.
++- Probe mode에서는 transition penalty를 기록하되 weighted logit에는 적용하지 않는다.
++
++## 추정
++- 실제 런타임에서 CPU/GPU transition parity를 확인하려면 WebGPU compile/runtime validation이 필요하다.
++
++## 판단불가
++- cargo check / rustfmt / WGSL runtime compile은 현재 컨테이너에 도구가 없어 NOT_RUN이다.
+diff -ruN decode02a_orig/workspace/decode02a_static_checks.json decode02a_work/workspace/decode02a_static_checks.json
+--- decode02a_orig/workspace/decode02a_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02a_work/workspace/decode02a_static_checks.json	2026-05-27 00:31:06.257814641 +0000
+@@ -0,0 +1,13 @@
++{
++  "decode_candidate_piece_hints_module_exists": true,
++  "lib_declares_hint_module": true,
++  "generation_config_has_candidate_piece_hints": true,
++  "gpu_config_has_candidate_piece_hints": true,
++  "topp_scan_has_hint_binding": true,
++  "candidate_trace_version_3_fields": true,
++  "probe_only_zero_penalty": true,
++  "gpu_transition_compact_bits": true,
++  "execution": "NOT_RUN_NO_CARGO_WGPU_RUNTIME",
++  "gpu_uniform_has_prev_token": true,
++  "gpu_uses_prev_token_hint_not_index_minus_one": true
++}
+\ No newline at end of file

@@ -1,0 +1,59 @@
+## row_gather
+crates/model_core/src/native_wgpu.rs:485:    embedding_row_gather_enabled: bool,
+crates/model_core/src/native_wgpu.rs:487:    last_embedding_row_gather_bytes: std::sync::Mutex<Option<usize>>,
+crates/model_core/src/native_wgpu.rs:1387:        use_embedding_row_gather: bool,
+crates/model_core/src/native_wgpu.rs:1432:        if use_embedding_row_gather {
+crates/model_core/src/native_wgpu.rs:1434:                "[native-embedding-row-gather] full_embedding_upload_skipped=true full_bytes={}",
+crates/model_core/src/native_wgpu.rs:1442:            !use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1453:            embedding_row_gather_enabled: use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1455:            last_embedding_row_gather_bytes: std::sync::Mutex::new(None),
+crates/model_core/src/native_wgpu.rs:1485:        use_embedding_row_gather: bool,
+crates/model_core/src/native_wgpu.rs:1497:            use_embedding_row_gather,
+crates/model_core/src/native_wgpu.rs:1621:            .expect("failed to materialize input ids for row_gather embedding");
+crates/model_core/src/native_wgpu.rs:1638:            .expect("row_gather embedding requires full checkpoint execution weights");
+crates/model_core/src/native_wgpu.rs:1646:                    "[native-embedding-row-gather][warn] token_id_out_of_vocab={} vocab={} using_token_id=0",
+crates/model_core/src/native_wgpu.rs:1658:        if let Ok(mut slot) = self.last_embedding_row_gather_bytes.lock() {
+crates/model_core/src/native_wgpu.rs:1662:            "[native-embedding-row-gather] mode=row_gather prompt_len={} hidden={} bytes={} unique_tokens={} full_embedding_upload_skipped=true full_bytes={}",
+crates/model_core/src/native_wgpu.rs:1679:        if self.embedding_row_gather_enabled {
+crates/model_core/src/native_wgpu.rs:1730:        if self.embedding_row_gather_enabled {
+crates/model_core/src/reference_checkpoint.rs:1147:        // Commit 16Y-4: row_gather mode must not allocate the full [vocab, hidden]
+crates/model_core/src/reference_checkpoint.rs:1152:            "model.embed_tokens.weight.placeholder_row_gather",
+crates/runtime/src/infer.rs:462:            Self::RowGather => "row_gather",
+crates/runtime/src/infer.rs:469:            "row_gather" | "rowGather" | "gather" => Self::RowGather,
+crates/runtime/src/infer.rs:494:    pub embedding_row_gather_bytes: Option<usize>,
+crates/runtime/src/infer.rs:520:            embedding_row_gather_bytes: None,
+crates/runtime/src/infer.rs:579:            embedding_row_gather_bytes: None,
+crates/runtime/src/infer.rs:2317:            let native_use_embedding_row_gather = native_effective_embedding_mode == NativeEmbeddingMode::RowGather;
+crates/runtime/src/infer.rs:2319:                "[16Y-3/4][native-loader] vocab_projection_effective={} use_vocab_atlas={} embedding_effective={} use_row_gather={} tile_size={} full_vocab_bytes={} max_single_buffer={}",
+crates/runtime/src/infer.rs:2323:                native_use_embedding_row_gather,
+crates/runtime/src/infer.rs:2335:                native_use_embedding_row_gather,
+crates/runtime/src/infer.rs.bak_16Y_remaining:462:            Self::RowGather => "row_gather",
+crates/runtime/src/infer.rs.bak_16Y_remaining:469:            "row_gather" | "rowGather" | "gather" => Self::RowGather,
+crates/orchestrator_local/src/infer_entry.rs:395:    output_json.insert("native_embedding_row_gather_bytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+crates/orchestrator_local/src/infer_entry.rs:764:    response_json.insert("nativeEmbeddingRowGatherBytes".to_string(), json!(result.native_vocab_allocation_probe.embedding_row_gather_bytes));
+
+## atlas cache
+crates/model_core/src/native_wgpu.rs:349:    pub cache_action: String,
+crates/model_core/src/native_wgpu.rs:460:        "[native-vocab-atlas-cache] action=build tile_count={} vocab={} hidden={} tile_vocab={} full_vocab_bytes={}",
+crates/model_core/src/native_wgpu.rs:473:        cache_action: "build".to_string(),
+crates/model_core/src/native_wgpu.rs:1796:            "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",
+crates/model_core/src/native_wgpu.rs:1802:            atlas.cache_action,
+crates/runtime/src/infer.rs:495:    pub vocab_atlas_cache_action: Option<String>,
+crates/runtime/src/infer.rs:521:            vocab_atlas_cache_action: None,
+crates/runtime/src/infer.rs:580:            vocab_atlas_cache_action: if effective_vocab_projection == NativeVocabProjectionMode::GpuAtlas { Some("build_or_reuse_model_instance".to_string()) } else { None },
+crates/orchestrator_local/src/infer_entry.rs:396:    output_json.insert("native_projection_cache_action".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+crates/orchestrator_local/src/infer_entry.rs:765:    response_json.insert("nativeProjectionCacheAction".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+
+## sampling/top-k
+crates/model_core/src/native_wgpu.rs:368:fn top_k_tile_candidates(
+crates/model_core/src/native_wgpu.rs:387:fn merge_atlas_top_k(
+crates/model_core/src/native_wgpu.rs:1786:            atlas_top_k_candidates.extend(top_k_tile_candidates(
+crates/model_core/src/native_wgpu.rs:1793:        let global_top_k = merge_atlas_top_k(atlas_top_k_candidates, tile_top_k);
+crates/orchestrator_local/src/infer_entry.rs:397:    output_json.insert("native_sampling_mode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+crates/orchestrator_local/src/infer_entry.rs:766:    response_json.insert("nativeSamplingMode".to_string(), json!(&result.native_vocab_allocation_probe.sampling_mode));
+
+## telemetry
+crates/orchestrator_local/src/infer_entry.rs:391:    output_json.insert("native_embedding_mode_requested".to_string(), json!(&result.native_vocab_allocation_probe.requested_embedding_mode));
+crates/orchestrator_local/src/infer_entry.rs:396:    output_json.insert("native_projection_cache_action".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));
+crates/orchestrator_local/src/infer_entry.rs:760:    response_json.insert("nativeEmbeddingModeRequested".to_string(), json!(&result.native_vocab_allocation_probe.requested_embedding_mode));
+crates/orchestrator_local/src/infer_entry.rs:765:    response_json.insert("nativeProjectionCacheAction".to_string(), json!(result.native_vocab_allocation_probe.vocab_atlas_cache_action));

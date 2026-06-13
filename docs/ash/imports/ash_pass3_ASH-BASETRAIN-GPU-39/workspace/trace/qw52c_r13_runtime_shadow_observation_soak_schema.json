@@ -1,0 +1,22 @@
+{
+  "patch_id": "QW-52C-R13",
+  "title": "Runtime Shadow Observation Soak / Long Horizon No Apply Seal",
+  "base_patch": "QW-52C-R12",
+  "trace_type": "RuntimeShadowObservationSoakTraceR13",
+  "required_outputs": [
+    "artifacts/qw52c_r13_runtime_shadow_observation_soak.jsonl",
+    "artifacts/qw52c_r13_runtime_shadow_observation_soak_report.json",
+    "artifacts/qw52c_r13_runtime_shadow_observation_soak_manifest.json",
+    "workspace/trace/qw52c_r13_runtime_shadow_observation_soak_receipt.json"
+  ],
+  "invariants": {
+    "long_horizon_soak": true,
+    "soak_result_applied": false,
+    "promotion_eligible": false,
+    "runtime_apply_allowed": false,
+    "runtime_default_apply_allowed": false,
+    "weight_commit_allowed": false,
+    "safe_profile_apply_allowed": false,
+    "crate_js_ts_allowed": false
+  }
+}

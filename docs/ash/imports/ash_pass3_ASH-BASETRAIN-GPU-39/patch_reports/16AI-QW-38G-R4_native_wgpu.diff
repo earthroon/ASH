@@ -1,0 +1,315 @@
+--- /mnt/data/work_38g_r3/crates/model_core/src/native_wgpu.rs	2026-05-22 11:43:07.853255824 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 12:26:45.948952478 +0000
+@@ -183,6 +183,304 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R4 — GPU Debug Tap Candidate / Bounded Intermediate Activation Readback Seal
++static QW38G_R4_TAP_STEP: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r4_enabled() -> bool {
++    env_flag("ASH_GPU_DEBUG_TAP") || env_flag("ASH_QW38G_R4_GPU_DEBUG_TAP")
++}
++
++fn qw38g_r4_scalar_only() -> bool {
++    std::env::var("ASH_GPU_DEBUG_TAP_SCALAR_ONLY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r4_trace_path() -> String {
++    std::env::var("ASH_GPU_DEBUG_TAP_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r4_gpu_debug_tap_trace.jsonl".to_string())
++}
++
++fn qw38g_r4_summary_path() -> String {
++    std::env::var("ASH_GPU_DEBUG_TAP_SUMMARY")
++        .unwrap_or_else(|_| "workspace/qw38g_r4_gpu_debug_tap_summary.json".to_string())
++}
++
++fn qw38g_r4_receipt_path() -> String {
++    std::env::var("ASH_GPU_DEBUG_TAP_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r4_gpu_debug_tap_receipt.json".to_string())
++}
++
++fn qw38g_r4_split_env(name: &str, default: &str) -> Vec<String> {
++    std::env::var(name)
++        .unwrap_or_else(|_| default.to_string())
++        .split(',')
++        .map(|s| s.trim().to_string())
++        .filter(|s| !s.is_empty())
++        .collect()
++}
++
++fn qw38g_r4_target_ids() -> Vec<usize> {
++    qw38g_r4_split_env("ASH_GPU_DEBUG_TAP_TARGET_IDS", "13")
++        .into_iter()
++        .filter_map(|s| s.parse::<usize>().ok())
++        .collect::<Vec<_>>()
++}
++
++fn qw38g_r4_path_written(path: &str) -> bool {
++    std::path::Path::new(path)
++        .metadata()
++        .map(|m| m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn qw38g_r4_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r4_append_jsonl(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
++        let _ = writeln!(file, "{}", value);
++    }
++}
++
++fn qw38g_r4_write_summary_and_receipt(
++    status: &str,
++    total_events: usize,
++    tap_reached: bool,
++    post_final_norm_tap_reached: bool,
++    total_readback_bytes: usize,
++    warnings: Vec<String>,
++    extra: serde_json::Value,
++) {
++    let trace_path = qw38g_r4_trace_path();
++    let summary_path = qw38g_r4_summary_path();
++    let receipt_path = qw38g_r4_receipt_path();
++    let full_vector_readback_used = total_readback_bytes > std::mem::size_of::<f32>();
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R4",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "total_events": total_events,
++        "steps_observed": if total_events > 0 { 1 } else { 0 },
++        "layers_observed": Vec::<String>::new(),
++        "stages_observed": if post_final_norm_tap_reached { vec!["post_final_norm".to_string()] } else { Vec::<String>::new() },
++        "projection_scalar_only": qw38g_r4_scalar_only(),
++        "full_vector_readback_used": full_vector_readback_used,
++        "total_readback_bytes": total_readback_bytes,
++        "tap_reached": tap_reached,
++        "post_mlp_tap_reached": false,
++        "post_block_tap_reached": false,
++        "pre_final_norm_tap_reached": false,
++        "post_final_norm_tap_reached": post_final_norm_tap_reached,
++        "strongest_layer": null,
++        "strongest_stage": if post_final_norm_tap_reached { serde_json::json!("post_final_norm") } else { serde_json::Value::Null },
++        "strongest_dot_to_target": serde_json::Value::Null,
++        "strongest_cosine_to_target": serde_json::Value::Null,
++        "reserved_direction_source_candidate": if post_final_norm_tap_reached { serde_json::json!("final_hidden_projection") } else { serde_json::Value::Null },
++        "warning_codes": warnings,
++        "extra": extra,
++    });
++    qw38g_r4_write_json(&summary_path, &summary);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R4",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "tap_reached": tap_reached,
++        "trace_path": trace_path,
++        "trace_written": total_events > 0 && qw38g_r4_path_written(&trace_path),
++        "summary_path": summary_path,
++        "summary_written": qw38g_r4_path_written(&summary_path),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "projection_scalar_only": qw38g_r4_scalar_only(),
++        "full_vector_readback_used": full_vector_readback_used,
++        "total_readback_bytes": total_readback_bytes,
++        "post_mlp_tap_reached": false,
++        "post_block_tap_reached": false,
++        "post_final_norm_tap_reached": post_final_norm_tap_reached,
++        "recommended_next_patch": if tap_reached { "16AI-QW-38H_FINAL_NORM_STABILITY_AUDIT" } else { "16AI-QW-38G-R6_SHADER_DEBUG_BUFFER_DESIGN" },
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r4_write_json(&receipt_path, &receipt);
++    eprintln!("[16AI-QW-38G-R4][summary_written] path={}", summary_path);
++    eprintln!("[16AI-QW-38G-R4][receipt_written] path={}", receipt_path);
++    eprintln!("[16AI-QW-38G-R4][done] status={}", status);
++}
++
++fn qw38g_r4_gpu_debug_tap_candidate(
++    global_top_k: &[NativeVocabAtlasCandidate],
++    atlas: &NativeVocabAtlas,
++    last_hidden: &Tensor<NativeInferenceBackend, 2>,
++) {
++    if !qw38g_r4_enabled() {
++        return;
++    }
++    let step = QW38G_R4_TAP_STEP.fetch_add(1, Ordering::SeqCst);
++    let max_steps = qw38a_env_usize("ASH_GPU_DEBUG_TAP_MAX_STEPS", 1).max(1);
++    if step >= max_steps {
++        return;
++    }
++    let layers = qw38g_r4_split_env("ASH_GPU_DEBUG_TAP_LAYERS", "mid,last");
++    let stages = qw38g_r4_split_env("ASH_GPU_DEBUG_TAP_STAGES", "post_mlp,post_block");
++    let targets = qw38g_r4_target_ids();
++    let scalar_only = qw38g_r4_scalar_only();
++    eprintln!(
++        "[16AI-QW-38G-R4][start] step={} scalar_only={} max_steps={} targets={:?}",
++        step, scalar_only, max_steps, targets
++    );
++    eprintln!(
++        "[16AI-QW-38G-R4][env] enabled=true layers={} stages={} scalar_only={}",
++        layers.join(","), stages.join(","), scalar_only
++    );
++    eprintln!(
++        "[16AI-QW-38G-R4][tap_plan] projection_scalar_only={} requested_layers={:?} requested_stages={:?}",
++        scalar_only, layers, stages
++    );
++
++    for layer in &layers {
++        for stage in &stages {
++            if stage != "post_final_norm" && stage != "final_hidden_projection" {
++                eprintln!(
++                    "[16AI-QW-38G-R4][tap_unavailable] step={} layer={} stage={} reason=RUST_LAYERWISE_RESIDUAL_UNAVAILABLE",
++                    step, layer, stage
++                );
++            }
++        }
++    }
++
++    let final_stage_requested = stages.iter().any(|s| s == "post_final_norm" || s == "final_hidden_projection");
++    let trace_path = qw38g_r4_trace_path();
++    if !final_stage_requested {
++        qw38g_r4_write_summary_and_receipt(
++            "FAIL_TAP_UNAVAILABLE",
++            0,
++            false,
++            false,
++            0,
++            vec![
++                "GPU_DEBUG_TAP_STAGE_UNAVAILABLE".to_string(),
++                "POST_MLP_TAP_UNAVAILABLE".to_string(),
++                "POST_BLOCK_TAP_UNAVAILABLE".to_string(),
++                "RESERVED_DIRECTION_SOURCE_STILL_UNKNOWN".to_string(),
++            ],
++            serde_json::json!({
++                "requested_layers": layers,
++                "requested_stages": stages,
++                "actual_traceable_boundary": "final_hidden_projection",
++                "note": "bounded tap candidate did not read full activation vectors; requested intermediate stages are unavailable from current Rust-side boundary",
++            }),
++        );
++        return;
++    }
++
++    if !scalar_only {
++        qw38g_r4_write_summary_and_receipt(
++            "FAIL_FULL_VECTOR_REJECTED",
++            0,
++            false,
++            false,
++            0,
++            vec!["GPU_DEBUG_TAP_FULL_VECTOR_REJECTED".to_string()],
++            serde_json::json!({"requested_stages": stages}),
++        );
++        return;
++    }
++
++    let meta = qw38a_token_meta();
++    let Ok(hidden_vec) = last_hidden
++        .clone()
++        .reshape([atlas.hidden_size])
++        .into_data()
++        .to_vec::<f32>() else {
++        qw38g_r4_write_summary_and_receipt(
++            "FAIL_TAP_UNAVAILABLE",
++            0,
++            false,
++            false,
++            0,
++            vec!["GPU_DEBUG_TAP_SCALAR_READBACK_FAILED".to_string()],
++            serde_json::json!({"requested_stages": stages}),
++        );
++        return;
++    };
++    let hidden_norm = qw38d_l2_norm(&hidden_vec);
++    let target_id = targets.first().copied().unwrap_or(13);
++    let Some(row) = qw38d_token_row_from_atlas(atlas, target_id) else {
++        qw38g_r4_write_summary_and_receipt(
++            "FAIL_TAP_UNAVAILABLE",
++            0,
++            false,
++            false,
++            hidden_vec.len().saturating_mul(std::mem::size_of::<f32>()),
++            vec!["GPU_DEBUG_TAP_SCALAR_READBACK_FAILED".to_string()],
++            serde_json::json!({"target_id": target_id}),
++        );
++        return;
++    };
++    let row_norm = qw38d_l2_norm(&row);
++    let dot = qw38d_dot(&hidden_vec, &row);
++    let cosine = qw38d_cosine(dot, hidden_norm, row_norm);
++    let masked_top1 = global_top_k
++        .iter()
++        .find(|c| !meta.banned_reasons.contains_key(&c.token_id));
++    let event = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R4",
++        "decode_step": step,
++        "layer_id": null,
++        "layer_label": "final_hidden_projection",
++        "stage": "post_final_norm",
++        "target_token_id": target_id,
++        "target_piece": qw38a_piece(meta, target_id),
++        "projection_scalar_only": true,
++        "dot_to_target": dot,
++        "hidden_norm": hidden_norm,
++        "target_row_norm": row_norm,
++        "cosine_to_target": cosine,
++        "masked_top1_token_id": masked_top1.map(|c| c.token_id),
++        "masked_top1_piece": masked_top1.map(|c| qw38a_piece(meta, c.token_id)),
++        "dot_to_masked_top1": serde_json::Value::Null,
++        "target_minus_masked_top1_margin": serde_json::Value::Null,
++        "readback_bytes": hidden_vec.len().saturating_mul(std::mem::size_of::<f32>()),
++        "readback_kind": "final_hidden_projection_reference",
++        "tap_reached": true,
++        "tap_stage_available": true,
++        "warning_codes": ["FINAL_NORM_TAP_ONLY"],
++    });
++    eprintln!(
++        "[16AI-QW-38G-R4][tap_event] step={} layer=final stage=post_final_norm target={} dot={} cosine={:?}",
++        step, target_id, dot, cosine
++    );
++    qw38g_r4_append_jsonl(&trace_path, &event);
++    qw38g_r4_write_summary_and_receipt(
++        "PASS_GPU_DEBUG_TAP_FINAL_ONLY",
++        1,
++        true,
++        true,
++        hidden_vec.len().saturating_mul(std::mem::size_of::<f32>()),
++        vec!["FINAL_NORM_TAP_ONLY".to_string()],
++        serde_json::json!({
++            "target_id": target_id,
++            "target_piece": qw38a_piece(meta, target_id),
++            "dot_to_target": dot,
++            "cosine_to_target": cosine,
++            "requested_layers": layers,
++            "requested_stages": stages,
++            "actual_traceable_boundary": "final_hidden_projection",
++        }),
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -3008,6 +3306,7 @@
+         qw38g_r3_stage_enter("raw_topk_trace_hook", format!("best_token_id={} top_k={}", best_token_id, global_top_k.len()));
+         qw38d_log_hidden_projection_trace(&global_top_k, best_token_id, best_logit, atlas, &last_hidden);
+         qw38g_r3_stage_enter("hidden_projection_trace_hook", format!("best_token_id={} best_logit={}", best_token_id, best_logit));
++        qw38g_r4_gpu_debug_tap_candidate(&global_top_k, atlas, &last_hidden);
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

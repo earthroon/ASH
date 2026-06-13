@@ -1,0 +1,18 @@
+{
+  "patch_id": "ASH-FT-23",
+  "title": "Atlas Group Memory Budget Planner / No OOM Full Tensor Load Seal",
+  "mode": "atlas_group_memory_budget_planner",
+  "base_required": "ASH-FT-22",
+  "budget_scope": "atlas_group_only",
+  "allow_full_tensor_load": false,
+  "allow_full_model_upload": false,
+  "allow_full_gradient_allocation": false,
+  "allow_full_optimizer_state_allocation": false,
+  "allow_runtime_allocation": false,
+  "allow_weight_update": false,
+  "allow_base_checkpoint_mutation": false,
+  "optimizer_profile": "adamw_fp32_moments",
+  "activation_budget_mode": "hint_only",
+  "oom_risk_policy": "conservative",
+  "next_patch": "ASH-FT-24"
+}

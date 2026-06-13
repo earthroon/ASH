@@ -1,0 +1,33 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-MINP-C1A",
+  "wgsl_compile": {
+    "status": "NOT_RUN",
+    "reason": "NO_WGPU_RUNTIME_OR_WGSL_VALIDATOR_IN_CONTAINER",
+    "static_shader_scan": {
+      "gpu_sampling_topk.wgsl": {
+        "has_sampling_uniform": true,
+        "has_semantic_bias_function": true,
+        "has_weighted_logit_function_or_call": true,
+        "has_bias_cap_field": true
+      },
+      "gpu_sampling_topp_scan.wgsl": {
+        "has_sampling_uniform": true,
+        "has_semantic_bias_function": true,
+        "has_weighted_logit_function_or_call": true,
+        "has_bias_cap_field": true
+      },
+      "gpu_sampling_select.wgsl": {
+        "has_sampling_uniform": true,
+        "has_semantic_bias_function": true,
+        "has_weighted_logit_function_or_call": true,
+        "has_bias_cap_field": true
+      },
+      "gpu_sampling_select_legacy.wgsl": {
+        "has_sampling_uniform": true,
+        "has_semantic_bias_function": true,
+        "has_weighted_logit_function_or_call": true,
+        "has_bias_cap_field": true
+      }
+    }
+  }
+}

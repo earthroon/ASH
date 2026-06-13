@@ -1,0 +1,100 @@
+{
+  "run_name": "ash_ko_short_lora_500_short_dump",
+  "model_id": "model_tinyllama_1p1b_v5",
+  "model_path": "D:/1111113232/DUST/1/ash_pass3/specs/model_spec_v5_48259.toml",
+  "dataset": {
+    "train_jsonl": "D:/1111113232/DUST/1/ash_pass3/datasets/ash_ko_short_lora/train_500_short.jsonl",
+    "train_jsonl_paths": [
+      "D:/1111113232/DUST/1/ash_pass3/datasets/ash_ko_short_lora/train_500_short.jsonl"
+    ],
+    "eval_jsonl": "D:/1111113232/DUST/1/ash_pass3/datasets/ash_ko_short_lora/val_500_short.jsonl",
+    "system_field": null,
+    "prompt_field": "prompt",
+    "response_field": "response",
+    "max_samples": 500,
+    "max_seq_len": 192,
+    "pack_turns": false,
+    "feature_jsonl": null,
+    "feature_store_manifest": null,
+    "max_feature_batches": null
+  },
+  "optimizer": {
+    "optimizer": "adamw",
+    "learning_rate": 0.00005,
+    "weight_decay": 0.01,
+    "warmup_steps": 10,
+    "gradient_accumulation": 1,
+    "max_steps": 5
+  },
+  "hyper": {
+    "rank": 8,
+    "alpha": 16.0,
+    "dropout": 0.05,
+    "preset": "custom",
+    "target_modules": ["attn.q_proj"],
+    "bias_mode": "none",
+    "hidden_size": 2048,
+    "vocab_size": 48259,
+    "init_std": 0.02
+  },
+  "checkpoints": {
+    "output_dir": "D:/1111113232/DUST/1/ash_pass3/workspace/lora_runs/ash_ko_short_lora_500_short_dump",
+    "save_every_steps": 20,
+    "keep_last": 3,
+    "manifest_name": "module_lora_checkpoint_manifest.json",
+    "adapter_name": "lora_adapters"
+  },
+  "logging": {
+    "log_every_steps": 1,
+    "eval_every_steps": 20,
+    "save_every_steps": 20
+  },
+  "training": {
+    "plan_kind": "module_lora",
+    "planned_layers": 1,
+    "pad_token_id": 0,
+    "label_smoothing": 0.0,
+    "save_adapter_checkpoint": true,
+    "bridge_dump_only": true,
+    "module_lora_require_generation_smoke_pass": false,
+    "module_lora_require_capture_quality_pass": false,
+    "module_lora_allow_capture_not_applicable": true,
+    "module_lora_require_native_trace_submit_ready": false,
+    "module_lora_require_native_trace_runtime_selected": false
+  },
+  "bridge": {
+    "enabled": true,
+    "model_kind": "ash_native",
+    "tokenizer_path": "D:/1111113232/DUST/1/ash_pass3/artifacts/tokenizer_manifest_v5_final.json",
+    "teacher_full_model_path": "D:/1111113232/DUST/1/ash_pass3/tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors",
+    "max_bridge_samples": 500,
+    "bos": true,
+    "eos": true,
+    "include_system_prompt": false,
+    "output_feature_jsonl": null,
+    "feature_store_work_dir": "D:/1111113232/DUST/1/ash_pass3/workspace/lora_runs/ash_ko_short_lora_500_short_dump/feature_store_work",
+    "feature_store_archive_dir": "D:/1111113232/DUST/1/ash_pass3/workspace/lora_runs/ash_ko_short_lora_500_short_dump/feature_store_archive",
+    "feature_store_rows_per_shard": 4096,
+    "module_local_teacher_batch_size": 4,
+    "module_local_trace_slots": 2,
+    "teacher": {
+      "mode": "token_aligned",
+      "span": "full_sequence",
+      "center_per_sequence": false,
+      "l2_normalize": false,
+      "subtract_prompt_mean": false,
+      "prompt_mean_scale": 1.0,
+      "keep_last_k_tokens": null,
+      "min_span_tokens": 1,
+      "layer_blend": {
+        "enabled": false,
+        "previous_weight": 0.2,
+        "current_weight": 0.6,
+        "next_weight": 0.2,
+        "renormalize": true
+      }
+    },
+    "extract_only": false,
+    "max_seq_len": 192
+  }
+}

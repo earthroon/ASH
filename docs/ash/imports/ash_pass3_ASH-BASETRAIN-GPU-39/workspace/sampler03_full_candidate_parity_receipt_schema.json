@@ -1,0 +1,44 @@
+{
+  "path": "workspace/sampler03_full_candidate_parity_receipt.jsonl",
+  "format": "jsonl",
+  "step_receipt": {
+    "patch_id": "16AI-QW-38G-R6A-SAMPLER-03",
+    "step": "usize",
+    "mode": "Off|ProbeOnly|Strict",
+    "decode_config": {
+      "temperature": "f32",
+      "top_k": "u32",
+      "top_p": "f32",
+      "min_p": "f32"
+    },
+    "cpu": {
+      "active_count": "usize",
+      "final_count": "usize",
+      "active_ids_head": "Vec<u32>",
+      "final_ids_head": "Vec<u32>",
+      "min_p_threshold": "Option<f32>",
+      "recovery_mode": "String",
+      "selected_id": "u32"
+    },
+    "gpu": {
+      "active_count": "Option<usize>",
+      "final_count": "Option<usize>",
+      "active_ids_head": "Vec<u32>",
+      "final_ids_head": "Vec<u32>",
+      "active_overflow": "bool",
+      "final_overflow": "bool",
+      "trace_top_n": "usize",
+      "trace_completeness": "String",
+      "selected_id": "u32"
+    },
+    "parity": {
+      "candidate_set_match": "Option<bool>",
+      "active_set_match": "Option<bool>",
+      "final_set_match": "Option<bool>",
+      "trace_truncated": "bool",
+      "selected_match": "bool",
+      "strict_demoted": "bool",
+      "status": "PASS|WARN_TRACE_TRUNCATED|WARN_SELECTED_ONLY|FAIL_*|PARTIAL_*"
+    }
+  }
+}

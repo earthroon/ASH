@@ -1,0 +1,38 @@
+SFT-GPU-RUN-08 STATIC SCAN
+
+new files:
+- crates/ash_core/src/sft_gpu_current_pointer_switch.rs
+- crates/ash_core/tests/sft_gpu_run_08_current_pointer_switch.rs
+- crates/lora_train/src/gpu_trained_current_pointer_switch.rs
+- crates/lora_train/tests/gpu_trained_current_pointer_switch.rs
+- crates/burn_webgpu_backend/src/gpu_trained_current_pointer_switch.rs
+- crates/burn_webgpu_backend/tests/gpu_trained_current_pointer_switch.rs
+
+string gates observed:
+- CurrentPointerSwitchAccepted
+- HeldUnreviewedPromotionApplyDetected
+- HeldUnexpectedRollbackExecution
+- texture_sample_for_weight_fetch_detected
+- runtime_sft_training_performed
+- runtime_gradient_write_performed
+- runtime_optimizer_step_performed
+- slot_ready_for_post_switch_health
+
+boundary opened:
+- reviewed_promotion_apply_commit_allowed = true
+- runtime_current_pointer_update_allowed = true
+- current_pointer_switch_allowed = true
+- slot_ready_mark_allowed = true
+- rollback_ledger_commit_allowed = true
+- texture_load_revalidation_allowed = true
+
+boundary closed:
+- unreviewed_promotion_apply_allowed = false
+- rollback_execution_allowed = false
+- lifecycle_mutation_allowed = false
+- slot_action_apply_allowed = false
+- ash_binding_allowed = false
+- runtime_sft_training_allowed = false
+- runtime_gradient_write_allowed = false
+- runtime_optimizer_step_allowed = false
+- texture_sample_weight_fetch_allowed = false

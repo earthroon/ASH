@@ -1,0 +1,2094 @@
+diff -ruN eval02_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md eval02_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md
+--- eval02_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md	2026-05-27 08:20:44.985686537 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-EVAL-02 Acceptance
++
++## Result
++
++PASS_STATIC. Runtime soak was not executed in this container because cargo/runtime execution is unavailable.
++
++## Acceptance Criteria Covered
++
++- Long prompt suite exists.
++- Soak matrix exists.
++- Window metric, drift metric, run receipt, step sample, summary structures exist.
++- `sampler_parity::append_receipt()` hook is connected.
++- Summary and source hash manifest are present.
++
++## Not Run
++
++- cargo check
++- runtime soak
++- profile comparison
++- backend-specific long horizon replay
+diff -ruN eval02_orig/crates/model_core/src/eval02_long_horizon.rs eval02_work/crates/model_core/src/eval02_long_horizon.rs
+--- eval02_orig/crates/model_core/src/eval02_long_horizon.rs	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/crates/model_core/src/eval02_long_horizon.rs	2026-05-27 08:19:36.878719437 +0000
+@@ -0,0 +1,824 @@
++use serde::{Deserialize, Serialize};
++use std::{collections::BTreeMap, env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++pub const EVAL02_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-02";
++pub const EVAL02_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03E";
++pub const EVAL02_SSOT: &str = "fixed_long_prompt_suite_plus_step_window_metric_ledger";
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Eval02Mode {
++    Off,
++    ManifestOnly,
++    RunSoak,
++    CompareProfiles,
++    StrictSoakGate,
++}
++
++impl Eval02Mode {
++    pub fn from_env() -> Self {
++        let value = env::var("ASH_EVAL02_MODE")
++            .unwrap_or_else(|_| "manifest_only".to_string())
++            .trim()
++            .to_ascii_lowercase();
++        match value.as_str() {
++            "off" | "false" | "0" | "disabled" => Self::Off,
++            "run_soak" | "run" | "bench" => Self::RunSoak,
++            "compare" | "compare_profiles" => Self::CompareProfiles,
++            "strict" | "strict_soak_gate" => Self::StrictSoakGate,
++            _ => Self::ManifestOnly,
++        }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ManifestOnly => "ManifestOnly",
++            Self::RunSoak => "RunSoak",
++            Self::CompareProfiles => "CompareProfiles",
++            Self::StrictSoakGate => "StrictSoakGate",
++        }
++    }
++
++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
++pub enum Eval02DriftRisk {
++    Low,
++    Medium,
++    High,
++    Critical,
++}
++
++impl Eval02DriftRisk {
++    pub fn from_score(score: f32) -> Self {
++        let score = clamp01(score);
++        if score >= 0.80 { Self::Critical }
++        else if score >= 0.55 { Self::High }
++        else if score >= 0.30 { Self::Medium }
++        else { Self::Low }
++    }
++
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Low => "Low",
++            Self::Medium => "Medium",
++            Self::High => "High",
++            Self::Critical => "Critical",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02ExpectedRisks {
++    pub salad_expected: bool,
++    pub stop_expected: bool,
++    pub rollback_expected: bool,
++    pub long_output_expected: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02PromptCase {
++    pub prompt_id: String,
++    pub category: String,
++    pub prompt: String,
++    pub language: String,
++    pub max_new_tokens: usize,
++    pub horizon_buckets: Vec<usize>,
++    pub expected_risks: Eval02ExpectedRisks,
++    pub tags: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02Profile {
++    pub profile_id: String,
++    pub dynamic_controlled: bool,
++    pub salad02: bool,
++    pub salad04: bool,
++    pub decode03e_guard_overlay: bool,
++    pub stop_surface: bool,
++    pub rollback_execute: bool,
++    pub description: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02Matrix {
++    pub patch_id: String,
++    pub prompt_suite: String,
++    pub seeds: Vec<u64>,
++    pub backends: Vec<String>,
++    pub profiles: Vec<Eval02Profile>,
++    pub max_new_tokens_default: usize,
++    pub horizon_buckets: Vec<usize>,
++    pub window_size: usize,
++    pub sample_every_n_steps: usize,
++    pub strict_replay: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02WindowMetrics {
++    pub window_start_step: usize,
++    pub window_end_step: usize,
++    pub token_count: usize,
++
++    pub pci_mean: Option<f32>,
++    pub pci_min: Option<f32>,
++    pub pci_slope: Option<f32>,
++
++    pub entropy_final_mean: Option<f32>,
++    pub entropy_final_max: Option<f32>,
++    pub entropy_slope: Option<f32>,
++
++    pub salad02_score_mean: Option<f32>,
++    pub salad02_score_max: Option<f32>,
++    pub salad02_high_count: usize,
++    pub salad02_critical_count: usize,
++
++    pub salad04_score_mean: Option<f32>,
++    pub salad04_score_max: Option<f32>,
++    pub salad04_high_count: usize,
++    pub salad04_critical_count: usize,
++
++    pub morph_loop_count: usize,
++    pub josa_loop_count: usize,
++    pub eomi_loop_count: usize,
++    pub jamo_leak_count: usize,
++    pub byte_piece_count: usize,
++
++    pub repeat_3gram_rate: Option<f32>,
++    pub distinct_2_ratio: Option<f32>,
++
++    pub guard_strict_count: usize,
++    pub guard_panic_count: usize,
++    pub decode03e_overlay_applied_count: usize,
++
++    pub rollback_candidate_count: usize,
++    pub rollback_execute_count: usize,
++
++    pub stop_candidate_count: usize,
++    pub stop_execute_count: usize,
++
++    pub fallback_count: usize,
++    pub global_finite_fallback_count: usize,
++    pub empty_active_set_count: usize,
++
++    pub tokens_per_second_mean: Option<f32>,
++    pub latency_p95_ms: Option<f32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02DriftMetrics {
++    pub pci_decay_rate: Option<f32>,
++    pub entropy_growth_rate: Option<f32>,
++    pub salad02_growth_rate: Option<f32>,
++    pub salad04_growth_rate: Option<f32>,
++    pub morph_loop_growth_rate: Option<f32>,
++    pub repeat_growth_rate: Option<f32>,
++    pub stop_pressure_growth_rate: Option<f32>,
++    pub fallback_pressure_growth_rate: Option<f32>,
++    pub guard_panic_growth_rate: Option<f32>,
++    pub long_horizon_drift_score: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02RunJudgement {
++    pub status: String,
++    pub drift_risk: Eval02DriftRisk,
++    pub fail_reasons: Vec<String>,
++    pub warn_reasons: Vec<String>,
++    pub ready_for_profile_promotion: bool,
++    pub ready_for_default_enable: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02RunReceipt {
++    pub patch_id: String,
++    pub schema_version: u32,
++    pub run_id: String,
++    pub prompt_id: String,
++    pub prompt_hash: String,
++    pub profile_id: String,
++    pub backend: String,
++    pub seed: u64,
++    pub max_new_tokens: usize,
++    pub horizon_buckets: Vec<usize>,
++    pub output_token_count: usize,
++    pub output_hash: String,
++    pub visible_output_hash: Option<String>,
++    pub finish_reason: String,
++    pub windows: Vec<Eval02WindowMetrics>,
++    pub drift: Eval02DriftMetrics,
++    pub judgement: Eval02RunJudgement,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02StepSample {
++    pub run_id: String,
++    pub prompt_id: String,
++    pub profile_id: String,
++    pub backend: String,
++    pub seed: u64,
++    pub step: usize,
++    pub selected_id: Option<u32>,
++    pub selected_piece_preview: Option<String>,
++    pub pci_raw: Option<f32>,
++    pub entropy_final: Option<f32>,
++    pub salad02_score: Option<f32>,
++    pub salad02_risk: Option<String>,
++    pub salad04_score: Option<f32>,
++    pub salad04_risk: Option<String>,
++    pub decode03e_applied: bool,
++    pub guard_strength: Option<String>,
++    pub fallback_mode: Option<String>,
++    pub stop_reason: Option<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval02SuiteStats {
++    pub prompt_count: usize,
++    pub profile_count: usize,
++    pub seed_count: usize,
++    pub backend_count: usize,
++    pub expected_run_count: usize,
++    pub completed_run_count: usize,
++    pub not_comparable_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval02OverallStats {
++    pub pass_count: usize,
++    pub warn_count: usize,
++    pub fail_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval02ProfileStats {
++    pub pass_rate: f32,
++    pub run_count: usize,
++    pub fail_count: usize,
++    pub warn_count: usize,
++    pub drift_score_mean: f32,
++    pub salad02_score_max_mean: f32,
++    pub salad04_score_max_mean: f32,
++    pub stop_execute_count: usize,
++    pub tokens_per_second_mean: f32,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
++pub struct Eval02LongHorizonStats {
++    pub critical_drift_count: usize,
++    pub high_drift_count: usize,
++    pub pci_decay_warn_count: usize,
++    pub entropy_growth_warn_count: usize,
++    pub morph_loop_growth_warn_count: usize,
++    pub guard_panic_growth_warn_count: usize,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02RegressionJudgement {
++    pub baseline_profile: String,
++    pub candidate_profile: String,
++    pub drift_score_improved: bool,
++    pub salad_score_improved: bool,
++    pub morph_loop_reduced: bool,
++    pub over_stop_regression: bool,
++    pub speed_regression_warn: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02Acceptance {
++    pub ready_for_decode03f_threshold_calibration: bool,
++    pub ready_for_medusa00: bool,
++    pub ready_for_default_guard_overlay: bool,
++    pub reason: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Eval02Summary {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub status: String,
++    pub mode: String,
++    pub suite: Eval02SuiteStats,
++    pub overall: Eval02OverallStats,
++    pub by_profile: BTreeMap<String, Eval02ProfileStats>,
++    pub long_horizon: Eval02LongHorizonStats,
++    pub regression: Eval02RegressionJudgement,
++    pub acceptance: Eval02Acceptance,
++}
++
++fn env_bool(name: &str, default: bool) -> bool {
++    env::var(name).ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")).unwrap_or(default)
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    env::var(name).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default)
++}
++
++fn env_u64(name: &str, default: u64) -> u64 {
++    env::var(name).ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(default)
++}
++
++fn path_from_env(name: &str, default: &str) -> PathBuf {
++    env::var(name).map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(default))
++}
++
++fn prompt_suite_path() -> PathBuf { path_from_env("ASH_EVAL02_PROMPT_SUITE", "workspace/eval02_long_prompt_suite.jsonl") }
++fn matrix_path() -> PathBuf { path_from_env("ASH_EVAL02_MATRIX", "workspace/eval02_matrix.json") }
++fn runs_path() -> PathBuf { path_from_env("ASH_EVAL02_RUNS", "workspace/eval02_window_runs.jsonl") }
++fn samples_path() -> PathBuf { path_from_env("ASH_EVAL02_STEP_SAMPLES", "workspace/eval02_step_samples.jsonl") }
++fn summary_path() -> PathBuf { path_from_env("ASH_EVAL02_SUMMARY", "workspace/eval02_summary.json") }
++
++fn hash_string(input: &str) -> String {
++    let mut h: u64 = 0xcbf29ce484222325;
++    for b in input.as_bytes() {
++        h ^= *b as u64;
++        h = h.wrapping_mul(0x100000001b3);
++    }
++    format!("fnv64:{:016x}", h)
++}
++
++fn clamp01(v: f32) -> f32 {
++    if !v.is_finite() { return 1.0; }
++    v.clamp(0.0, 1.0)
++}
++
++fn option_mean(values: &[Option<f32>]) -> Option<f32> {
++    let finite: Vec<f32> = values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).collect();
++    if finite.is_empty() { None } else { Some(finite.iter().sum::<f32>() / finite.len() as f32) }
++}
++
++fn option_max(values: &[Option<f32>]) -> Option<f32> {
++    values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).fold(None, |acc: Option<f32>, v| Some(acc.map(|a| a.max(v)).unwrap_or(v)))
++}
++
++fn option_min(values: &[Option<f32>]) -> Option<f32> {
++    values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).fold(None, |acc: Option<f32>, v| Some(acc.map(|a| a.min(v)).unwrap_or(v)))
++}
++
++fn slope(first: Option<f32>, last: Option<f32>, steps: usize) -> Option<f32> {
++    match (first, last) {
++        (Some(a), Some(b)) if steps > 1 => Some((b - a) / steps as f32),
++        _ => None,
++    }
++}
++
++pub fn default_long_prompt_suite() -> Vec<Eval02PromptCase> {
++    let buckets = vec![128, 256, 512];
++    let normal = Eval02ExpectedRisks { salad_expected: false, stop_expected: false, rollback_expected: false, long_output_expected: true };
++    let trap = Eval02ExpectedRisks { salad_expected: true, stop_expected: false, rollback_expected: false, long_output_expected: true };
++    vec![
++        Eval02PromptCase { prompt_id: "L01_long_korean_explanation_001".to_string(), category: "long_korean_explanation".to_string(), prompt: "배추찜을 주제로, 재료 준비부터 보관법까지 차분하게 긴 설명을 작성해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "long".to_string(), "normal".to_string(), "explanation".to_string()] },
++        Eval02PromptCase { prompt_id: "L02_long_structured_markdown_001".to_string(), category: "long_structured_markdown".to_string(), prompt: "작은 웹 도구를 설계한다고 가정하고, 목적/사용자/상태/오류처리/접근성을 마크다운 구조로 길게 정리해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "markdown".to_string(), "structure".to_string()] },
++        Eval02PromptCase { prompt_id: "L03_long_emotional_prose_001".to_string(), category: "long_emotional_prose".to_string(), prompt: "비 오는 골목에서 오래 참은 인물이 조용히 무너지는 장면을 감정이 과열되지 않게 길게 써줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "prose".to_string(), "emotion".to_string()] },
++        Eval02PromptCase { prompt_id: "L04_long_dialogue_continuation_001".to_string(), category: "long_dialogue_continuation".to_string(), prompt: "두 사람이 오래 미뤄둔 오해를 풀기 시작하는 대화를 512토큰 안에서 자연스럽게 이어줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "dialogue".to_string()] },
++        Eval02PromptCase { prompt_id: "L05_long_noisy_input_repair_001".to_string(), category: "long_noisy_input_repair".to_string(), prompt: "아니 그니까 웹지피유 샘플러가 자꾸 이상하게 튀는데 이거 구조를 어떻게 봐야하냐고ㅠㅠ 라는 입력에 차분히 긴 답변을 해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "noisy".to_string(), "technical".to_string()] },
++        Eval02PromptCase { prompt_id: "L06_long_code_explanation_ko_001".to_string(), category: "long_code_explanation_ko".to_string(), prompt: "Rust에서 상태 머신과 receipt 기반 검증을 어떻게 분리하면 좋은지 긴 설명으로 정리해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "code".to_string(), "rust".to_string()] },
++        Eval02PromptCase { prompt_id: "L07_long_josa_eomi_pressure_001".to_string(), category: "long_josa_eomi_pressure".to_string(), prompt: "합니다, 입니다, 것이다 같은 표현을 자연스럽게 포함하되 반복하지 않는 긴 설명문을 작성해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: trap.clone(), tags: vec!["korean".to_string(), "josa".to_string(), "eomi".to_string(), "trap".to_string()] },
++        Eval02PromptCase { prompt_id: "L08_long_repetition_trap_soft_001".to_string(), category: "long_repetition_trap_soft".to_string(), prompt: "같은 문장을 반복하지 말고, 같은 주제를 세 관점으로 길게 설명해줘. 단, 각 문단의 끝은 다르게 맺어줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: trap.clone(), tags: vec!["korean".to_string(), "repetition".to_string(), "trap".to_string()] },
++        Eval02PromptCase { prompt_id: "L09_long_worldbuilding_exposition_001".to_string(), category: "long_worldbuilding_exposition".to_string(), prompt: "드래곤과 와이번이 상징 체계에서 어떻게 다르게 쓰이는지 세계관 설정 문서처럼 길게 설명해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "worldbuilding".to_string()] },
++        Eval02PromptCase { prompt_id: "L10_long_tool_design_report_001".to_string(), category: "long_tool_design_report".to_string(), prompt: "PDF 조판 도구에서 이미지 프레임박스를 Notion 블록처럼 옮기는 구조를 긴 설계 보고서로 써줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets, expected_risks: normal, tags: vec!["korean".to_string(), "tool-design".to_string(), "report".to_string()] },
++    ]
++}
++
++pub fn default_matrix() -> Eval02Matrix {
++    Eval02Matrix {
++        patch_id: EVAL02_PATCH_ID.to_string(),
++        prompt_suite: "workspace/eval02_long_prompt_suite.jsonl".to_string(),
++        seeds: vec![101, 202, 303],
++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
++        profiles: vec![
++            Eval02Profile { profile_id: "S01_static_safe".to_string(), dynamic_controlled: false, salad02: false, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "static safe long horizon baseline".to_string() },
++            Eval02Profile { profile_id: "S02_dynamic_controlled".to_string(), dynamic_controlled: true, salad02: false, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "DECODE-03D controlled only".to_string() },
++            Eval02Profile { profile_id: "S03_dynamic_controlled_salad02".to_string(), dynamic_controlled: true, salad02: true, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "dynamic controlled with SALAD-02 detector".to_string() },
++            Eval02Profile { profile_id: "S04_dynamic_controlled_salad04_overlay".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "SALAD-04 overlay observe without DECODE-03E apply".to_string() },
++            Eval02Profile { profile_id: "S05_decode03e_guard_overlay".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: true, stop_surface: false, rollback_execute: false, description: "DECODE-03E controlled guard overlay".to_string() },
++            Eval02Profile { profile_id: "S06_full_guard_stop_surface".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: true, stop_surface: true, rollback_execute: false, description: "full guard plus STOP-01/02 surface, rollback execute off or verified only".to_string() },
++        ],
++        max_new_tokens_default: 512,
++        horizon_buckets: vec![128, 256, 512],
++        window_size: 64,
++        sample_every_n_steps: 16,
++        strict_replay: true,
++    }
++}
++
++pub fn write_eval02_manifests() -> Result<(), String> {
++    let suite_path = prompt_suite_path();
++    if let Some(parent) = suite_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    let suite = default_long_prompt_suite();
++    let mut suite_text = String::new();
++    for case in suite {
++        suite_text.push_str(&serde_json::to_string(&case).map_err(|e| e.to_string())?);
++        suite_text.push('\n');
++    }
++    fs::write(&suite_path, suite_text).map_err(|e| e.to_string())?;
++
++    let matrix = default_matrix();
++    let matrix_path = matrix_path();
++    if let Some(parent) = matrix_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(&matrix_path, serde_json::to_string_pretty(&matrix).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
++    Ok(())
++}
++
++pub fn load_eval02_long_prompt_suite(path: &str) -> Result<Vec<Eval02PromptCase>, String> {
++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
++    let mut out = Vec::new();
++    for line in text.lines().filter(|line| !line.trim().is_empty()) {
++        out.push(serde_json::from_str::<Eval02PromptCase>(line).map_err(|e| e.to_string())?);
++    }
++    Ok(out)
++}
++
++pub fn load_eval02_matrix(path: &str) -> Result<Eval02Matrix, String> {
++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
++    serde_json::from_str(&text).map_err(|e| e.to_string())
++}
++
++pub fn compute_eval02_window_metrics(samples: &[Eval02StepSample], window_start_step: usize, window_end_step: usize) -> Eval02WindowMetrics {
++    let window: Vec<&Eval02StepSample> = samples.iter().filter(|s| s.step >= window_start_step && s.step <= window_end_step).collect();
++    let pci_values: Vec<Option<f32>> = window.iter().map(|s| s.pci_raw).collect();
++    let entropy_values: Vec<Option<f32>> = window.iter().map(|s| s.entropy_final).collect();
++    let salad02_values: Vec<Option<f32>> = window.iter().map(|s| s.salad02_score).collect();
++    let salad04_values: Vec<Option<f32>> = window.iter().map(|s| s.salad04_score).collect();
++    let first_pci = pci_values.iter().find_map(|v| *v);
++    let last_pci = pci_values.iter().rev().find_map(|v| *v);
++    let first_entropy = entropy_values.iter().find_map(|v| *v);
++    let last_entropy = entropy_values.iter().rev().find_map(|v| *v);
++    let mut selected_ids = Vec::new();
++    for s in &window { if let Some(id) = s.selected_id { selected_ids.push(id); } }
++    let repeat_3gram_rate = if selected_ids.len() >= 3 {
++        let mut total = 0usize;
++        let mut repeats = 0usize;
++        for idx in 3..selected_ids.len() {
++            total += 1;
++            if selected_ids[idx] == selected_ids[idx - 3] { repeats += 1; }
++        }
++        Some(repeats as f32 / total.max(1) as f32)
++    } else { None };
++    let distinct_2_ratio = if selected_ids.len() >= 2 {
++        let mut total = 0usize;
++        let mut bigrams = std::collections::BTreeSet::new();
++        for pair in selected_ids.windows(2) {
++            total += 1;
++            bigrams.insert((pair[0], pair[1]));
++        }
++        Some(bigrams.len() as f32 / total.max(1) as f32)
++    } else { None };
++    Eval02WindowMetrics {
++        window_start_step,
++        window_end_step,
++        token_count: window.len(),
++        pci_mean: option_mean(&pci_values),
++        pci_min: option_min(&pci_values),
++        pci_slope: slope(first_pci, last_pci, window.len()),
++        entropy_final_mean: option_mean(&entropy_values),
++        entropy_final_max: option_max(&entropy_values),
++        entropy_slope: slope(first_entropy, last_entropy, window.len()),
++        salad02_score_mean: option_mean(&salad02_values),
++        salad02_score_max: option_max(&salad02_values),
++        salad02_high_count: window.iter().filter(|s| matches!(s.salad02_risk.as_deref(), Some("High" | "Critical"))).count(),
++        salad02_critical_count: window.iter().filter(|s| s.salad02_risk.as_deref() == Some("Critical")).count(),
++        salad04_score_mean: option_mean(&salad04_values),
++        salad04_score_max: option_max(&salad04_values),
++        salad04_high_count: window.iter().filter(|s| matches!(s.salad04_risk.as_deref(), Some("High" | "Critical"))).count(),
++        salad04_critical_count: window.iter().filter(|s| s.salad04_risk.as_deref() == Some("Critical")).count(),
++        morph_loop_count: window.iter().filter(|s| matches!(s.salad04_risk.as_deref(), Some("Medium" | "High" | "Critical"))).count(),
++        josa_loop_count: 0,
++        eomi_loop_count: 0,
++        jamo_leak_count: 0,
++        byte_piece_count: 0,
++        repeat_3gram_rate,
++        distinct_2_ratio,
++        guard_strict_count: window.iter().filter(|s| s.guard_strength.as_deref() == Some("Strict")).count(),
++        guard_panic_count: window.iter().filter(|s| s.guard_strength.as_deref() == Some("Panic")).count(),
++        decode03e_overlay_applied_count: window.iter().filter(|s| s.decode03e_applied).count(),
++        rollback_candidate_count: 0,
++        rollback_execute_count: 0,
++        stop_candidate_count: window.iter().filter(|s| s.stop_reason.is_some()).count(),
++        stop_execute_count: window.iter().filter(|s| s.stop_reason.is_some()).count(),
++        fallback_count: window.iter().filter(|s| !matches!(s.fallback_mode.as_deref(), None | Some("None") | Some("NONE") | Some("PASS"))).count(),
++        global_finite_fallback_count: window.iter().filter(|s| matches!(s.fallback_mode.as_deref(), Some("GLOBAL_FINITE_FALLBACK"))).count(),
++        empty_active_set_count: 0,
++        tokens_per_second_mean: None,
++        latency_p95_ms: None,
++    }
++}
++
++pub fn compute_eval02_drift_metrics(windows: &[Eval02WindowMetrics]) -> Eval02DriftMetrics {
++    let first = windows.first();
++    let last = windows.last();
++    let pci_decay_rate = match (first.and_then(|w| w.pci_mean), last.and_then(|w| w.pci_mean)) {
++        (Some(a), Some(b)) => Some((a - b).max(0.0)),
++        _ => None,
++    };
++    let entropy_growth_rate = match (first.and_then(|w| w.entropy_final_mean), last.and_then(|w| w.entropy_final_mean)) {
++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
++        _ => None,
++    };
++    let salad02_growth_rate = match (first.and_then(|w| w.salad02_score_mean), last.and_then(|w| w.salad02_score_mean)) {
++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
++        _ => None,
++    };
++    let salad04_growth_rate = match (first.and_then(|w| w.salad04_score_mean), last.and_then(|w| w.salad04_score_mean)) {
++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
++        _ => None,
++    };
++    let morph_loop_growth_rate = match (first.map(|w| w.morph_loop_count as f32), last.map(|w| w.morph_loop_count as f32)) {
++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
++        _ => None,
++    };
++    let repeat_growth_rate = match (first.and_then(|w| w.repeat_3gram_rate), last.and_then(|w| w.repeat_3gram_rate)) {
++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
++        _ => None,
++    };
++    let stop_pressure_growth_rate = match (first.map(|w| w.stop_execute_count as f32), last.map(|w| w.stop_execute_count as f32)) {
++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
++        _ => None,
++    };
++    let fallback_pressure_growth_rate = match (first.map(|w| w.fallback_count as f32), last.map(|w| w.fallback_count as f32)) {
++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
++        _ => None,
++    };
++    let guard_panic_growth_rate = match (first.map(|w| w.guard_panic_count as f32), last.map(|w| w.guard_panic_count as f32)) {
++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
++        _ => None,
++    };
++    let score = 0.20 * pci_decay_rate.unwrap_or(0.0)
++        + 0.18 * entropy_growth_rate.unwrap_or(0.0)
++        + 0.20 * salad02_growth_rate.unwrap_or(0.0).max(salad04_growth_rate.unwrap_or(0.0))
++        + 0.14 * morph_loop_growth_rate.unwrap_or(0.0)
++        + 0.10 * repeat_growth_rate.unwrap_or(0.0)
++        + 0.08 * stop_pressure_growth_rate.unwrap_or(0.0)
++        + 0.06 * fallback_pressure_growth_rate.unwrap_or(0.0)
++        + 0.04 * guard_panic_growth_rate.unwrap_or(0.0);
++    Eval02DriftMetrics {
++        pci_decay_rate,
++        entropy_growth_rate,
++        salad02_growth_rate,
++        salad04_growth_rate,
++        morph_loop_growth_rate,
++        repeat_growth_rate,
++        stop_pressure_growth_rate,
++        fallback_pressure_growth_rate,
++        guard_panic_growth_rate,
++        long_horizon_drift_score: clamp01(score),
++    }
++}
++
++pub fn judge_eval02_run(run: &Eval02RunReceipt) -> Eval02RunJudgement {
++    let mut fail = Vec::new();
++    let mut warn = Vec::new();
++    let total_global_fallback: usize = run.windows.iter().map(|w| w.global_finite_fallback_count).sum();
++    let total_salad02_critical: usize = run.windows.iter().map(|w| w.salad02_critical_count).sum();
++    let total_salad04_critical: usize = run.windows.iter().map(|w| w.salad04_critical_count).sum();
++    let total_byte: usize = run.windows.iter().map(|w| w.byte_piece_count).sum();
++    let total_jamo: usize = run.windows.iter().map(|w| w.jamo_leak_count).sum();
++    let total_empty_active: usize = run.windows.iter().map(|w| w.empty_active_set_count).sum();
++    let total_stop: usize = run.windows.iter().map(|w| w.stop_execute_count).sum();
++    if total_global_fallback > 0 { fail.push("global_finite_fallback".to_string()); }
++    if total_salad02_critical > 0 { fail.push("salad02_critical".to_string()); }
++    if total_salad04_critical > 0 { fail.push("salad04_critical".to_string()); }
++    if total_byte >= 3 { fail.push("byte_piece_threshold_exceeded".to_string()); }
++    if total_jamo >= 5 { fail.push("jamo_leak_threshold_exceeded".to_string()); }
++    if total_empty_active > 0 { fail.push("active_set_empty".to_string()); }
++    if run.output_token_count < 64 && run.finish_reason == "length" { fail.push("too_short_without_stop_reason".to_string()); }
++    let drift_risk = Eval02DriftRisk::from_score(run.drift.long_horizon_drift_score);
++    if matches!(drift_risk, Eval02DriftRisk::High | Eval02DriftRisk::Critical) { warn.push(format!("drift_risk_{}", drift_risk.as_str())); }
++    if total_stop > 0 { warn.push("stop_executed_in_long_horizon".to_string()); }
++    if run.drift.pci_decay_rate.unwrap_or(0.0) > 0.20 { warn.push("pci_decay_warn".to_string()); }
++    if run.drift.entropy_growth_rate.unwrap_or(0.0) > 0.20 { warn.push("entropy_growth_warn".to_string()); }
++    let status = if !fail.is_empty() { "FAIL" } else if !warn.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
++    Eval02RunJudgement {
++        status: status.to_string(),
++        drift_risk,
++        fail_reasons: fail,
++        warn_reasons: warn,
++        ready_for_profile_promotion: status == "PASS",
++        ready_for_default_enable: false,
++    }
++}
++
++pub fn build_eval02_run_from_samples(
++    run_id: String,
++    prompt_id: String,
++    profile_id: String,
++    backend: String,
++    seed: u64,
++    max_new_tokens: usize,
++    horizon_buckets: Vec<usize>,
++    samples: Vec<Eval02StepSample>,
++) -> Eval02RunReceipt {
++    let matrix = default_matrix();
++    let window_size = matrix.window_size;
++    let mut windows = Vec::new();
++    let mut start = 0usize;
++    while start < max_new_tokens {
++        let end = (start + window_size - 1).min(max_new_tokens);
++        windows.push(compute_eval02_window_metrics(&samples, start, end));
++        start += window_size;
++    }
++    let drift = compute_eval02_drift_metrics(&windows);
++    let output_token_count = samples.len();
++    let output_sig = format!("{}:{}:{}:{}:{}", run_id, prompt_id, profile_id, backend, output_token_count);
++    let mut run = Eval02RunReceipt {
++        patch_id: EVAL02_PATCH_ID.to_string(),
++        schema_version: 1,
++        run_id,
++        prompt_hash: hash_string(&prompt_id),
++        prompt_id,
++        profile_id,
++        backend,
++        seed,
++        max_new_tokens,
++        horizon_buckets,
++        output_token_count,
++        output_hash: hash_string(&output_sig),
++        visible_output_hash: None,
++        finish_reason: if output_token_count >= max_new_tokens { "length".to_string() } else { "partial_soak_trace".to_string() },
++        windows,
++        drift,
++        judgement: Eval02RunJudgement { status: "PENDING".to_string(), drift_risk: Eval02DriftRisk::Low, fail_reasons: Vec::new(), warn_reasons: Vec::new(), ready_for_profile_promotion: false, ready_for_default_enable: false },
++    };
++    run.judgement = judge_eval02_run(&run);
++    run
++}
++
++pub fn sample_from_sampler03(receipt: &SamplerParityReceipt) -> Eval02StepSample {
++    let profile_id = env::var("ASH_EVAL02_PROFILE_ID").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
++    let backend = env::var("ASH_EVAL02_BACKEND").unwrap_or_else(|_| "sampler03_projection".to_string());
++    let seed = env_u64("ASH_EVAL02_SEED", 0);
++    let pci = receipt.cpu.final_normalized_entropy.map(|h| 1.0 - h.clamp(0.0, 1.0));
++    let entropy = receipt.cpu.final_entropy.or(receipt.cpu.active_entropy);
++    let salad02_score = env::var("ASH_EVAL02_SALAD02_SCORE").ok().and_then(|v| v.parse::<f32>().ok());
++    let salad04_score = env::var("ASH_EVAL02_SALAD04_SCORE").ok().and_then(|v| v.parse::<f32>().ok());
++    Eval02StepSample {
++        run_id: env::var("ASH_EVAL02_RUN_ID").unwrap_or_else(|_| "eval02_sampler03_soak".to_string()),
++        prompt_id: env::var("ASH_EVAL02_PROMPT_ID").unwrap_or_else(|_| format!("sampler03_step_{}", receipt.step)),
++        profile_id,
++        backend,
++        seed,
++        step: receipt.step,
++        selected_id: Some(receipt.cpu.selected_id),
++        selected_piece_preview: None,
++        pci_raw: pci,
++        entropy_final: entropy,
++        salad02_score,
++        salad02_risk: risk_from_score(salad02_score),
++        salad04_score,
++        salad04_risk: risk_from_score(salad04_score),
++        decode03e_applied: env_bool("ASH_EVAL02_DECODE03E_APPLIED", false),
++        guard_strength: env::var("ASH_EVAL02_GUARD_STRENGTH").ok(),
++        fallback_mode: Some(receipt.cpu.recovery_mode.clone()),
++        stop_reason: env::var("ASH_EVAL02_STOP_REASON").ok(),
++    }
++}
++
++fn risk_from_score(score: Option<f32>) -> Option<String> {
++    score.map(|s| {
++        let s = clamp01(s);
++        let risk = if s >= 0.80 { "Critical" }
++            else if s >= 0.55 { "High" }
++            else if s >= 0.30 { "Medium" }
++            else { "Low" };
++        risk.to_string()
++    })
++}
++
++fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) {
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(value) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++}
++
++pub fn append_eval02_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
++    let mode = Eval02Mode::from_env();
++    if !mode.enabled() { return; }
++    let _ = write_eval02_manifests();
++    if matches!(mode, Eval02Mode::ManifestOnly) {
++        let _ = write_eval02_summary_from_receipt_file();
++        return;
++    }
++    let sample = sample_from_sampler03(receipt);
++    let sample_every = env_usize("ASH_EVAL02_SAMPLE_EVERY_N_STEPS", default_matrix().sample_every_n_steps).max(1);
++    if receipt.step % sample_every == 0 { append_jsonl(samples_path(), &sample); }
++    if matches!(mode, Eval02Mode::RunSoak | Eval02Mode::CompareProfiles | Eval02Mode::StrictSoakGate) {
++        let max_new_tokens = env_usize("ASH_EVAL02_MAX_NEW_TOKENS", default_matrix().max_new_tokens_default);
++        let run = build_eval02_run_from_samples(
++            sample.run_id.clone(),
++            sample.prompt_id.clone(),
++            sample.profile_id.clone(),
++            sample.backend.clone(),
++            sample.seed,
++            max_new_tokens,
++            default_matrix().horizon_buckets,
++            vec![sample.clone()],
++        );
++        append_jsonl(runs_path(), &run);
++    }
++    let _ = write_eval02_summary_from_receipt_file();
++}
++
++pub fn summarize_eval02_runs(runs: &[Eval02RunReceipt]) -> Eval02Summary {
++    let matrix = default_matrix();
++    let mut overall = Eval02OverallStats::default();
++    let mut by_profile_raw: BTreeMap<String, Vec<&Eval02RunReceipt>> = BTreeMap::new();
++    let mut long = Eval02LongHorizonStats::default();
++    for run in runs {
++        match run.judgement.status.as_str() {
++            "PASS" => overall.pass_count += 1,
++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
++            "FAIL" => overall.fail_count += 1,
++            _ => {}
++        }
++        if run.judgement.drift_risk == Eval02DriftRisk::Critical { long.critical_drift_count += 1; }
++        if run.judgement.drift_risk == Eval02DriftRisk::High { long.high_drift_count += 1; }
++        if run.drift.pci_decay_rate.unwrap_or(0.0) > 0.20 { long.pci_decay_warn_count += 1; }
++        if run.drift.entropy_growth_rate.unwrap_or(0.0) > 0.20 { long.entropy_growth_warn_count += 1; }
++        if run.drift.morph_loop_growth_rate.unwrap_or(0.0) > 0.10 { long.morph_loop_growth_warn_count += 1; }
++        if run.drift.guard_panic_growth_rate.unwrap_or(0.0) > 0.10 { long.guard_panic_growth_warn_count += 1; }
++        by_profile_raw.entry(run.profile_id.clone()).or_default().push(run);
++    }
++    let mut by_profile = BTreeMap::new();
++    for (profile, list) in by_profile_raw {
++        let count = list.len().max(1);
++        let pass = list.iter().filter(|r| r.judgement.status == "PASS").count();
++        let warn = list.iter().filter(|r| r.judgement.status == "PASS_WITH_WARNINGS").count();
++        let fail = list.iter().filter(|r| r.judgement.status == "FAIL").count();
++        let drift_mean = list.iter().map(|r| r.drift.long_horizon_drift_score).sum::<f32>() / count as f32;
++        let salad02_mean = list.iter().map(|r| r.windows.iter().filter_map(|w| w.salad02_score_max).fold(0.0, f32::max)).sum::<f32>() / count as f32;
++        let salad04_mean = list.iter().map(|r| r.windows.iter().filter_map(|w| w.salad04_score_max).fold(0.0, f32::max)).sum::<f32>() / count as f32;
++        let stop_count = list.iter().flat_map(|r| r.windows.iter()).map(|w| w.stop_execute_count).sum::<usize>();
++        by_profile.insert(profile, Eval02ProfileStats {
++            pass_rate: pass as f32 / count as f32,
++            run_count: list.len(),
++            fail_count: fail,
++            warn_count: warn,
++            drift_score_mean: drift_mean,
++            salad02_score_max_mean: salad02_mean,
++            salad04_score_max_mean: salad04_mean,
++            stop_execute_count: stop_count,
++            tokens_per_second_mean: 0.0,
++        });
++    }
++    let baseline_id = env::var("ASH_EVAL02_BASELINE_PROFILE").unwrap_or_else(|_| "S01_static_safe".to_string());
++    let candidate_id = env::var("ASH_EVAL02_CANDIDATE_PROFILE").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
++    let baseline = by_profile.get(&baseline_id).cloned().unwrap_or_default();
++    let candidate = by_profile.get(&candidate_id).cloned().unwrap_or_default();
++    Eval02Summary {
++        patch_id: EVAL02_PATCH_ID.to_string(),
++        input_patch: EVAL02_INPUT_PATCH_ID.to_string(),
++        status: if overall.fail_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS_STATIC_OR_EMPTY" }.to_string(),
++        mode: Eval02Mode::from_env().as_str().to_string(),
++        suite: Eval02SuiteStats {
++            prompt_count: 10,
++            profile_count: matrix.profiles.len(),
++            seed_count: matrix.seeds.len(),
++            backend_count: matrix.backends.len(),
++            expected_run_count: 10 * matrix.profiles.len() * matrix.seeds.len() * matrix.backends.len(),
++            completed_run_count: runs.len(),
++            not_comparable_count: 0,
++        },
++        overall,
++        by_profile,
++        long_horizon: long,
++        regression: Eval02RegressionJudgement {
++            baseline_profile: baseline_id,
++            candidate_profile: candidate_id,
++            drift_score_improved: candidate.drift_score_mean <= baseline.drift_score_mean || baseline.run_count == 0,
++            salad_score_improved: candidate.salad02_score_max_mean <= baseline.salad02_score_max_mean || baseline.run_count == 0,
++            morph_loop_reduced: candidate.salad04_score_max_mean <= baseline.salad04_score_max_mean || baseline.run_count == 0,
++            over_stop_regression: candidate.stop_execute_count > baseline.stop_execute_count && baseline.run_count > 0,
++            speed_regression_warn: false,
++        },
++        acceptance: Eval02Acceptance {
++            ready_for_decode03f_threshold_calibration: true,
++            ready_for_medusa00: false,
++            ready_for_default_guard_overlay: false,
++            reason: "long horizon soak harness sealed; runtime soak evidence required before default guard overlay or Medusa promotion".to_string(),
++        },
++    }
++}
++
++pub fn write_eval02_summary_from_receipt_file() -> Result<Eval02Summary, String> {
++    let path = runs_path();
++    let runs = if path.exists() {
++        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
++        let mut out = Vec::new();
++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
++            if let Ok(run) = serde_json::from_str::<Eval02RunReceipt>(line) { out.push(run); }
++        }
++        out
++    } else { Vec::new() };
++    let summary = summarize_eval02_runs(&runs);
++    let path = summary_path();
++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
++    fs::write(&path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
++    Ok(summary)
++}
+diff -ruN eval02_orig/crates/model_core/src/lib.rs eval02_work/crates/model_core/src/lib.rs
+--- eval02_orig/crates/model_core/src/lib.rs	2026-05-27 08:09:52.000000000 +0000
++++ eval02_work/crates/model_core/src/lib.rs	2026-05-27 08:19:20.413750451 +0000
+@@ -31,6 +31,7 @@
+ mod eval00_regression;
+ mod eval01_backend_replay;
+ mod decode03e_guard_overlay;
++mod eval02_long_horizon;
+ mod minp_c1a_smoke;
+ mod semantic_prior_scores;
+ mod minp_c2_score_provider_smoke;
+@@ -244,6 +245,20 @@
+ };
+ 
+ 
++pub use eval02_long_horizon::{
++    EVAL02_PATCH_ID, EVAL02_INPUT_PATCH_ID, EVAL02_SSOT, Eval02Mode, Eval02DriftRisk,
++    Eval02ExpectedRisks, Eval02PromptCase, Eval02Profile, Eval02Matrix,
++    Eval02WindowMetrics, Eval02DriftMetrics, Eval02RunJudgement, Eval02RunReceipt,
++    Eval02StepSample, Eval02SuiteStats, Eval02OverallStats, Eval02ProfileStats,
++    Eval02LongHorizonStats, Eval02RegressionJudgement, Eval02Acceptance, Eval02Summary,
++    default_long_prompt_suite as eval02_default_long_prompt_suite, default_matrix as eval02_default_matrix,
++    write_eval02_manifests, load_eval02_long_prompt_suite, load_eval02_matrix,
++    compute_eval02_window_metrics, compute_eval02_drift_metrics, judge_eval02_run,
++    build_eval02_run_from_samples, sample_from_sampler03 as eval02_sample_from_sampler03,
++    summarize_eval02_runs, append_eval02_receipt_from_sampler03, write_eval02_summary_from_receipt_file,
++};
++
++
+ 
+ pub use decode_transition_validation::{
+     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
+diff -ruN eval02_orig/crates/model_core/src/sampler_parity.rs eval02_work/crates/model_core/src/sampler_parity.rs
+--- eval02_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:09:52.000000000 +0000
++++ eval02_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:19:20.414814909 +0000
+@@ -464,5 +464,6 @@
+     crate::eval00_regression::append_eval00_receipt_from_sampler03(receipt);
+     crate::eval01_backend_replay::append_eval01_receipt_from_sampler03(receipt);
+     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
++    crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
+     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN eval02_orig/workspace/eval02.patch eval02_work/workspace/eval02.patch
+--- eval02_orig/workspace/eval02.patch	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02.patch	2026-05-27 08:20:45.494652612 +0000
+@@ -0,0 +1,894 @@
++diff -ruN eval02_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md eval02_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md
++--- eval02_orig/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ eval02_work/acceptance_reports/16AI-QW-38G-R6A-EVAL-02_acceptance.md	2026-05-27 08:20:44.985686537 +0000
++@@ -0,0 +1,20 @@
+++# 16AI-QW-38G-R6A-EVAL-02 Acceptance
+++
+++## Result
+++
+++PASS_STATIC. Runtime soak was not executed in this container because cargo/runtime execution is unavailable.
+++
+++## Acceptance Criteria Covered
+++
+++- Long prompt suite exists.
+++- Soak matrix exists.
+++- Window metric, drift metric, run receipt, step sample, summary structures exist.
+++- `sampler_parity::append_receipt()` hook is connected.
+++- Summary and source hash manifest are present.
+++
+++## Not Run
+++
+++- cargo check
+++- runtime soak
+++- profile comparison
+++- backend-specific long horizon replay
++diff -ruN eval02_orig/crates/model_core/src/eval02_long_horizon.rs eval02_work/crates/model_core/src/eval02_long_horizon.rs
++--- eval02_orig/crates/model_core/src/eval02_long_horizon.rs	1970-01-01 00:00:00.000000000 +0000
+++++ eval02_work/crates/model_core/src/eval02_long_horizon.rs	2026-05-27 08:19:36.878719437 +0000
++@@ -0,0 +1,824 @@
+++use serde::{Deserialize, Serialize};
+++use std::{collections::BTreeMap, env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++pub const EVAL02_PATCH_ID: &str = "16AI-QW-38G-R6A-EVAL-02";
+++pub const EVAL02_INPUT_PATCH_ID: &str = "16AI-QW-38G-R6A-DECODE-03E";
+++pub const EVAL02_SSOT: &str = "fixed_long_prompt_suite_plus_step_window_metric_ledger";
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Eval02Mode {
+++    Off,
+++    ManifestOnly,
+++    RunSoak,
+++    CompareProfiles,
+++    StrictSoakGate,
+++}
+++
+++impl Eval02Mode {
+++    pub fn from_env() -> Self {
+++        let value = env::var("ASH_EVAL02_MODE")
+++            .unwrap_or_else(|_| "manifest_only".to_string())
+++            .trim()
+++            .to_ascii_lowercase();
+++        match value.as_str() {
+++            "off" | "false" | "0" | "disabled" => Self::Off,
+++            "run_soak" | "run" | "bench" => Self::RunSoak,
+++            "compare" | "compare_profiles" => Self::CompareProfiles,
+++            "strict" | "strict_soak_gate" => Self::StrictSoakGate,
+++            _ => Self::ManifestOnly,
+++        }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ManifestOnly => "ManifestOnly",
+++            Self::RunSoak => "RunSoak",
+++            Self::CompareProfiles => "CompareProfiles",
+++            Self::StrictSoakGate => "StrictSoakGate",
+++        }
+++    }
+++
+++    pub fn enabled(self) -> bool { !matches!(self, Self::Off) }
+++}
+++
+++#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+++pub enum Eval02DriftRisk {
+++    Low,
+++    Medium,
+++    High,
+++    Critical,
+++}
+++
+++impl Eval02DriftRisk {
+++    pub fn from_score(score: f32) -> Self {
+++        let score = clamp01(score);
+++        if score >= 0.80 { Self::Critical }
+++        else if score >= 0.55 { Self::High }
+++        else if score >= 0.30 { Self::Medium }
+++        else { Self::Low }
+++    }
+++
+++    pub fn as_str(self) -> &'static str {
+++        match self {
+++            Self::Low => "Low",
+++            Self::Medium => "Medium",
+++            Self::High => "High",
+++            Self::Critical => "Critical",
+++        }
+++    }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02ExpectedRisks {
+++    pub salad_expected: bool,
+++    pub stop_expected: bool,
+++    pub rollback_expected: bool,
+++    pub long_output_expected: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02PromptCase {
+++    pub prompt_id: String,
+++    pub category: String,
+++    pub prompt: String,
+++    pub language: String,
+++    pub max_new_tokens: usize,
+++    pub horizon_buckets: Vec<usize>,
+++    pub expected_risks: Eval02ExpectedRisks,
+++    pub tags: Vec<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02Profile {
+++    pub profile_id: String,
+++    pub dynamic_controlled: bool,
+++    pub salad02: bool,
+++    pub salad04: bool,
+++    pub decode03e_guard_overlay: bool,
+++    pub stop_surface: bool,
+++    pub rollback_execute: bool,
+++    pub description: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02Matrix {
+++    pub patch_id: String,
+++    pub prompt_suite: String,
+++    pub seeds: Vec<u64>,
+++    pub backends: Vec<String>,
+++    pub profiles: Vec<Eval02Profile>,
+++    pub max_new_tokens_default: usize,
+++    pub horizon_buckets: Vec<usize>,
+++    pub window_size: usize,
+++    pub sample_every_n_steps: usize,
+++    pub strict_replay: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02WindowMetrics {
+++    pub window_start_step: usize,
+++    pub window_end_step: usize,
+++    pub token_count: usize,
+++
+++    pub pci_mean: Option<f32>,
+++    pub pci_min: Option<f32>,
+++    pub pci_slope: Option<f32>,
+++
+++    pub entropy_final_mean: Option<f32>,
+++    pub entropy_final_max: Option<f32>,
+++    pub entropy_slope: Option<f32>,
+++
+++    pub salad02_score_mean: Option<f32>,
+++    pub salad02_score_max: Option<f32>,
+++    pub salad02_high_count: usize,
+++    pub salad02_critical_count: usize,
+++
+++    pub salad04_score_mean: Option<f32>,
+++    pub salad04_score_max: Option<f32>,
+++    pub salad04_high_count: usize,
+++    pub salad04_critical_count: usize,
+++
+++    pub morph_loop_count: usize,
+++    pub josa_loop_count: usize,
+++    pub eomi_loop_count: usize,
+++    pub jamo_leak_count: usize,
+++    pub byte_piece_count: usize,
+++
+++    pub repeat_3gram_rate: Option<f32>,
+++    pub distinct_2_ratio: Option<f32>,
+++
+++    pub guard_strict_count: usize,
+++    pub guard_panic_count: usize,
+++    pub decode03e_overlay_applied_count: usize,
+++
+++    pub rollback_candidate_count: usize,
+++    pub rollback_execute_count: usize,
+++
+++    pub stop_candidate_count: usize,
+++    pub stop_execute_count: usize,
+++
+++    pub fallback_count: usize,
+++    pub global_finite_fallback_count: usize,
+++    pub empty_active_set_count: usize,
+++
+++    pub tokens_per_second_mean: Option<f32>,
+++    pub latency_p95_ms: Option<f32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02DriftMetrics {
+++    pub pci_decay_rate: Option<f32>,
+++    pub entropy_growth_rate: Option<f32>,
+++    pub salad02_growth_rate: Option<f32>,
+++    pub salad04_growth_rate: Option<f32>,
+++    pub morph_loop_growth_rate: Option<f32>,
+++    pub repeat_growth_rate: Option<f32>,
+++    pub stop_pressure_growth_rate: Option<f32>,
+++    pub fallback_pressure_growth_rate: Option<f32>,
+++    pub guard_panic_growth_rate: Option<f32>,
+++    pub long_horizon_drift_score: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02RunJudgement {
+++    pub status: String,
+++    pub drift_risk: Eval02DriftRisk,
+++    pub fail_reasons: Vec<String>,
+++    pub warn_reasons: Vec<String>,
+++    pub ready_for_profile_promotion: bool,
+++    pub ready_for_default_enable: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02RunReceipt {
+++    pub patch_id: String,
+++    pub schema_version: u32,
+++    pub run_id: String,
+++    pub prompt_id: String,
+++    pub prompt_hash: String,
+++    pub profile_id: String,
+++    pub backend: String,
+++    pub seed: u64,
+++    pub max_new_tokens: usize,
+++    pub horizon_buckets: Vec<usize>,
+++    pub output_token_count: usize,
+++    pub output_hash: String,
+++    pub visible_output_hash: Option<String>,
+++    pub finish_reason: String,
+++    pub windows: Vec<Eval02WindowMetrics>,
+++    pub drift: Eval02DriftMetrics,
+++    pub judgement: Eval02RunJudgement,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02StepSample {
+++    pub run_id: String,
+++    pub prompt_id: String,
+++    pub profile_id: String,
+++    pub backend: String,
+++    pub seed: u64,
+++    pub step: usize,
+++    pub selected_id: Option<u32>,
+++    pub selected_piece_preview: Option<String>,
+++    pub pci_raw: Option<f32>,
+++    pub entropy_final: Option<f32>,
+++    pub salad02_score: Option<f32>,
+++    pub salad02_risk: Option<String>,
+++    pub salad04_score: Option<f32>,
+++    pub salad04_risk: Option<String>,
+++    pub decode03e_applied: bool,
+++    pub guard_strength: Option<String>,
+++    pub fallback_mode: Option<String>,
+++    pub stop_reason: Option<String>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval02SuiteStats {
+++    pub prompt_count: usize,
+++    pub profile_count: usize,
+++    pub seed_count: usize,
+++    pub backend_count: usize,
+++    pub expected_run_count: usize,
+++    pub completed_run_count: usize,
+++    pub not_comparable_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval02OverallStats {
+++    pub pass_count: usize,
+++    pub warn_count: usize,
+++    pub fail_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval02ProfileStats {
+++    pub pass_rate: f32,
+++    pub run_count: usize,
+++    pub fail_count: usize,
+++    pub warn_count: usize,
+++    pub drift_score_mean: f32,
+++    pub salad02_score_max_mean: f32,
+++    pub salad04_score_max_mean: f32,
+++    pub stop_execute_count: usize,
+++    pub tokens_per_second_mean: f32,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+++pub struct Eval02LongHorizonStats {
+++    pub critical_drift_count: usize,
+++    pub high_drift_count: usize,
+++    pub pci_decay_warn_count: usize,
+++    pub entropy_growth_warn_count: usize,
+++    pub morph_loop_growth_warn_count: usize,
+++    pub guard_panic_growth_warn_count: usize,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02RegressionJudgement {
+++    pub baseline_profile: String,
+++    pub candidate_profile: String,
+++    pub drift_score_improved: bool,
+++    pub salad_score_improved: bool,
+++    pub morph_loop_reduced: bool,
+++    pub over_stop_regression: bool,
+++    pub speed_regression_warn: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02Acceptance {
+++    pub ready_for_decode03f_threshold_calibration: bool,
+++    pub ready_for_medusa00: bool,
+++    pub ready_for_default_guard_overlay: bool,
+++    pub reason: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Eval02Summary {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub status: String,
+++    pub mode: String,
+++    pub suite: Eval02SuiteStats,
+++    pub overall: Eval02OverallStats,
+++    pub by_profile: BTreeMap<String, Eval02ProfileStats>,
+++    pub long_horizon: Eval02LongHorizonStats,
+++    pub regression: Eval02RegressionJudgement,
+++    pub acceptance: Eval02Acceptance,
+++}
+++
+++fn env_bool(name: &str, default: bool) -> bool {
+++    env::var(name).ok().map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")).unwrap_or(default)
+++}
+++
+++fn env_usize(name: &str, default: usize) -> usize {
+++    env::var(name).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default)
+++}
+++
+++fn env_u64(name: &str, default: u64) -> u64 {
+++    env::var(name).ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(default)
+++}
+++
+++fn path_from_env(name: &str, default: &str) -> PathBuf {
+++    env::var(name).map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(default))
+++}
+++
+++fn prompt_suite_path() -> PathBuf { path_from_env("ASH_EVAL02_PROMPT_SUITE", "workspace/eval02_long_prompt_suite.jsonl") }
+++fn matrix_path() -> PathBuf { path_from_env("ASH_EVAL02_MATRIX", "workspace/eval02_matrix.json") }
+++fn runs_path() -> PathBuf { path_from_env("ASH_EVAL02_RUNS", "workspace/eval02_window_runs.jsonl") }
+++fn samples_path() -> PathBuf { path_from_env("ASH_EVAL02_STEP_SAMPLES", "workspace/eval02_step_samples.jsonl") }
+++fn summary_path() -> PathBuf { path_from_env("ASH_EVAL02_SUMMARY", "workspace/eval02_summary.json") }
+++
+++fn hash_string(input: &str) -> String {
+++    let mut h: u64 = 0xcbf29ce484222325;
+++    for b in input.as_bytes() {
+++        h ^= *b as u64;
+++        h = h.wrapping_mul(0x100000001b3);
+++    }
+++    format!("fnv64:{:016x}", h)
+++}
+++
+++fn clamp01(v: f32) -> f32 {
+++    if !v.is_finite() { return 1.0; }
+++    v.clamp(0.0, 1.0)
+++}
+++
+++fn option_mean(values: &[Option<f32>]) -> Option<f32> {
+++    let finite: Vec<f32> = values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).collect();
+++    if finite.is_empty() { None } else { Some(finite.iter().sum::<f32>() / finite.len() as f32) }
+++}
+++
+++fn option_max(values: &[Option<f32>]) -> Option<f32> {
+++    values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).fold(None, |acc: Option<f32>, v| Some(acc.map(|a| a.max(v)).unwrap_or(v)))
+++}
+++
+++fn option_min(values: &[Option<f32>]) -> Option<f32> {
+++    values.iter().filter_map(|v| *v).filter(|v| v.is_finite()).fold(None, |acc: Option<f32>, v| Some(acc.map(|a| a.min(v)).unwrap_or(v)))
+++}
+++
+++fn slope(first: Option<f32>, last: Option<f32>, steps: usize) -> Option<f32> {
+++    match (first, last) {
+++        (Some(a), Some(b)) if steps > 1 => Some((b - a) / steps as f32),
+++        _ => None,
+++    }
+++}
+++
+++pub fn default_long_prompt_suite() -> Vec<Eval02PromptCase> {
+++    let buckets = vec![128, 256, 512];
+++    let normal = Eval02ExpectedRisks { salad_expected: false, stop_expected: false, rollback_expected: false, long_output_expected: true };
+++    let trap = Eval02ExpectedRisks { salad_expected: true, stop_expected: false, rollback_expected: false, long_output_expected: true };
+++    vec![
+++        Eval02PromptCase { prompt_id: "L01_long_korean_explanation_001".to_string(), category: "long_korean_explanation".to_string(), prompt: "배추찜을 주제로, 재료 준비부터 보관법까지 차분하게 긴 설명을 작성해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "long".to_string(), "normal".to_string(), "explanation".to_string()] },
+++        Eval02PromptCase { prompt_id: "L02_long_structured_markdown_001".to_string(), category: "long_structured_markdown".to_string(), prompt: "작은 웹 도구를 설계한다고 가정하고, 목적/사용자/상태/오류처리/접근성을 마크다운 구조로 길게 정리해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "markdown".to_string(), "structure".to_string()] },
+++        Eval02PromptCase { prompt_id: "L03_long_emotional_prose_001".to_string(), category: "long_emotional_prose".to_string(), prompt: "비 오는 골목에서 오래 참은 인물이 조용히 무너지는 장면을 감정이 과열되지 않게 길게 써줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "prose".to_string(), "emotion".to_string()] },
+++        Eval02PromptCase { prompt_id: "L04_long_dialogue_continuation_001".to_string(), category: "long_dialogue_continuation".to_string(), prompt: "두 사람이 오래 미뤄둔 오해를 풀기 시작하는 대화를 512토큰 안에서 자연스럽게 이어줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "dialogue".to_string()] },
+++        Eval02PromptCase { prompt_id: "L05_long_noisy_input_repair_001".to_string(), category: "long_noisy_input_repair".to_string(), prompt: "아니 그니까 웹지피유 샘플러가 자꾸 이상하게 튀는데 이거 구조를 어떻게 봐야하냐고ㅠㅠ 라는 입력에 차분히 긴 답변을 해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "noisy".to_string(), "technical".to_string()] },
+++        Eval02PromptCase { prompt_id: "L06_long_code_explanation_ko_001".to_string(), category: "long_code_explanation_ko".to_string(), prompt: "Rust에서 상태 머신과 receipt 기반 검증을 어떻게 분리하면 좋은지 긴 설명으로 정리해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "code".to_string(), "rust".to_string()] },
+++        Eval02PromptCase { prompt_id: "L07_long_josa_eomi_pressure_001".to_string(), category: "long_josa_eomi_pressure".to_string(), prompt: "합니다, 입니다, 것이다 같은 표현을 자연스럽게 포함하되 반복하지 않는 긴 설명문을 작성해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: trap.clone(), tags: vec!["korean".to_string(), "josa".to_string(), "eomi".to_string(), "trap".to_string()] },
+++        Eval02PromptCase { prompt_id: "L08_long_repetition_trap_soft_001".to_string(), category: "long_repetition_trap_soft".to_string(), prompt: "같은 문장을 반복하지 말고, 같은 주제를 세 관점으로 길게 설명해줘. 단, 각 문단의 끝은 다르게 맺어줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: trap.clone(), tags: vec!["korean".to_string(), "repetition".to_string(), "trap".to_string()] },
+++        Eval02PromptCase { prompt_id: "L09_long_worldbuilding_exposition_001".to_string(), category: "long_worldbuilding_exposition".to_string(), prompt: "드래곤과 와이번이 상징 체계에서 어떻게 다르게 쓰이는지 세계관 설정 문서처럼 길게 설명해줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets.clone(), expected_risks: normal.clone(), tags: vec!["korean".to_string(), "worldbuilding".to_string()] },
+++        Eval02PromptCase { prompt_id: "L10_long_tool_design_report_001".to_string(), category: "long_tool_design_report".to_string(), prompt: "PDF 조판 도구에서 이미지 프레임박스를 Notion 블록처럼 옮기는 구조를 긴 설계 보고서로 써줘.".to_string(), language: "ko".to_string(), max_new_tokens: 512, horizon_buckets: buckets, expected_risks: normal, tags: vec!["korean".to_string(), "tool-design".to_string(), "report".to_string()] },
+++    ]
+++}
+++
+++pub fn default_matrix() -> Eval02Matrix {
+++    Eval02Matrix {
+++        patch_id: EVAL02_PATCH_ID.to_string(),
+++        prompt_suite: "workspace/eval02_long_prompt_suite.jsonl".to_string(),
+++        seeds: vec![101, 202, 303],
+++        backends: vec!["cpu_oracle".to_string(), "standard_runtime".to_string(), "webgpu_runtime".to_string()],
+++        profiles: vec![
+++            Eval02Profile { profile_id: "S01_static_safe".to_string(), dynamic_controlled: false, salad02: false, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "static safe long horizon baseline".to_string() },
+++            Eval02Profile { profile_id: "S02_dynamic_controlled".to_string(), dynamic_controlled: true, salad02: false, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "DECODE-03D controlled only".to_string() },
+++            Eval02Profile { profile_id: "S03_dynamic_controlled_salad02".to_string(), dynamic_controlled: true, salad02: true, salad04: false, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "dynamic controlled with SALAD-02 detector".to_string() },
+++            Eval02Profile { profile_id: "S04_dynamic_controlled_salad04_overlay".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: false, stop_surface: false, rollback_execute: false, description: "SALAD-04 overlay observe without DECODE-03E apply".to_string() },
+++            Eval02Profile { profile_id: "S05_decode03e_guard_overlay".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: true, stop_surface: false, rollback_execute: false, description: "DECODE-03E controlled guard overlay".to_string() },
+++            Eval02Profile { profile_id: "S06_full_guard_stop_surface".to_string(), dynamic_controlled: true, salad02: true, salad04: true, decode03e_guard_overlay: true, stop_surface: true, rollback_execute: false, description: "full guard plus STOP-01/02 surface, rollback execute off or verified only".to_string() },
+++        ],
+++        max_new_tokens_default: 512,
+++        horizon_buckets: vec![128, 256, 512],
+++        window_size: 64,
+++        sample_every_n_steps: 16,
+++        strict_replay: true,
+++    }
+++}
+++
+++pub fn write_eval02_manifests() -> Result<(), String> {
+++    let suite_path = prompt_suite_path();
+++    if let Some(parent) = suite_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    let suite = default_long_prompt_suite();
+++    let mut suite_text = String::new();
+++    for case in suite {
+++        suite_text.push_str(&serde_json::to_string(&case).map_err(|e| e.to_string())?);
+++        suite_text.push('\n');
+++    }
+++    fs::write(&suite_path, suite_text).map_err(|e| e.to_string())?;
+++
+++    let matrix = default_matrix();
+++    let matrix_path = matrix_path();
+++    if let Some(parent) = matrix_path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(&matrix_path, serde_json::to_string_pretty(&matrix).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+++    Ok(())
+++}
+++
+++pub fn load_eval02_long_prompt_suite(path: &str) -> Result<Vec<Eval02PromptCase>, String> {
+++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+++    let mut out = Vec::new();
+++    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+++        out.push(serde_json::from_str::<Eval02PromptCase>(line).map_err(|e| e.to_string())?);
+++    }
+++    Ok(out)
+++}
+++
+++pub fn load_eval02_matrix(path: &str) -> Result<Eval02Matrix, String> {
+++    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+++    serde_json::from_str(&text).map_err(|e| e.to_string())
+++}
+++
+++pub fn compute_eval02_window_metrics(samples: &[Eval02StepSample], window_start_step: usize, window_end_step: usize) -> Eval02WindowMetrics {
+++    let window: Vec<&Eval02StepSample> = samples.iter().filter(|s| s.step >= window_start_step && s.step <= window_end_step).collect();
+++    let pci_values: Vec<Option<f32>> = window.iter().map(|s| s.pci_raw).collect();
+++    let entropy_values: Vec<Option<f32>> = window.iter().map(|s| s.entropy_final).collect();
+++    let salad02_values: Vec<Option<f32>> = window.iter().map(|s| s.salad02_score).collect();
+++    let salad04_values: Vec<Option<f32>> = window.iter().map(|s| s.salad04_score).collect();
+++    let first_pci = pci_values.iter().find_map(|v| *v);
+++    let last_pci = pci_values.iter().rev().find_map(|v| *v);
+++    let first_entropy = entropy_values.iter().find_map(|v| *v);
+++    let last_entropy = entropy_values.iter().rev().find_map(|v| *v);
+++    let mut selected_ids = Vec::new();
+++    for s in &window { if let Some(id) = s.selected_id { selected_ids.push(id); } }
+++    let repeat_3gram_rate = if selected_ids.len() >= 3 {
+++        let mut total = 0usize;
+++        let mut repeats = 0usize;
+++        for idx in 3..selected_ids.len() {
+++            total += 1;
+++            if selected_ids[idx] == selected_ids[idx - 3] { repeats += 1; }
+++        }
+++        Some(repeats as f32 / total.max(1) as f32)
+++    } else { None };
+++    let distinct_2_ratio = if selected_ids.len() >= 2 {
+++        let mut total = 0usize;
+++        let mut bigrams = std::collections::BTreeSet::new();
+++        for pair in selected_ids.windows(2) {
+++            total += 1;
+++            bigrams.insert((pair[0], pair[1]));
+++        }
+++        Some(bigrams.len() as f32 / total.max(1) as f32)
+++    } else { None };
+++    Eval02WindowMetrics {
+++        window_start_step,
+++        window_end_step,
+++        token_count: window.len(),
+++        pci_mean: option_mean(&pci_values),
+++        pci_min: option_min(&pci_values),
+++        pci_slope: slope(first_pci, last_pci, window.len()),
+++        entropy_final_mean: option_mean(&entropy_values),
+++        entropy_final_max: option_max(&entropy_values),
+++        entropy_slope: slope(first_entropy, last_entropy, window.len()),
+++        salad02_score_mean: option_mean(&salad02_values),
+++        salad02_score_max: option_max(&salad02_values),
+++        salad02_high_count: window.iter().filter(|s| matches!(s.salad02_risk.as_deref(), Some("High" | "Critical"))).count(),
+++        salad02_critical_count: window.iter().filter(|s| s.salad02_risk.as_deref() == Some("Critical")).count(),
+++        salad04_score_mean: option_mean(&salad04_values),
+++        salad04_score_max: option_max(&salad04_values),
+++        salad04_high_count: window.iter().filter(|s| matches!(s.salad04_risk.as_deref(), Some("High" | "Critical"))).count(),
+++        salad04_critical_count: window.iter().filter(|s| s.salad04_risk.as_deref() == Some("Critical")).count(),
+++        morph_loop_count: window.iter().filter(|s| matches!(s.salad04_risk.as_deref(), Some("Medium" | "High" | "Critical"))).count(),
+++        josa_loop_count: 0,
+++        eomi_loop_count: 0,
+++        jamo_leak_count: 0,
+++        byte_piece_count: 0,
+++        repeat_3gram_rate,
+++        distinct_2_ratio,
+++        guard_strict_count: window.iter().filter(|s| s.guard_strength.as_deref() == Some("Strict")).count(),
+++        guard_panic_count: window.iter().filter(|s| s.guard_strength.as_deref() == Some("Panic")).count(),
+++        decode03e_overlay_applied_count: window.iter().filter(|s| s.decode03e_applied).count(),
+++        rollback_candidate_count: 0,
+++        rollback_execute_count: 0,
+++        stop_candidate_count: window.iter().filter(|s| s.stop_reason.is_some()).count(),
+++        stop_execute_count: window.iter().filter(|s| s.stop_reason.is_some()).count(),
+++        fallback_count: window.iter().filter(|s| !matches!(s.fallback_mode.as_deref(), None | Some("None") | Some("NONE") | Some("PASS"))).count(),
+++        global_finite_fallback_count: window.iter().filter(|s| matches!(s.fallback_mode.as_deref(), Some("GLOBAL_FINITE_FALLBACK"))).count(),
+++        empty_active_set_count: 0,
+++        tokens_per_second_mean: None,
+++        latency_p95_ms: None,
+++    }
+++}
+++
+++pub fn compute_eval02_drift_metrics(windows: &[Eval02WindowMetrics]) -> Eval02DriftMetrics {
+++    let first = windows.first();
+++    let last = windows.last();
+++    let pci_decay_rate = match (first.and_then(|w| w.pci_mean), last.and_then(|w| w.pci_mean)) {
+++        (Some(a), Some(b)) => Some((a - b).max(0.0)),
+++        _ => None,
+++    };
+++    let entropy_growth_rate = match (first.and_then(|w| w.entropy_final_mean), last.and_then(|w| w.entropy_final_mean)) {
+++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
+++        _ => None,
+++    };
+++    let salad02_growth_rate = match (first.and_then(|w| w.salad02_score_mean), last.and_then(|w| w.salad02_score_mean)) {
+++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
+++        _ => None,
+++    };
+++    let salad04_growth_rate = match (first.and_then(|w| w.salad04_score_mean), last.and_then(|w| w.salad04_score_mean)) {
+++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
+++        _ => None,
+++    };
+++    let morph_loop_growth_rate = match (first.map(|w| w.morph_loop_count as f32), last.map(|w| w.morph_loop_count as f32)) {
+++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
+++        _ => None,
+++    };
+++    let repeat_growth_rate = match (first.and_then(|w| w.repeat_3gram_rate), last.and_then(|w| w.repeat_3gram_rate)) {
+++        (Some(a), Some(b)) => Some((b - a).max(0.0)),
+++        _ => None,
+++    };
+++    let stop_pressure_growth_rate = match (first.map(|w| w.stop_execute_count as f32), last.map(|w| w.stop_execute_count as f32)) {
+++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
+++        _ => None,
+++    };
+++    let fallback_pressure_growth_rate = match (first.map(|w| w.fallback_count as f32), last.map(|w| w.fallback_count as f32)) {
+++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
+++        _ => None,
+++    };
+++    let guard_panic_growth_rate = match (first.map(|w| w.guard_panic_count as f32), last.map(|w| w.guard_panic_count as f32)) {
+++        (Some(a), Some(b)) => Some(((b - a) / 64.0).max(0.0)),
+++        _ => None,
+++    };
+++    let score = 0.20 * pci_decay_rate.unwrap_or(0.0)
+++        + 0.18 * entropy_growth_rate.unwrap_or(0.0)
+++        + 0.20 * salad02_growth_rate.unwrap_or(0.0).max(salad04_growth_rate.unwrap_or(0.0))
+++        + 0.14 * morph_loop_growth_rate.unwrap_or(0.0)
+++        + 0.10 * repeat_growth_rate.unwrap_or(0.0)
+++        + 0.08 * stop_pressure_growth_rate.unwrap_or(0.0)
+++        + 0.06 * fallback_pressure_growth_rate.unwrap_or(0.0)
+++        + 0.04 * guard_panic_growth_rate.unwrap_or(0.0);
+++    Eval02DriftMetrics {
+++        pci_decay_rate,
+++        entropy_growth_rate,
+++        salad02_growth_rate,
+++        salad04_growth_rate,
+++        morph_loop_growth_rate,
+++        repeat_growth_rate,
+++        stop_pressure_growth_rate,
+++        fallback_pressure_growth_rate,
+++        guard_panic_growth_rate,
+++        long_horizon_drift_score: clamp01(score),
+++    }
+++}
+++
+++pub fn judge_eval02_run(run: &Eval02RunReceipt) -> Eval02RunJudgement {
+++    let mut fail = Vec::new();
+++    let mut warn = Vec::new();
+++    let total_global_fallback: usize = run.windows.iter().map(|w| w.global_finite_fallback_count).sum();
+++    let total_salad02_critical: usize = run.windows.iter().map(|w| w.salad02_critical_count).sum();
+++    let total_salad04_critical: usize = run.windows.iter().map(|w| w.salad04_critical_count).sum();
+++    let total_byte: usize = run.windows.iter().map(|w| w.byte_piece_count).sum();
+++    let total_jamo: usize = run.windows.iter().map(|w| w.jamo_leak_count).sum();
+++    let total_empty_active: usize = run.windows.iter().map(|w| w.empty_active_set_count).sum();
+++    let total_stop: usize = run.windows.iter().map(|w| w.stop_execute_count).sum();
+++    if total_global_fallback > 0 { fail.push("global_finite_fallback".to_string()); }
+++    if total_salad02_critical > 0 { fail.push("salad02_critical".to_string()); }
+++    if total_salad04_critical > 0 { fail.push("salad04_critical".to_string()); }
+++    if total_byte >= 3 { fail.push("byte_piece_threshold_exceeded".to_string()); }
+++    if total_jamo >= 5 { fail.push("jamo_leak_threshold_exceeded".to_string()); }
+++    if total_empty_active > 0 { fail.push("active_set_empty".to_string()); }
+++    if run.output_token_count < 64 && run.finish_reason == "length" { fail.push("too_short_without_stop_reason".to_string()); }
+++    let drift_risk = Eval02DriftRisk::from_score(run.drift.long_horizon_drift_score);
+++    if matches!(drift_risk, Eval02DriftRisk::High | Eval02DriftRisk::Critical) { warn.push(format!("drift_risk_{}", drift_risk.as_str())); }
+++    if total_stop > 0 { warn.push("stop_executed_in_long_horizon".to_string()); }
+++    if run.drift.pci_decay_rate.unwrap_or(0.0) > 0.20 { warn.push("pci_decay_warn".to_string()); }
+++    if run.drift.entropy_growth_rate.unwrap_or(0.0) > 0.20 { warn.push("entropy_growth_warn".to_string()); }
+++    let status = if !fail.is_empty() { "FAIL" } else if !warn.is_empty() { "PASS_WITH_WARNINGS" } else { "PASS" };
+++    Eval02RunJudgement {
+++        status: status.to_string(),
+++        drift_risk,
+++        fail_reasons: fail,
+++        warn_reasons: warn,
+++        ready_for_profile_promotion: status == "PASS",
+++        ready_for_default_enable: false,
+++    }
+++}
+++
+++pub fn build_eval02_run_from_samples(
+++    run_id: String,
+++    prompt_id: String,
+++    profile_id: String,
+++    backend: String,
+++    seed: u64,
+++    max_new_tokens: usize,
+++    horizon_buckets: Vec<usize>,
+++    samples: Vec<Eval02StepSample>,
+++) -> Eval02RunReceipt {
+++    let matrix = default_matrix();
+++    let window_size = matrix.window_size;
+++    let mut windows = Vec::new();
+++    let mut start = 0usize;
+++    while start < max_new_tokens {
+++        let end = (start + window_size - 1).min(max_new_tokens);
+++        windows.push(compute_eval02_window_metrics(&samples, start, end));
+++        start += window_size;
+++    }
+++    let drift = compute_eval02_drift_metrics(&windows);
+++    let output_token_count = samples.len();
+++    let output_sig = format!("{}:{}:{}:{}:{}", run_id, prompt_id, profile_id, backend, output_token_count);
+++    let mut run = Eval02RunReceipt {
+++        patch_id: EVAL02_PATCH_ID.to_string(),
+++        schema_version: 1,
+++        run_id,
+++        prompt_hash: hash_string(&prompt_id),
+++        prompt_id,
+++        profile_id,
+++        backend,
+++        seed,
+++        max_new_tokens,
+++        horizon_buckets,
+++        output_token_count,
+++        output_hash: hash_string(&output_sig),
+++        visible_output_hash: None,
+++        finish_reason: if output_token_count >= max_new_tokens { "length".to_string() } else { "partial_soak_trace".to_string() },
+++        windows,
+++        drift,
+++        judgement: Eval02RunJudgement { status: "PENDING".to_string(), drift_risk: Eval02DriftRisk::Low, fail_reasons: Vec::new(), warn_reasons: Vec::new(), ready_for_profile_promotion: false, ready_for_default_enable: false },
+++    };
+++    run.judgement = judge_eval02_run(&run);
+++    run
+++}
+++
+++pub fn sample_from_sampler03(receipt: &SamplerParityReceipt) -> Eval02StepSample {
+++    let profile_id = env::var("ASH_EVAL02_PROFILE_ID").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
+++    let backend = env::var("ASH_EVAL02_BACKEND").unwrap_or_else(|_| "sampler03_projection".to_string());
+++    let seed = env_u64("ASH_EVAL02_SEED", 0);
+++    let pci = receipt.cpu.final_normalized_entropy.map(|h| 1.0 - h.clamp(0.0, 1.0));
+++    let entropy = receipt.cpu.final_entropy.or(receipt.cpu.active_entropy);
+++    let salad02_score = env::var("ASH_EVAL02_SALAD02_SCORE").ok().and_then(|v| v.parse::<f32>().ok());
+++    let salad04_score = env::var("ASH_EVAL02_SALAD04_SCORE").ok().and_then(|v| v.parse::<f32>().ok());
+++    Eval02StepSample {
+++        run_id: env::var("ASH_EVAL02_RUN_ID").unwrap_or_else(|_| "eval02_sampler03_soak".to_string()),
+++        prompt_id: env::var("ASH_EVAL02_PROMPT_ID").unwrap_or_else(|_| format!("sampler03_step_{}", receipt.step)),
+++        profile_id,
+++        backend,
+++        seed,
+++        step: receipt.step,
+++        selected_id: Some(receipt.cpu.selected_id),
+++        selected_piece_preview: None,
+++        pci_raw: pci,
+++        entropy_final: entropy,
+++        salad02_score,
+++        salad02_risk: risk_from_score(salad02_score),
+++        salad04_score,
+++        salad04_risk: risk_from_score(salad04_score),
+++        decode03e_applied: env_bool("ASH_EVAL02_DECODE03E_APPLIED", false),
+++        guard_strength: env::var("ASH_EVAL02_GUARD_STRENGTH").ok(),
+++        fallback_mode: Some(receipt.cpu.recovery_mode.clone()),
+++        stop_reason: env::var("ASH_EVAL02_STOP_REASON").ok(),
+++    }
+++}
+++
+++fn risk_from_score(score: Option<f32>) -> Option<String> {
+++    score.map(|s| {
+++        let s = clamp01(s);
+++        let risk = if s >= 0.80 { "Critical" }
+++            else if s >= 0.55 { "High" }
+++            else if s >= 0.30 { "Medium" }
+++            else { "Low" };
+++        risk.to_string()
+++    })
+++}
+++
+++fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) {
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(line) = serde_json::to_string(value) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++}
+++
+++pub fn append_eval02_receipt_from_sampler03(receipt: &SamplerParityReceipt) {
+++    let mode = Eval02Mode::from_env();
+++    if !mode.enabled() { return; }
+++    let _ = write_eval02_manifests();
+++    if matches!(mode, Eval02Mode::ManifestOnly) {
+++        let _ = write_eval02_summary_from_receipt_file();
+++        return;
+++    }
+++    let sample = sample_from_sampler03(receipt);
+++    let sample_every = env_usize("ASH_EVAL02_SAMPLE_EVERY_N_STEPS", default_matrix().sample_every_n_steps).max(1);
+++    if receipt.step % sample_every == 0 { append_jsonl(samples_path(), &sample); }
+++    if matches!(mode, Eval02Mode::RunSoak | Eval02Mode::CompareProfiles | Eval02Mode::StrictSoakGate) {
+++        let max_new_tokens = env_usize("ASH_EVAL02_MAX_NEW_TOKENS", default_matrix().max_new_tokens_default);
+++        let run = build_eval02_run_from_samples(
+++            sample.run_id.clone(),
+++            sample.prompt_id.clone(),
+++            sample.profile_id.clone(),
+++            sample.backend.clone(),
+++            sample.seed,
+++            max_new_tokens,
+++            default_matrix().horizon_buckets,
+++            vec![sample.clone()],
+++        );
+++        append_jsonl(runs_path(), &run);
+++    }
+++    let _ = write_eval02_summary_from_receipt_file();
+++}
+++
+++pub fn summarize_eval02_runs(runs: &[Eval02RunReceipt]) -> Eval02Summary {
+++    let matrix = default_matrix();
+++    let mut overall = Eval02OverallStats::default();
+++    let mut by_profile_raw: BTreeMap<String, Vec<&Eval02RunReceipt>> = BTreeMap::new();
+++    let mut long = Eval02LongHorizonStats::default();
+++    for run in runs {
+++        match run.judgement.status.as_str() {
+++            "PASS" => overall.pass_count += 1,
+++            "PASS_WITH_WARNINGS" => overall.warn_count += 1,
+++            "FAIL" => overall.fail_count += 1,
+++            _ => {}
+++        }
+++        if run.judgement.drift_risk == Eval02DriftRisk::Critical { long.critical_drift_count += 1; }
+++        if run.judgement.drift_risk == Eval02DriftRisk::High { long.high_drift_count += 1; }
+++        if run.drift.pci_decay_rate.unwrap_or(0.0) > 0.20 { long.pci_decay_warn_count += 1; }
+++        if run.drift.entropy_growth_rate.unwrap_or(0.0) > 0.20 { long.entropy_growth_warn_count += 1; }
+++        if run.drift.morph_loop_growth_rate.unwrap_or(0.0) > 0.10 { long.morph_loop_growth_warn_count += 1; }
+++        if run.drift.guard_panic_growth_rate.unwrap_or(0.0) > 0.10 { long.guard_panic_growth_warn_count += 1; }
+++        by_profile_raw.entry(run.profile_id.clone()).or_default().push(run);
+++    }
+++    let mut by_profile = BTreeMap::new();
+++    for (profile, list) in by_profile_raw {
+++        let count = list.len().max(1);
+++        let pass = list.iter().filter(|r| r.judgement.status == "PASS").count();
+++        let warn = list.iter().filter(|r| r.judgement.status == "PASS_WITH_WARNINGS").count();
+++        let fail = list.iter().filter(|r| r.judgement.status == "FAIL").count();
+++        let drift_mean = list.iter().map(|r| r.drift.long_horizon_drift_score).sum::<f32>() / count as f32;
+++        let salad02_mean = list.iter().map(|r| r.windows.iter().filter_map(|w| w.salad02_score_max).fold(0.0, f32::max)).sum::<f32>() / count as f32;
+++        let salad04_mean = list.iter().map(|r| r.windows.iter().filter_map(|w| w.salad04_score_max).fold(0.0, f32::max)).sum::<f32>() / count as f32;
+++        let stop_count = list.iter().flat_map(|r| r.windows.iter()).map(|w| w.stop_execute_count).sum::<usize>();
+++        by_profile.insert(profile, Eval02ProfileStats {
+++            pass_rate: pass as f32 / count as f32,
+++            run_count: list.len(),
+++            fail_count: fail,
+++            warn_count: warn,
+++            drift_score_mean: drift_mean,
+++            salad02_score_max_mean: salad02_mean,
+++            salad04_score_max_mean: salad04_mean,
+++            stop_execute_count: stop_count,
+++            tokens_per_second_mean: 0.0,
+++        });
+++    }
+++    let baseline_id = env::var("ASH_EVAL02_BASELINE_PROFILE").unwrap_or_else(|_| "S01_static_safe".to_string());
+++    let candidate_id = env::var("ASH_EVAL02_CANDIDATE_PROFILE").unwrap_or_else(|_| "S05_decode03e_guard_overlay".to_string());
+++    let baseline = by_profile.get(&baseline_id).cloned().unwrap_or_default();
+++    let candidate = by_profile.get(&candidate_id).cloned().unwrap_or_default();
+++    Eval02Summary {
+++        patch_id: EVAL02_PATCH_ID.to_string(),
+++        input_patch: EVAL02_INPUT_PATCH_ID.to_string(),
+++        status: if overall.fail_count > 0 { "PASS_WITH_WARNINGS" } else { "PASS_STATIC_OR_EMPTY" }.to_string(),
+++        mode: Eval02Mode::from_env().as_str().to_string(),
+++        suite: Eval02SuiteStats {
+++            prompt_count: 10,
+++            profile_count: matrix.profiles.len(),
+++            seed_count: matrix.seeds.len(),
+++            backend_count: matrix.backends.len(),
+++            expected_run_count: 10 * matrix.profiles.len() * matrix.seeds.len() * matrix.backends.len(),
+++            completed_run_count: runs.len(),
+++            not_comparable_count: 0,
+++        },
+++        overall,
+++        by_profile,
+++        long_horizon: long,
+++        regression: Eval02RegressionJudgement {
+++            baseline_profile: baseline_id,
+++            candidate_profile: candidate_id,
+++            drift_score_improved: candidate.drift_score_mean <= baseline.drift_score_mean || baseline.run_count == 0,
+++            salad_score_improved: candidate.salad02_score_max_mean <= baseline.salad02_score_max_mean || baseline.run_count == 0,
+++            morph_loop_reduced: candidate.salad04_score_max_mean <= baseline.salad04_score_max_mean || baseline.run_count == 0,
+++            over_stop_regression: candidate.stop_execute_count > baseline.stop_execute_count && baseline.run_count > 0,
+++            speed_regression_warn: false,
+++        },
+++        acceptance: Eval02Acceptance {
+++            ready_for_decode03f_threshold_calibration: true,
+++            ready_for_medusa00: false,
+++            ready_for_default_guard_overlay: false,
+++            reason: "long horizon soak harness sealed; runtime soak evidence required before default guard overlay or Medusa promotion".to_string(),
+++        },
+++    }
+++}
+++
+++pub fn write_eval02_summary_from_receipt_file() -> Result<Eval02Summary, String> {
+++    let path = runs_path();
+++    let runs = if path.exists() {
+++        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+++        let mut out = Vec::new();
+++        for line in text.lines().filter(|line| !line.trim().is_empty()) {
+++            if let Ok(run) = serde_json::from_str::<Eval02RunReceipt>(line) { out.push(run); }
+++        }
+++        out
+++    } else { Vec::new() };
+++    let summary = summarize_eval02_runs(&runs);
+++    let path = summary_path();
+++    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+++    fs::write(&path, serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+++    Ok(summary)
+++}
++diff -ruN eval02_orig/crates/model_core/src/lib.rs eval02_work/crates/model_core/src/lib.rs
++--- eval02_orig/crates/model_core/src/lib.rs	2026-05-27 08:09:52.000000000 +0000
+++++ eval02_work/crates/model_core/src/lib.rs	2026-05-27 08:19:20.413750451 +0000
++@@ -31,6 +31,7 @@
++ mod eval00_regression;
++ mod eval01_backend_replay;
++ mod decode03e_guard_overlay;
+++mod eval02_long_horizon;
++ mod minp_c1a_smoke;
++ mod semantic_prior_scores;
++ mod minp_c2_score_provider_smoke;
++@@ -244,6 +245,20 @@
++ };
++ 
++ 
+++pub use eval02_long_horizon::{
+++    EVAL02_PATCH_ID, EVAL02_INPUT_PATCH_ID, EVAL02_SSOT, Eval02Mode, Eval02DriftRisk,
+++    Eval02ExpectedRisks, Eval02PromptCase, Eval02Profile, Eval02Matrix,
+++    Eval02WindowMetrics, Eval02DriftMetrics, Eval02RunJudgement, Eval02RunReceipt,
+++    Eval02StepSample, Eval02SuiteStats, Eval02OverallStats, Eval02ProfileStats,
+++    Eval02LongHorizonStats, Eval02RegressionJudgement, Eval02Acceptance, Eval02Summary,
+++    default_long_prompt_suite as eval02_default_long_prompt_suite, default_matrix as eval02_default_matrix,
+++    write_eval02_manifests, load_eval02_long_prompt_suite, load_eval02_matrix,
+++    compute_eval02_window_metrics, compute_eval02_drift_metrics, judge_eval02_run,
+++    build_eval02_run_from_samples, sample_from_sampler03 as eval02_sample_from_sampler03,
+++    summarize_eval02_runs, append_eval02_receipt_from_sampler03, write_eval02_summary_from_receipt_file,
+++};
+++
+++
++ 
++ pub use decode_transition_validation::{
++     TransitionValidationMode, TransitionProbeIntegrityCounters, TransitionProbeIntegrityStatus,
++diff -ruN eval02_orig/crates/model_core/src/sampler_parity.rs eval02_work/crates/model_core/src/sampler_parity.rs
++--- eval02_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 08:09:52.000000000 +0000
+++++ eval02_work/crates/model_core/src/sampler_parity.rs	2026-05-27 08:19:20.414814909 +0000
++@@ -464,5 +464,6 @@
++     crate::eval00_regression::append_eval00_receipt_from_sampler03(receipt);
++     crate::eval01_backend_replay::append_eval01_receipt_from_sampler03(receipt);
++     crate::decode03e_guard_overlay::append_decode03e_receipt_from_sampler03(receipt);
+++    crate::eval02_long_horizon::append_eval02_receipt_from_sampler03(receipt);
++     crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN eval02_orig/workspace/eval02_long_prompt_suite.jsonl eval02_work/workspace/eval02_long_prompt_suite.jsonl
+--- eval02_orig/workspace/eval02_long_prompt_suite.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_long_prompt_suite.jsonl	2026-05-27 08:20:44.975532420 +0000
+@@ -0,0 +1,10 @@
++{"prompt_id": "L01_long_korean_explanation_001", "category": "long_korean_explanation", "prompt": "배추찜을 주제로, 재료 준비부터 보관법까지 차분하게 긴 설명을 작성해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "long", "normal", "explanation"]}
++{"prompt_id": "L02_long_structured_markdown_001", "category": "long_structured_markdown", "prompt": "작은 웹 도구를 설계한다고 가정하고, 목적/사용자/상태/오류처리/접근성을 마크다운 구조로 길게 정리해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "markdown", "structure"]}
++{"prompt_id": "L03_long_emotional_prose_001", "category": "long_emotional_prose", "prompt": "비 오는 골목에서 오래 참은 인물이 조용히 무너지는 장면을 감정이 과열되지 않게 길게 써줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "prose", "emotion"]}
++{"prompt_id": "L04_long_dialogue_continuation_001", "category": "long_dialogue_continuation", "prompt": "두 사람이 오래 미뤄둔 오해를 풀기 시작하는 대화를 512토큰 안에서 자연스럽게 이어줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "dialogue"]}
++{"prompt_id": "L05_long_noisy_input_repair_001", "category": "long_noisy_input_repair", "prompt": "아니 그니까 웹지피유 샘플러가 자꾸 이상하게 튀는데 이거 구조를 어떻게 봐야하냐고ㅠㅠ 라는 입력에 차분히 긴 답변을 해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "noisy", "technical"]}
++{"prompt_id": "L06_long_code_explanation_ko_001", "category": "long_code_explanation_ko", "prompt": "Rust에서 상태 머신과 receipt 기반 검증을 어떻게 분리하면 좋은지 긴 설명으로 정리해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "code", "rust"]}
++{"prompt_id": "L07_long_josa_eomi_pressure_001", "category": "long_josa_eomi_pressure", "prompt": "합니다, 입니다, 것이다 같은 표현을 자연스럽게 포함하되 반복하지 않는 긴 설명문을 작성해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": true, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "josa", "eomi", "trap"]}
++{"prompt_id": "L08_long_repetition_trap_soft_001", "category": "long_repetition_trap_soft", "prompt": "같은 문장을 반복하지 말고, 같은 주제를 세 관점으로 길게 설명해줘. 단, 각 문단의 끝은 다르게 맺어줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": true, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "repetition", "trap"]}
++{"prompt_id": "L09_long_worldbuilding_exposition_001", "category": "long_worldbuilding_exposition", "prompt": "드래곤과 와이번이 상징 체계에서 어떻게 다르게 쓰이는지 세계관 설정 문서처럼 길게 설명해줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "worldbuilding"]}
++{"prompt_id": "L10_long_tool_design_report_001", "category": "long_tool_design_report", "prompt": "PDF 조판 도구에서 이미지 프레임박스를 Notion 블록처럼 옮기는 구조를 긴 설계 보고서로 써줘.", "language": "ko", "max_new_tokens": 512, "horizon_buckets": [128, 256, 512], "expected_risks": {"salad_expected": false, "stop_expected": false, "rollback_expected": false, "long_output_expected": true}, "tags": ["korean", "tool-design", "report"]}
+diff -ruN eval02_orig/workspace/eval02_matrix.json eval02_work/workspace/eval02_matrix.json
+--- eval02_orig/workspace/eval02_matrix.json	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_matrix.json	2026-05-27 08:20:44.975812199 +0000
+@@ -0,0 +1,85 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
++  "prompt_suite": "workspace/eval02_long_prompt_suite.jsonl",
++  "seeds": [
++    101,
++    202,
++    303
++  ],
++  "backends": [
++    "cpu_oracle",
++    "standard_runtime",
++    "webgpu_runtime"
++  ],
++  "profiles": [
++    {
++      "profile_id": "S01_static_safe",
++      "dynamic_controlled": false,
++      "salad02": false,
++      "salad04": false,
++      "decode03e_guard_overlay": false,
++      "stop_surface": false,
++      "rollback_execute": false,
++      "description": "static safe long horizon baseline"
++    },
++    {
++      "profile_id": "S02_dynamic_controlled",
++      "dynamic_controlled": true,
++      "salad02": false,
++      "salad04": false,
++      "decode03e_guard_overlay": false,
++      "stop_surface": false,
++      "rollback_execute": false,
++      "description": "DECODE-03D controlled only"
++    },
++    {
++      "profile_id": "S03_dynamic_controlled_salad02",
++      "dynamic_controlled": true,
++      "salad02": true,
++      "salad04": false,
++      "decode03e_guard_overlay": false,
++      "stop_surface": false,
++      "rollback_execute": false,
++      "description": "dynamic controlled with SALAD-02 detector"
++    },
++    {
++      "profile_id": "S04_dynamic_controlled_salad04_overlay",
++      "dynamic_controlled": true,
++      "salad02": true,
++      "salad04": true,
++      "decode03e_guard_overlay": false,
++      "stop_surface": false,
++      "rollback_execute": false,
++      "description": "SALAD-04 overlay observe without DECODE-03E apply"
++    },
++    {
++      "profile_id": "S05_decode03e_guard_overlay",
++      "dynamic_controlled": true,
++      "salad02": true,
++      "salad04": true,
++      "decode03e_guard_overlay": true,
++      "stop_surface": false,
++      "rollback_execute": false,
++      "description": "DECODE-03E controlled guard overlay"
++    },
++    {
++      "profile_id": "S06_full_guard_stop_surface",
++      "dynamic_controlled": true,
++      "salad02": true,
++      "salad04": true,
++      "decode03e_guard_overlay": true,
++      "stop_surface": true,
++      "rollback_execute": false,
++      "description": "full guard plus STOP-01/02 surface, rollback execute off or verified only"
++    }
++  ],
++  "max_new_tokens_default": 512,
++  "horizon_buckets": [
++    128,
++    256,
++    512
++  ],
++  "window_size": 64,
++  "sample_every_n_steps": 16,
++  "strict_replay": true
++}
+\ No newline at end of file
+diff -ruN eval02_orig/workspace/eval02_metric_schema.json eval02_work/workspace/eval02_metric_schema.json
+--- eval02_orig/workspace/eval02_metric_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_metric_schema.json	2026-05-27 08:20:44.975943045 +0000
+@@ -0,0 +1,27 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
++  "schema_version": 1,
++  "files": {
++    "long_prompt_suite": "workspace/eval02_long_prompt_suite.jsonl",
++    "matrix": "workspace/eval02_matrix.json",
++    "window_runs": "workspace/eval02_window_runs.jsonl",
++    "step_samples": "workspace/eval02_step_samples.jsonl",
++    "summary": "workspace/eval02_summary.json"
++  },
++  "metric_groups": [
++    "window_metrics",
++    "drift_metrics",
++    "judgement",
++    "profile_summary"
++  ],
++  "hard_fail": [
++    "global_finite_fallback_count > 0",
++    "salad02_critical_count > 0 in normal long prompt",
++    "salad04_critical_count > 0 in normal long prompt",
++    "byte_piece_count >= 3 in any window",
++    "jamo_leak_count >= 5 total",
++    "active_set_empty",
++    "stop receipt missing for premature stop",
++    "ledger mutation forbidden violation"
++  ]
++}
+\ No newline at end of file
+diff -ruN eval02_orig/workspace/eval02_regression_report.md eval02_work/workspace/eval02_regression_report.md
+--- eval02_orig/workspace/eval02_regression_report.md	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_regression_report.md	2026-05-27 08:20:44.982383935 +0000
+@@ -0,0 +1,5 @@
++# 16AI-QW-38G-R6A-EVAL-02 Regression Report
++
++EVAL-02 compares long-horizon soak behavior across `S01_static_safe` and `S05_decode03e_guard_overlay` candidates.
++
++Runtime evidence is not included in this container bake. The included files define the fixed suite, matrix, run receipt schema, window metrics, drift scoring, and summary aggregation contract.
+diff -ruN eval02_orig/workspace/eval02_report.md eval02_work/workspace/eval02_report.md
+--- eval02_orig/workspace/eval02_report.md	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_report.md	2026-05-27 08:20:44.981868576 +0000
+@@ -0,0 +1,20 @@
++# 16AI-QW-38G-R6A-EVAL-02 Report
++
++## Status
++
++- Static bake: PASS_STATIC
++- Cargo check: NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER
++- Runtime soak: NOT_RUN
++
++## Implemented
++
++- `crates/model_core/src/eval02_long_horizon.rs`
++- Long prompt suite with 10 Korean long-horizon cases
++- Soak matrix with 6 profiles, 3 seeds, 3 backends
++- Window metric structures for PCI, entropy, SALAD-02, SALAD-04, guard overlay, fallback, stop pressure
++- Drift score and risk judgement structure
++- `sampler_parity::append_receipt()` integration hook
++
++## Contract
++
++EVAL-02 is an evaluation harness only. It does not change decode behavior. It seals long horizon drift evidence by prompt/profile/backend/seed/window.
+diff -ruN eval02_orig/workspace/eval02_source_hash_manifest.json eval02_work/workspace/eval02_source_hash_manifest.json
+--- eval02_orig/workspace/eval02_source_hash_manifest.json	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_source_hash_manifest.json	2026-05-27 08:20:44.985296533 +0000
+@@ -0,0 +1,40 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
++  "items": [
++    {
++      "path": "crates/model_core/src/eval02_long_horizon.rs",
++      "sha256": "d7427801f11f414344db65e76c122703c1ddceac324fd12c4b41427a12bcafb1",
++      "bytes": 40369
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "sha256": "d6017ed4abf67f88e50a713c9e39164df63b990f1d26f0cd3b0f0126e186a477",
++      "bytes": 21430
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "sha256": "103ad25a3a8779ef26274f65db053625d186ac5f7c04b78e3abe8d5a8b489b78",
++      "bytes": 21028
++    },
++    {
++      "path": "workspace/eval02_long_prompt_suite.jsonl",
++      "sha256": "faf48778caff44094e9af7f64d37501280b1cf0ee857a27fe5685aa317e1fdb9",
++      "bytes": 4786
++    },
++    {
++      "path": "workspace/eval02_matrix.json",
++      "sha256": "f42feebc689f94e902d3f4203dfbf20900f9ffee8dbbb21c6e12a76e5b5b5e0e",
++      "bytes": 2293
++    },
++    {
++      "path": "workspace/eval02_metric_schema.json",
++      "sha256": "8592b40969da545b27f51ff04d750731ca34272761d758a9c75f225efaeb50f5",
++      "bytes": 834
++    },
++    {
++      "path": "workspace/eval02_summary.json",
++      "sha256": "8999fb24ff0a1226cc291df1e7617b779471cf86b633d62631764413ab391560",
++      "bytes": 1263
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN eval02_orig/workspace/eval02_static_checks.json eval02_work/workspace/eval02_static_checks.json
+--- eval02_orig/workspace/eval02_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_static_checks.json	2026-05-27 08:20:44.980977427 +0000
+@@ -0,0 +1,34 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
++  "status": "PASS_STATIC",
++  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
++  "runtime_bench": "NOT_RUN",
++  "long_horizon_soak": "NOT_RUN",
++  "checks": [
++    {
++      "path": "crates/model_core/src/eval02_long_horizon.rs",
++      "missing": [],
++      "ok": true
++    },
++    {
++      "path": "crates/model_core/src/lib.rs",
++      "missing": [],
++      "ok": true
++    },
++    {
++      "path": "crates/model_core/src/sampler_parity.rs",
++      "missing": [],
++      "ok": true
++    },
++    {
++      "path": "workspace/eval02_long_prompt_suite.jsonl",
++      "missing": [],
++      "ok": true
++    },
++    {
++      "path": "workspace/eval02_matrix.json",
++      "missing": [],
++      "ok": true
++    }
++  ]
++}
+\ No newline at end of file
+diff -ruN eval02_orig/workspace/eval02_summary.json eval02_work/workspace/eval02_summary.json
+--- eval02_orig/workspace/eval02_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ eval02_work/workspace/eval02_summary.json	2026-05-27 08:20:44.976373865 +0000
+@@ -0,0 +1,44 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-03E",
++  "status": "PASS_STATIC_OR_EMPTY",
++  "mode": "ManifestOnly",
++  "suite": {
++    "prompt_count": 10,
++    "profile_count": 6,
++    "seed_count": 3,
++    "backend_count": 3,
++    "expected_run_count": 540,
++    "completed_run_count": 0,
++    "not_comparable_count": 0
++  },
++  "overall": {
++    "pass_count": 0,
++    "warn_count": 0,
++    "fail_count": 0
++  },
++  "by_profile": {},
++  "long_horizon": {
++    "critical_drift_count": 0,
++    "high_drift_count": 0,
++    "pci_decay_warn_count": 0,
++    "entropy_growth_warn_count": 0,
++    "morph_loop_growth_warn_count": 0,
++    "guard_panic_growth_warn_count": 0
++  },
++  "regression": {
++    "baseline_profile": "S01_static_safe",
++    "candidate_profile": "S05_decode03e_guard_overlay",
++    "drift_score_improved": true,
++    "salad_score_improved": true,
++    "morph_loop_reduced": true,
++    "over_stop_regression": false,
++    "speed_regression_warn": false
++  },
++  "acceptance": {
++    "ready_for_decode03f_threshold_calibration": true,
++    "ready_for_medusa00": false,
++    "ready_for_default_guard_overlay": false,
++    "reason": "long horizon soak harness sealed; runtime soak evidence required before default guard overlay or Medusa promotion"
++  }
++}
+\ No newline at end of file

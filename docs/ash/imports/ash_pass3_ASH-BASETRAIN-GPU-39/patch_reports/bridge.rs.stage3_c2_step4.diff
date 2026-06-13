@@ -1,0 +1,427 @@
+--- /tmp/stage4_orig/crates/lora_train/src/bridge.rs	2026-04-19 13:41:18.000000000 +0000
++++ /tmp/stage4/crates/lora_train/src/bridge.rs	2026-04-19 13:45:22.058532202 +0000
+@@ -2,9 +2,10 @@
+ use model_core::{resolve_runtime_lora_target_module_dims, ModelSpec, NativeWgpuModel, ReferenceModel};
+ use std::fs;
+ use std::path::{Path, PathBuf};
+-use std::sync::mpsc::sync_channel;
++use std::collections::VecDeque;
++use std::sync::mpsc::{sync_channel, Receiver, TryRecvError, RecvTimeoutError};
+ use std::thread;
+-use std::time::Instant;
++use std::time::{Duration, Instant};
+ use tokenizer_core::{NativeTokenizer, TokenizerEngine, TokenizerManifest};
+ 
+ use crate::{
+@@ -108,6 +109,45 @@
+     Reference(ReferenceModel),
+ }
+ 
++#[derive(Debug)]
++enum SubmittedModuleLocalCapture {
++    Native {
++        slot_id: usize,
++        target_key: String,
++        batch_size: usize,
++        max_seq_len: usize,
++    },
++    ReferenceReady {
++        target_key: String,
++        batch_size: usize,
++        max_seq_len: usize,
++        captures: Vec<model_core::CapturedModuleIo>,
++    },
++}
++
++impl SubmittedModuleLocalCapture {
++    fn target_key(&self) -> &str {
++        match self {
++            Self::Native { target_key, .. } => target_key,
++            Self::ReferenceReady { target_key, .. } => target_key,
++        }
++    }
++
++    fn batch_size(&self) -> usize {
++        match self {
++            Self::Native { batch_size, .. } => *batch_size,
++            Self::ReferenceReady { batch_size, .. } => *batch_size,
++        }
++    }
++
++    fn max_seq_len(&self) -> usize {
++        match self {
++            Self::Native { max_seq_len, .. } => *max_seq_len,
++            Self::ReferenceReady { max_seq_len, .. } => *max_seq_len,
++        }
++    }
++}
++
+ impl ModuleLocalCaptureRuntime {
+     fn mode_label(&self) -> &'static str {
+         match self {
+@@ -116,14 +156,14 @@
+         }
+     }
+ 
+-    fn capture_padded_batch(
++    fn submit_padded_batch(
+         &mut self,
+         batch_index: usize,
+         target_key: &str,
+         token_ids: &[u32],
+         lengths: &[usize],
+         max_seq_len: usize,
+-    ) -> Result<Vec<model_core::CapturedModuleIo>> {
++    ) -> Result<SubmittedModuleLocalCapture> {
+         match self {
+             Self::NativeFirst { native, fallback } => {
+                 let request = model_core::ModuleTraceTapRequest {
+@@ -142,61 +182,79 @@
+                     record_ids,
+                 ) {
+                     Ok(slot_id) => {
+-                        let mut ready = false;
+-                        for _ in 0..4 {
+-                            if native.poll_trace_slot(slot_id)? {
+-                                ready = true;
+-                                break;
+-                            }
+-                        }
+-                        if ready {
+-                            match native.try_collect_ready_module_trace(slot_id)? {
+-                                Some((_meta, captures)) => {
+-                                    println!(
+-                                        "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={} slot_id={}",
+-                                        target_key,
+-                                        lengths.len(),
+-                                        max_seq_len,
+-                                        slot_id,
+-                                    );
+-                                    Ok(captures)
+-                                }
+-                                None => {
+-                                    println!(
+-                                        "[bridge][module_local][runtime] native trace slot ready-without-collect target_key={} batch={} max_seq_len={} slot_id={} -> fallback",
+-                                        target_key,
+-                                        lengths.len(),
+-                                        max_seq_len,
+-                                        slot_id,
+-                                    );
+-                                    fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
+-                                }
+-                            }
+-                        } else {
+-                            println!(
+-                                "[bridge][module_local][runtime] native trace slot still pending after poll window target_key={} batch={} max_seq_len={} slot_id={} -> fallback",
+-                                target_key,
+-                                lengths.len(),
+-                                max_seq_len,
+-                                slot_id,
+-                            );
+-                            fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
+-                        }
++                        println!(
++                            "[bridge][module_local][runtime] native submit ok target_key={} batch={} max_seq_len={} slot_id={}",
++                            target_key,
++                            lengths.len(),
++                            max_seq_len,
++                            slot_id,
++                        );
++                        Ok(SubmittedModuleLocalCapture::Native {
++                            slot_id,
++                            target_key: target_key.to_string(),
++                            batch_size: lengths.len(),
++                            max_seq_len,
++                        })
+                     }
+                     Err(err) => {
+                         println!(
+-                            "[bridge][module_local][runtime] native capture fallback target_key={} batch={} max_seq_len={} reason={}",
++                            "[bridge][module_local][runtime] native submit fallback target_key={} batch={} max_seq_len={} reason={}",
+                             target_key,
+                             lengths.len(),
+                             max_seq_len,
+                             err,
+                         );
+-                        fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++                        let captures = fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)?;
++                        Ok(SubmittedModuleLocalCapture::ReferenceReady {
++                            target_key: target_key.to_string(),
++                            batch_size: lengths.len(),
++                            max_seq_len,
++                            captures,
++                        })
+                     }
+                 }
+             }
+             Self::Reference(reference) => {
+-                reference.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++                let captures = reference.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)?;
++                Ok(SubmittedModuleLocalCapture::ReferenceReady {
++                    target_key: target_key.to_string(),
++                    batch_size: lengths.len(),
++                    max_seq_len,
++                    captures,
++                })
++            }
++        }
++    }
++
++    fn poll_submitted_capture(
++        &mut self,
++        handle: &SubmittedModuleLocalCapture,
++    ) -> Result<bool> {
++        match (self, handle) {
++            (_, SubmittedModuleLocalCapture::ReferenceReady { .. }) => Ok(true),
++            (Self::NativeFirst { native, .. }, SubmittedModuleLocalCapture::Native { slot_id, .. }) => {
++                native.poll_trace_slot(*slot_id)
++            }
++            (Self::Reference(_), SubmittedModuleLocalCapture::Native { .. }) => {
++                bail!("reference-only runtime received native submitted handle")
++            }
++        }
++    }
++
++    fn try_collect_submitted_capture(
++        &mut self,
++        handle: SubmittedModuleLocalCapture,
++    ) -> Result<Option<Vec<model_core::CapturedModuleIo>>> {
++        match (self, handle) {
++            (_, SubmittedModuleLocalCapture::ReferenceReady { captures, .. }) => Ok(Some(captures)),
++            (Self::NativeFirst { native, .. }, SubmittedModuleLocalCapture::Native { slot_id, .. }) => {
++                match native.try_collect_ready_module_trace(slot_id)? {
++                    Some((_meta, captures)) => Ok(Some(captures)),
++                    None => Ok(None),
++                }
++            }
++            (Self::Reference(_), SubmittedModuleLocalCapture::Native { .. }) => {
++                bail!("reference-only runtime received native submitted handle")
+             }
+         }
+     }
+@@ -958,79 +1016,158 @@
+     });
+     drop(pack_shard_tx);
+ 
+-    while let Ok(batch) = prepared_rx.recv() {
+-        let batch_size = batch.seq_lens.len();
+-        let seq_lens = batch.seq_lens;
+-        let max_batch_seq_len = batch.max_batch_seq_len;
+-        let padded_token_ids = batch.padded_token_ids;
+-        let trace_slot = batch.batch_index % module_local_trace_slots.max(1);
+-        println!(
+-            "[bridge][module_local][trace] submit batch_index={} trace_slot={} rows={} max_batch_seq_len={} queue_capacity={}",
+-            batch.batch_index,
+-            trace_slot,
+-            batch_size,
+-            max_batch_seq_len,
+-            module_local_trace_slots,
+-        );
+-        let t_capture = Instant::now();
+-        let captures = teacher_runtime.capture_padded_batch(
+-            batch.batch_index,
+-            &target_key,
+-            &padded_token_ids,
+-            &seq_lens,
+-            max_batch_seq_len,
+-        )?;
+-        let capture_sec = t_capture.elapsed().as_secs_f64();
+-        if captures.len() != batch_size {
+-            bail!(
+-                "module-local batch capture count mismatch: target_key={} requested={} returned={}",
+-                target_key,
++    #[derive(Debug)]
++    struct InFlightModuleLocalCapture {
++        batch: PreparedModuleLocalBatch,
++        handle: SubmittedModuleLocalCapture,
++        trace_slot: usize,
++        submit_at: Instant,
++    }
++
++    fn try_recv_prepared_batch(
++        prepared_rx: &Receiver<PreparedModuleLocalBatch>,
++        prep_done: bool,
++    ) -> Result<Option<PreparedModuleLocalBatch>> {
++        if prep_done {
++            match prepared_rx.try_recv() {
++                Ok(batch) => Ok(Some(batch)),
++                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => Ok(None),
++            }
++        } else {
++            match prepared_rx.recv_timeout(Duration::from_millis(2)) {
++                Ok(batch) => Ok(Some(batch)),
++                Err(RecvTimeoutError::Timeout) => Ok(None),
++                Err(RecvTimeoutError::Disconnected) => Ok(None),
++            }
++        }
++    }
++
++    let mut prepared_done = false;
++    let mut prepared_pending = VecDeque::<PreparedModuleLocalBatch>::new();
++    let mut in_flight = VecDeque::<InFlightModuleLocalCapture>::new();
++
++    loop {
++        while !prepared_done {
++            match prepared_rx.try_recv() {
++                Ok(batch) => prepared_pending.push_back(batch),
++                Err(TryRecvError::Empty) => break,
++                Err(TryRecvError::Disconnected) => {
++                    prepared_done = true;
++                    break;
++                }
++            }
++        }
++
++        while in_flight.len() < module_local_trace_slots.max(1) {
++            let next_batch = if let Some(batch) = prepared_pending.pop_front() {
++                Some(batch)
++            } else {
++                try_recv_prepared_batch(&prepared_rx, prepared_done)?
++            };
++            let Some(batch) = next_batch else { break; };
++            let batch_size = batch.seq_lens.len();
++            let trace_slot = batch.batch_index % module_local_trace_slots.max(1);
++            println!(
++                "[bridge][module_local][trace] submit batch_index={} trace_slot={} rows={} max_batch_seq_len={} queue_capacity={}",
++                batch.batch_index,
++                trace_slot,
+                 batch_size,
+-                captures.len(),
++                batch.max_batch_seq_len,
++                module_local_trace_slots,
+             );
++            let handle = teacher_runtime.submit_padded_batch(
++                batch.batch_index,
++                &target_key,
++                &batch.padded_token_ids,
++                &batch.seq_lens,
++                batch.max_batch_seq_len,
++            )?;
++            in_flight.push_back(InFlightModuleLocalCapture {
++                batch,
++                handle,
++                trace_slot,
++                submit_at: Instant::now(),
++            });
+         }
+ 
+-        let mut rows = Vec::with_capacity(batch_size);
+-        for (idx, capture) in captures.into_iter().enumerate() {
+-            if capture.input_dim != input_dim || capture.output_dim != output_dim {
+-                bail!(
+-                    "module-local capture dim mismatch: target_key={} expected={} -> {} actual={} -> {}",
+-                    target_key,
+-                    input_dim,
+-                    output_dim,
+-                    capture.input_dim,
+-                    capture.output_dim,
+-                );
+-            }
+-            report.samples_seen += 1;
+-            report.feature_batches += 1;
+-            report.max_observed_seq_len = report.max_observed_seq_len.max(capture.seq_len);
+-            report.selected_tokens_total += capture.seq_len;
+-            total_rows += 1;
+-            total_tokens += capture.seq_len;
+-            max_seq_len_seen = max_seq_len_seen.max(capture.seq_len);
+-            rows.push(CapturedModuleLocalRow {
+-                sample_id,
+-                record_id: batch.record_ids[idx].clone(),
+-                seq_len: capture.seq_len,
+-                module_input: capture.module_input,
+-                module_output: capture.module_output,
+-                input_dim: capture.input_dim,
+-                output_dim: capture.output_dim,
+-            });
+-            sample_id += 1;
++        let mut remaining = VecDeque::<InFlightModuleLocalCapture>::new();
++        while let Some(mut pending) = in_flight.pop_front() {
++            if teacher_runtime.poll_submitted_capture(&pending.handle)? {
++                let captures = teacher_runtime
++                    .try_collect_submitted_capture(pending.handle)?
++                    .ok_or_else(|| anyhow!(
++                        "module-local ready handle failed to collect target_key={} batch={} max_seq_len={}",
++                        target_key,
++                        pending.batch.seq_lens.len(),
++                        pending.batch.max_batch_seq_len,
++                    ))?;
++                let capture_sec = pending.submit_at.elapsed().as_secs_f64();
++                let batch_size = pending.batch.seq_lens.len();
++                if captures.len() != batch_size {
++                    bail!(
++                        "module-local batch capture count mismatch: target_key={} requested={} returned={}",
++                        target_key,
++                        batch_size,
++                        captures.len(),
++                    );
++                }
++                let mut rows = Vec::with_capacity(batch_size);
++                for (idx, capture) in captures.into_iter().enumerate() {
++                    if capture.input_dim != input_dim || capture.output_dim != output_dim {
++                        bail!(
++                            "module-local capture dim mismatch: target_key={} expected={} -> {} actual={} -> {}",
++                            target_key,
++                            input_dim,
++                            output_dim,
++                            capture.input_dim,
++                            capture.output_dim,
++                        );
++                    }
++                    report.samples_seen += 1;
++                    report.feature_batches += 1;
++                    report.max_observed_seq_len = report.max_observed_seq_len.max(capture.seq_len);
++                    report.selected_tokens_total += capture.seq_len;
++                    total_rows += 1;
++                    total_tokens += capture.seq_len;
++                    max_seq_len_seen = max_seq_len_seen.max(capture.seq_len);
++                    rows.push(CapturedModuleLocalRow {
++                        sample_id,
++                        record_id: pending.batch.record_ids[idx].clone(),
++                        seq_len: capture.seq_len,
++                        module_input: capture.module_input,
++                        module_output: capture.module_output,
++                        input_dim: capture.input_dim,
++                        output_dim: capture.output_dim,
++                    });
++                    sample_id += 1;
++                }
++                captured_tx
++                    .send(CapturedModuleLocalBatch {
++                        batch_index: pending.batch.batch_index,
++                        trace_slot: pending.trace_slot,
++                        target_key: target_key.clone(),
++                        prepared_max_seq_len: pending.batch.max_batch_seq_len,
++                        capture_sec,
++                        rows,
++                    })
++                    .map_err(|_| anyhow!("module-local pack stage failed to receive captured batch"))?;
++            } else {
++                remaining.push_back(pending);
++            }
+         }
++        in_flight = remaining;
+ 
+-        captured_tx
+-            .send(CapturedModuleLocalBatch {
+-                batch_index: batch.batch_index,
+-                trace_slot,
+-                target_key: target_key.clone(),
+-                prepared_max_seq_len: max_batch_seq_len,
+-                capture_sec,
+-                rows,
+-            })
+-            .map_err(|_| anyhow!("module-local pack stage failed to receive captured batch"))?;
++        if prepared_done && prepared_pending.is_empty() && in_flight.is_empty() {
++            break;
++        }
++
++        if !prepared_done && prepared_pending.is_empty() && in_flight.is_empty() {
++            match prepared_rx.recv_timeout(Duration::from_millis(2)) {
++                Ok(batch) => prepared_pending.push_back(batch),
++                Err(RecvTimeoutError::Timeout) => {}
++                Err(RecvTimeoutError::Disconnected) => prepared_done = true,
++            }
++        }
+     }
+     drop(captured_tx);
+ 

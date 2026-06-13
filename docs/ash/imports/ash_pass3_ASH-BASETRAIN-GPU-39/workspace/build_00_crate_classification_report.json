@@ -1,0 +1,251 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-BUILD-00",
+  "title": "Cargo Workspace Check / Rust Compilation Readiness Seal",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "generated_at_utc": "2026-05-29T02:29:41Z",
+  "workspace_root_detected": true,
+  "workspace_root": ".",
+  "members_count": 17,
+  "default_members_count": 15,
+  "package_count_from_static_manifest_parse": 17,
+  "active_crate_count": 15,
+  "legacy_crate_count": 1,
+  "non_default_workspace_member_count": 1,
+  "excluded_path_count": 2,
+  "excluded_paths": [
+    "vendor/sherpa-rs-main/crates/sherpa-rs",
+    "vendor/sherpa-rs-main/crates/sherpa-rs-sys"
+  ],
+  "missing_member_cargo_toml_count": 0,
+  "missing_member_cargo_toml": [],
+  "static_path_dependency_error_count": 1,
+  "static_path_dependency_errors": [
+    {
+      "crate": "crates/asr_sidecar",
+      "section": "dependencies",
+      "dependency": "sherpa-rs",
+      "path": "../../vendor/sherpa-rs-main/crates/sherpa-rs",
+      "resolved_path": "/mnt/data/ash_build00_work/vendor/sherpa-rs-main/crates/sherpa-rs",
+      "exists": false
+    }
+  ],
+  "members": [
+    {
+      "path": "crates/artifact_store",
+      "cargo_toml": "crates/artifact_store/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "artifact_store",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/ash_core",
+      "cargo_toml": "crates/ash_core/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "ash_core",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/asr_sidecar",
+      "cargo_toml": "crates/asr_sidecar/Cargo.toml",
+      "workspace_member": true,
+      "default_member": false,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "asr_sidecar",
+      "classification": "non_default_workspace_member",
+      "reason": "not in default-members; still included by cargo check --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": [
+        {
+          "section": "dependencies",
+          "dependency": "sherpa-rs",
+          "path": "../../vendor/sherpa-rs-main/crates/sherpa-rs",
+          "resolved_path": "/mnt/data/ash_build00_work/vendor/sherpa-rs-main/crates/sherpa-rs",
+          "exists": false
+        }
+      ]
+    },
+    {
+      "path": "crates/audio_kernel",
+      "cargo_toml": "crates/audio_kernel/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "audio_kernel",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/base_train",
+      "cargo_toml": "crates/base_train/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "base_train",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/burn_webgpu_backend",
+      "cargo_toml": "crates/burn_webgpu_backend/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "burn_webgpu_backend",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/lora_train",
+      "cargo_toml": "crates/lora_train/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "lora_train",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/model_core",
+      "cargo_toml": "crates/model_core/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "model_core",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/native_host",
+      "cargo_toml": "crates/native_host/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "native_host",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/orchestrator_local",
+      "cargo_toml": "crates/orchestrator_local/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "orchestrator_local",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/policy",
+      "cargo_toml": "crates/policy/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "policy",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/runtime",
+      "cargo_toml": "crates/runtime/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "runtime",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/runtime_unz",
+      "cargo_toml": "crates/runtime_unz/Cargo.toml",
+      "workspace_member": true,
+      "default_member": false,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "runtime_unz_legacy",
+      "classification": "legacy_workspace_member_non_default",
+      "reason": "not in default-members; package/path marks legacy; still included by cargo check --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/text_kernel",
+      "cargo_toml": "crates/text_kernel/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "text_kernel",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/tokenizer_core",
+      "cargo_toml": "crates/tokenizer_core/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "tokenizer_core",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/tokenizer_import",
+      "cargo_toml": "crates/tokenizer_import/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "tokenizer_import",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    },
+    {
+      "path": "crates/train_data",
+      "cargo_toml": "crates/train_data/Cargo.toml",
+      "workspace_member": true,
+      "default_member": true,
+      "included_by_cargo_check_workspace_all_targets": true,
+      "package_name": "train_data",
+      "classification": "active_default_member",
+      "reason": "listed in workspace.default-members and included by --workspace",
+      "manifest_parse_ok": true,
+      "static_path_dependency_errors": []
+    }
+  ],
+  "notes": [
+    "cargo check --workspace --all-targets includes every workspace member, including non-default and legacy workspace members.",
+    "runtime_unz_legacy is non-default but remains a workspace member in this tree; this is recorded as a build-scope risk, not silently excluded.",
+    "No active crate was excluded by this patch."
+  ]
+}

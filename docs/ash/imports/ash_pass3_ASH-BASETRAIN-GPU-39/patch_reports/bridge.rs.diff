@@ -1,0 +1,78 @@
+--- orig/crates/lora_train/src/bridge.rs	2026-04-19 11:19:07.000000000 +0000
++++ src/crates/lora_train/src/bridge.rs	2026-04-19 11:55:29.121598358 +0000
+@@ -545,7 +545,9 @@
+         let rows = buf.rows;
+         let tokens = buf.total_tokens;
+         let max_seq_len = buf.max_seq_len;
++        let t_write = Instant::now();
+         let byte_size = write_module_local_feature_shard(&shard_path, buf)?;
++        let write_sec = t_write.elapsed().as_secs_f64();
+         shards.push(FeatureShardMeta {
+             shard_id,
+             path: shard_rel_path.to_string_lossy().replace('\\', "/"),
+@@ -562,11 +564,12 @@
+         });
+         let elapsed = started.elapsed().as_secs_f64().max(1e-9);
+         println!(
+-            "[bridge][module_local] flushed shard_id={} rows={} total_tokens={} bytes={} elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} path={}",
++            "[bridge][module_local] flushed shard_id={} rows={} total_tokens={} bytes={} write_sec={:.2}s elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} path={}",
+             shard_id,
+             rows,
+             tokens,
+             byte_size,
++            write_sec,
+             elapsed,
+             cumulative_rows as f64 / elapsed,
+             cumulative_tokens as f64 / elapsed,
+@@ -598,7 +601,9 @@
+         let record_ids: Vec<Option<String>> = pending_value.iter().map(|p| p.record_id.clone()).collect();
+         let batch_input_ids: Vec<Vec<u32>> = pending_value.iter().map(|p| p.all_ids.clone()).collect();
+ 
++        let t_capture = Instant::now();
+         let captures = teacher.capture_module_io_ids_batch(&batch_input_ids, &target_key)?;
++        let capture_sec = t_capture.elapsed().as_secs_f64();
+         if captures.len() != batch_input_ids.len() {
+             bail!(
+                 "module-local batch capture count mismatch: target_key={} requested={} returned={}",
+@@ -610,6 +615,7 @@
+ 
+         pending_value.clear();
+ 
++        let t_pack = Instant::now();
+         for (idx, capture) in captures.into_iter().enumerate() {
+             if capture.input_dim != input_dim || capture.output_dim != output_dim {
+                 bail!(
+@@ -633,7 +639,7 @@
+             if report.samples_seen == 1 || report.samples_seen % module_local_teacher_batch_size == 0 {
+                 let elapsed = started.elapsed().as_secs_f64().max(1e-9);
+                 println!(
+-                    "[bridge][module_local][batch] batch={} samples_seen={} skipped={} target_key={} expected={} -> {} actual={} -> {} rows_written={} elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} source_record_id={}",
++                    "[bridge][module_local][batch] batch={} samples_seen={} skipped={} target_key={} expected={} -> {} actual={} -> {} rows_written={} elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} capture_sec={:.2} source_record_id={}",
+                     batch_size,
+                     report.samples_seen,
+                     report.samples_skipped,
+@@ -646,6 +652,7 @@
+                     elapsed,
+                     report.samples_seen as f64 / elapsed,
+                     *total_tokens as f64 / elapsed,
++                    capture_sec,
+                     record_ids[idx].as_deref().unwrap_or(""),
+                 );
+             }
+@@ -655,6 +662,16 @@
+             }
+         }
+ 
++        let pack_sec = t_pack.elapsed().as_secs_f64();
++        println!(
++            "[bridge][module_local][timing] target_key={} batch={} capture_sec={:.2} pack_sec={:.2} rows_after={}",
++            target_key,
++            batch_size,
++            capture_sec,
++            pack_sec,
++            *total_rows,
++        );
++
+         Ok(())
+     };
+ 

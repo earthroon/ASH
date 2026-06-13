@@ -1,0 +1,85 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-EVAL-02",
+  "prompt_suite": "workspace/eval02_long_prompt_suite.jsonl",
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "backends": [
+    "cpu_oracle",
+    "standard_runtime",
+    "webgpu_runtime"
+  ],
+  "profiles": [
+    {
+      "profile_id": "S01_static_safe",
+      "dynamic_controlled": false,
+      "salad02": false,
+      "salad04": false,
+      "decode03e_guard_overlay": false,
+      "stop_surface": false,
+      "rollback_execute": false,
+      "description": "static safe long horizon baseline"
+    },
+    {
+      "profile_id": "S02_dynamic_controlled",
+      "dynamic_controlled": true,
+      "salad02": false,
+      "salad04": false,
+      "decode03e_guard_overlay": false,
+      "stop_surface": false,
+      "rollback_execute": false,
+      "description": "DECODE-03D controlled only"
+    },
+    {
+      "profile_id": "S03_dynamic_controlled_salad02",
+      "dynamic_controlled": true,
+      "salad02": true,
+      "salad04": false,
+      "decode03e_guard_overlay": false,
+      "stop_surface": false,
+      "rollback_execute": false,
+      "description": "dynamic controlled with SALAD-02 detector"
+    },
+    {
+      "profile_id": "S04_dynamic_controlled_salad04_overlay",
+      "dynamic_controlled": true,
+      "salad02": true,
+      "salad04": true,
+      "decode03e_guard_overlay": false,
+      "stop_surface": false,
+      "rollback_execute": false,
+      "description": "SALAD-04 overlay observe without DECODE-03E apply"
+    },
+    {
+      "profile_id": "S05_decode03e_guard_overlay",
+      "dynamic_controlled": true,
+      "salad02": true,
+      "salad04": true,
+      "decode03e_guard_overlay": true,
+      "stop_surface": false,
+      "rollback_execute": false,
+      "description": "DECODE-03E controlled guard overlay"
+    },
+    {
+      "profile_id": "S06_full_guard_stop_surface",
+      "dynamic_controlled": true,
+      "salad02": true,
+      "salad04": true,
+      "decode03e_guard_overlay": true,
+      "stop_surface": true,
+      "rollback_execute": false,
+      "description": "full guard plus STOP-01/02 surface, rollback execute off or verified only"
+    }
+  ],
+  "max_new_tokens_default": 512,
+  "horizon_buckets": [
+    128,
+    256,
+    512
+  ],
+  "window_size": 64,
+  "sample_every_n_steps": 16,
+  "strict_replay": true
+}

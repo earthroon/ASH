@@ -1,0 +1,18 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-KV-ROLLBACK-01",
+  "status": "PASS_STATIC",
+  "checks": {
+    "files_present": true,
+    "patch_id_present": true,
+    "behavior_change_false": true,
+    "probe_only_true": true,
+    "main_state_unchanged_fn": true,
+    "restore_verified_gate": true,
+    "fork_traits": true,
+    "module_registered": true,
+    "append_hook_registered": true,
+    "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+    "runtime_smoke": "NOT_RUN",
+    "forked_replay": "NOT_RUN"
+  }
+}

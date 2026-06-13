@@ -1,0 +1,28 @@
+ASH-BASETRAIN-GPU-35-R2C-R1 BUILD FIX
+
+Scope:
+- Compile-only fix for ASH-BASETRAIN-GPU-35-R2C atlas group plan receipt locator.
+- No semantic contract change.
+- No weight load, no GPU allocation, no backward, no optimizer.
+
+Fixed diagnostics:
+1. error[E0308] mismatched types
+   - locator_tile expected serde_json::Value for extra_a_value.
+   - EXPECTED_GROUP_ID was passed as &str.
+   - Fixed by passing Value::from(EXPECTED_GROUP_ID).
+
+2. warning: unnecessary parentheses around index expression
+   - confidence LUT index expression had redundant parentheses.
+   - Fixed by changing ["NONE", "LOW"][((found || count > 0) as usize)] to ["NONE", "LOW"][(found || count > 0) as usize].
+
+Closed boundaries preserved:
+- operator_manifest_created = false
+- target_manifest_written = false
+- selected_group_manifest_materialized = false
+- selected_group_weights_loaded = false
+- runtime_gpu_buffer_created = false
+- selected_group_gradient_buffer_allocated = false
+- backward_executed = false
+- optimizer_step_executed = false
+- safetensors_mutation_present = false
+- runtime_1p1b_training_claimed = false

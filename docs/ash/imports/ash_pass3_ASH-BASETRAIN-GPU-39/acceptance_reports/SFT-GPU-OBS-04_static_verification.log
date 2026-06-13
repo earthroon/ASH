@@ -1,0 +1,21 @@
+SFT-GPU-OBS-04 static verification
+
+Performed:
+- delimiter balance check for new Rust source and test files: PASS
+- ash_core lib.rs export wiring: PASS
+- lora_train lib.rs export wiring: PASS
+- burn_webgpu_backend lib.rs export wiring: PASS
+- required file inclusion before zip: PASS
+
+Not performed in this container:
+- cargo test
+- rustc compile
+- rustfmt
+
+Reason:
+- cargo/rustc/rustfmt are not installed in the execution container.
+
+Required local verification:
+- cargo test -p ash_core sft_gpu_obs_04 -- --nocapture
+- cargo test -p lora_train gpu_health_review_receipt -- --nocapture
+- cargo test -p burn_webgpu_backend gpu_health_review_decision_signals -- --nocapture

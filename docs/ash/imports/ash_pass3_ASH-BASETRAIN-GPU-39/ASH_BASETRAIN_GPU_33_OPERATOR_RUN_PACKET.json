@@ -1,0 +1,8 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-33",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-34",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-33A",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_33_loss_scalar_to_logits_gradient_binding_audit --jobs 1",
+  "recommended_binding_audit_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_33_loss_scalar_to_logits_gradient_binding_audit",
+  "pass": true
+}

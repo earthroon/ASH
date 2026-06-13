@@ -1,0 +1,53 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-RUN-01",
+  "status": "RUNTIME_RECEIPT_EXECUTION_DEFINED_EXECUTION_NOT_RUN",
+  "input_patch": "16AI-QW-38G-R6A-RUN-00",
+  "cargo": {
+    "check_status": "NOT_RUN",
+    "test_status": "NOT_RUN"
+  },
+  "wgsl": {
+    "compile_status": "NOT_RUN",
+    "binding_layout_status": "NOT_RUN"
+  },
+  "runtime": {
+    "smoke_status": "NOT_RUN",
+    "checked_cases": 0,
+    "pass_cases": 0,
+    "fail_cases": 0,
+    "blocked_cases": 0
+  },
+  "promotion_gates": {
+    "patch_id": "16AI-QW-38G-R6A-RUN-01",
+    "input_patch": "16AI-QW-38G-R6A-RUN-00",
+    "sampler_strict_ready": false,
+    "transition_on_candidate_ready": false,
+    "semantic_prior_enable_ready": false,
+    "gate_inputs": {
+      "cargo_check": "NOT_RUN",
+      "wgsl_compile": "NOT_RUN",
+      "runtime_smoke": "NOT_RUN",
+      "sampler04_status": "NOT_RUN",
+      "decode02d_status": "NOT_RUN",
+      "minp_c2a_status": "NOT_RUN"
+    },
+    "blocking_reasons": [
+      "CARGO_CHECK_NOT_RUN",
+      "WGSL_COMPILE_NOT_RUN",
+      "RUNTIME_SMOKE_NOT_RUN",
+      "SAMPLER04_NOT_RUN",
+      "DECODE02D_NOT_RUN",
+      "MINP_C2A_NOT_RUN"
+    ],
+    "not_run_used_for_promotion": false
+  },
+  "default_modes_changed": false,
+  "non_scope": [
+    "new_sampler_feature",
+    "dynamic_qwave_deltak",
+    "transition_default_on",
+    "semantic_prior_default_on",
+    "lora_training",
+    "context_router"
+  ]
+}

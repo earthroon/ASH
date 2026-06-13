@@ -1,0 +1,54 @@
+# 16AI-QW-38G-R6A-WCTX-10 Bake Report
+
+## Added
+
+- `crates/ash_core/src/word_context_prompt_dryrun.rs`
+- `crates/ash_core/src/bin/ash_word_context_prompt_dryrun.rs`
+- `workspace/word_context_probe/wctx_10_enko_prompt_dryrun_cases.json`
+- `workspace/word_context_probe/wctx_10_enko_prompt_dryrun_matrix.json`
+- `workspace/word_context_probe/wctx_10_enko_prompt_dryrun_summary.json`
+- `workspace/word_context_probe/wctx_10_enko_prompt_dryrun_sample_receipt.json`
+- `workspace/word_context_probe/wctx_10_static_validation.json`
+
+## Modified
+
+- `crates/ash_core/src/lib.rs` exported `word_context_prompt_dryrun`.
+
+## Static Matrix
+
+```json
+{
+  "patch_id": "16AI-QW-38G-R6A-WCTX-10",
+  "domain_ssot": "en_to_ko_translation_subtitle_machine",
+  "total_cases": 24,
+  "pass_cases": 24,
+  "fail_cases": 0,
+  "deterministic_failures": 0,
+  "risk_failures": 0,
+  "ready_count": 12,
+  "blocked_pending_count": 12,
+  "blocked_rejected_count": 0,
+  "blocked_needs_revision_count": 0,
+  "blocked_invalid_approval_count": 0,
+  "candidate_prompt_created_count": 12,
+  "candidate_prompt_applied_count": 0,
+  "active_prompt_mutation_count": 0,
+  "generation_input_mutation_count": 0,
+  "generation_executed_count": 0,
+  "approved_for_dry_run_count": 12,
+  "dry_run_gate_open_count": 12,
+  "runtime_apply_gate_open_count": 0,
+  "runtime_default_apply_count": 0,
+  "token_id_mutation_count": 0,
+  "generation_mutation_count": 0,
+  "rerank_applied_count": 0
+}
+```
+
+## Verification Status
+
+`PASS_STATIC_RUST_TOOLCHAIN_UNAVAILABLE`: cargo/rustc was unavailable in this container, so compile/runtime validation must be run locally with:
+
+```bash
+cargo run -p ash_core --bin ash_word_context_prompt_dryrun
+```

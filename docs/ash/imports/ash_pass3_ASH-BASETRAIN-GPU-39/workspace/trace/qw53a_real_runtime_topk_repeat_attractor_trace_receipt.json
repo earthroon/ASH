@@ -1,0 +1,38 @@
+{
+  "patch_id": "QW-53A",
+  "title": "Real Runtime TopK Repeat Attractor Trace Capture / QWave Apply Eligibility Evidence Seal",
+  "base_patch": "QW-52C-R13-S6",
+  "status": "PATCH_IMPLEMENTED_PENDING_LOCAL_CARGO_RUNTIME_TRACE",
+  "implemented_files": [
+    "crates/runtime/src/qw53a_runtime_topk_trace.rs",
+    "crates/model_core/src/qw53a_real_runtime_topk_repeat_attractor_trace.rs",
+    "crates/model_core/src/bin/qw53a_real_runtime_topk_repeat_attractor_trace.rs",
+    "crates/model_core/src/bin/qw53a_real_runtime_topk_repeat_attractor_trace_validate.rs",
+    "crates/model_core/tests/qw53a_real_runtime_trace_validation.rs",
+    "crates/runtime/tests/qw53a_no_runtime_mutation.rs"
+  ],
+  "runtime_hook": "crates/runtime/src/infer.rs::run_standard_infer calls qw53a_capture_from_env after checkpoint fingerprint is available",
+  "runtime_env": {
+    "ASH_QW53A_TRACE": "1 enables capture",
+    "ASH_QW53A_TOPK": "top-k record limit; default 8",
+    "ASH_QW53A_REPEAT_WINDOW": "recent repeat window; default 32",
+    "ASH_QW53A_OUTPUT_DIR": "trace root; default ."
+  },
+  "outputs": [
+    "workspace/runtime_traces/qw53a_real_runtime_topk_repeat_attractor_trace.jsonl",
+    "workspace/runtime_traces/qw52c_r13_s6_runtime_topk_trace_batch.jsonl",
+    "workspace/trace/qw53a_runtime_trace_capture_receipt.json"
+  ],
+  "runtime_apply_allowed": false,
+  "runtime_default_apply_allowed": false,
+  "promotion_eligible": false,
+  "weight_commit_allowed": false,
+  "safe_profile_apply_allowed": false,
+  "policy_promotion_allowed": false,
+  "token_selection_mutation_allowed": false,
+  "token_rank_mutation_allowed": false,
+  "logit_mutation_allowed": false,
+  "sampler_mutation_allowed": false,
+  "core_runtime_language_ssot": "Rust + WGPU/WGSL only",
+  "js_ts_core_logic_allowed": false
+}

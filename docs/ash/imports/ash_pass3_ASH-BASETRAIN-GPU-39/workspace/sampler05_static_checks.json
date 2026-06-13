@@ -1,0 +1,25 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
+  "input_patch": "16AI-QW-38G-R6A-SAMPLER-04",
+  "checks": {
+    "sampler05_module_exists": true,
+    "lib_declares_sampler05": true,
+    "lib_exports_sampler05": true,
+    "sampler03_append_hooks_sampler05": true,
+    "sampler05_default_behavior_change_false": true,
+    "sampler05_forbids_global_finite_fallback": true,
+    "wgsl_pre_minp_uses_weighted": true,
+    "wgsl_scaled_threshold_removed": true,
+    "gpu_topk_bypass_policy_present": true,
+    "gpu_uniform_uses_effective_top_k": true,
+    "gpu_logs_effective_top_k": true,
+    "cargo_available_in_container": false,
+    "patch_file_exists": true,
+    "patch_contains_wgsl_weighted": true,
+    "patch_contains_sampler05_module": true
+  },
+  "cargo_check": "NOT_RUN_CARGO_NOT_FOUND_IN_CONTAINER",
+  "wgsl_compile": "NOT_RUN_WGPU_COMPILER_NOT_AVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN_TARGET_RUNTIME_REQUIRED",
+  "promotion_status": "STATIC_BAKE_ONLY"
+}

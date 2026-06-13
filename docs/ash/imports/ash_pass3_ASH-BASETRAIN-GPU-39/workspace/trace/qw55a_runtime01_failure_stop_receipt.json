@@ -1,0 +1,16 @@
+{
+  "patch_id": "QW-55A-RUNTIME-01",
+  "status": "PASS_QW55A_RUNTIME01_FAILURE_STOP_RECEIPT",
+  "summary": "QW-55A runtime selector failure paths are sealed as explicit failure stops with no greedy, sampler, original argmax, or normal stop recovery.",
+  "failure_policy": "ExplicitSelectorFailureStop",
+  "greedy_fallback_used": false,
+  "sampler_fallback_used": false,
+  "normal_stop_disguised": false,
+  "trace_required": true,
+  "receipt_required": true,
+  "committed_token_present": false,
+  "next_patch": "QW-MCTS-00",
+  "policy_version": "qw55a.runtime01.failure_stop_receipt.v1",
+  "trace_path": "workspace/runtime_traces/qw55a_runtime01_failure_stop_trace.jsonl",
+  "report_path": "artifacts/qw55a_runtime01_failure_stop_receipt_report.json"
+}

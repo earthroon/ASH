@@ -1,0 +1,54 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-STOP-02",
+  "status": "PASS_STATIC",
+  "cargo_check": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_smoke": "NOT_RUN",
+  "checks": [
+    {
+      "file": "crates/model_core/src/stop02_finalization.rs",
+      "exists": true,
+      "size": 35403
+    },
+    {
+      "file": "crates/model_core/src/lib.rs",
+      "exists": true,
+      "size": 17415
+    },
+    {
+      "file": "crates/model_core/src/sampler_parity.rs",
+      "exists": true,
+      "size": 20618
+    },
+    {
+      "file": "apps/desktop/src/components/StopSurface.vue",
+      "exists": true,
+      "size": 3604
+    },
+    {
+      "file": "workspace/stop02_finalization_schema.json",
+      "exists": true,
+      "size": 2766
+    },
+    {
+      "file": "workspace/stop02_summary.json",
+      "exists": true,
+      "size": 1515
+    }
+  ],
+  "required_markers": {
+    "ledger_mutated: false": true,
+    "eos_appended_to_ledger": true,
+    "output_tail_truncated_from_ledger": true,
+    "Stop02SurfaceKind": true,
+    "Stop02MessageCode": true,
+    "finalize_stop02_surface": true,
+    "append_stop02_receipt_from_sampler03": true
+  },
+  "contracts": {
+    "ledger_mutation_allowed": false,
+    "append_ledger_eos_forbidden": true,
+    "truncate_ledger_tail_forbidden": true,
+    "surface_only": true,
+    "raw_visible_output_separated": true
+  }
+}

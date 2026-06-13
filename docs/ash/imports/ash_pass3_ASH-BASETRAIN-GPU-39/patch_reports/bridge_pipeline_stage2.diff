@@ -1,0 +1,81 @@
+--- /mnt/data/stage2_orig/crates/lora_train/src/bridge.rs	2026-04-19 12:58:05.000000000 +0000
++++ crates/lora_train/src/bridge.rs	2026-04-19 13:01:38.599665185 +0000
+@@ -500,9 +500,9 @@
+     struct PreparedModuleLocalBatch {
+         batch_index: usize,
+         record_ids: Vec<Option<String>>,
+-        input_ids: Vec<Vec<u32>>,
+         seq_lens: Vec<usize>,
+         max_batch_seq_len: usize,
++        padded_token_ids: Vec<u32>,
+     }
+ 
+     #[derive(Debug)]
+@@ -580,22 +580,32 @@
+                 return Ok(());
+             }
+             let max_batch_seq_len = pending_seq_lens.iter().copied().max().unwrap_or(0);
++            let row_width = max_batch_seq_len.max(1);
++            let batch_rows = pending_ids.len();
++            let mut padded_token_ids = vec![0u32; batch_rows * row_width];
++            for (row_idx, ids) in pending_ids.iter().enumerate() {
++                let dst_start = row_idx * row_width;
++                let dst_end = dst_start + ids.len().min(row_width);
++                padded_token_ids[dst_start..dst_end].copy_from_slice(&ids[..ids.len().min(row_width)]);
++            }
+             let batch = PreparedModuleLocalBatch {
+                 batch_index: *batch_index,
+                 record_ids: std::mem::take(pending_record_ids),
+-                input_ids: std::mem::take(pending_ids),
+                 seq_lens: std::mem::take(pending_seq_lens),
+                 max_batch_seq_len,
++                padded_token_ids,
+             };
+             summary.prepared_batches += 1;
+-            summary.prepared_rows += batch.input_ids.len();
++            summary.prepared_rows += batch_rows;
+             println!(
+-                "[bridge][module_local][prep] batch={} rows={} max_batch_seq_len={} pending_capacity={}",
++                "[bridge][module_local][prep] batch={} rows={} max_batch_seq_len={} padded_tokens={} pending_capacity={}",
+                 batch.batch_index,
+-                batch.input_ids.len(),
++                batch_rows,
+                 batch.max_batch_seq_len,
++                batch.padded_token_ids.len(),
+                 module_local_teacher_batch_size,
+             );
++            pending_ids.clear();
+             prepared_tx
+                 .send(batch)
+                 .map_err(|_| anyhow!("module-local prepare stage failed to send prepared batch"))?;
+@@ -717,11 +727,18 @@
+     };
+ 
+     while let Ok(batch) = prepared_rx.recv() {
+-        let batch_size = batch.input_ids.len();
++        let batch_size = batch.seq_lens.len();
+         let record_ids = batch.record_ids;
+-        let batch_input_ids = batch.input_ids;
++        let seq_lens = batch.seq_lens;
++        let max_batch_seq_len = batch.max_batch_seq_len;
++        let padded_token_ids = batch.padded_token_ids;
+         let t_capture = Instant::now();
+-        let captures = teacher.capture_module_io_ids_batch(&batch_input_ids, &target_key)?;
++        let captures = teacher.capture_module_io_padded_batch(
++            &padded_token_ids,
++            &seq_lens,
++            max_batch_seq_len,
++            &target_key,
++        )?;
+         let capture_sec = t_capture.elapsed().as_secs_f64();
+         if captures.len() != batch_size {
+             bail!(
+@@ -795,7 +812,7 @@
+             "[bridge][module_local][timing] target_key={} batch={} prepared_max_seq_len={} capture_sec={:.2} pack_sec={:.2} rows_after={}",
+             target_key,
+             batch_size,
+-            batch.max_batch_seq_len,
++            max_batch_seq_len,
+             capture_sec,
+             pack_sec,
+             total_rows,

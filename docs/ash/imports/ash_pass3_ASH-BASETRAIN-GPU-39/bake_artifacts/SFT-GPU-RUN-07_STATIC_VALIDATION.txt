@@ -1,0 +1,35 @@
+SFT-GPU-RUN-07 STATIC VALIDATION
+
+PASS file created: crates/ash_core/src/sft_gpu_promotion_apply_candidate.rs
+PASS file created: crates/ash_core/tests/sft_gpu_run_07_promotion_apply_candidate.rs
+PASS file created: crates/lora_train/src/gpu_trained_promotion_apply_candidate.rs
+PASS file created: crates/lora_train/tests/gpu_trained_promotion_apply_candidate.rs
+PASS file created: crates/burn_webgpu_backend/src/gpu_trained_promotion_apply_candidate.rs
+PASS file created: crates/burn_webgpu_backend/tests/gpu_trained_promotion_apply_candidate.rs
+PASS ash_core lib.rs module/export connected
+PASS lora_train lib.rs module/export connected
+PASS burn_webgpu_backend lib.rs module/export connected
+PASS Rust brace balance check for new files
+PASS source RUN-06 runtime attach dry-run seal required
+PASS promotion intent required
+PASS apply plan required
+PASS apply preflight required and must pass
+PASS promotion apply candidate required
+PASS rollback ledger candidate required
+PASS rollback handle required
+PASS rollback restore pointer required
+PASS fallback target required
+PASS textureLoad pre-apply guard required
+PASS textureSample/sampler/normalized-uv weight fetch rejected
+PASS actual promotion apply default closed
+PASS runtime current pointer update default closed
+PASS current pointer switch default closed
+PASS slot ready mark default closed
+PASS lifecycle mutation default closed
+PASS slot action apply default closed
+PASS rollback execution default closed
+PASS ASH current binding default closed
+PASS runtime SFT training / gradient / optimizer default closed
+PENDING cargo test -p ash_core sft_gpu_run_07 -- --nocapture
+PENDING cargo test -p lora_train gpu_trained_promotion_apply_candidate -- --nocapture
+PENDING cargo test -p burn_webgpu_backend gpu_trained_promotion_apply_candidate -- --nocapture

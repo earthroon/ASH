@@ -1,0 +1,1346 @@
+diff -ruN decode02b_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md decode02b_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md
+--- decode02b_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md	2026-05-27 00:40:21.201964765 +0000
+@@ -0,0 +1,20 @@
++# Acceptance — 16AI-QW-38G-R6A-DECODE-02B
++
++Status: STATIC_PASS / EXECUTION_NOT_RUN
++
++## Accepted static scope
++- TransitionValidationMode exists.
++- Runtime transition probe receipt schema exists.
++- Probe-to-On summary exists.
++- Candidate trace version 3 is required for transition parity.
++- CPU/GPU selected transition action and reason mask comparison path exists.
++- Probe integrity missing counters are not promoted to PASS; they are recorded as PARTIAL and promotion-blocking.
++
++## Not run
++- cargo check
++- cargo test
++- rustfmt
++- WebGPU runtime probe
++
++## Promotion state
++`TRANSITION_ON_CANDIDATE_READY` is not granted by this bake. Runtime receipt must first provide probe integrity counters or an equivalent direct no-mutation proof.
+diff -ruN decode02b_orig/crates/model_core/src/decode_transition_guard.rs decode02b_work/crates/model_core/src/decode_transition_guard.rs
+--- decode02b_orig/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:14:07.000000000 +0000
++++ decode02b_work/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:40:21.186260295 +0000
+@@ -351,6 +351,67 @@
+     TransitionDecision { risk, penalty, action, reasons }
+ }
+ 
++
++
++pub fn transition_action_code(action: TransitionAction) -> u32 {
++    match action {
++        TransitionAction::Allow => 0,
++        TransitionAction::Penalize => 1,
++        TransitionAction::HardBlock => 2,
++        TransitionAction::ProbeOnly => 3,
++        TransitionAction::Unavailable => 4,
++    }
++}
++
++pub fn transition_reason_bit(reason: TransitionReason) -> u32 {
++    match reason {
++        TransitionReason::PadToken => 1 << 0,
++        TransitionReason::ControlToken => 1 << 1,
++        TransitionReason::EosBeforeMinNewTokens => 1 << 2,
++        TransitionReason::GenericContinuationImmediateEos => 1 << 3,
++        TransitionReason::InvalidByteToken => 1 << 4,
++        TransitionReason::ByteTextBoundaryRisk => 1 << 5,
++        TransitionReason::MojibakeSuspected => 1 << 6,
++        TransitionReason::DoubleParticleLike => 1 << 7,
++        TransitionReason::DoubleSentenceEndingLike => 1 << 8,
++        TransitionReason::RepeatedPunctuation => 1 << 9,
++        TransitionReason::UnknownToken => 1 << 10,
++        TransitionReason::RecentLoopRisk => 1 << 11,
++        TransitionReason::PieceContextUnavailable => 1 << 12,
++        TransitionReason::WhitespaceOnlyToken => 1 << 13,
++        TransitionReason::UnbalancedOpenCloseSymbol => 1 << 14,
++        TransitionReason::None => 0,
++    }
++}
++
++pub fn transition_reasons_mask(reasons: &[TransitionReason]) -> u32 {
++    reasons.iter().fold(0u32, |acc, reason| acc | transition_reason_bit(*reason))
++}
++
++pub fn transition_reason_string_mask(reasons: &[String]) -> u32 {
++    reasons.iter().fold(0u32, |acc, reason| {
++        let bit = match reason.as_str() {
++            "pad_token" | "PadToken" => 1 << 0,
++            "control_token" | "ControlToken" => 1 << 1,
++            "eos_before_min_new_tokens" | "EosBeforeMinNewTokens" => 1 << 2,
++            "generic_continuation_immediate_eos" | "GenericContinuationImmediateEos" => 1 << 3,
++            "invalid_byte_token" | "InvalidByteToken" => 1 << 4,
++            "byte_text_boundary_risk" | "ByteTextBoundaryRisk" => 1 << 5,
++            "mojibake_suspected" | "MojibakeSuspected" => 1 << 6,
++            "double_particle_like" | "DoubleParticleLike" => 1 << 7,
++            "double_sentence_ending_like" | "DoubleSentenceEndingLike" => 1 << 8,
++            "repeated_punctuation" | "RepeatedPunctuation" => 1 << 9,
++            "unknown_token" | "UnknownToken" => 1 << 10,
++            "recent_loop_risk" | "RecentLoopRisk" => 1 << 11,
++            "piece_context_unavailable" | "PieceContextUnavailable" => 1 << 12,
++            "whitespace_only_token" | "WhitespaceOnlyToken" => 1 << 13,
++            "unbalanced_open_close_symbol" | "UnbalancedOpenCloseSymbol" => 1 << 14,
++            _ => 0,
++        };
++        acc | bit
++    })
++}
++
+ pub fn transition_guard_config_from_env() -> TransitionGuardConfig {
+     let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
+     let parse_usize = |key: &str, default: usize| -> usize { std::env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default) };
+diff -ruN decode02b_orig/crates/model_core/src/decode_transition_validation.rs decode02b_work/crates/model_core/src/decode_transition_validation.rs
+--- decode02b_orig/crates/model_core/src/decode_transition_validation.rs	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:40:21.188850166 +0000
+@@ -0,0 +1,297 @@
++use serde::{Deserialize, Serialize};
++use std::{env, fs, path::PathBuf};
++
++use crate::sampler_parity::SamplerParityReceipt;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum TransitionValidationMode {
++    Off,
++    ValidateProbe,
++    PromoteOnCandidate,
++}
++
++impl TransitionValidationMode {
++    pub fn from_env() -> Self {
++        let enabled = env::var("ASH_DECODE_TRANSITION_VALIDATE")
++            .ok()
++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "validate"))
++            .unwrap_or(false);
++        if !enabled {
++            return Self::Off;
++        }
++        let promote = env::var("ASH_DECODE_TRANSITION_PROMOTE_ON")
++            .ok()
++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "promote"))
++            .unwrap_or(false);
++        if promote { Self::PromoteOnCandidate } else { Self::ValidateProbe }
++    }
++
++    pub fn as_str(&self) -> &'static str {
++        match self {
++            Self::Off => "Off",
++            Self::ValidateProbe => "ValidateProbe",
++            Self::PromoteOnCandidate => "PromoteOnCandidate",
++        }
++    }
++
++    pub fn enabled(&self) -> bool { !matches!(self, Self::Off) }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionProbeIntegrity {
++    pub probe_mode: bool,
++    pub weighted_logit_before: Option<f32>,
++    pub weighted_logit_after: Option<f32>,
++    pub candidate_mask_before: Option<bool>,
++    pub candidate_mask_after: Option<bool>,
++    pub sampling_state_mutated: Option<bool>,
++    pub status: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionRuntimeSide {
++    pub selected_id: u32,
++    pub risk: Option<f32>,
++    pub penalty: Option<f32>,
++    pub action_code: Option<u32>,
++    pub reason_mask: Option<u32>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct TransitionParityStatus {
++    pub action_match: Option<bool>,
++    pub reason_match: Option<bool>,
++    pub hardblock_match: Option<bool>,
++    pub risk_match: Option<bool>,
++    pub penalty_match: Option<bool>,
++    pub hint_trace_available: bool,
++    pub candidate_trace_version_ok: bool,
++    pub status: String,
++    pub promotion_blocking: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02bTransitionValidationReceipt {
++    pub patch_id: String,
++    pub input_patch: String,
++    pub step: usize,
++    pub mode: String,
++    pub candidate_trace_version: u32,
++    pub cpu_transition: TransitionRuntimeSide,
++    pub gpu_transition: TransitionRuntimeSide,
++    pub probe_integrity: TransitionProbeIntegrity,
++    pub parity: TransitionParityStatus,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Decode02bTransitionValidationSummary {
++    pub patch_id: String,
++    pub status: String,
++    pub input_patch: String,
++    pub transition_guard_ssot: String,
++    pub candidate_piece_hint_ssot: String,
++    pub default_mode: String,
++    pub validation_mode_default: String,
++    pub promotion_status: String,
++    pub checked_steps: usize,
++    pub pass_steps: usize,
++    pub warn_steps: usize,
++    pub fail_steps: usize,
++    pub partial_steps: usize,
++    pub probe_mode_mutation_allowed: bool,
++    pub receipt: String,
++    pub non_scope: Vec<String>,
++}
++
++pub fn transition_validation_receipt_path() -> PathBuf {
++    env::var("ASH_DECODE_TRANSITION_RECEIPT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_runtime_probe_receipt.jsonl"))
++}
++
++pub fn transition_validation_summary_path() -> PathBuf {
++    env::var("ASH_DECODE_TRANSITION_SUMMARY")
++        .map(PathBuf::from)
++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_probe_to_on_summary.json"))
++}
++
++fn is_hardblock(action: Option<u32>) -> bool { action == Some(2) }
++
++fn float_match(cpu: Option<f32>, gpu: Option<f32>, tol: f32) -> Option<bool> {
++    match (cpu, gpu) {
++        (Some(a), Some(b)) => Some((a - b).abs() <= tol),
++        (None, None) => None,
++        _ => Some(false),
++    }
++}
++
++fn status_is_pass(status: &str) -> bool { status == "PASS" }
++fn status_is_warn(status: &str) -> bool { status.starts_with("WARN_") }
++fn status_is_fail(status: &str) -> bool { status.starts_with("FAIL_") }
++fn status_is_partial(status: &str) -> bool { status.starts_with("PARTIAL_") }
++
++pub fn transition_validation_from_sampler_receipt(
++    mode: TransitionValidationMode,
++    receipt: &SamplerParityReceipt,
++) -> Decode02bTransitionValidationReceipt {
++    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 3;
++    let hint_trace_available = candidate_trace_version_ok
++        && receipt.gpu.selected_transition_action_code.is_some()
++        && receipt.gpu.selected_transition_reason_mask.is_some();
++
++    let action_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let reason_match = match (receipt.cpu.selected_transition_reason_mask, receipt.gpu.selected_transition_reason_mask) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let hardblock_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
++        (Some(_), Some(_)) => Some(is_hardblock(receipt.cpu.selected_transition_action_code) == is_hardblock(receipt.gpu.selected_transition_action_code)),
++        _ => None,
++    };
++    let risk_match = float_match(receipt.cpu.selected_transition_risk, receipt.gpu.selected_transition_risk, 1e-4);
++    let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
++
++    let probe_mode = receipt.cpu.transition_guard_probe_only || receipt.gpu.transition_guard_probe_only;
++    let probe_integrity = TransitionProbeIntegrity {
++        probe_mode,
++        weighted_logit_before: None,
++        weighted_logit_after: None,
++        candidate_mask_before: None,
++        candidate_mask_after: None,
++        sampling_state_mutated: None,
++        status: if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() },
++    };
++
++    let (status, promotion_blocking) = if !candidate_trace_version_ok {
++        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V3".to_string(), true)
++    } else if !hint_trace_available {
++        ("FAIL_HINT_TABLE_MISSING".to_string(), true)
++    } else if action_match == Some(false) {
++        ("FAIL_ACTION_MISMATCH".to_string(), true)
++    } else if reason_match == Some(false) {
++        ("FAIL_REASON_MISMATCH".to_string(), true)
++    } else if hardblock_match == Some(false) {
++        ("FAIL_HARDBLOCK_MISMATCH".to_string(), true)
++    } else if probe_integrity.status.starts_with("PARTIAL_") {
++        (probe_integrity.status.clone(), true)
++    } else if risk_match == Some(false) || penalty_match == Some(false) {
++        ("WARN_RISK_ONLY".to_string(), false)
++    } else {
++        ("PASS".to_string(), false)
++    };
++
++    Decode02bTransitionValidationReceipt {
++        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++        input_patch: receipt.patch_id.clone(),
++        step: receipt.step,
++        mode: mode.as_str().to_string(),
++        candidate_trace_version: receipt.gpu.candidate_trace_version,
++        cpu_transition: TransitionRuntimeSide {
++            selected_id: receipt.cpu.selected_id,
++            risk: receipt.cpu.selected_transition_risk,
++            penalty: receipt.cpu.selected_transition_penalty,
++            action_code: receipt.cpu.selected_transition_action_code,
++            reason_mask: receipt.cpu.selected_transition_reason_mask,
++        },
++        gpu_transition: TransitionRuntimeSide {
++            selected_id: receipt.gpu.selected_id,
++            risk: receipt.gpu.selected_transition_risk,
++            penalty: receipt.gpu.selected_transition_penalty,
++            action_code: receipt.gpu.selected_transition_action_code,
++            reason_mask: receipt.gpu.selected_transition_reason_mask,
++        },
++        probe_integrity,
++        parity: TransitionParityStatus {
++            action_match,
++            reason_match,
++            hardblock_match,
++            risk_match,
++            penalty_match,
++            hint_trace_available,
++            candidate_trace_version_ok,
++            status,
++            promotion_blocking,
++        },
++    }
++}
++
++pub fn append_transition_validation_receipt(receipt: &SamplerParityReceipt) {
++    let mode = TransitionValidationMode::from_env();
++    if !mode.enabled() { return; }
++    let validation = transition_validation_from_sampler_receipt(mode, receipt);
++    let path = transition_validation_receipt_path();
++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(line) = serde_json::to_string(&validation) {
++        use std::io::Write;
++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
++            let _ = writeln!(file, "{}", line);
++        }
++    }
++    write_transition_validation_summary(mode);
++}
++
++pub fn write_transition_validation_summary(mode: TransitionValidationMode) {
++    let receipt_path = transition_validation_receipt_path();
++    let summary_path = transition_validation_summary_path();
++    let mut checked = 0usize;
++    let mut pass = 0usize;
++    let mut warn = 0usize;
++    let mut fail = 0usize;
++    let mut partial = 0usize;
++    let mut blocked = false;
++
++    if let Ok(raw) = fs::read_to_string(&receipt_path) {
++        for line in raw.lines().filter(|line| !line.trim().is_empty()) {
++            if let Ok(item) = serde_json::from_str::<Decode02bTransitionValidationReceipt>(line) {
++                checked += 1;
++                if item.parity.promotion_blocking { blocked = true; }
++                let status = item.parity.status.as_str();
++                if status_is_pass(status) { pass += 1; }
++                else if status_is_warn(status) { warn += 1; }
++                else if status_is_partial(status) { partial += 1; blocked = true; }
++                else if status_is_fail(status) { fail += 1; blocked = true; }
++            }
++        }
++    }
++
++    let promotion_status = if checked == 0 {
++        "NOT_RUN"
++    } else if blocked || fail > 0 || partial > 0 {
++        "TRANSITION_ON_BLOCKED"
++    } else {
++        "TRANSITION_ON_CANDIDATE_READY"
++    };
++
++    let summary = Decode02bTransitionValidationSummary {
++        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
++        status: "TRANSITION_GUARD_RUNTIME_PROBE_AND_PROBE_TO_ON_GATE_DEFINED".to_string(),
++        input_patch: "16AI-QW-38G-R6A-DECODE-02A".to_string(),
++        transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
++        candidate_piece_hint_ssot: "model_core::decode_candidate_piece_hints::CandidatePieceHintTable".to_string(),
++        default_mode: "off".to_string(),
++        validation_mode_default: "off".to_string(),
++        promotion_status: promotion_status.to_string(),
++        checked_steps: checked,
++        pass_steps: pass,
++        warn_steps: warn,
++        fail_steps: fail,
++        partial_steps: partial,
++        probe_mode_mutation_allowed: false,
++        receipt: receipt_path.to_string_lossy().to_string(),
++        non_scope: vec![
++            "transition_rule_redesign".to_string(),
++            "dynamic_context_qwave".to_string(),
++            "minp_formula_change".to_string(),
++            "semantic_prior_default_enable".to_string(),
++            "lora_training".to_string(),
++        ],
++    };
++
++    if let Some(parent) = summary_path.parent() { let _ = fs::create_dir_all(parent); }
++    if let Ok(text) = serde_json::to_string_pretty(&summary) { let _ = fs::write(summary_path, text); }
++}
+diff -ruN decode02b_orig/crates/model_core/src/generation_sampling.rs decode02b_work/crates/model_core/src/generation_sampling.rs
+--- decode02b_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:30:43.000000000 +0000
++++ decode02b_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:40:21.188522370 +0000
+@@ -2493,6 +2493,12 @@
+         let top_n = sampler_parity::top_n_limit();
+         let cpu_trace = sampler_parity::cpu_trace_from_result(&cpu_result, top_n);
+         let candidate_trace = sampled.candidate_trace.as_ref();
++        let selected_transition_entry = candidate_trace
++            .and_then(|t| {
++                t.entries.iter()
++                    .find(|e| e.token_id == sampled.token_id && e.stage == 2)
++                    .or_else(|| t.entries.iter().find(|e| e.token_id == sampled.token_id))
++            });
+         let gpu_trace = GpuSamplerRuntimeTrace {
+             selected_id: sampled.token_id,
+             selected_logprob: sampled.logprob,
+@@ -2514,6 +2520,13 @@
+             },
+             transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
+             transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
++            candidate_trace_version: if candidate_trace.is_some() { 3 } else { 0 },
++            transition_guard_enabled: sampling.transition_guard.enabled,
++            transition_guard_probe_only: sampling.transition_guard.probe_only,
++            selected_transition_risk: selected_transition_entry.map(|e| e.transition_risk),
++            selected_transition_penalty: selected_transition_entry.map(|e| e.transition_penalty),
++            selected_transition_action_code: selected_transition_entry.map(|e| e.transition_action),
++            selected_transition_reason_mask: selected_transition_entry.map(|e| e.transition_reason_mask),
+         };
+         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
+         let strict_demote = receipt.parity.strict_demoted;
+diff -ruN decode02b_orig/crates/model_core/src/lib.rs decode02b_work/crates/model_core/src/lib.rs
+--- decode02b_orig/crates/model_core/src/lib.rs	2026-05-27 00:27:01.000000000 +0000
++++ decode02b_work/crates/model_core/src/lib.rs	2026-05-27 00:40:21.189439964 +0000
+@@ -12,6 +12,7 @@
+ mod cpu_oracle_sampler;
+ mod decode_transition_guard;
+ mod decode_candidate_piece_hints;
++mod decode_transition_validation;
+ mod sampler_parity;
+ mod sampler_parity_validation;
+ mod minp_c1a_smoke;
+@@ -72,6 +73,11 @@
+ };
+ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
+ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
++pub use decode_transition_validation::{
++    TransitionValidationMode, Decode02bTransitionValidationReceipt,
++    Decode02bTransitionValidationSummary, TransitionParityStatus,
++    transition_validation_from_sampler_receipt, append_transition_validation_receipt,
++};
+ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
+ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
+ pub use minp_c2a_snapshot_alignment::{
+diff -ruN decode02b_orig/crates/model_core/src/sampler_parity.rs decode02b_work/crates/model_core/src/sampler_parity.rs
+--- decode02b_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:27:01.000000000 +0000
++++ decode02b_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:40:47.563902122 +0000
+@@ -3,6 +3,7 @@
+ 
+ use crate::cpu_oracle_sampler::{CpuOracleCandidateTrace, CpuOracleSampleResult};
+ use crate::generation_sampling::GenerationSamplingConfig;
++use crate::decode_transition_guard::{transition_reason_string_mask, transition_action_code, TransitionAction};
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum SamplerParityMode {
+@@ -70,6 +71,13 @@
+     pub trace_completeness: String,
+     pub transition_actions_head: Vec<u32>,
+     pub transition_reason_masks_head: Vec<u32>,
++    pub candidate_trace_version: u32,
++    pub transition_guard_enabled: bool,
++    pub transition_guard_probe_only: bool,
++    pub selected_transition_risk: Option<f32>,
++    pub selected_transition_penalty: Option<f32>,
++    pub selected_transition_action_code: Option<u32>,
++    pub selected_transition_reason_mask: Option<u32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -84,6 +92,12 @@
+     pub active_ids_head: Vec<u32>,
+     pub final_ids_head: Vec<u32>,
+     pub recovery_mode: String,
++    pub transition_guard_enabled: bool,
++    pub transition_guard_probe_only: bool,
++    pub selected_transition_risk: Option<f32>,
++    pub selected_transition_penalty: Option<f32>,
++    pub selected_transition_action_code: Option<u32>,
++    pub selected_transition_reason_mask: Option<u32>,
+ }
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -100,6 +114,8 @@
+     pub strict_demoted: bool,
+     pub transition_action_match: Option<bool>,
+     pub transition_reason_match: Option<bool>,
++    pub transition_hardblock_match: Option<bool>,
++    pub transition_probe_integrity_status: Option<String>,
+     pub status: String,
+     pub reason: String,
+ }
+@@ -156,6 +172,19 @@
+         active_ids_head: trace.active_ids.iter().copied().take(top_n).collect(),
+         final_ids_head: trace.final_ids.iter().copied().take(top_n).collect(),
+         recovery_mode: trace.recovery_mode.as_str().to_string(),
++        transition_guard_enabled: trace.transition_guard_enabled,
++        transition_guard_probe_only: trace.transition_guard_probe_only,
++        selected_transition_risk: trace.selected_transition_risk,
++        selected_transition_penalty: trace.selected_transition_penalty,
++        selected_transition_action_code: trace.selected_transition_action.as_ref().and_then(|name| match name.as_str() {
++            "Allow" => Some(transition_action_code(TransitionAction::Allow)),
++            "Penalize" => Some(transition_action_code(TransitionAction::Penalize)),
++            "HardBlock" => Some(transition_action_code(TransitionAction::HardBlock)),
++            "ProbeOnly" => Some(transition_action_code(TransitionAction::ProbeOnly)),
++            "Unavailable" => Some(transition_action_code(TransitionAction::Unavailable)),
++            _ => None,
++        }),
++        selected_transition_reason_mask: Some(transition_reason_string_mask(&trace.selected_transition_reasons)),
+     }
+ }
+ 
+@@ -194,6 +223,26 @@
+         _ => None,
+     };
+     let recovery_mode_match = gpu.recovery_mode.as_ref().map(|g| g == &cpu.recovery_mode);
++    let transition_action_match = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let transition_reason_match = match (cpu.selected_transition_reason_mask, gpu.selected_transition_reason_mask) {
++        (Some(c), Some(g)) => Some(c == g),
++        (None, None) => None,
++        _ => Some(false),
++    };
++    let is_hardblock = |v: Option<u32>| v == Some(transition_action_code(TransitionAction::HardBlock));
++    let transition_hardblock_match = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
++        (Some(_), Some(_)) => Some(is_hardblock(cpu.selected_transition_action_code) == is_hardblock(gpu.selected_transition_action_code)),
++        _ => None,
++    };
++    let transition_probe_integrity_status = if (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only) {
++        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
++    } else {
++        None
++    };
+ 
+     let (status, reason) = if active_count_match == Some(false) {
+         ("FAIL_ACTIVE_SET_MISMATCH".to_string(), "GPU active_count differs from CPU oracle".to_string())
+@@ -211,6 +260,14 @@
+         ("PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE".to_string(), "GPU candidate ID trace buffer not present".to_string())
+     } else if trace_truncated {
+         ("WARN_TRACE_TRUNCATED".to_string(), "GPU candidate trace overflowed trace_top_n; counts checked but full ID parity is partial".to_string())
++    } else if transition_action_match == Some(false) {
++        ("FAIL_TRANSITION_ACTION_MISMATCH".to_string(), "CPU/GPU selected transition action differs".to_string())
++    } else if transition_reason_match == Some(false) {
++        ("FAIL_TRANSITION_REASON_MISMATCH".to_string(), "CPU/GPU selected transition reason mask differs".to_string())
++    } else if transition_hardblock_match == Some(false) {
++        ("FAIL_TRANSITION_HARDBLOCK_MISMATCH".to_string(), "CPU/GPU selected transition hardblock decision differs".to_string())
++    } else if transition_probe_integrity_status.as_deref() == Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE") {
++        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not yet instrumented".to_string())
+     } else if !selected_match {
+         ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
+     } else {
+@@ -241,8 +298,10 @@
+             selected_match,
+             trace_truncated,
+             strict_demoted,
+-            transition_action_match: None,
+-            transition_reason_match: None,
++            transition_action_match,
++            transition_reason_match,
++            transition_hardblock_match,
++            transition_probe_integrity_status,
+             status,
+             reason,
+         },
+@@ -261,4 +320,5 @@
+         }
+     }
+     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
++    crate::decode_transition_validation::append_transition_validation_receipt(receipt);
+ }
+diff -ruN decode02b_orig/workspace/decode02b.patch decode02b_work/workspace/decode02b.patch
+--- decode02b_orig/workspace/decode02b.patch	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b.patch	2026-05-27 00:41:14.266909720 +0000
+@@ -0,0 +1,577 @@
++diff -ruN decode02b_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md decode02b_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md
++--- decode02b_orig/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md	1970-01-01 00:00:00.000000000 +0000
+++++ decode02b_work/acceptance_reports/16AI-QW-38G-R6A-DECODE-02B_acceptance.md	2026-05-27 00:40:21.201964765 +0000
++@@ -0,0 +1,20 @@
+++# Acceptance — 16AI-QW-38G-R6A-DECODE-02B
+++
+++Status: STATIC_PASS / EXECUTION_NOT_RUN
+++
+++## Accepted static scope
+++- TransitionValidationMode exists.
+++- Runtime transition probe receipt schema exists.
+++- Probe-to-On summary exists.
+++- Candidate trace version 3 is required for transition parity.
+++- CPU/GPU selected transition action and reason mask comparison path exists.
+++- Probe integrity missing counters are not promoted to PASS; they are recorded as PARTIAL and promotion-blocking.
+++
+++## Not run
+++- cargo check
+++- cargo test
+++- rustfmt
+++- WebGPU runtime probe
+++
+++## Promotion state
+++`TRANSITION_ON_CANDIDATE_READY` is not granted by this bake. Runtime receipt must first provide probe integrity counters or an equivalent direct no-mutation proof.
++diff -ruN decode02b_orig/crates/model_core/src/decode_transition_guard.rs decode02b_work/crates/model_core/src/decode_transition_guard.rs
++--- decode02b_orig/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:14:07.000000000 +0000
+++++ decode02b_work/crates/model_core/src/decode_transition_guard.rs	2026-05-27 00:40:21.186260295 +0000
++@@ -351,6 +351,67 @@
++     TransitionDecision { risk, penalty, action, reasons }
++ }
++ 
+++
+++
+++pub fn transition_action_code(action: TransitionAction) -> u32 {
+++    match action {
+++        TransitionAction::Allow => 0,
+++        TransitionAction::Penalize => 1,
+++        TransitionAction::HardBlock => 2,
+++        TransitionAction::ProbeOnly => 3,
+++        TransitionAction::Unavailable => 4,
+++    }
+++}
+++
+++pub fn transition_reason_bit(reason: TransitionReason) -> u32 {
+++    match reason {
+++        TransitionReason::PadToken => 1 << 0,
+++        TransitionReason::ControlToken => 1 << 1,
+++        TransitionReason::EosBeforeMinNewTokens => 1 << 2,
+++        TransitionReason::GenericContinuationImmediateEos => 1 << 3,
+++        TransitionReason::InvalidByteToken => 1 << 4,
+++        TransitionReason::ByteTextBoundaryRisk => 1 << 5,
+++        TransitionReason::MojibakeSuspected => 1 << 6,
+++        TransitionReason::DoubleParticleLike => 1 << 7,
+++        TransitionReason::DoubleSentenceEndingLike => 1 << 8,
+++        TransitionReason::RepeatedPunctuation => 1 << 9,
+++        TransitionReason::UnknownToken => 1 << 10,
+++        TransitionReason::RecentLoopRisk => 1 << 11,
+++        TransitionReason::PieceContextUnavailable => 1 << 12,
+++        TransitionReason::WhitespaceOnlyToken => 1 << 13,
+++        TransitionReason::UnbalancedOpenCloseSymbol => 1 << 14,
+++        TransitionReason::None => 0,
+++    }
+++}
+++
+++pub fn transition_reasons_mask(reasons: &[TransitionReason]) -> u32 {
+++    reasons.iter().fold(0u32, |acc, reason| acc | transition_reason_bit(*reason))
+++}
+++
+++pub fn transition_reason_string_mask(reasons: &[String]) -> u32 {
+++    reasons.iter().fold(0u32, |acc, reason| {
+++        let bit = match reason.as_str() {
+++            "pad_token" | "PadToken" => 1 << 0,
+++            "control_token" | "ControlToken" => 1 << 1,
+++            "eos_before_min_new_tokens" | "EosBeforeMinNewTokens" => 1 << 2,
+++            "generic_continuation_immediate_eos" | "GenericContinuationImmediateEos" => 1 << 3,
+++            "invalid_byte_token" | "InvalidByteToken" => 1 << 4,
+++            "byte_text_boundary_risk" | "ByteTextBoundaryRisk" => 1 << 5,
+++            "mojibake_suspected" | "MojibakeSuspected" => 1 << 6,
+++            "double_particle_like" | "DoubleParticleLike" => 1 << 7,
+++            "double_sentence_ending_like" | "DoubleSentenceEndingLike" => 1 << 8,
+++            "repeated_punctuation" | "RepeatedPunctuation" => 1 << 9,
+++            "unknown_token" | "UnknownToken" => 1 << 10,
+++            "recent_loop_risk" | "RecentLoopRisk" => 1 << 11,
+++            "piece_context_unavailable" | "PieceContextUnavailable" => 1 << 12,
+++            "whitespace_only_token" | "WhitespaceOnlyToken" => 1 << 13,
+++            "unbalanced_open_close_symbol" | "UnbalancedOpenCloseSymbol" => 1 << 14,
+++            _ => 0,
+++        };
+++        acc | bit
+++    })
+++}
+++
++ pub fn transition_guard_config_from_env() -> TransitionGuardConfig {
++     let mode = std::env::var("ASH_DECODE_TRANSITION_GUARD").unwrap_or_else(|_| "off".to_string()).to_ascii_lowercase();
++     let parse_usize = |key: &str, default: usize| -> usize { std::env::var(key).ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(default) };
++diff -ruN decode02b_orig/crates/model_core/src/decode_transition_validation.rs decode02b_work/crates/model_core/src/decode_transition_validation.rs
++--- decode02b_orig/crates/model_core/src/decode_transition_validation.rs	1970-01-01 00:00:00.000000000 +0000
+++++ decode02b_work/crates/model_core/src/decode_transition_validation.rs	2026-05-27 00:40:21.188850166 +0000
++@@ -0,0 +1,297 @@
+++use serde::{Deserialize, Serialize};
+++use std::{env, fs, path::PathBuf};
+++
+++use crate::sampler_parity::SamplerParityReceipt;
+++
+++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+++pub enum TransitionValidationMode {
+++    Off,
+++    ValidateProbe,
+++    PromoteOnCandidate,
+++}
+++
+++impl TransitionValidationMode {
+++    pub fn from_env() -> Self {
+++        let enabled = env::var("ASH_DECODE_TRANSITION_VALIDATE")
+++            .ok()
+++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "validate"))
+++            .unwrap_or(false);
+++        if !enabled {
+++            return Self::Off;
+++        }
+++        let promote = env::var("ASH_DECODE_TRANSITION_PROMOTE_ON")
+++            .ok()
+++            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "promote"))
+++            .unwrap_or(false);
+++        if promote { Self::PromoteOnCandidate } else { Self::ValidateProbe }
+++    }
+++
+++    pub fn as_str(&self) -> &'static str {
+++        match self {
+++            Self::Off => "Off",
+++            Self::ValidateProbe => "ValidateProbe",
+++            Self::PromoteOnCandidate => "PromoteOnCandidate",
+++        }
+++    }
+++
+++    pub fn enabled(&self) -> bool { !matches!(self, Self::Off) }
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct TransitionProbeIntegrity {
+++    pub probe_mode: bool,
+++    pub weighted_logit_before: Option<f32>,
+++    pub weighted_logit_after: Option<f32>,
+++    pub candidate_mask_before: Option<bool>,
+++    pub candidate_mask_after: Option<bool>,
+++    pub sampling_state_mutated: Option<bool>,
+++    pub status: String,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct TransitionRuntimeSide {
+++    pub selected_id: u32,
+++    pub risk: Option<f32>,
+++    pub penalty: Option<f32>,
+++    pub action_code: Option<u32>,
+++    pub reason_mask: Option<u32>,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct TransitionParityStatus {
+++    pub action_match: Option<bool>,
+++    pub reason_match: Option<bool>,
+++    pub hardblock_match: Option<bool>,
+++    pub risk_match: Option<bool>,
+++    pub penalty_match: Option<bool>,
+++    pub hint_trace_available: bool,
+++    pub candidate_trace_version_ok: bool,
+++    pub status: String,
+++    pub promotion_blocking: bool,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode02bTransitionValidationReceipt {
+++    pub patch_id: String,
+++    pub input_patch: String,
+++    pub step: usize,
+++    pub mode: String,
+++    pub candidate_trace_version: u32,
+++    pub cpu_transition: TransitionRuntimeSide,
+++    pub gpu_transition: TransitionRuntimeSide,
+++    pub probe_integrity: TransitionProbeIntegrity,
+++    pub parity: TransitionParityStatus,
+++}
+++
+++#[derive(Debug, Clone, Serialize, Deserialize)]
+++pub struct Decode02bTransitionValidationSummary {
+++    pub patch_id: String,
+++    pub status: String,
+++    pub input_patch: String,
+++    pub transition_guard_ssot: String,
+++    pub candidate_piece_hint_ssot: String,
+++    pub default_mode: String,
+++    pub validation_mode_default: String,
+++    pub promotion_status: String,
+++    pub checked_steps: usize,
+++    pub pass_steps: usize,
+++    pub warn_steps: usize,
+++    pub fail_steps: usize,
+++    pub partial_steps: usize,
+++    pub probe_mode_mutation_allowed: bool,
+++    pub receipt: String,
+++    pub non_scope: Vec<String>,
+++}
+++
+++pub fn transition_validation_receipt_path() -> PathBuf {
+++    env::var("ASH_DECODE_TRANSITION_RECEIPT")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_runtime_probe_receipt.jsonl"))
+++}
+++
+++pub fn transition_validation_summary_path() -> PathBuf {
+++    env::var("ASH_DECODE_TRANSITION_SUMMARY")
+++        .map(PathBuf::from)
+++        .unwrap_or_else(|_| PathBuf::from("workspace/decode02b_transition_probe_to_on_summary.json"))
+++}
+++
+++fn is_hardblock(action: Option<u32>) -> bool { action == Some(2) }
+++
+++fn float_match(cpu: Option<f32>, gpu: Option<f32>, tol: f32) -> Option<bool> {
+++    match (cpu, gpu) {
+++        (Some(a), Some(b)) => Some((a - b).abs() <= tol),
+++        (None, None) => None,
+++        _ => Some(false),
+++    }
+++}
+++
+++fn status_is_pass(status: &str) -> bool { status == "PASS" }
+++fn status_is_warn(status: &str) -> bool { status.starts_with("WARN_") }
+++fn status_is_fail(status: &str) -> bool { status.starts_with("FAIL_") }
+++fn status_is_partial(status: &str) -> bool { status.starts_with("PARTIAL_") }
+++
+++pub fn transition_validation_from_sampler_receipt(
+++    mode: TransitionValidationMode,
+++    receipt: &SamplerParityReceipt,
+++) -> Decode02bTransitionValidationReceipt {
+++    let candidate_trace_version_ok = receipt.gpu.candidate_trace_version >= 3;
+++    let hint_trace_available = candidate_trace_version_ok
+++        && receipt.gpu.selected_transition_action_code.is_some()
+++        && receipt.gpu.selected_transition_reason_mask.is_some();
+++
+++    let action_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
+++        (Some(c), Some(g)) => Some(c == g),
+++        (None, None) => None,
+++        _ => Some(false),
+++    };
+++    let reason_match = match (receipt.cpu.selected_transition_reason_mask, receipt.gpu.selected_transition_reason_mask) {
+++        (Some(c), Some(g)) => Some(c == g),
+++        (None, None) => None,
+++        _ => Some(false),
+++    };
+++    let hardblock_match = match (receipt.cpu.selected_transition_action_code, receipt.gpu.selected_transition_action_code) {
+++        (Some(_), Some(_)) => Some(is_hardblock(receipt.cpu.selected_transition_action_code) == is_hardblock(receipt.gpu.selected_transition_action_code)),
+++        _ => None,
+++    };
+++    let risk_match = float_match(receipt.cpu.selected_transition_risk, receipt.gpu.selected_transition_risk, 1e-4);
+++    let penalty_match = float_match(receipt.cpu.selected_transition_penalty, receipt.gpu.selected_transition_penalty, 1e-4);
+++
+++    let probe_mode = receipt.cpu.transition_guard_probe_only || receipt.gpu.transition_guard_probe_only;
+++    let probe_integrity = TransitionProbeIntegrity {
+++        probe_mode,
+++        weighted_logit_before: None,
+++        weighted_logit_after: None,
+++        candidate_mask_before: None,
+++        candidate_mask_after: None,
+++        sampling_state_mutated: None,
+++        status: if probe_mode { "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string() } else { "NOT_PROBE_MODE".to_string() },
+++    };
+++
+++    let (status, promotion_blocking) = if !candidate_trace_version_ok {
+++        ("FAIL_CANDIDATE_TRACE_VERSION_NOT_V3".to_string(), true)
+++    } else if !hint_trace_available {
+++        ("FAIL_HINT_TABLE_MISSING".to_string(), true)
+++    } else if action_match == Some(false) {
+++        ("FAIL_ACTION_MISMATCH".to_string(), true)
+++    } else if reason_match == Some(false) {
+++        ("FAIL_REASON_MISMATCH".to_string(), true)
+++    } else if hardblock_match == Some(false) {
+++        ("FAIL_HARDBLOCK_MISMATCH".to_string(), true)
+++    } else if probe_integrity.status.starts_with("PARTIAL_") {
+++        (probe_integrity.status.clone(), true)
+++    } else if risk_match == Some(false) || penalty_match == Some(false) {
+++        ("WARN_RISK_ONLY".to_string(), false)
+++    } else {
+++        ("PASS".to_string(), false)
+++    };
+++
+++    Decode02bTransitionValidationReceipt {
+++        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
+++        input_patch: receipt.patch_id.clone(),
+++        step: receipt.step,
+++        mode: mode.as_str().to_string(),
+++        candidate_trace_version: receipt.gpu.candidate_trace_version,
+++        cpu_transition: TransitionRuntimeSide {
+++            selected_id: receipt.cpu.selected_id,
+++            risk: receipt.cpu.selected_transition_risk,
+++            penalty: receipt.cpu.selected_transition_penalty,
+++            action_code: receipt.cpu.selected_transition_action_code,
+++            reason_mask: receipt.cpu.selected_transition_reason_mask,
+++        },
+++        gpu_transition: TransitionRuntimeSide {
+++            selected_id: receipt.gpu.selected_id,
+++            risk: receipt.gpu.selected_transition_risk,
+++            penalty: receipt.gpu.selected_transition_penalty,
+++            action_code: receipt.gpu.selected_transition_action_code,
+++            reason_mask: receipt.gpu.selected_transition_reason_mask,
+++        },
+++        probe_integrity,
+++        parity: TransitionParityStatus {
+++            action_match,
+++            reason_match,
+++            hardblock_match,
+++            risk_match,
+++            penalty_match,
+++            hint_trace_available,
+++            candidate_trace_version_ok,
+++            status,
+++            promotion_blocking,
+++        },
+++    }
+++}
+++
+++pub fn append_transition_validation_receipt(receipt: &SamplerParityReceipt) {
+++    let mode = TransitionValidationMode::from_env();
+++    if !mode.enabled() { return; }
+++    let validation = transition_validation_from_sampler_receipt(mode, receipt);
+++    let path = transition_validation_receipt_path();
+++    if let Some(parent) = path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(line) = serde_json::to_string(&validation) {
+++        use std::io::Write;
+++        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+++            let _ = writeln!(file, "{}", line);
+++        }
+++    }
+++    write_transition_validation_summary(mode);
+++}
+++
+++pub fn write_transition_validation_summary(mode: TransitionValidationMode) {
+++    let receipt_path = transition_validation_receipt_path();
+++    let summary_path = transition_validation_summary_path();
+++    let mut checked = 0usize;
+++    let mut pass = 0usize;
+++    let mut warn = 0usize;
+++    let mut fail = 0usize;
+++    let mut partial = 0usize;
+++    let mut blocked = false;
+++
+++    if let Ok(raw) = fs::read_to_string(&receipt_path) {
+++        for line in raw.lines().filter(|line| !line.trim().is_empty()) {
+++            if let Ok(item) = serde_json::from_str::<Decode02bTransitionValidationReceipt>(line) {
+++                checked += 1;
+++                if item.parity.promotion_blocking { blocked = true; }
+++                let status = item.parity.status.as_str();
+++                if status_is_pass(status) { pass += 1; }
+++                else if status_is_warn(status) { warn += 1; }
+++                else if status_is_partial(status) { partial += 1; blocked = true; }
+++                else if status_is_fail(status) { fail += 1; blocked = true; }
+++            }
+++        }
+++    }
+++
+++    let promotion_status = if checked == 0 {
+++        "NOT_RUN"
+++    } else if blocked || fail > 0 || partial > 0 {
+++        "TRANSITION_ON_BLOCKED"
+++    } else {
+++        "TRANSITION_ON_CANDIDATE_READY"
+++    };
+++
+++    let summary = Decode02bTransitionValidationSummary {
+++        patch_id: "16AI-QW-38G-R6A-DECODE-02B".to_string(),
+++        status: "TRANSITION_GUARD_RUNTIME_PROBE_AND_PROBE_TO_ON_GATE_DEFINED".to_string(),
+++        input_patch: "16AI-QW-38G-R6A-DECODE-02A".to_string(),
+++        transition_guard_ssot: "model_core::decode_transition_guard".to_string(),
+++        candidate_piece_hint_ssot: "model_core::decode_candidate_piece_hints::CandidatePieceHintTable".to_string(),
+++        default_mode: "off".to_string(),
+++        validation_mode_default: "off".to_string(),
+++        promotion_status: promotion_status.to_string(),
+++        checked_steps: checked,
+++        pass_steps: pass,
+++        warn_steps: warn,
+++        fail_steps: fail,
+++        partial_steps: partial,
+++        probe_mode_mutation_allowed: false,
+++        receipt: receipt_path.to_string_lossy().to_string(),
+++        non_scope: vec![
+++            "transition_rule_redesign".to_string(),
+++            "dynamic_context_qwave".to_string(),
+++            "minp_formula_change".to_string(),
+++            "semantic_prior_default_enable".to_string(),
+++            "lora_training".to_string(),
+++        ],
+++    };
+++
+++    if let Some(parent) = summary_path.parent() { let _ = fs::create_dir_all(parent); }
+++    if let Ok(text) = serde_json::to_string_pretty(&summary) { let _ = fs::write(summary_path, text); }
+++}
++diff -ruN decode02b_orig/crates/model_core/src/generation_sampling.rs decode02b_work/crates/model_core/src/generation_sampling.rs
++--- decode02b_orig/crates/model_core/src/generation_sampling.rs	2026-05-27 00:30:43.000000000 +0000
+++++ decode02b_work/crates/model_core/src/generation_sampling.rs	2026-05-27 00:40:21.188522370 +0000
++@@ -2493,6 +2493,12 @@
++         let top_n = sampler_parity::top_n_limit();
++         let cpu_trace = sampler_parity::cpu_trace_from_result(&cpu_result, top_n);
++         let candidate_trace = sampled.candidate_trace.as_ref();
+++        let selected_transition_entry = candidate_trace
+++            .and_then(|t| {
+++                t.entries.iter()
+++                    .find(|e| e.token_id == sampled.token_id && e.stage == 2)
+++                    .or_else(|| t.entries.iter().find(|e| e.token_id == sampled.token_id))
+++            });
++         let gpu_trace = GpuSamplerRuntimeTrace {
++             selected_id: sampled.token_id,
++             selected_logprob: sampled.logprob,
++@@ -2514,6 +2520,13 @@
++             },
++             transition_actions_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_action).collect()).unwrap_or_default(),
++             transition_reason_masks_head: candidate_trace.map(|t| t.entries.iter().take(top_n).map(|e| e.transition_reason_mask).collect()).unwrap_or_default(),
+++            candidate_trace_version: if candidate_trace.is_some() { 3 } else { 0 },
+++            transition_guard_enabled: sampling.transition_guard.enabled,
+++            transition_guard_probe_only: sampling.transition_guard.probe_only,
+++            selected_transition_risk: selected_transition_entry.map(|e| e.transition_risk),
+++            selected_transition_penalty: selected_transition_entry.map(|e| e.transition_penalty),
+++            selected_transition_action_code: selected_transition_entry.map(|e| e.transition_action),
+++            selected_transition_reason_mask: selected_transition_entry.map(|e| e.transition_reason_mask),
++         };
++         let receipt = sampler_parity::compare_traces(mode, sampling, step, cpu_trace, gpu_trace);
++         let strict_demote = receipt.parity.strict_demoted;
++diff -ruN decode02b_orig/crates/model_core/src/lib.rs decode02b_work/crates/model_core/src/lib.rs
++--- decode02b_orig/crates/model_core/src/lib.rs	2026-05-27 00:27:01.000000000 +0000
+++++ decode02b_work/crates/model_core/src/lib.rs	2026-05-27 00:40:21.189439964 +0000
++@@ -12,6 +12,7 @@
++ mod cpu_oracle_sampler;
++ mod decode_transition_guard;
++ mod decode_candidate_piece_hints;
+++mod decode_transition_validation;
++ mod sampler_parity;
++ mod sampler_parity_validation;
++ mod minp_c1a_smoke;
++@@ -72,6 +73,11 @@
++ };
++ pub use sampler_parity::{SamplerParityMode, SamplerParityReceipt, SamplerParityStatus, GpuSamplerRuntimeTrace, CpuSamplerRuntimeTrace};
++ pub use sampler_parity_validation::{SamplerParityValidationMode, Sampler04ValidationReceipt, Sampler04ValidationSummary};
+++pub use decode_transition_validation::{
+++    TransitionValidationMode, Decode02bTransitionValidationReceipt,
+++    Decode02bTransitionValidationSummary, TransitionParityStatus,
+++    transition_validation_from_sampler_receipt, append_transition_validation_receipt,
+++};
++ pub use minp_c1a_smoke::{MinpC1aFixtureReceipt, run_minp_c1a_cpu_smoke_fixtures};
++ pub use minp_c2_score_provider_smoke::{MinpC2FixtureReceipt, run_minp_c2_score_provider_smoke};
++ pub use minp_c2a_snapshot_alignment::{
++diff -ruN decode02b_orig/crates/model_core/src/sampler_parity.rs decode02b_work/crates/model_core/src/sampler_parity.rs
++--- decode02b_orig/crates/model_core/src/sampler_parity.rs	2026-05-27 00:27:01.000000000 +0000
+++++ decode02b_work/crates/model_core/src/sampler_parity.rs	2026-05-27 00:40:47.563902122 +0000
++@@ -3,6 +3,7 @@
++ 
++ use crate::cpu_oracle_sampler::{CpuOracleCandidateTrace, CpuOracleSampleResult};
++ use crate::generation_sampling::GenerationSamplingConfig;
+++use crate::decode_transition_guard::{transition_reason_string_mask, transition_action_code, TransitionAction};
++ 
++ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++ pub enum SamplerParityMode {
++@@ -70,6 +71,13 @@
++     pub trace_completeness: String,
++     pub transition_actions_head: Vec<u32>,
++     pub transition_reason_masks_head: Vec<u32>,
+++    pub candidate_trace_version: u32,
+++    pub transition_guard_enabled: bool,
+++    pub transition_guard_probe_only: bool,
+++    pub selected_transition_risk: Option<f32>,
+++    pub selected_transition_penalty: Option<f32>,
+++    pub selected_transition_action_code: Option<u32>,
+++    pub selected_transition_reason_mask: Option<u32>,
++ }
++ 
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++@@ -84,6 +92,12 @@
++     pub active_ids_head: Vec<u32>,
++     pub final_ids_head: Vec<u32>,
++     pub recovery_mode: String,
+++    pub transition_guard_enabled: bool,
+++    pub transition_guard_probe_only: bool,
+++    pub selected_transition_risk: Option<f32>,
+++    pub selected_transition_penalty: Option<f32>,
+++    pub selected_transition_action_code: Option<u32>,
+++    pub selected_transition_reason_mask: Option<u32>,
++ }
++ 
++ #[derive(Debug, Clone, Serialize, Deserialize)]
++@@ -100,6 +114,8 @@
++     pub strict_demoted: bool,
++     pub transition_action_match: Option<bool>,
++     pub transition_reason_match: Option<bool>,
+++    pub transition_hardblock_match: Option<bool>,
+++    pub transition_probe_integrity_status: Option<String>,
++     pub status: String,
++     pub reason: String,
++ }
++@@ -156,6 +172,19 @@
++         active_ids_head: trace.active_ids.iter().copied().take(top_n).collect(),
++         final_ids_head: trace.final_ids.iter().copied().take(top_n).collect(),
++         recovery_mode: trace.recovery_mode.as_str().to_string(),
+++        transition_guard_enabled: trace.transition_guard_enabled,
+++        transition_guard_probe_only: trace.transition_guard_probe_only,
+++        selected_transition_risk: trace.selected_transition_risk,
+++        selected_transition_penalty: trace.selected_transition_penalty,
+++        selected_transition_action_code: trace.selected_transition_action.as_ref().and_then(|name| match name.as_str() {
+++            "Allow" => Some(transition_action_code(TransitionAction::Allow)),
+++            "Penalize" => Some(transition_action_code(TransitionAction::Penalize)),
+++            "HardBlock" => Some(transition_action_code(TransitionAction::HardBlock)),
+++            "ProbeOnly" => Some(transition_action_code(TransitionAction::ProbeOnly)),
+++            "Unavailable" => Some(transition_action_code(TransitionAction::Unavailable)),
+++            _ => None,
+++        }),
+++        selected_transition_reason_mask: Some(transition_reason_string_mask(&trace.selected_transition_reasons)),
++     }
++ }
++ 
++@@ -194,6 +223,26 @@
++         _ => None,
++     };
++     let recovery_mode_match = gpu.recovery_mode.as_ref().map(|g| g == &cpu.recovery_mode);
+++    let transition_action_match = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
+++        (Some(c), Some(g)) => Some(c == g),
+++        (None, None) => None,
+++        _ => Some(false),
+++    };
+++    let transition_reason_match = match (cpu.selected_transition_reason_mask, gpu.selected_transition_reason_mask) {
+++        (Some(c), Some(g)) => Some(c == g),
+++        (None, None) => None,
+++        _ => Some(false),
+++    };
+++    let is_hardblock = |v: Option<u32>| v == Some(transition_action_code(TransitionAction::HardBlock));
+++    let transition_hardblock_match = match (cpu.selected_transition_action_code, gpu.selected_transition_action_code) {
+++        (Some(_), Some(_)) => Some(is_hardblock(cpu.selected_transition_action_code) == is_hardblock(gpu.selected_transition_action_code)),
+++        _ => None,
+++    };
+++    let transition_probe_integrity_status = if (cpu.transition_guard_enabled && cpu.transition_guard_probe_only) || (gpu.transition_guard_enabled && gpu.transition_guard_probe_only) {
+++        Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string())
+++    } else {
+++        None
+++    };
++ 
++     let (status, reason) = if active_count_match == Some(false) {
++         ("FAIL_ACTIVE_SET_MISMATCH".to_string(), "GPU active_count differs from CPU oracle".to_string())
++@@ -211,6 +260,14 @@
++         ("PARTIAL_GPU_CANDIDATE_TRACE_UNAVAILABLE".to_string(), "GPU candidate ID trace buffer not present".to_string())
++     } else if trace_truncated {
++         ("WARN_TRACE_TRUNCATED".to_string(), "GPU candidate trace overflowed trace_top_n; counts checked but full ID parity is partial".to_string())
+++    } else if transition_action_match == Some(false) {
+++        ("FAIL_TRANSITION_ACTION_MISMATCH".to_string(), "CPU/GPU selected transition action differs".to_string())
+++    } else if transition_reason_match == Some(false) {
+++        ("FAIL_TRANSITION_REASON_MISMATCH".to_string(), "CPU/GPU selected transition reason mask differs".to_string())
+++    } else if transition_hardblock_match == Some(false) {
+++        ("FAIL_TRANSITION_HARDBLOCK_MISMATCH".to_string(), "CPU/GPU selected transition hardblock decision differs".to_string())
+++    } else if transition_probe_integrity_status.as_deref() == Some("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE") {
+++        ("PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE".to_string(), "Probe mode before/after logit and mask counters are not yet instrumented".to_string())
++     } else if !selected_match {
++         ("WARN_SELECTED_ONLY".to_string(), "candidate set matches but selected token differs".to_string())
++     } else {
++@@ -241,8 +298,10 @@
++             selected_match,
++             trace_truncated,
++             strict_demoted,
++-            transition_action_match: None,
++-            transition_reason_match: None,
+++            transition_action_match,
+++            transition_reason_match,
+++            transition_hardblock_match,
+++            transition_probe_integrity_status,
++             status,
++             reason,
++         },
++@@ -261,4 +320,5 @@
++         }
++     }
++     crate::sampler_parity_validation::append_validation_receipt_from_sampler03(receipt);
+++    crate::decode_transition_validation::append_transition_validation_receipt(receipt);
++ }
+diff -ruN decode02b_orig/workspace/decode02b_report.md decode02b_work/workspace/decode02b_report.md
+--- decode02b_orig/workspace/decode02b_report.md	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_report.md	2026-05-27 00:40:21.193028534 +0000
+@@ -0,0 +1,32 @@
++# 16AI-QW-38G-R6A-DECODE-02B Report
++
++## Scope
++- Added `model_core::decode_transition_validation`.
++- Added runtime transition probe receipt and probe-to-on summary gate.
++- Extended sampler parity traces with selected transition action/reason/risk fields and candidate trace version.
++- Connected sampler parity receipt append to DECODE-02B validation receipt append.
++
++## Important limitation
++`probe` mode before/after logit and candidate mask counters are not instrumented in this patch. DECODE-02B therefore records `PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE` and blocks `TRANSITION_ON_CANDIDATE_READY` until a later counter patch provides direct before/after evidence.
++
++## Static checks
++```json
++{
++  "decode_transition_validation_module_exists": true,
++  "lib_declares_decode_transition_validation": true,
++  "transition_validation_mode_exists": true,
++  "probe_integrity_status_exists": true,
++  "sampler_parity_calls_decode02b_validation": true,
++  "candidate_trace_version_field": true,
++  "selected_transition_fields_gpu": true,
++  "selected_transition_entry_extracted": true,
++  "reason_mask_helper": true,
++  "json_artifacts": true
++}
++```
++
++## Execution
++- cargo check: NOT_RUN
++- cargo test: NOT_RUN
++- rustfmt: NOT_RUN
++- WebGPU runtime transition validation: NOT_RUN
+diff -ruN decode02b_orig/workspace/decode02b_static_checks.json decode02b_work/workspace/decode02b_static_checks.json
+--- decode02b_orig/workspace/decode02b_static_checks.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_static_checks.json	2026-05-27 00:40:21.192820636 +0000
+@@ -0,0 +1,16 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
++  "checks": {
++    "decode_transition_validation_module_exists": true,
++    "lib_declares_decode_transition_validation": true,
++    "transition_validation_mode_exists": true,
++    "probe_integrity_status_exists": true,
++    "sampler_parity_calls_decode02b_validation": true,
++    "candidate_trace_version_field": true,
++    "selected_transition_fields_gpu": true,
++    "selected_transition_entry_extracted": true,
++    "reason_mask_helper": true,
++    "json_artifacts": true
++  },
++  "status": "STATIC_PASS"
++}
+\ No newline at end of file
+diff -ruN decode02b_orig/workspace/decode02b_transition_probe_to_on_summary.json decode02b_work/workspace/decode02b_transition_probe_to_on_summary.json
+--- decode02b_orig/workspace/decode02b_transition_probe_to_on_summary.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_transition_probe_to_on_summary.json	2026-05-27 00:40:21.190039911 +0000
+@@ -0,0 +1,29 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
++  "status": "TRANSITION_GUARD_RUNTIME_PROBE_AND_PROBE_TO_ON_GATE_DEFINED",
++  "input_patch": "16AI-QW-38G-R6A-DECODE-02A",
++  "transition_guard_ssot": "model_core::decode_transition_guard",
++  "candidate_piece_hint_ssot": "model_core::decode_candidate_piece_hints::CandidatePieceHintTable",
++  "default_mode": "off",
++  "validation_mode_default": "off",
++  "promotion_status": "NOT_RUN",
++  "probe_mode_mutation_allowed": false,
++  "known_limitations": [
++    "probe before/after logit and mask counters are not instrumented yet; runtime receipt marks PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE until added"
++  ],
++  "required_pass_checks": [
++    "candidate_trace_version_3",
++    "hint_trace_available",
++    "action_parity",
++    "reason_mask_parity",
++    "hardblock_parity",
++    "probe_integrity"
++  ],
++  "non_scope": [
++    "transition_rule_redesign",
++    "dynamic_context_qwave",
++    "minp_formula_change",
++    "semantic_prior_default_enable",
++    "lora_training"
++  ]
++}
+\ No newline at end of file
+diff -ruN decode02b_orig/workspace/decode02b_transition_runtime_probe_receipt.jsonl decode02b_work/workspace/decode02b_transition_runtime_probe_receipt.jsonl
+--- decode02b_orig/workspace/decode02b_transition_runtime_probe_receipt.jsonl	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_transition_runtime_probe_receipt.jsonl	2026-05-27 00:40:21.190324404 +0000
+@@ -0,0 +1 @@
++{"patch_id": "16AI-QW-38G-R6A-DECODE-02B", "step": 0, "mode": "ValidateProbe", "candidate_trace_version": 3, "cpu_transition": {"selected_id": 2, "risk": 0.95, "penalty": 0.95, "action_code": 1, "reason_mask": 8}, "gpu_transition": {"selected_id": 2, "risk": 0.95, "penalty": 0.95, "action_code": 1, "reason_mask": 8}, "probe_integrity": {"probe_mode": true, "weighted_logit_before": null, "weighted_logit_after": null, "candidate_mask_before": null, "candidate_mask_after": null, "sampling_state_mutated": null, "status": "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE"}, "parity": {"action_match": true, "reason_match": true, "hardblock_match": true, "risk_match": true, "penalty_match": true, "hint_trace_available": true, "candidate_trace_version_ok": true, "status": "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE", "promotion_blocking": true}}
+diff -ruN decode02b_orig/workspace/decode02b_transition_runtime_probe_schema.json decode02b_work/workspace/decode02b_transition_runtime_probe_schema.json
+--- decode02b_orig/workspace/decode02b_transition_runtime_probe_schema.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_transition_runtime_probe_schema.json	2026-05-27 00:40:21.190199284 +0000
+@@ -0,0 +1,24 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
++  "receipt": "workspace/decode02b_transition_runtime_probe_receipt.jsonl",
++  "fields": [
++    "step",
++    "mode",
++    "candidate_trace_version",
++    "cpu_transition",
++    "gpu_transition",
++    "probe_integrity",
++    "parity"
++  ],
++  "parity_statuses": [
++    "PASS",
++    "WARN_RISK_ONLY",
++    "FAIL_ACTION_MISMATCH",
++    "FAIL_REASON_MISMATCH",
++    "FAIL_HARDBLOCK_MISMATCH",
++    "FAIL_HINT_TABLE_MISSING",
++    "FAIL_CANDIDATE_TRACE_VERSION_NOT_V3",
++    "PARTIAL_PROBE_INTEGRITY_COUNTER_NOT_AVAILABLE"
++  ],
++  "promotion_ready_requires_no_partial": true
++}
+\ No newline at end of file
+diff -ruN decode02b_orig/workspace/decode02b_transition_validation_fixtures.json decode02b_work/workspace/decode02b_transition_validation_fixtures.json
+--- decode02b_orig/workspace/decode02b_transition_validation_fixtures.json	1970-01-01 00:00:00.000000000 +0000
++++ decode02b_work/workspace/decode02b_transition_validation_fixtures.json	2026-05-27 00:40:21.190626893 +0000
+@@ -0,0 +1,58 @@
++{
++  "patch_id": "16AI-QW-38G-R6A-DECODE-02B",
++  "fixtures": [
++    {
++      "name": "generic_continuation_eos",
++      "prev": "▁이어가고",
++      "candidate": "<eos>",
++      "expected": "Penalize + GenericContinuationImmediateEos"
++    },
++    {
++      "name": "eos_before_min_new_tokens",
++      "step": 2,
++      "min_new_tokens": 8,
++      "candidate": "<eos>",
++      "expected": "HardBlock + EosBeforeMinNewTokens"
++    },
++    {
++      "name": "pad_token",
++      "candidate": "<pad>",
++      "expected": "HardBlock + PadToken"
++    },
++    {
++      "name": "control_token",
++      "candidate": "<glossary:on>",
++      "expected": "HardBlock + ControlToken"
++    },
++    {
++      "name": "mojibake_token",
++      "candidate": "?댁뼱媛怨?",
++      "expected": "HardBlock + MojibakeSuspected"
++    },
++    {
++      "name": "normal_korean_transition",
++      "prev": "사람",
++      "candidate": "은",
++      "expected": "Allow"
++    },
++    {
++      "name": "emotional_repeat_safe",
++      "recent": [
++        "ㅠ",
++        "ㅠ"
++      ],
++      "candidate": "ㅠ",
++      "expected": "not HardBlock"
++    },
++    {
++      "name": "repeated_punctuation",
++      "recent": [
++        "!",
++        "!",
++        "!"
++      ],
++      "candidate": "!",
++      "expected": "Penalize + RepeatedPunctuation"
++    }
++  ]
++}
+\ No newline at end of file

@@ -1,0 +1,26 @@
+{
+  "patch_id": "16AI-QW-38G-R6A-SAMPLER-05",
+  "file": "workspace/sampler05_parity_steps.jsonl",
+  "format": "jsonl",
+  "behavior_change": false,
+  "required_fields": [
+    "patch_id",
+    "input_patch",
+    "step",
+    "fixture_id",
+    "mode",
+    "semantic_reference",
+    "gpu_projection",
+    "decode_config",
+    "cpu",
+    "gpu",
+    "parity"
+  ],
+  "threshold_kind_contract": {
+    "cpu": "weighted",
+    "gpu": "weighted"
+  },
+  "fallback_contract": {
+    "GLOBAL_FINITE_FALLBACK": "forbidden unless explicitly downgraded outside SAMPLER-05"
+  }
+}

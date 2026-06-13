@@ -1,0 +1,17 @@
+{
+  "patch_id": "ASH-FT-48",
+  "title": "Official Delta Packet Finalization / No Stack Append No Apply Seal",
+  "mode": "official_delta_packet_finalization",
+  "base_required": "ASH-FT-47",
+  "finalization_mode": "official_delta_packet_finalization",
+  "official_delta_packet_schema_version": "ash_ft48_official_delta_packet_v1",
+  "packet_kind": "selected_group_delta_packet",
+  "packet_status": "finalized",
+  "packet_format": "packet_json",
+  "allow_official_delta_packet_finalization": true,
+  "allow_official_delta_packet_payload_packaging": true,
+  "allow_delta_stack_append": false,
+  "allow_apply_to_checkpoint": false,
+  "allow_shadow_replay": false,
+  "next_patch": "ASH-FT-49"
+}

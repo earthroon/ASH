@@ -1,0 +1,17 @@
+ASH-BASETRAIN-GPU-30 STATIC CHECKS
+{
+  "patch_id": "ASH-BASETRAIN-GPU-30",
+  "object_level_json_macro_pattern_json_bang_lbrace": false,
+  "match_statement_used_literal": false,
+  "early_return_used_literal": false,
+  "unwrap_used_literal": false,
+  "panic_used_literal": false,
+  "gpu_write_guard_present": true,
+  "gpu_compute_dispatch_literal_present": false,
+  "backward_shader_created_literal_true": false,
+  "optimizer_step_executed_literal_true": false,
+  "model_weight_gradient_contract_created_literal_true": false,
+  "safetensors_mutation_present_literal_true": false,
+  "raw_logits_env_key_required": true,
+  "softmax_minus_target_cpu_formula_present": true
+}

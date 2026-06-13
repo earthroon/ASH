@@ -1,0 +1,12 @@
+- native_r8_env_gate: True
+- native_r8_trace_path: True
+- native_r8_profile_metric: True
+- native_r8_full_mask: True
+- native_r8_scale_sweep: True
+- native_r8_direction_removal: True
+- runner_exists: True
+- runner_loads_r7r2: True
+- runner_writes_scoreboard: True
+- runner_writes_safe_candidate: True
+- runner_guard: True
+- static_validation_pass: True

@@ -1,0 +1,16 @@
+{
+  "manifest_materialization_status": "BLOCKED_MISSING_OPERATOR_MANIFEST_ENV",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-35-R2A",
+  "next_patch_if_fail": "ASH-BASETRAIN-GPU-35-R2F",
+  "next_patch_if_manifest_materialized": "ASH-BASETRAIN-GPU-35-R1-RECHECK",
+  "operator_manifest_env": "ASH_BASETRAIN_GPU_OPERATOR_SELECTED_GROUP_MANIFEST_PATH",
+  "operator_manifest_input_path_example": "D:\\1111113232\\DUST\\1\\ash_pass3\\target\\selected_atlas_group_slot_0_manifest.operator.json",
+  "pass": true,
+  "patch_id": "ASH-BASETRAIN-GPU-35-R2",
+  "recommended_low_memory_build_command": "cargo build -p base_train --bin ash_basetrain_gpu_35_r2_selected_group_manifest_template_materialization --jobs 1",
+  "recommended_manifest_materialization_command": "cargo run --jobs 1 -p base_train --bin ash_basetrain_gpu_35_r2_selected_group_manifest_template_materialization",
+  "runtime_gpu_required": false,
+  "selected_group_weight_load_required": false,
+  "target_manifest_env": "ASH_BASETRAIN_GPU_SELECTED_GROUP_MANIFEST_PATH",
+  "target_manifest_path_example": "D:\\1111113232\\DUST\\1\\ash_pass3\\target\\selected_atlas_group_slot_0_manifest.json"
+}

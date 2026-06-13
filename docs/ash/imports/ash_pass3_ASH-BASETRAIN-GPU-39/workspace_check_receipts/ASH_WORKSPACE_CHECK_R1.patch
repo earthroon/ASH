@@ -1,0 +1,200 @@
+--- work_04r2/crates/ash_core/src/word_context_rt_preview_queue_receipt_bind.rs	2026-06-08 13:14:20.000000000 +0000
++++ ash_workspace_check_r1_work/crates/ash_core/src/word_context_rt_preview_queue_receipt_bind.rs	2026-06-08 14:34:42.084022687 +0000
+@@ -540,7 +540,7 @@
+             preview_item_id_matches_rt09: true,
+         },
+         preview_queue_receipt_bind: EnKoWctxRt10PreviewQueueReceiptBind {
+-            preview_queue_receipt_id,
++            preview_queue_receipt_id: preview_receipt_id.clone(),
+             preview_queue_receipt_created: true,
+             preview_queue_receipt_id_issued: true,
+             preview_item_id,
+--- work_04r2/crates/ash_core/src/word_context_promo_06_rt00_real_forward_receipt_rebind.rs	2026-06-08 13:14:20.000000000 +0000
++++ ash_workspace_check_r1_work/crates/ash_core/src/word_context_promo_06_rt00_real_forward_receipt_rebind.rs	2026-06-08 14:34:42.085239336 +0000
+@@ -659,62 +659,62 @@
+     let mut pos2 = base.clone(); pos2.request_id = "promo06-pass-no-selection".to_string(); add_case("CASE-POS-06-02_no_selection_decode_candidate", true, pos2);
+     let mut pos3 = base.clone(); pos3.request_id = "promo06-pass-topk-bound-no-selection".to_string(); add_case("CASE-POS-06-03_topk_bound_no_selection", true, pos3);
+ 
+-    macro_rules! neg { ($id:expr, $body:block) => {{ let mut req = base.clone(); req.request_id = $id.to_string(); $body add_case($id, false, req); }}; }
++    macro_rules! neg { ($id:expr, $req:ident, $body:block) => {{ let mut $req = base.clone(); $req.request_id = $id.to_string(); $body add_case($id, false, $req); }}; }
+ 
+-    neg!("CASE-NEG-06-00_promo00_missing", { req.promo_00_boundary_present = false; });
+-    neg!("CASE-NEG-06-01_promo00_violated", { req.promo_00_boundary_respected = false; });
+-    neg!("CASE-NEG-06-02_promo01_missing", { req.promo_01_adapter_interface_present = false; });
+-    neg!("CASE-NEG-06-03_promo01_violated", { req.promo_01_adapter_interface_respected = false; });
+-    neg!("CASE-NEG-06-04_promo02_missing", { req.promo_02_identity_bundle_present = false; });
+-    neg!("CASE-NEG-06-05_promo02_violated", { req.promo_02_identity_bundle_respected = false; });
+-    neg!("CASE-NEG-06-06_promo03_missing", { req.promo_03_tokenized_input_present = false; });
+-    neg!("CASE-NEG-06-07_promo03_violated", { req.promo_03_tokenized_input_respected = false; });
+-    neg!("CASE-NEG-06-08_promo04_missing", { req.promo_04_forward_probe_present = false; });
+-    neg!("CASE-NEG-06-09_promo04_violated", { req.promo_04_forward_probe_respected = false; });
+-    neg!("CASE-NEG-06-10_promo05_missing", { req.promo_05_topk_trace_present = false; });
+-    neg!("CASE-NEG-06-11_promo05_violated", { req.promo_05_topk_trace_respected = false; });
+-    neg!("CASE-NEG-06-12_mock20_shape_missing", { req.mock20_guard.mock20_shape_draft_present = false; });
+-    neg!("CASE-NEG-06-13_mock20_key_reused", { req.mock20_guard.mock20_key_reused_as_rt00_key = true; req.rt00_key.rt00_receipt_key_unique_from_mock20 = false; });
+-    neg!("CASE-NEG-06-14_mock20_digest_reused", { req.mock20_guard.mock20_digest_reused_as_rt00_digest = true; });
+-    neg!("CASE-NEG-06-15_mock20_source_relabelled", { req.mock20_guard.mock20_source_relabelled_as_real_runtime = true; });
+-    neg!("CASE-NEG-06-16_mock20_substitution_detected", { req.mock20_guard.mock20_substitution_detected = true; });
+-    neg!("CASE-NEG-06-17_rt00_rebind_not_executed", { req.rebind.rt00_rebind_executed = false; });
+-    neg!("CASE-NEG-06-18_rt00_key_missing", { req.rt00_key.rt00_receipt_key_created = false; });
+-    neg!("CASE-NEG-06-19_rt00_digest_missing", { req.rt00_key.rt00_receipt_digest_bound = false; });
+-    neg!("CASE-NEG-06-20_rt00_digest_mismatch", { req.rt00_key.rt00_receipt_digest_matches_rebind_sources = false; });
+-    neg!("CASE-NEG-06-21_real_forward_missing", { req.rebind.real_forward_output_bound = false; });
+-    neg!("CASE-NEG-06-22_logits_shape_missing", { req.rebind.logits_shape_digest_bound = false; });
+-    neg!("CASE-NEG-06-23_finite_failed", { req.rebind.logits_finite_check_passed = false; });
+-    neg!("CASE-NEG-06-24_topk_trace_missing", { req.rebind.topk_trace_digest_bound = false; });
+-    neg!("CASE-NEG-06-25_fixture_rebind", { req.source.rebind_source_is_fixture = true; });
+-    neg!("CASE-NEG-06-26_receipt_only_rebind", { req.source.rebind_source_is_receipt_only = true; });
+-    neg!("CASE-NEG-06-27_synthetic_rebind", { req.source.rebind_source_is_synthetic = true; });
+-    neg!("CASE-NEG-06-28_mock20_source_rebind", { req.source.rebind_source_is_mock20_shape = true; });
+-    neg!("CASE-NEG-06-29_full_logits_attached", { req.rebind.full_logits_attached = true; });
+-    neg!("CASE-NEG-06-30_full_logits_persisted", { req.rebind.full_logits_persisted = true; });
+-    neg!("CASE-NEG-06-31_selected_token_created", { req.rebind.selected_token_id_present = true; });
+-    neg!("CASE-NEG-06-32_token_selection_executed", { req.rebind.token_selection_executed = true; });
+-    neg!("CASE-NEG-06-33_sampling_executed", { req.execution.sampling_executed = true; });
+-    neg!("CASE-NEG-06-34_generation_executed", { req.execution.generation_executed = true; });
+-    neg!("CASE-NEG-06-35_decode_executed", { req.rebind.decode_executed = true; });
+-    neg!("CASE-NEG-06-36_decoded_surface_created", { req.rebind.decoded_surface_created = true; });
+-    neg!("CASE-NEG-06-37_candidate_text_created", { req.rebind.candidate_text_created = true; });
+-    neg!("CASE-NEG-06-38_draft_shadow_created", { req.rebind.draft_shadow_created = true; });
+-    neg!("CASE-NEG-06-39_rt01_receipt_created", { req.rebind.rt01_receipt_created = true; });
+-    neg!("CASE-NEG-06-40_preview_queue_inserted", { req.execution.preview_queue_inserted = true; });
+-    neg!("CASE-NEG-06-41_review_queue_inserted", { req.execution.production_review_inserted = true; });
+-    neg!("CASE-NEG-06-42_operator_approval", { req.execution.operator_approval_executed = true; });
+-    neg!("CASE-NEG-06-43_candidate_commit", { req.execution.candidate_commit_executed = true; });
+-    neg!("CASE-NEG-06-44_runtime_apply", { req.execution.runtime_apply_executed = true; });
+-    neg!("CASE-NEG-06-45_weight_commit", { req.execution.weight_commit_executed = true; });
+-    neg!("CASE-NEG-06-46_training_forward", { req.execution.training_forward_executed = true; });
+-    neg!("CASE-NEG-06-47_backward", { req.execution.backward_executed = true; });
+-    neg!("CASE-NEG-06-48_optimizer_step", { req.execution.optimizer_step_executed = true; });
+-    neg!("CASE-NEG-06-49_delta_stack_append", { req.execution.delta_stack_append_executed = true; });
+-    neg!("CASE-NEG-06-50_mock20_substitution_allowed", { req.mock20_guard.mock20_shape_substitution_allowed = true; });
+-    neg!("CASE-NEG-06-51_rt01_gate_opened", { req.execution_gate.rt01_receipt_creation_allowed = true; });
+-    neg!("CASE-NEG-06-52_runtime_apply_gate_opened", { req.execution_gate.runtime_apply_allowed = true; });
+-    neg!("CASE-NEG-06-53_rt00_digest_text_mismatch", { req.rt00_key.rt00_receipt_digest_expected = "mismatch".to_string(); });
++    neg!("CASE-NEG-06-00_promo00_missing", req, { req.promo_00_boundary_present = false; });
++    neg!("CASE-NEG-06-01_promo00_violated", req, { req.promo_00_boundary_respected = false; });
++    neg!("CASE-NEG-06-02_promo01_missing", req, { req.promo_01_adapter_interface_present = false; });
++    neg!("CASE-NEG-06-03_promo01_violated", req, { req.promo_01_adapter_interface_respected = false; });
++    neg!("CASE-NEG-06-04_promo02_missing", req, { req.promo_02_identity_bundle_present = false; });
++    neg!("CASE-NEG-06-05_promo02_violated", req, { req.promo_02_identity_bundle_respected = false; });
++    neg!("CASE-NEG-06-06_promo03_missing", req, { req.promo_03_tokenized_input_present = false; });
++    neg!("CASE-NEG-06-07_promo03_violated", req, { req.promo_03_tokenized_input_respected = false; });
++    neg!("CASE-NEG-06-08_promo04_missing", req, { req.promo_04_forward_probe_present = false; });
++    neg!("CASE-NEG-06-09_promo04_violated", req, { req.promo_04_forward_probe_respected = false; });
++    neg!("CASE-NEG-06-10_promo05_missing", req, { req.promo_05_topk_trace_present = false; });
++    neg!("CASE-NEG-06-11_promo05_violated", req, { req.promo_05_topk_trace_respected = false; });
++    neg!("CASE-NEG-06-12_mock20_shape_missing", req, { req.mock20_guard.mock20_shape_draft_present = false; });
++    neg!("CASE-NEG-06-13_mock20_key_reused", req, { req.mock20_guard.mock20_key_reused_as_rt00_key = true; req.rt00_key.rt00_receipt_key_unique_from_mock20 = false; });
++    neg!("CASE-NEG-06-14_mock20_digest_reused", req, { req.mock20_guard.mock20_digest_reused_as_rt00_digest = true; });
++    neg!("CASE-NEG-06-15_mock20_source_relabelled", req, { req.mock20_guard.mock20_source_relabelled_as_real_runtime = true; });
++    neg!("CASE-NEG-06-16_mock20_substitution_detected", req, { req.mock20_guard.mock20_substitution_detected = true; });
++    neg!("CASE-NEG-06-17_rt00_rebind_not_executed", req, { req.rebind.rt00_rebind_executed = false; });
++    neg!("CASE-NEG-06-18_rt00_key_missing", req, { req.rt00_key.rt00_receipt_key_created = false; });
++    neg!("CASE-NEG-06-19_rt00_digest_missing", req, { req.rt00_key.rt00_receipt_digest_bound = false; });
++    neg!("CASE-NEG-06-20_rt00_digest_mismatch", req, { req.rt00_key.rt00_receipt_digest_matches_rebind_sources = false; });
++    neg!("CASE-NEG-06-21_real_forward_missing", req, { req.rebind.real_forward_output_bound = false; });
++    neg!("CASE-NEG-06-22_logits_shape_missing", req, { req.rebind.logits_shape_digest_bound = false; });
++    neg!("CASE-NEG-06-23_finite_failed", req, { req.rebind.logits_finite_check_passed = false; });
++    neg!("CASE-NEG-06-24_topk_trace_missing", req, { req.rebind.topk_trace_digest_bound = false; });
++    neg!("CASE-NEG-06-25_fixture_rebind", req, { req.source.rebind_source_is_fixture = true; });
++    neg!("CASE-NEG-06-26_receipt_only_rebind", req, { req.source.rebind_source_is_receipt_only = true; });
++    neg!("CASE-NEG-06-27_synthetic_rebind", req, { req.source.rebind_source_is_synthetic = true; });
++    neg!("CASE-NEG-06-28_mock20_source_rebind", req, { req.source.rebind_source_is_mock20_shape = true; });
++    neg!("CASE-NEG-06-29_full_logits_attached", req, { req.rebind.full_logits_attached = true; });
++    neg!("CASE-NEG-06-30_full_logits_persisted", req, { req.rebind.full_logits_persisted = true; });
++    neg!("CASE-NEG-06-31_selected_token_created", req, { req.rebind.selected_token_id_present = true; });
++    neg!("CASE-NEG-06-32_token_selection_executed", req, { req.rebind.token_selection_executed = true; });
++    neg!("CASE-NEG-06-33_sampling_executed", req, { req.execution.sampling_executed = true; });
++    neg!("CASE-NEG-06-34_generation_executed", req, { req.execution.generation_executed = true; });
++    neg!("CASE-NEG-06-35_decode_executed", req, { req.rebind.decode_executed = true; });
++    neg!("CASE-NEG-06-36_decoded_surface_created", req, { req.rebind.decoded_surface_created = true; });
++    neg!("CASE-NEG-06-37_candidate_text_created", req, { req.rebind.candidate_text_created = true; });
++    neg!("CASE-NEG-06-38_draft_shadow_created", req, { req.rebind.draft_shadow_created = true; });
++    neg!("CASE-NEG-06-39_rt01_receipt_created", req, { req.rebind.rt01_receipt_created = true; });
++    neg!("CASE-NEG-06-40_preview_queue_inserted", req, { req.execution.preview_queue_inserted = true; });
++    neg!("CASE-NEG-06-41_review_queue_inserted", req, { req.execution.production_review_inserted = true; });
++    neg!("CASE-NEG-06-42_operator_approval", req, { req.execution.operator_approval_executed = true; });
++    neg!("CASE-NEG-06-43_candidate_commit", req, { req.execution.candidate_commit_executed = true; });
++    neg!("CASE-NEG-06-44_runtime_apply", req, { req.execution.runtime_apply_executed = true; });
++    neg!("CASE-NEG-06-45_weight_commit", req, { req.execution.weight_commit_executed = true; });
++    neg!("CASE-NEG-06-46_training_forward", req, { req.execution.training_forward_executed = true; });
++    neg!("CASE-NEG-06-47_backward", req, { req.execution.backward_executed = true; });
++    neg!("CASE-NEG-06-48_optimizer_step", req, { req.execution.optimizer_step_executed = true; });
++    neg!("CASE-NEG-06-49_delta_stack_append", req, { req.execution.delta_stack_append_executed = true; });
++    neg!("CASE-NEG-06-50_mock20_substitution_allowed", req, { req.mock20_guard.mock20_shape_substitution_allowed = true; });
++    neg!("CASE-NEG-06-51_rt01_gate_opened", req, { req.execution_gate.rt01_receipt_creation_allowed = true; });
++    neg!("CASE-NEG-06-52_runtime_apply_gate_opened", req, { req.execution_gate.runtime_apply_allowed = true; });
++    neg!("CASE-NEG-06-53_rt00_digest_text_mismatch", req, { req.rt00_key.rt00_receipt_digest_expected = "mismatch".to_string(); });
+ 
+     cases
+ }
+--- work_04r2/crates/ash_core/src/word_context_promo_08_rt02_real_topk_shadow_selection.rs	2026-06-08 13:14:20.000000000 +0000
++++ ash_workspace_check_r1_work/crates/ash_core/src/word_context_promo_08_rt02_real_topk_shadow_selection.rs	2026-06-08 14:34:42.085701305 +0000
+@@ -650,7 +650,7 @@
+             shadow_selected_rank_present: true,
+             shadow_selected_rank: Some(shadow_rank),
+             shadow_selected_score_digest_present: true,
+-            shadow_selected_score_digest,
++            shadow_selected_score_digest: shadow_score_digest,
+             shadow_selected_token_in_topk_trace: true,
+             shadow_selected_token_in_vocab_range: true,
+             shadow_selected_score_finite: true,
+--- work_04r2/crates/ash_core/src/word_context_rt_candidate_text_draft_shadow.rs	2026-06-08 13:14:20.000000000 +0000
++++ ash_workspace_check_r1_work/crates/ash_core/src/word_context_rt_candidate_text_draft_shadow.rs	2026-06-08 14:34:42.086315774 +0000
+@@ -407,7 +407,7 @@
+         Some(R::MissingRt05SurfaceChainShadowReceiptKey) => S::BlockedMissingRt05SurfaceChainShadowReceiptKey,
+         Some(R::MissingRt04SurfaceBindReceiptChainKey) => S::BlockedMissingRt04SurfaceBindReceiptChainKey,
+         Some(R::MissingRt03OneStepDecodeReceiptChainKey) => S::BlockedMissingRt03OneStepDecodeReceiptChainKey,
+-        Some(R::MissingRt02ShadowSelectionReceiptKey) => S::BlockedMissingRt02ShadowSelectionReceiptKey,
++        Some(R::MissingRt02ShadowSelectionReceiptChainKey) => S::BlockedMissingRt02ShadowSelectionReceiptChainKey,
+         Some(R::MissingRt01ForwardOutputShapeBindReceiptKey) => S::BlockedMissingRt01ForwardOutputShapeBindReceiptKey,
+         Some(R::MissingRt00ForwardDryProbeReceiptKey) => S::BlockedMissingRt00ForwardDryProbeReceiptKey,
+         Some(R::MissingMock20RuntimeReceiptShapeDraftKey) => S::BlockedMissingMock20RuntimeReceiptShapeDraftKey,
+@@ -588,7 +588,7 @@
+     neg!("rt07:missing_rt05_surface_chain_shadow_receipt_key", R::MissingRt05SurfaceChainShadowReceiptKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt05_surface_chain_shadow_receipt_key.clear(); });
+     neg!("rt07:missing_rt04_surface_bind_receipt_chain_key", R::MissingRt04SurfaceBindReceiptChainKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt04_surface_bind_receipt_chain_key.clear(); });
+     neg!("rt07:missing_rt03_one_step_decode_receipt_chain_key", R::MissingRt03OneStepDecodeReceiptChainKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt03_one_step_decode_receipt_chain_key.clear(); });
+-    neg!("rt07:missing_rt02_shadow_selection_receipt_chain_key", R::MissingRt02ShadowSelectionReceiptKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt02_shadow_selection_receipt_chain_key.clear(); });
++    neg!("rt07:missing_rt02_shadow_selection_receipt_chain_key", R::MissingRt02ShadowSelectionReceiptChainKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt02_shadow_selection_receipt_chain_key.clear(); });
+     neg!("rt07:missing_rt01_forward_output_shape_bind_receipt_key", R::MissingRt01ForwardOutputShapeBindReceiptKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt01_forward_output_shape_bind_receipt_key.clear(); });
+     neg!("rt07:missing_rt00_forward_dry_probe_receipt_key", R::MissingRt00ForwardDryProbeReceiptKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.rt00_forward_dry_probe_receipt_key.clear(); });
+     neg!("rt07:missing_mock20_runtime_receipt_shape_draft_key", R::MissingMock20RuntimeReceiptShapeDraftKey, |r: &mut EnKoWctxRt07CandidateTextDraftShadowRequest| { r.mock20_runtime_receipt_shape_draft_key.clear(); });
+@@ -635,7 +635,7 @@
+     if r.rt05_surface_chain_shadow_receipt_key.is_empty() { reasons.push(R::MissingRt05SurfaceChainShadowReceiptKey); }
+     if r.rt04_surface_bind_receipt_chain_key.is_empty() { reasons.push(R::MissingRt04SurfaceBindReceiptChainKey); }
+     if r.rt03_one_step_decode_receipt_chain_key.is_empty() { reasons.push(R::MissingRt03OneStepDecodeReceiptChainKey); }
+-    if r.rt02_shadow_selection_receipt_chain_key.is_empty() { reasons.push(R::MissingRt02ShadowSelectionReceiptKey); }
++    if r.rt02_shadow_selection_receipt_chain_key.is_empty() { reasons.push(R::MissingRt02ShadowSelectionReceiptChainKey); }
+     if r.rt01_forward_output_shape_bind_receipt_key.is_empty() { reasons.push(R::MissingRt01ForwardOutputShapeBindReceiptKey); }
+     if r.rt00_forward_dry_probe_receipt_key.is_empty() { reasons.push(R::MissingRt00ForwardDryProbeReceiptKey); }
+     if r.mock20_runtime_receipt_shape_draft_key.is_empty() { reasons.push(R::MissingMock20RuntimeReceiptShapeDraftKey); }
+@@ -822,7 +822,7 @@
+         missing_rt05_surface_chain_shadow_receipt_key_blocked_count: count_reason(receipts, R::MissingRt05SurfaceChainShadowReceiptKey),
+         missing_rt04_surface_bind_receipt_chain_key_blocked_count: count_reason(receipts, R::MissingRt04SurfaceBindReceiptChainKey),
+         missing_rt03_one_step_decode_receipt_chain_key_blocked_count: count_reason(receipts, R::MissingRt03OneStepDecodeReceiptChainKey),
+-        missing_rt02_shadow_selection_receipt_key_blocked_count: count_reason(receipts, R::MissingRt02ShadowSelectionReceiptKey),
++        missing_rt02_shadow_selection_receipt_key_blocked_count: count_reason(receipts, R::MissingRt02ShadowSelectionReceiptChainKey),
+         missing_rt01_forward_output_shape_bind_receipt_key_blocked_count: count_reason(receipts, R::MissingRt01ForwardOutputShapeBindReceiptKey),
+         missing_rt00_forward_dry_probe_receipt_key_blocked_count: count_reason(receipts, R::MissingRt00ForwardDryProbeReceiptKey),
+         missing_mock20_runtime_receipt_shape_draft_key_blocked_count: count_reason(receipts, R::MissingMock20RuntimeReceiptShapeDraftKey),
+--- work_04r2/crates/ash_core/src/word_context_promo_12_rt06_surface_chain_receipt_bind.rs	2026-06-08 13:14:20.000000000 +0000
++++ ash_workspace_check_r1_work/crates/ash_core/src/word_context_promo_12_rt06_surface_chain_receipt_bind.rs	2026-06-08 14:34:42.086866443 +0000
+@@ -708,7 +708,8 @@
+     if request.delta_stack_append_allowed || request.delta_stack_append_executed { reasons.push("FAIL_DELTA_STACK_APPEND_EXECUTED_TOO_EARLY".to_string()); }
+ 
+     if !reasons.is_empty() {
+-        return fail(&reasons[0], reasons, request);
++        let first_reason = reasons[0].clone();
++        return fail(&first_reason, reasons, request);
+     }
+ 
+     receipt(
+--- work_04r2/crates/model_core/src/lib.rs	2026-06-08 13:14:22.000000000 +0000
++++ ash_workspace_check_r1_work/crates/model_core/src/lib.rs	2026-06-08 14:34:42.087989136 +0000
+@@ -1,3 +1,5 @@
++#![recursion_limit = "512"]
++
+ pub mod gpu_penalty;
+ mod spec;
+ mod generation_telemetry;

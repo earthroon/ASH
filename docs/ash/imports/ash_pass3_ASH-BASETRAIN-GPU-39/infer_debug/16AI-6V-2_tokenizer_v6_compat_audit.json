@@ -1,0 +1,645 @@
+{
+  "checks": [
+    {
+      "actual": "true",
+      "category": "file",
+      "expected": "true",
+      "field": "v5_manifest_exists",
+      "id": "FILE-01",
+      "message": "v5 manifest must exist",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "file",
+      "expected": "true",
+      "field": "v6_manifest_exists",
+      "id": "FILE-02",
+      "message": "v6 compat manifest must exist",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "file",
+      "expected": "true",
+      "field": "ssot_json_exists",
+      "id": "FILE-03",
+      "message": "V0 SSOT json should exist",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "file",
+      "expected": "true",
+      "field": "manifest_run_json_exists",
+      "id": "FILE-04",
+      "message": "V1 manifest run json should exist",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "tokenizer_runtime_profile",
+      "category": "identity",
+      "expected": "tokenizer_runtime_profile",
+      "field": "manifest_kind",
+      "id": "ID-01",
+      "message": "v6 manifest must be a tokenizer runtime profile",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "v6-compat",
+      "category": "identity",
+      "expected": "v6-compat",
+      "field": "tokenizer_version",
+      "id": "ID-02",
+      "message": "target tokenizer version must be v6-compat",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "AshTokenizerV6Compat",
+      "category": "identity",
+      "expected": "AshTokenizerV6Compat",
+      "field": "tokenizer_name",
+      "id": "ID-03",
+      "message": "tokenizer runtime profile should use the V6 compat name",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "Ash 1.1B",
+      "category": "identity",
+      "expected": "Ash 1.1B",
+      "field": "model_identity.model_identity",
+      "id": "ID-04",
+      "message": "model identity must remain Ash 1.1B",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "v5",
+      "category": "base_tokenizer",
+      "expected": "v5",
+      "field": "base_tokenizer.base_tokenizer_version",
+      "id": "BASE-01",
+      "message": "base tokenizer version must remain v5",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "artifacts/tokenizer_manifest_v5_final.json",
+      "category": "base_tokenizer",
+      "expected": "artifacts/tokenizer_manifest_v5_final.json",
+      "field": "base_tokenizer.base_manifest",
+      "id": "BASE-02",
+      "message": "v6 manifest must reference the v5 manifest instead of replacing it",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "48259",
+      "category": "base_tokenizer",
+      "expected": "48259",
+      "field": "base_tokenizer.base_vocab_size",
+      "id": "BASE-03",
+      "message": "base vocab size must match existing checkpoint vocab",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "base_tokenizer",
+      "expected": "true",
+      "field": "base_tokenizer.fallback_to_base",
+      "id": "BASE-04",
+      "message": "fallback to v5/base tokenizer must be preserved",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "48259",
+      "category": "v5_manifest",
+      "expected": "48259",
+      "field": "v5.trainer.vocab_size",
+      "id": "V5-01",
+      "message": "v5 manifest must expose expected vocab size",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "48259",
+      "category": "v5_manifest",
+      "expected": "48259",
+      "field": "v5.vocab.len",
+      "id": "V5-02",
+      "message": "v5 vocab length should match expected vocab size",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "compatibility",
+      "expected": "true",
+      "field": "compatibility_contract.checkpoint_compatible",
+      "id": "COMPAT-01",
+      "message": "v6 must remain checkpoint compatible",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "48259",
+      "category": "compatibility",
+      "expected": "48259",
+      "field": "compatibility_contract.vocab_size",
+      "id": "COMPAT-02",
+      "message": "vocab size must not change",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "compatibility",
+      "expected": "false",
+      "field": "compatibility_contract.token_id_table_mutated",
+      "id": "COMPAT-03",
+      "message": "token id table must not be mutated",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "compatibility",
+      "expected": "false",
+      "field": "compatibility_contract.new_token_ids_created",
+      "id": "COMPAT-04",
+      "message": "new token ids must not be created",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "compatibility",
+      "expected": "false",
+      "field": "compatibility_contract.vocab_augmented",
+      "id": "COMPAT-05",
+      "message": "vocab must not be augmented",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "compatibility",
+      "expected": "false",
+      "field": "compatibility_contract.embedding_resize_required",
+      "id": "COMPAT-06",
+      "message": "embedding resize must not be required",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "compatibility",
+      "expected": "false",
+      "field": "compatibility_contract.checkpoint_rewrite_required",
+      "id": "COMPAT-07",
+      "message": "checkpoint rewrite must not be required",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "v5-baseline",
+      "category": "runtime_defaults",
+      "expected": "v5-baseline",
+      "field": "runtime_defaults.default_mode",
+      "id": "DEFAULT-01",
+      "message": "default mode must remain v5-baseline",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "runtime_defaults",
+      "expected": "false",
+      "field": "runtime_defaults.global_default_commit",
+      "id": "DEFAULT-02",
+      "message": "global default commit must remain disabled",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_defaults",
+      "expected": "true",
+      "field": "runtime_defaults.fallback_to_v5",
+      "id": "DEFAULT-03",
+      "message": "fallback to v5 must remain enabled",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_defaults",
+      "expected": "true",
+      "field": "runtime_defaults.cpu_fallback",
+      "id": "DEFAULT-04",
+      "message": "CPU fallback must remain enabled",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "runtime_defaults",
+      "expected": "false",
+      "field": "runtime_defaults.gpu_default",
+      "id": "DEFAULT-05",
+      "message": "GPU must not be default",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "available_modes",
+      "expected": "contains v5-baseline",
+      "field": "available_modes",
+      "id": "MODE-01",
+      "message": "required tokenizer runtime mode should be declared",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "available_modes",
+      "expected": "contains v6-shadow",
+      "field": "available_modes",
+      "id": "MODE-02",
+      "message": "required tokenizer runtime mode should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "available_modes",
+      "expected": "contains v6-branch-local",
+      "field": "available_modes",
+      "id": "MODE-03",
+      "message": "required tokenizer runtime mode should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "available_modes",
+      "expected": "contains v6-policy-gated",
+      "field": "available_modes",
+      "id": "MODE-04",
+      "message": "required tokenizer runtime mode should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "available_modes",
+      "expected": "contains v6-gpu-shadow",
+      "field": "available_modes",
+      "id": "MODE-05",
+      "message": "required tokenizer runtime mode should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains protected_span_scanner",
+      "field": "runtime_layers",
+      "id": "LAYER-01",
+      "message": "required runtime layer should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains cheonjiin_structural_analyzer",
+      "field": "runtime_layers",
+      "id": "LAYER-02",
+      "message": "required runtime layer should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains existing_vocab_lookup_lattice",
+      "field": "runtime_layers",
+      "id": "LAYER-03",
+      "message": "required runtime layer should be declared",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains dp_best_token_path_assembler",
+      "field": "runtime_layers",
+      "id": "LAYER-04",
+      "message": "required runtime layer should be declared",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains quality_policy_gate",
+      "field": "runtime_layers",
+      "id": "LAYER-05",
+      "message": "required runtime layer should be declared",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains branch_local_commit_selector",
+      "field": "runtime_layers",
+      "id": "LAYER-06",
+      "message": "required runtime layer should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_layers",
+      "expected": "contains gpu_shadow_backend_gate",
+      "field": "runtime_layers",
+      "id": "LAYER-07",
+      "message": "required runtime layer should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "dialogue-ko",
+      "category": "policy_scope",
+      "expected": "dialogue-ko",
+      "field": "policy_scope.primary_wrapper",
+      "id": "POLICY-01",
+      "message": "primary policy scope should remain dialogue-ko",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "policy_scope",
+      "expected": "true",
+      "field": "policy_scope.branch_local_commit_supported",
+      "id": "POLICY-02",
+      "message": "branch-local commit should be supported",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "policy_scope",
+      "expected": "true",
+      "field": "policy_scope.policy_gated_commit_supported",
+      "id": "POLICY-03",
+      "message": "policy-gated commit should be supported",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "policy_scope",
+      "expected": "false",
+      "field": "policy_scope.global_commit_supported",
+      "id": "POLICY-04",
+      "message": "global commit must not be supported in v6 compat manifest",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "policy_scope",
+      "expected": "contains ko_descriptive_sentence/dialogue-ko",
+      "field": "known_branch_local_candidates",
+      "id": "POLICY-05",
+      "message": "known branch-local candidate should be recorded",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "policy_scope",
+      "expected": "contains ko_particle_short/dialogue-ko",
+      "field": "known_branch_local_candidates",
+      "id": "POLICY-06",
+      "message": "known branch-local candidate should be recorded",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "gpu_contract",
+      "expected": "true",
+      "field": "gpu_contract.gpu_shadow_supported",
+      "id": "GPU-01",
+      "message": "GPU shadow support should be declared",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "gpu_contract",
+      "expected": "true",
+      "field": "gpu_contract.gpu_shadow_parity_1_verified",
+      "id": "GPU-02",
+      "message": "GPU 1-token shadow parity should be recorded",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "gpu_contract",
+      "expected": "true",
+      "field": "gpu_contract.gpu_shadow_replay8_verified",
+      "id": "GPU-03",
+      "message": "GPU replay8 shadow parity should be recorded",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "gpu_contract",
+      "expected": "false",
+      "field": "gpu_contract.gpu_default",
+      "id": "GPU-04",
+      "message": "GPU must not be default",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "gpu_contract",
+      "expected": "true",
+      "field": "gpu_contract.cpu_fallback",
+      "id": "GPU-05",
+      "message": "CPU fallback must be available",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "8",
+      "category": "gpu_contract",
+      "expected": "8",
+      "field": "gpu_contract.max_verified_new_tokens",
+      "id": "GPU-06",
+      "message": "GPU verified token budget should record 8",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "2",
+      "category": "gpu_contract",
+      "expected": "2",
+      "field": "gpu_contract.exact_parity_cases",
+      "id": "GPU-07",
+      "message": "GPU exact parity case count should record 2",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_status_policy",
+      "expected": "true",
+      "field": "runtime_status_policy.pending_manifest_is_not_runtime_pass",
+      "id": "STATUS-01",
+      "message": "PENDING manifest must not be treated as runtime PASS",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_status_policy",
+      "expected": "true",
+      "field": "runtime_status_policy.runtime_pass_required_for_execution_gates",
+      "id": "STATUS-02",
+      "message": "execution gates must require runtime PASS",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "runtime_status_policy",
+      "expected": "true",
+      "field": "runtime_status_policy.status_reader_must_distinguish_pending_and_pass",
+      "id": "STATUS-03",
+      "message": "status readers must distinguish PENDING and PASS",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "true",
+      "category": "dpo",
+      "expected": "true",
+      "field": "dpo.dpo_candidate_export_supported",
+      "id": "DPO-01",
+      "message": "DPO candidate export may be supported",
+      "severity": "Info",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "dpo",
+      "expected": "false",
+      "field": "dpo.training_enabled",
+      "id": "DPO-02",
+      "message": "DPO training must remain disabled",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "dpo",
+      "expected": "false",
+      "field": "dpo.weights_mutated",
+      "id": "DPO-03",
+      "message": "weights must not be mutated",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "false",
+      "category": "dpo",
+      "expected": "false",
+      "field": "dpo.checkpoint_created",
+      "id": "DPO-04",
+      "message": "new checkpoint must not be created",
+      "severity": "Blocking",
+      "status": "Pass"
+    },
+    {
+      "actual": "provisional",
+      "category": "dpo",
+      "expected": "provisional",
+      "field": "dpo.candidate_status",
+      "id": "DPO-05",
+      "message": "DPO candidates should remain provisional",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "PASS_TOKENIZER_V6_COMPAT_MANIFEST",
+      "category": "v1_run",
+      "expected": "PASS_TOKENIZER_V6_COMPAT_MANIFEST",
+      "field": "manifest_run.acceptance.status",
+      "id": "RUN-01",
+      "message": "V1 manifest run should record PASS status",
+      "severity": "Warning",
+      "status": "Pass"
+    },
+    {
+      "actual": "PASS_TOKENIZER_V6_COMPAT_SSOT",
+      "category": "v0_ssot",
+      "expected": "PASS_TOKENIZER_V6_COMPAT_SSOT",
+      "field": "ssot.acceptance.status",
+      "id": "SSOT-01",
+      "message": "V0 SSOT should record PASS status",
+      "severity": "Warning",
+      "status": "Pass"
+    }
+  ],
+  "inputs": {
+    "manifest_run_json": "infer_debug/16AI-6V-1_tokenizer_v6_compat_manifest.json",
+    "ssot_json": "infer_debug/16AI-6V-0_tokenizer_v6_compat_ssot.json",
+    "v5_manifest": "artifacts/tokenizer_manifest_v5_final.json",
+    "v6_manifest": "artifacts/tokenizer_manifest_v6_compat.json"
+  },
+  "run": {
+    "checkpoint_required": false,
+    "embedding_resize_required": false,
+    "generation": false,
+    "gpu_execution": false,
+    "id": "16AI-6V-2",
+    "kind": "tokenizer_v6_compat_audit",
+    "new_token_ids_created": false,
+    "runtime_changed": false,
+    "token_ids_mutated": false,
+    "vocab_augmented": false
+  },
+  "summary": {
+    "acceptance_status": "PASS_TOKENIZER_V6_COMPAT_AUDIT",
+    "blocking_fail_count": 0,
+    "checkpoint_compatible": true,
+    "default_safe": true,
+    "dpo_training_disabled": true,
+    "fail_count": 0,
+    "gpu_safe_shadow_only": true,
+    "manifest_compatible": true,
+    "pass_count": 61,
+    "total_checks": 61,
+    "warn_count": 0
+  }
+}

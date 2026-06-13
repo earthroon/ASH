@@ -1,0 +1,55 @@
+--- crates/lora_train/src/bridge.rs.orig
++++ crates/lora_train/src/bridge.rs.patched
+@@ -141,28 +141,31 @@
+                     sample_ids,
+                     record_ids,
+                 ) {
+-                    Ok(slot_id) => match native.try_collect_ready_module_trace(slot_id)? {
+-                        Some((_meta, captures)) => {
+-                            println!(
+-                                "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={} slot_id={}",
+-                                target_key,
+-                                lengths.len(),
+-                                max_seq_len,
+-                                slot_id,
+-                            );
+-                            Ok(captures)
++                    Ok(slot_id) => {
++                        let _ = native.poll_trace_slot(slot_id)?;
++                        match native.try_collect_ready_module_trace(slot_id)? {
++                            Some((_meta, captures)) => {
++                                println!(
++                                    "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={} slot_id={}",
++                                    target_key,
++                                    lengths.len(),
++                                    max_seq_len,
++                                    slot_id,
++                                );
++                                Ok(captures)
++                            }
++                            None => {
++                                println!(
++                                    "[bridge][module_local][runtime] native trace slot pending target_key={} batch={} max_seq_len={} slot_id={} -> fallback",
++                                    target_key,
++                                    lengths.len(),
++                                    max_seq_len,
++                                    slot_id,
++                                );
++                                fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++                            }
+                         }
+-                        None => {
+-                            println!(
+-                                "[bridge][module_local][runtime] native trace slot pending target_key={} batch={} max_seq_len={} slot_id={} -> fallback",
+-                                target_key,
+-                                lengths.len(),
+-                                max_seq_len,
+-                                slot_id,
+-                            );
+-                            fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
+-                        }
+-                    },
++                    }
+                     Err(err) => {
+                         println!(
+                             "[bridge][module_local][runtime] native capture fallback target_key={} batch={} max_seq_len={} reason={}",

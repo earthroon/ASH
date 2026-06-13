@@ -1,0 +1,28 @@
+QW-TOK-00-R4 module exists: PASS
+lib module wired: PASS
+lib pub use wired: PASS
+QwTok00R4CheckpointMetadataShapeScannerConfig: PASS
+QwTok00R4ModelConfigMetadataProbe: PASS
+QwTok00R4SafetensorsIndexProbe: PASS
+QwTok00R4SafetensorsTensorHeader: PASS
+QwTok00R4TensorShapeParityProbe: PASS
+QwTok00R4RuntimeVocabCapMetadataProbe: PASS
+QwTok00R4NoFullLoadNoResizeSeal: PASS
+QwTok00R4CheckpointMetadataShapeScannerReport: PASS
+build_qw_tok00_r4_checkpoint_metadata_shape_scanner_report: PASS
+build_qw_tok00_r4_default_checkpoint_metadata_shape_scanner_report: PASS
+expected vocab const 48259: PASS
+default blocks full weight load: PASS
+default blocks embedding resize: PASS
+default blocks lm_head resize: PASS
+requires explicit tied lm_head flag: PASS
+requires explicit transpose flag: PASS
+test qw_tok00_r4_checkpoint_metadata_shape_scanner.rs present: PASS
+test qw_tok00_r4_safetensors_header_probe.rs present: PASS
+test qw_tok00_r4_no_weight_load_no_resize.rs present: PASS
+test qw_tok00_r4_tied_lm_head_contract.rs present: PASS
+report artifact exists: PASS
+trace artifact exists: PASS
+receipt artifact exists: PASS
+no checkpoint/safetensors/weight files packaged: PASS
+overall: PASS

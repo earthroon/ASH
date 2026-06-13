@@ -1,0 +1,36 @@
+SFT-GPU-SAFETY-02 static verification
+cargo_available=false
+rustc_available=false
+rustfmt_available=false
+
+Required files:
+- crates/ash_core/src/sft_gpu_partial_artifact_quarantine.rs: True size=30652
+- crates/ash_core/tests/sft_gpu_safety_02_partial_artifact_quarantine.rs: True size=8257
+- crates/lora_train/src/partial_artifact_quarantine.rs: True size=4858
+- crates/lora_train/tests/partial_artifact_quarantine.rs: True size=3468
+- crates/burn_webgpu_backend/src/gpu_partial_artifact_guard.rs: True size=3813
+- crates/burn_webgpu_backend/tests/gpu_partial_artifact_guard.rs: True size=1343
+- acceptance_reports/SFT-GPU-SAFETY-02_partial_artifact_quarantine.md: True size=2754
+- patch_reports/SFT-GPU-SAFETY-02_bake_report.md: True size=1841
+- docs/roadmap/SFT-GPU-SAFETY-02_to_OBS-01_after_bake.md: True size=1856
+
+Text checks:
+- ash_core export: True
+- lora_train export: True
+- backend export: True
+- registry block: True
+- promotion block: True
+- current binding block: True
+- lifecycle action block: True
+- auto repair guard: True
+- manifest patch guard: True
+- digest replacement guard: True
+- texture sample closed: True
+
+Delimiter checks:
+- crates/ash_core/src/sft_gpu_partial_artifact_quarantine.rs: True
+- crates/ash_core/tests/sft_gpu_safety_02_partial_artifact_quarantine.rs: True
+- crates/lora_train/src/partial_artifact_quarantine.rs: True
+- crates/lora_train/tests/partial_artifact_quarantine.rs: True
+- crates/burn_webgpu_backend/src/gpu_partial_artifact_guard.rs: True
+- crates/burn_webgpu_backend/tests/gpu_partial_artifact_guard.rs: True

@@ -1,0 +1,133 @@
+{
+  "patch_id": "QW-52C",
+  "title": "Controlled Awareness Soft Rerank Shadow / No Hard Ban Seal",
+  "base_patch": "QW-53C",
+  "cases": [
+    {
+      "case_id": "normal_candidate_preserved_shadow",
+      "decode_step": 1,
+      "topk": [
+        {
+          "rank": 0,
+          "token_id": 101,
+          "piece": "오늘",
+          "original_score": 0.9,
+          "mirror_resonance_score": 0.72,
+          "self_echo_score": 0.05,
+          "residual_loop_score": 0.08,
+          "diversity_risk_score": 0.07,
+          "stable_quarantine_class": "StablePhraseCandidate"
+        },
+        {
+          "rank": 1,
+          "token_id": 204,
+          "piece": "나오죠",
+          "original_score": 0.7,
+          "mirror_resonance_score": 0.2,
+          "self_echo_score": 0.6,
+          "residual_loop_score": 0.55,
+          "diversity_risk_score": 0.58,
+          "stable_quarantine_class": "ReviewQueueCandidate"
+        }
+      ],
+      "expected": {
+        "shadow_top1_piece": "오늘",
+        "hard_ban_count": 0,
+        "token_selection_change_count": 0,
+        "runtime_apply": false
+      }
+    },
+    {
+      "case_id": "salad_candidate_demoted_shadow_only",
+      "decode_step": 2,
+      "topk": [
+        {
+          "rank": 0,
+          "token_id": 901,
+          "piece": "나오죠",
+          "original_score": 0.92,
+          "mirror_resonance_score": -0.4,
+          "mirror_risk_score": 0.7,
+          "self_echo_score": 0.88,
+          "residual_loop_score": 0.91,
+          "diversity_risk_score": 0.84,
+          "context_attractor_score": 0.8,
+          "dream_collapse_risk": 0.86,
+          "stable_quarantine_class": "QuarantineCandidate"
+        },
+        {
+          "rank": 1,
+          "token_id": 512,
+          "piece": "그래서",
+          "original_score": 0.8,
+          "mirror_resonance_score": 0.55,
+          "self_echo_score": 0.12,
+          "residual_loop_score": 0.15,
+          "diversity_risk_score": 0.18,
+          "stable_quarantine_class": "StablePhraseCandidate"
+        }
+      ],
+      "expected": {
+        "actual_top1_piece": "나오죠",
+        "shadow_top1_piece": "그래서",
+        "shadow_top1_differs_from_actual": true,
+        "token_selection_change_count": 0,
+        "hard_ban_count": 0
+      }
+    },
+    {
+      "case_id": "no_hard_ban_for_context_word",
+      "decode_step": 3,
+      "topk": [
+        {
+          "rank": 0,
+          "token_id": 401,
+          "piece": "풋살화",
+          "original_score": 0.88,
+          "context_attractor_score": 0.78,
+          "self_echo_score": 0.7,
+          "residual_loop_score": 0.72,
+          "diversity_risk_score": 0.65,
+          "stable_quarantine_class": "QuarantineCandidate"
+        }
+      ],
+      "expected": {
+        "hard_ban_applied": false,
+        "token_ban": false,
+        "blacklist_mutation": false,
+        "shadow_score_available": true
+      }
+    },
+    {
+      "case_id": "missing_detector_signals_partial_shadow",
+      "decode_step": 4,
+      "topk": [
+        {
+          "rank": 0,
+          "token_id": 777,
+          "piece": "모름",
+          "original_score": 0.5,
+          "mirror_resonance_score": null,
+          "self_echo_score": null,
+          "residual_loop_score": null,
+          "diversity_risk_score": null
+        }
+      ],
+      "expected": {
+        "shadow_rerank_status": "Partial",
+        "token_selection_change_count": 0,
+        "hard_ban_count": 0
+      }
+    },
+    {
+      "case_id": "missing_topk_unavailable",
+      "decode_step": 5,
+      "topk": [],
+      "expected": {
+        "shadow_rerank_status": "Unavailable",
+        "candidate_count": 0,
+        "runtime_apply": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-FT-07",
+  "kind": "single_group_optimizer_dryrun_plan",
+  "selected_group": {
+    "group_id": "",
+    "group_kind": "",
+    "tensor_keys": [],
+    "selection_policy": "from_ft06_or_auto"
+  },
+  "optimizer_config": {
+    "optimizer_mode": "adamw_dryrun",
+    "learning_rate": 0.00001,
+    "weight_decay": 0.01,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.999,
+    "adam_eps": 1e-8,
+    "gradient_clip_norm": 1.0,
+    "candidate_write_allowed": false,
+    "persist_optimizer_state": false
+  }
+}

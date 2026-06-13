@@ -1,0 +1,29 @@
+{
+  "patch_id": "ASH-FT-38",
+  "group_local_state_layout_created": true,
+  "selected_group_id": "",
+  "optimizer_kind": "adamw",
+  "state_dtype": "fp32",
+  "trainable_tensor_count": 0,
+  "state_slots": [
+    {
+      "slot_name": "exp_avg",
+      "slot_kind": "momentum_1",
+      "dtype": "fp32",
+      "materialized": false
+    },
+    {
+      "slot_name": "exp_avg_sq",
+      "slot_kind": "momentum_2",
+      "dtype": "fp32",
+      "materialized": false
+    },
+    {
+      "slot_name": "step_counter",
+      "slot_kind": "step_scalar",
+      "dtype": "u64",
+      "materialized": false
+    }
+  ],
+  "layout_status": "PASS"
+}

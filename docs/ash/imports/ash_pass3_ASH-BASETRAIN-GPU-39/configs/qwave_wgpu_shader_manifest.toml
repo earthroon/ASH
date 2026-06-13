@@ -1,0 +1,28 @@
+[manifest]
+id = "qwave_wgpu_shader_manifest_v1"
+version = "0.1.0"
+strict_required_shader = true
+
+[shaders.route_score_flat_tiled]
+role = "route_score_flat_tiled"
+path = "crates/lora_train/shaders/qwave_route_score_flat_tiled.wgsl"
+entry_point = "main"
+required = true
+
+[shaders.route_score_reduce]
+role = "route_score_reduce"
+path = "crates/lora_train/shaders/qwave_route_score_reduce.wgsl"
+entry_point = "main"
+required = false
+
+[shaders.sparse_lora_reduce]
+role = "sparse_lora_reduce"
+path = "crates/lora_train/shaders/qwave_sparse_lora_reduce.wgsl"
+entry_point = "main"
+required = true
+
+[shaders.sparse_lora_apply_delta]
+role = "sparse_lora_apply_delta"
+path = "crates/lora_train/shaders/qwave_sparse_lora_apply_delta.wgsl"
+entry_point = "main"
+required = true

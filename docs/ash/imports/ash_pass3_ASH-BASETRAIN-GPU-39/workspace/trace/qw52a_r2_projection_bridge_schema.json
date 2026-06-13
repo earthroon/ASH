@@ -1,0 +1,51 @@
+{
+  "patch_id": "QW-52A-R2",
+  "title": "Existing QWave Conditioning Projection Rebind / Cheonjiin Feature Input Bridge Seal",
+  "base_patch": "QW-52A-R1",
+  "schema": {
+    "cheonjiin_projection_bridge": {
+      "available": true,
+      "dry_run_only": true,
+      "input": {
+        "input_dim": 18,
+        "field_order_version": "qw52a_r2_facade_projection_v1",
+        "field_order": [
+          "aggregate.cheon_core_mean",
+          "aggregate.ji_support_mean",
+          "aggregate.in_bridge_mean",
+          "aggregate.axis_bits_or_as_f32",
+          "aggregate.axis_bits_tail_as_f32",
+          "aggregate.syllable_mass_mean",
+          "aggregate.curvature_bias_mean",
+          "aggregate.coda_weight_mean",
+          "aggregate.coda_weight_tail",
+          "aggregate.qwave_amplitude_mean",
+          "aggregate.qwave_phase_tail",
+          "aggregate.qwave_pressure_mean",
+          "aggregate.qwave_closure_mean",
+          "aggregate.qwave_resonance_mean",
+          "aggregate.transition_energy_mean",
+          "aggregate.flow_continuity_mean",
+          "aggregate.structural_confidence_score",
+          "aggregate.structural_risk_score"
+        ],
+        "missing_mask_required": true
+      },
+      "projection": {
+        "projection_source": "lora_train::qwave_conditioning_projection_dry_run",
+        "gate": 0.0,
+        "applied_to_hidden": false
+      },
+      "no_new_math": {
+        "used_existing_facade": true,
+        "used_existing_projection_dry_run": true,
+        "new_projection_matrix_created": false,
+        "new_adapter_weight_created": false,
+        "new_projection_math_added": false,
+        "hidden_state_fusion_applied": false,
+        "logit_mutation_applied": false,
+        "sampler_mutation_applied": false
+      }
+    }
+  }
+}

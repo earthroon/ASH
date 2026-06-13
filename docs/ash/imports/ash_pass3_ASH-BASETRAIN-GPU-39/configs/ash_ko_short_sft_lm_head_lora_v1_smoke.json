@@ -1,0 +1,311 @@
+{
+  "run_name": "ash_ko_short_sft_lm_head_lora_v1_smoke",
+  "family": "sft_lora",
+  "mode": "train",
+  "model_id": "model_tinyllama_1p1b_v4",
+  "model_path": "specs/model_spec_v5_48259.toml",
+  "dataset": {
+    "train_jsonl": "datasets/ash_ko_short_lora/train_500_short.jsonl",
+    "train_jsonl_paths": [],
+    "eval_jsonl": "datasets/ash_ko_short_lora/val_500_short.jsonl",
+    "system_field": null,
+    "prompt_field": "prompt",
+    "response_field": "response",
+    "format": "prompt_response",
+    "template": "?ъ슜?? {prompt}\n?좎돩: {response}",
+    "loss_on": "response_only",
+    "max_samples": 64,
+    "max_seq_len": 192,
+    "prompt_max_tokens": 96,
+    "response_max_tokens": 64,
+    "pack_turns": false,
+    "append_eos": true,
+    "feature_jsonl": null,
+    "feature_store_manifest": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1_smoke/feature_store_work/feature_store_manifest.json",
+    "max_feature_batches": null
+  },
+  "optimizer": {
+    "optimizer": "adamw",
+    "learning_rate": 0.0001,
+    "weight_decay": 0,
+    "warmup_steps": 0,
+    "gradient_accumulation": 1,
+    "max_steps": 20,
+    "grad_clip": 1
+  },
+  "hyper": {
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0,
+    "preset": "custom",
+    "target_modules": [
+      "lm_head"
+    ],
+    "bias_mode": "none",
+    "hidden_size": 2048,
+    "vocab_size": 48259,
+    "init_std": 0.02
+  },
+  "lora": {
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0,
+    "targets": [
+      "lm_head"
+    ],
+    "merge_mode": "runtime_attach",
+    "artifact_family": "module_lora"
+  },
+  "checkpoints": {
+    "output_dir": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1_smoke/artifacts/lm_head_lora",
+    "save_every_steps": 5,
+    "keep_last": 3,
+    "manifest_name": "adapter_manifest.json",
+    "adapter_name": "ash_ko_short_sft_lm_head_lora_v1_smoke.adapter.safetensors"
+  },
+  "logging": {
+    "log_every_steps": 1,
+    "report_loss": true,
+    "report_tokens_per_sec": true
+  },
+  "training": {
+    "planned_layers": 1,
+    "pad_token_id": 0,
+    "label_smoothing": null,
+    "save_adapter_checkpoint": true,
+    "plan_kind": "module_lora"
+  },
+  "bridge": {
+    "enabled": true,
+    "model_kind": "ash_native",
+    "tokenizer_path": "artifacts/tokenizer_manifest_v5_final.json",
+    "teacher_full_model_path": "tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors",
+    "max_bridge_samples": 64,
+    "bos": true,
+    "eos": true,
+    "include_system_prompt": false,
+    "output_feature_jsonl": null,
+    "feature_store_work_dir": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1_smoke/feature_store_work",
+    "feature_store_archive_dir": null,
+    "feature_store_rows_per_shard": 1,
+    "teacher": {
+      "mode": "token_aligned",
+      "span": "response_only",
+      "center_per_sequence": false,
+      "l2_normalize": false,
+      "subtract_prompt_mean": false,
+      "prompt_mean_scale": 1,
+      "keep_last_k_tokens": null,
+      "min_span_tokens": 1,
+      "layer_blend": {
+        "enabled": false
+      }
+    }
+  },
+  "guards": {
+    "intent": "A-SFT response-token LM-head LoRA smoke",
+    "do_not_reuse_module_local_q_proj_reconstruction": true,
+    "expect_lora_b_nonzero_after_train": true,
+    "expect_target_key": "lm_head",
+    "forbid_byte_markers": true,
+    "forbid_replacement_char": true,
+    "forbid_prompt_loss": true,
+    "require_response_loss_tokens": true
+  },
+  "a_sft_native_contract": {
+    "phase": "train_from_features",
+    "backend": "native_wgpu",
+    "vocab_projection": "lm_head",
+    "embedding": "checkpoint",
+    "forbid_direct_jsonl_train": false,
+    "allow_teacher_full_model_only_in_dump": true,
+    "forbid_teacher_full_model_in_train": true,
+    "require_feature_store_manifest": true,
+    "expected_target_key": "lm_head"
+  },
+  "hidden_source": {
+    "mode": "feature_store_manifest",
+    "feature_store_manifest_path": "workspace/lora_runs/ash_ko_short_sft_lm_head_lora_v1_smoke/feature_store_work/feature_store_manifest.json",
+    "atlas_grouped_hidden_provider_manifest_path": null,
+    "expected_dataset_digest": null,
+    "expected_hidden_source_digest": null,
+    "require_manifest_exists": true,
+    "require_dataset_digest_match": false,
+    "require_hidden_source_digest": false,
+    "allow_direct_checkpoint_teacher_in_train": false
+  },
+  "train_from_features_heartbeat": {
+    "enabled": true,
+    "write_jsonl": true,
+    "print_console": true,
+    "stall_warn_after_ms": 30000,
+    "hard_timeout_ms": null,
+    "require_adapter_output_exists": true,
+    "require_manifest_update": true
+  },
+  "generation_hygiene_acceptance": {
+    "enabled": true,
+    "exit_policy": "soft_fail_after_artifact_success",
+    "isolate_device_per_prompt": true,
+    "retry_on_device_lost": true,
+    "device_lost_retry_limit": 1,
+    "fresh_device_retry_on_existing_device_lost": true,
+    "treat_device_lost_as_artifact_failure": false,
+    "preserve_artifact_on_acceptance_failure": true,
+    "write_acceptance_receipt": true,
+    "allow_partial_prompt_pass": true,
+    "min_pass_count": 1,
+    "fail_on_empty_output": true,
+    "skip_baseline_on_device_lost_after_train_success": false,
+    "isolation_mode": "subprocess",
+    "child_timeout_ms": 120000,
+    "preserve_artifact_on_child_crash": true,
+    "native_crash_is_soft_acceptance_failure": true,
+    "write_native_crash_receipt": true,
+    "max_child_retry": 0
+  },
+  "lm_head_vocab_atlas": {
+    "enabled": true,
+    "projection": "gpu_parallel_vocab_atlas",
+    "vocab_tile_size": 1024,
+    "parallel_tile_groups": 4,
+    "streaming_cross_entropy": true,
+    "forbid_full_vocab_buffer": true,
+    "forbid_full_logits_buffer": true,
+    "forbid_trainable_module_from_base_for_lm_head": true,
+    "report_tile_timing": true,
+    "report_memory_policy": true,
+    "forbid_cpu_serial_tile_loop": true,
+    "gpu_parallel": {
+      "enabled": true,
+      "required": true,
+      "dispatch_mode": "tile_group_parallel",
+      "ce_reduce_mode": "gpu_partial_logsumexp",
+      "grad_reduce_mode": "gpu_partial_grad_reduce",
+      "update_mode": "gpu_reduce_update",
+      "tokens_per_workgroup": 1,
+      "vocab_lanes_per_workgroup": 128,
+      "hidden_chunk_size": 256,
+      "max_parallel_tiles": 4,
+      "max_group_weight_bytes": 33554432,
+      "readback_policy": "loss_and_report_only",
+      "forbid_logits_readback": true,
+      "forbid_cpu_token_vocab_loop": true,
+      "update": {
+        "enabled": true,
+        "mode": "sgd_smoke",
+        "learning_rate": 0.0001,
+        "gradient_clip_norm": 1.0,
+        "apply_gradient_clip": true,
+        "require_a_norm_change": true,
+        "require_b_norm_change": true,
+        "forbid_nan_update": true,
+        "report_update_norms": true
+      },
+      "export": {
+        "enabled": true,
+        "artifact_family": "module_lora",
+        "target_key": "lm_head",
+        "target": "lm_head",
+        "adapter_format": "safetensors",
+        "write_adapter_manifest": true,
+        "write_adapter_model": true,
+        "write_training_seal_report": true,
+        "require_update_applied": true,
+        "require_a_delta_norm_positive": true,
+        "require_b_delta_norm_positive": true
+      },
+      "readback_discipline": {
+        "enabled": true,
+        "policy": "loss_report_and_adapter_only",
+        "forbid_full_logits_readback": true,
+        "forbid_tile_logits_readback": true,
+        "forbid_full_weight_readback": true,
+        "allow_loss_scalar_readback": true,
+        "allow_norm_scalar_readback": true,
+        "allow_adapter_export_readback": true,
+        "max_scalar_report_bytes": 4096
+      },
+      "gpu_timing_profiler": {
+        "enabled": true,
+        "profile_bridge": true,
+        "profile_pass1": true,
+        "profile_reduce": true,
+        "profile_pass2_grad": true,
+        "profile_update": true,
+        "profile_export": true,
+        "report_readback_bytes": true,
+        "report_gpu_dispatch_count": true,
+        "report_step_total_ms": true
+      }
+    },
+    "timing_profiler": {
+      "enabled": true,
+      "report_dispatch_timing": true,
+      "report_gpu_reduce_timing": true,
+      "report_readback_bytes": true,
+      "progress_every_steps": 1
+    },
+    "multi_step_train": {
+      "enabled": true,
+      "mode": "all_step_gpu_redispatch",
+      "optimizer": "adamw",
+      "max_steps": 20,
+      "save_every_steps": 10,
+      "eval_every_steps": 10,
+      "report_every_steps": 1,
+      "resume": true,
+      "redispatch": {
+        "enabled": true,
+        "require_all_group_pass1_each_step": true,
+        "require_all_group_pass2_each_step": true,
+        "require_global_reduce_each_step": true,
+        "require_update_each_step": true,
+        "forbid_reuse_previous_step_partials": true,
+        "forbid_stale_loss_state": true,
+        "forbid_stale_grad_state": true
+      },
+      "buffer_clear": {
+        "enabled": true,
+        "clear_partial_ce": true,
+        "clear_global_ce": true,
+        "clear_pass2_grad": true,
+        "clear_update_grad": true,
+        "clear_target_seen": true,
+        "verify_zeroed_before_dispatch": true,
+        "verify_written_after_dispatch": true
+      },
+      "adamw": {
+        "learning_rate": 0.0001,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-08,
+        "weight_decay": 0.01,
+        "bias_correction": true
+      },
+      "guards": {
+        "forbid_nan_loss": true,
+        "forbid_inf_loss": true,
+        "forbid_nan_update": true,
+        "max_loss": 100.0,
+        "max_grad_norm": 10.0,
+        "require_loss_finite": true,
+        "require_delta_norm_positive": true,
+        "stop_on_loss_explosion": true,
+        "loss_explosion_warmup_steps": 3,
+        "loss_explosion_factor": 3.0
+      },
+      "checkpoint": {
+        "enabled": true,
+        "write_optimizer_state": true,
+        "write_lora_state": true,
+        "write_loss_trace": true,
+        "write_runtime_delta_every_eval": true,
+        "write_step_buffer_hygiene_report": true
+      }
+    },
+    "quality_eval": {
+      "enabled": false
+    }
+  }
+}

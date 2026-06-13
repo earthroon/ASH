@@ -1,0 +1,32 @@
+{
+  "patch_id": "QW-52C-R2",
+  "title": "Shadow Rerank RiskyDiff Guard / No Promotion Seal",
+  "base_patch": "QW-52C-R1",
+  "guard_policy_version": "shadow_rerank_riskydiff_guard_v1",
+  "promotion_policy_version": "no_promotion_until_risky_diff_cleared_v1",
+  "trace": {
+    "type": "ShadowRerankRiskyDiffGuardTrace",
+    "promotion_eligible": "bool",
+    "promotion_status": "ShadowPolicyPromotionStatus",
+    "guard_decision": "RiskyDiffGuardDecision",
+    "blocked_promotion_targets": "Vec<BlockedPromotionTarget>"
+  },
+  "mutation_policy": {
+    "runtime_apply": false,
+    "hidden_state_mutation": false,
+    "logit_mutation": false,
+    "sampler_mutation": false,
+    "token_rank_mutation": false,
+    "token_selection_mutation": false,
+    "token_ban": false,
+    "hard_ban": false,
+    "blacklist_mutation": false,
+    "rerank_execution": false,
+    "retry_execution": false,
+    "policy_promotion": false,
+    "threshold_autotune": false,
+    "memory_mutation": false,
+    "training_mutation": false,
+    "lora_mutation": false
+  }
+}

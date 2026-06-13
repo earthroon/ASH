@@ -1,0 +1,17 @@
+# ASH-45D Static Audit Result
+
+## Status
+PASS_STATIC_AUDIT_ASH_45D
+
+## Checks
+- PASS_LORA_ARTIFACT_LINEAGE_MODULE_PRESENT
+- PASS_LIB_MOD_EXPORT
+- PASS_LIB_USE_EXPORT
+- PASS_EVIDENCE_LORA_LINEAGE_FIELDS
+- PASS_ADJUSTMENT_LORA_LINEAGE_FIELDS
+- PASS_REPORT_LORA_LINEAGE_COUNTS
+- PASS_AUDIT_STATUS_ASH_45D
+- PASS_NO_PYTHON_VALIDATOR_45D
+
+## Boundary
+This audit is static only. Runtime Rust verification is sealed in bake commands but not executed in this container.

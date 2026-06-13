@@ -1,0 +1,18 @@
+--- 16AA static validation ---
+46:fn timestamp_query_disabled_by_env() -> bool {
+47:    env_flag_enabled("ASH_DISABLE_TIMESTAMP_QUERY")
+48:        || env_flag_enabled("ASH_NATIVE_DISABLE_TIMESTAMP_QUERY")
+49:        || env_flag_enabled("ASH_DISABLE_NATIVE_TIMESTAMP_QUERY")
+52:fn native_required_features_for_adapter(adapter: &backend_wgpu::Adapter, source: &'static str) -> backend_wgpu::Features {
+54:    let timestamp_supported = adapter_features.contains(backend_wgpu::Features::TIMESTAMP_QUERY);
+55:    let timestamp_disabled = timestamp_query_disabled_by_env();
+60:        required_features |= backend_wgpu::Features::TIMESTAMP_QUERY;
+64:        "[16AA][timestamp-query] source={} adapter_supported={} requested={} disabled_by_env={} required_features={:?}",
+74:            "[16AA][timestamp-query] source={} action=profiler_risk reason=adapter_does_not_support_timestamp_query",
+79:            "[16AA][timestamp-query] source={} action=profiler_risk reason=timestamp_query_disabled_by_env",
+84:            "[16AA][timestamp-query] source={} action=request_feature reason=cubecl_query_profiler_requires_timestamp_query",
+103:    let required_features = native_required_features_for_adapter(&adapter, source);
+128:        "[16AA][runtime-options] source={} runtime_options=default timestamp_query_feature_requested={}",
+130:        required_features.contains(backend_wgpu::Features::TIMESTAMP_QUERY),
+--- RuntimeOptions::default remaining in patched bootstrap ---
+132:    let burn_device = init_device(setup, RuntimeOptions::default());
