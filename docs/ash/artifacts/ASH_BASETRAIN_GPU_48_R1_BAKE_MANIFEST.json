@@ -1,0 +1,32 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48-R1",
+  "status": "BAKED_CODE_AND_STATIC_GUARD_ARTIFACTS_CREATED_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-48_forward_boundary_gpu_buffer_upload_execution_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R1_selected_group_payload_materialization_bridge_baked.zip",
+  "body_zip_excludes_artifacts": true,
+  "body_zip_excluded_patterns": [
+    "**/artifacts/**",
+    "target/**",
+    "docs/**",
+    "specs/**",
+    "*.sha256"
+  ],
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_r1_selected_group_payload_materialization_bridge.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_r1_selected_group_payload_materialization_bridge.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml"
+  ],
+  "github_artifact_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_48_R1_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_48_R1_STATIC_CHECKS.json",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_48_R1_BAKE_MANIFEST.json"
+  ],
+  "runtime_receipt_not_generated_in_container_reason": "cargo executable is not available in this container; local operator must run cargo to produce runtime PASS/BLOCKED receipt",
+  "runtime_command": "cargo run -p base_train --bin ash_basetrain_gpu_48_r1_selected_group_payload_materialization_bridge -- --gpu40-receipt ./artifacts/ASH_BASETRAIN_GPU_40_MULTI_ROW_BLOCK_MATVEC_SEGMENTED_DISPATCH_MATRIX.json --gpu41-receipt ./artifacts/ASH_BASETRAIN_GPU_41_PROJECTION_SEGMENT_STITCH_REVIEW_GATE.json --gpu42-receipt ./artifacts/ASH_BASETRAIN_GPU_42_PROJECTION_CANDIDATE_REVIEW_APPROVAL_GATE.json --gpu44-receipt ./artifacts/ASH_BASETRAIN_GPU_44_FORWARD_BOUNDARY_EXECUTION_PREFLIGHT.json --gpu45-receipt ./artifacts/ASH_BASETRAIN_GPU_45_FORWARD_BOUNDARY_BUFFER_MATERIALIZATION_CANDIDATE.json --gpu47-receipt ./artifacts/ASH_BASETRAIN_GPU_47_FORWARD_BOUNDARY_GPU_BUFFER_UPLOAD_CANDIDATE.json --selected-group-id selected-atlas-group-unknown --out-payload ./artifacts/ASH_BASETRAIN_GPU_48_SELECTED_GROUP_PAYLOAD.bin --out-receipt ./artifacts/ASH_BASETRAIN_GPU_48_R1_SELECTED_GROUP_PAYLOAD_MATERIALIZATION_BRIDGE.json --strict-selected-group true --max-payload-bytes 2048",
+  "expected_block_if_cpu_reference_does_not_exactly_match_gpu40_output_digest": "GPU40_EXACT_OUTPUT_BYTES_NOT_REPRODUCED",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-48",
+  "next_patch_if_blocked_exact_output_bytes": "ASH-BASETRAIN-GPU-48-R2"
+}
