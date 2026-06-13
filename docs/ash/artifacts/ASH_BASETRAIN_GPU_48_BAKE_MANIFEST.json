@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48",
+  "status": "BAKED_CODE_AND_STATIC_GUARD_ARTIFACTS_CREATED_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-47_forward_boundary_gpu_buffer_upload_candidate_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48_forward_boundary_gpu_buffer_upload_execution_baked.zip",
+  "body_zip_excludes_artifacts": true,
+  "body_zip_excluded_patterns": [
+    "**/artifacts/**",
+    "target/**",
+    "docs/**",
+    "*.sha256"
+  ],
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_forward_boundary_gpu_buffer_upload_execution.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_forward_boundary_gpu_buffer_upload_execution.rs",
+    "crates/base_train/src/lib.rs"
+  ],
+  "github_artifact_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_48_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_48_STATIC_CHECKS.json",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_48_BAKE_MANIFEST.json"
+  ],
+  "runtime_receipt_not_generated_in_container_reason": "cargo executable is not available in this container; local operator must run cargo to produce runtime PASS receipt",
+  "runtime_command": "cargo run -p base_train --bin ash_basetrain_gpu_48_forward_boundary_gpu_buffer_upload_execution -- --upload-candidate-receipt ./artifacts/ASH_BASETRAIN_GPU_47_FORWARD_BOUNDARY_GPU_BUFFER_UPLOAD_CANDIDATE.json --selected-group-payload ./artifacts/ASH_BASETRAIN_GPU_48_SELECTED_GROUP_PAYLOAD.bin --selected-group-id selected-atlas-group-unknown --max-upload-bytes 2048 --out ./artifacts/ASH_BASETRAIN_GPU_48_FORWARD_BOUNDARY_GPU_BUFFER_UPLOAD_EXECUTION.json",
+  "next_patch": "ASH-BASETRAIN-GPU-49"
+}
