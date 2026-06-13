@@ -1,9 +1,9 @@
 {
   "patch_id": "ASH-BASETRAIN-GPU-48-R2",
-  "status": "BAKED_CODE_AND_SPECS_LOCAL_ARTIFACT_OUTPUT_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "status": "BAKED_BIN_DIRECT_MODULE_BIND_COMPILEFIX_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
   "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
-  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R1_selected_group_payload_materialization_bridge_with_specs_compilefix_baked.zip",
-  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2_gpu40_exact_segment_output_payload_recovery_baked.zip",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2_gpu40_exact_segment_output_payload_recovery_rebaked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2_gpu40_exact_segment_output_payload_recovery_compilefix_baked.zip",
   "body_zip_excludes_artifacts": true,
   "body_zip_includes_specs": true,
   "body_zip_excluded_patterns": [
@@ -13,11 +13,14 @@
     "*.sha256"
   ],
   "sha256_files_included": false,
+  "compile_fix": {
+    "error_code": "E0433",
+    "error_summary": "bin could not resolve ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery in base_train",
+    "fixed_by": "bin now binds the R2 module through explicit local #[path = \"../ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery.rs\"] mod binding; lib export is still retained"
+  },
   "changed_files": [
-    "crates/base_train/src/ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery.rs",
     "crates/base_train/src/bin/ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery.rs",
     "crates/base_train/src/lib.rs",
-    "crates/base_train/Cargo.toml",
     "specs/ASH_BASETRAIN_GPU_48_R2_SPEC.md"
   ],
   "runtime_receipt_not_generated_in_container_reason": "cargo executable and WGPU runtime are not available in this container; local operator must run cargo to produce runtime PASS/BLOCKED receipt and local bin artifacts",
