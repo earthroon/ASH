@@ -1,0 +1,26 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48-R1",
+  "status": "PASS_ASH_BASETRAIN_GPU_48_R1_STATIC_GUARD_NO_DIRECT_GPU_CALLS_RUNTIME_COMPILE_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_r1_selected_group_payload_materialization_bridge.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_r1_selected_group_payload_materialization_bridge.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml"
+  ],
+  "direct_forbidden_gpu_call_occurrences": {
+    "create_buffer": [],
+    "write_buffer": [],
+    "create_bind_group": [],
+    "create_shader_module": [],
+    "create_compute_pipeline": [],
+    "dispatch_workgroups": [],
+    "map_async": [],
+    "wgpu::": []
+  },
+  "allowlist_note": "Textual receipt guard fields are allowed only as false-valued evidence. Static count targets direct WGPU API call tokens.",
+  "pass": true
+}
