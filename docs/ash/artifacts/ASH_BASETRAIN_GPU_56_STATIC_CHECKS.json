@@ -1,0 +1,58 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-56",
+  "status": "PASS_STATIC_GUARD_FORWARD_CANDIDATE_RAW_PAYLOAD_INTEGRITY_AUDIT_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_56_forward_candidate_raw_payload_integrity_audit.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_56_forward_candidate_raw_payload_integrity_audit.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_56_SPEC.md"
+  ],
+  "module_export_present": true,
+  "cargo_bin_registered": true,
+  "forbidden_gpu_calls_absent": {
+    "request_device_call": true,
+    "queue_submit_call": true,
+    "dispatch_workgroups_call": true,
+    "map_async_call": true,
+    "copy_buffer_to_buffer_call": true
+  },
+  "permitted_file_audit_calls_present": {
+    "raw_payload_read_call": true,
+    "sha256_compute_call": true,
+    "little_endian_f32_parse_call": true,
+    "finite_count_call": true,
+    "audit_receipt_write_call": true
+  },
+  "forbidden_training_calls_absent": {
+    "logits_adoption_call": true,
+    "loss_call": true,
+    "backward_call": true,
+    "optimizer_step_call": true,
+    "weight_mutation_call": true,
+    "runtime_default_apply_call": true
+  },
+  "audit_contract": {
+    "candidate_state": "review_required",
+    "adopted": false,
+    "runtime_default_apply": false,
+    "gpu_dispatch_allowed": false,
+    "gpu_readback_allowed": false,
+    "logits_adoption_allowed": false,
+    "expected_output_sha256": "2c2cd128cde79af49eec8824e17d785eb40286968181fae096daf2b0029d6a33",
+    "expected_byte_len": 2048,
+    "expected_f32_count": 512
+  },
+  "body_zip_policy": {
+    "artifacts_excluded": true,
+    "docs_excluded": true,
+    "target_excluded": true,
+    "sha256_files_included": false,
+    "specs_included": true
+  },
+  "pass": true
+}
