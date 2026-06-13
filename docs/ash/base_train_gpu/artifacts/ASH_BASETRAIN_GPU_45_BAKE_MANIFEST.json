@@ -1,0 +1,23 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-45",
+  "title": "Forward Boundary Buffer Materialization Candidate / Approved Projection Input To GPU Buffer Bind Preflight Seal / No Dispatch No Logits No Optimizer",
+  "source_zip": "ash_pass3_ASH-BASETRAIN-GPU-44_forward_boundary_execution_preflight_baked.zip",
+  "runtime_receipt_path": "artifacts/ASH_BASETRAIN_GPU_45_FORWARD_BOUNDARY_BUFFER_MATERIALIZATION_CANDIDATE.json",
+  "code_files": [
+    "crates/base_train/src/ash_basetrain_gpu_45_forward_boundary_buffer_materialization_candidate.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_45_forward_boundary_buffer_materialization_candidate.rs"
+  ],
+  "spec_file": "specs/ASH_BASETRAIN_GPU_45_SPEC.md",
+  "zip_policy": "LIGHTWEIGHT_CODE_PACKAGE_ONLY",
+  "github_docs_policy": "reports_manifests_static_checks_uploaded_to_earthroon_ASH",
+  "materialization_mode": "descriptor_only",
+  "actual_gpu_buffer_created": false,
+  "actual_gpu_buffer_uploaded": false,
+  "actual_bind_group_created": false,
+  "actual_dispatch_executed": false,
+  "no_sha256_files_included": true,
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "rustfmt_verification": "NOT_RUN_RUSTFMT_UNAVAILABLE_IN_CONTAINER",
+  "static_checks_status": "PASS"
+}
