@@ -1,0 +1,33 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48-R2",
+  "status": "PASS_STATIC_GUARD_R2_LOCAL_ARTIFACT_OUTPUT_PATHS_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_r2_gpu40_exact_segment_output_payload_recovery.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_48_R2_SPEC.md"
+  ],
+  "r2_permitted_gpu_calls_present": {
+    "create_buffer": true,
+    "write_buffer": true,
+    "create_bind_group": true,
+    "create_shader_module": true,
+    "create_compute_pipeline": true,
+    "dispatch_workgroups": true,
+    "map_async": true
+  },
+  "local_artifact_outputs_declared": {
+    "segment_filename_template": "ASH_BASETRAIN_GPU_48_R2_SEGMENT_{segment_index:03}_EXACT_GPU_OUTPUT.bin",
+    "segment_000_expected": "artifacts/ASH_BASETRAIN_GPU_48_R2_SEGMENT_000_EXACT_GPU_OUTPUT.bin",
+    "segment_001_expected": "artifacts/ASH_BASETRAIN_GPU_48_R2_SEGMENT_001_EXACT_GPU_OUTPUT.bin",
+    "payload": "artifacts/ASH_BASETRAIN_GPU_48_SELECTED_GROUP_PAYLOAD.bin",
+    "receipt": "artifacts/ASH_BASETRAIN_GPU_48_R2_EXACT_SEGMENT_OUTPUT_PAYLOAD_RECOVERY_OR_REPLAY.json"
+  },
+  "forbidden_training_terms_only_receipt_flags_note": "loss/backward/optimizer/weight_mutation appear only as seal/receipt guard strings; runtime mutation code paths are not implemented in R2 module.",
+  "pass": true
+}
