@@ -1,0 +1,50 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-51",
+  "status": "PASS_STATIC_GUARD_OUTPUT_BUFFER_BIND_CONTRACT_NO_DISPATCH_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_51_forward_boundary_output_buffer_bind_contract.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_51_forward_boundary_output_buffer_bind_contract.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_51_SPEC.md"
+  ],
+  "module_export_present": true,
+  "cargo_bin_registered": true,
+  "forbidden_execution_calls_absent": {
+    "dispatch_workgroups_call": true,
+    "queue_submit_call": true,
+    "map_async_call": true,
+    "copy_buffer_to_buffer_call": true
+  },
+  "permitted_materialization_calls_present": {
+    "queue_write_buffer_call": true,
+    "create_input_buffer_call": true,
+    "create_output_buffer_call": true,
+    "create_bind_group_layout_call": true,
+    "create_bind_group_call": true,
+    "create_shader_module_call": true,
+    "create_pipeline_layout_call": true,
+    "create_compute_pipeline_call": true
+  },
+  "binding_contract": {
+    "input_binding_slot": 0,
+    "output_binding_slot": 1,
+    "input_byte_len": 2048,
+    "output_byte_len": 2048,
+    "output_storage_bound": true,
+    "dispatch_allowed": false,
+    "readback_allowed": false
+  },
+  "body_zip_policy": {
+    "artifacts_excluded": true,
+    "docs_excluded": true,
+    "target_excluded": true,
+    "sha256_files_included": false,
+    "specs_included": true
+  },
+  "pass": true
+}
