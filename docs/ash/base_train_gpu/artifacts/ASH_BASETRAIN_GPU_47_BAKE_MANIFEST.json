@@ -1,0 +1,22 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-47",
+  "title": "Forward Boundary GPU Buffer Upload Candidate / Approved Projection Input Host To Device Upload Seal / No Bind Group No Dispatch No Logits No Optimizer",
+  "source_zip": "ash_pass3_ASH-BASETRAIN-GPU-46_forward_boundary_gpu_buffer_creation_dryrun_baked.zip",
+  "runtime_receipt_path": "artifacts/ASH_BASETRAIN_GPU_47_FORWARD_BOUNDARY_GPU_BUFFER_UPLOAD_CANDIDATE.json",
+  "code_files": [
+    "crates/base_train/src/ash_basetrain_gpu_47_forward_boundary_gpu_buffer_upload_candidate.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_47_forward_boundary_gpu_buffer_upload_candidate.rs"
+  ],
+  "spec_file": "specs/ASH_BASETRAIN_GPU_47_SPEC.md",
+  "zip_policy": "LIGHTWEIGHT_CODE_PACKAGE_ONLY",
+  "github_docs_policy": "reports_manifests_static_checks_uploaded_to_earthroon_ASH",
+  "upload_mode": "candidate_only",
+  "payload_source_default": "deferred_to_upload_probe",
+  "actual_upload_performed": false,
+  "actual_bind_or_dispatch_performed": false,
+  "no_sha256_files_included": true,
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED_FOR_BAKE_CONTAINER_OPERATOR_RUN_REQUIRED",
+  "rustfmt_verification": "NOT_RUN_RUSTFMT_UNAVAILABLE_IN_CONTAINER",
+  "static_checks_status": "PASS"
+}
