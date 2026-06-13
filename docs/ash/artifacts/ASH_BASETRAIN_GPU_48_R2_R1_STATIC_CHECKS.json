@@ -1,0 +1,32 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48-R2-R1",
+  "status": "PASS_STATIC_GUARD_NO_GPU_REPLAY_NO_UPLOAD_NO_DISPATCH_LOCAL_PAYLOAD_WRITER_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_r2_r1_payload_digest_contract_rebind.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_r2_r1_payload_digest_contract_rebind.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_48_R2_R1_SPEC.md"
+  ],
+  "module_export_present": true,
+  "cargo_bin_registered": true,
+  "direct_forbidden_gpu_call_occurrences": {
+    "wgpu": [],
+    "create_buffer": [],
+    "write_buffer": [],
+    "create_bind_group": [],
+    "create_shader_module": [],
+    "create_compute_pipeline": [],
+    "dispatch_workgroups": [],
+    "map_async": []
+  },
+  "local_artifact_outputs_declared": {
+    "payload": "artifacts/ASH_BASETRAIN_GPU_48_SELECTED_GROUP_PAYLOAD.bin",
+    "receipt": "artifacts/ASH_BASETRAIN_GPU_48_R2_R1_PAYLOAD_DIGEST_CONTRACT_REBIND.json"
+  },
+  "pass": true
+}
