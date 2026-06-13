@@ -1,0 +1,19 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-39",
+  "title": "Atlas Upload Ring Buffer / Sequential Group Slot Lease And Release Seal / No Full Tensor Load No Weight Mutation",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-38_bounded_matvec_forward_candidate_baked.zip",
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_39_atlas_upload_ring_buffer_slot_lease_release.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_39_atlas_upload_ring_buffer_slot_lease_release.rs",
+    "specs/ASH_BASETRAIN_GPU_39_SPEC.md",
+    "artifacts/ASH_BASETRAIN_GPU_39_STATIC_CHECKS.json",
+    "artifacts/ASH_BASETRAIN_GPU_39_STATIC_CHECKS.txt",
+    "acceptance_reports/ASH-BASETRAIN-GPU-39.md",
+    "patch_reports/ASH-BASETRAIN-GPU-39_bake_report.md",
+    "patch_reports/ASH-BASETRAIN-GPU-39.diff"
+  ],
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "static_checks_pass": true,
+  "sha256_files_included": false
+}

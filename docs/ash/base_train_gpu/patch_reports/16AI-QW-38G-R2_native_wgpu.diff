@@ -1,0 +1,55 @@
+--- ash38g_r1/crates/model_core/src/native_wgpu.rs	2026-05-22 09:40:02.194927274 +0000
++++ qw38g_r2/crates/model_core/src/native_wgpu.rs	2026-05-22 10:03:26.947454728 +0000
+@@ -833,7 +833,7 @@
+ 
+ // 16AI-QW-38G — Reserved Direction Hidden Activation Source Trace / Layerwise Residual Seal
+ static QW38G_LAYERWISE_FORWARD_STEP: AtomicUsize = AtomicUsize::new(0);
+-// 16AI-QW-38G-R1 — Rust-native Layerwise Trace Closure / No PowerShell Postprocess Seal
++// 16AI-QW-38G-R2 — Live Heartbeat & Hook Reachability / Fail-Closed Receipt Seal
+ static QW38G_LAYERWISE_EVENTS: OnceLock<Mutex<Vec<serde_json::Value>>> = OnceLock::new();
+ static QW38G_LAYERWISE_RECEIPT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+ 
+@@ -961,7 +961,7 @@
+     };
+ 
+     serde_json::json!({
+-        "patch_id": "16AI-QW-38G-R1",
++        "patch_id": "16AI-QW-38G-R2",
+         "status": if records.is_empty() { "TRACE_UNAVAILABLE" } else { "PASS_RUST_NATIVE_SUMMARY" },
+         "total_events": records.len(),
+         "steps_observed": steps.len(),
+@@ -1017,7 +1017,7 @@
+         let summary = qw38g_build_summary(&records);
+         qw38g_write_json(&qw38g_summary_path(), &summary);
+         let receipt = serde_json::json!({
+-            "patch_id": "16AI-QW-38G-R1",
++            "patch_id": "16AI-QW-38G-R2",
+             "status": "PASS_RUNTIME_TRACE_IN_PROGRESS",
+             "trace_events": records.len(),
+             "trace_jsonl_written": true,
+@@ -1124,6 +1124,10 @@
+     if !env_flag("ASH_LAYERWISE_RESERVED_TRACE") {
+         return;
+     }
++    eprintln!(
++        "[16AI-QW-38G-R2][hook_attempt] step={} layer={} stage={} total_layers={}",
++        step, layer_label, stage, total_layers
++    );
+     let max_steps = qw38a_env_usize("ASH_LAYERWISE_RESERVED_TRACE_MAX_STEPS", 4);
+     if step >= max_steps {
+         return;
+@@ -2668,6 +2672,14 @@
+             None
+         };
+         let total_layers = self.model.layers.len();
++        if trace_layerwise_reserved {
++            eprintln!(
++                "[16AI-QW-38G-R2][native_forward_enter] step={:?} input_dims={:?} layers={}",
++                trace_step,
++                input.dims(),
++                total_layers
++            );
++        }
+         let mut x = self.embed_tokens_for_generation_input(input);
+ 
+         let prepared_runtime_loras: PreparedRuntimeLoraSet<NativeInferenceBackend> = if active_loras.is_empty() {

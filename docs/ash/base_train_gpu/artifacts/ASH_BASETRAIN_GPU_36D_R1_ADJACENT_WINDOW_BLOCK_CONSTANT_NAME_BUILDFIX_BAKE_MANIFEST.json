@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36D-R1",
+  "title": "Adjacent Window Block Constant Name Buildfix / Out Of Range Symbol Rebind No Logic Change Seal",
+  "base_patch": "ASH-BASETRAIN-GPU-36D",
+  "change_kind": "buildfix_symbol_rebind",
+  "fixed_unresolved_symbol": "BLOCK_ADJ_WINDOW_PLAN_OUTSIDE_READ_RANGE",
+  "replacement_symbol": "BLOCK_ADJ_WINDOW_OUTSIDE_READ_RANGE",
+  "status_string_preserved": "BLOCKED_ADJACENT_WINDOW_PLAN_OUTSIDE_READ_RANGE",
+  "logic_change": false,
+  "receipt_schema_change": false,
+  "cargo_dependency_added": false,
+  "source_file": "crates/base_train/src/ash_basetrain_gpu_36d_bounded_weight_slice_row_sample_continuity_probe.rs",
+  "source_sha256": "d3fef81f22b2a255bd11c3348860901b4ae267cbc4c07b9b894ad056db746061",
+  "guards": {
+    "selected_group_full_slice_read": false,
+    "selected_group_weight_bytes_read": false,
+    "full_tensor_load_executed": false,
+    "full_tensor_stats_generated": false,
+    "safetensors_header_read_executed": false,
+    "mmap_materialization_executed": false,
+    "runtime_gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false,
+    "selected_group_backward_executed": false,
+    "optimizer_step_executed": false,
+    "safetensors_mutation_present": false
+  }
+}

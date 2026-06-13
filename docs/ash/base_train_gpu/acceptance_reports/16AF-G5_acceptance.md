@@ -1,0 +1,155 @@
+# 16AF-G5 Real Prompt Native FFN Candidate vs CPU Reference Generation Compare
+
+- commit: 16AF-G5
+- prompt_source: prompt_text
+- prompt_wrapper: dialogue-ko
+- generation_connected_default: false
+- candidate_runtime_enabled: true
+- fallback_cpu_reference: true
+- token_ids_match: true
+- new_token_ids_match: true
+- text_match: true
+- new_text_match: true
+- pass: true
+
+```json
+{
+  "attention_native": false,
+  "cache": {
+    "cached_layers": 14,
+    "enable_ms": 1641.2160999999999,
+    "preupload": true,
+    "preupload_ms": 689.5242000000001,
+    "total_bytes": 1937768448
+  },
+  "candidate_runtime_enabled": true,
+  "candidate_wire_present": true,
+  "commit": "16AF-G5",
+  "comparison": {
+    "first_mismatch_index": null,
+    "new_text_match": true,
+    "new_token_ids_match": true,
+    "text_match": true,
+    "token_ids_match": true
+  },
+  "cpu_reference": {
+    "elapsed_ms": 808527.2984,
+    "ids": [
+      1638,
+      2899,
+      1115,
+      48061,
+      3125,
+      21024,
+      416,
+      348,
+      21,
+      852,
+      877,
+      1551,
+      15030,
+      2391,
+      48061,
+      9505,
+      371,
+      627,
+      375,
+      442,
+      29891,
+      5708,
+      2120
+    ],
+    "new_ids": [
+      9505,
+      371,
+      627,
+      375,
+      442,
+      29891,
+      5708,
+      2120
+    ],
+    "new_text": "▁줬거든 ▁인제 ▁제 ▁그렇게 ▁생각해 ▁뜨더라고요 ▁외국에 겠다",
+    "text": "사 용 자: 오 늘 나 는\n어 시 스 턴 트: ▁줬거든 ▁인제 ▁제 ▁그렇게 ▁생각해 ▁뜨더라고요 ▁외국에 겠다"
+  },
+  "fallback_cpu_reference": true,
+  "generation_connected_default": false,
+  "kv_cache_native": false,
+  "max_new_tokens": 8,
+  "native_candidate": {
+    "elapsed_ms": 198020.1985,
+    "ids": [
+      1638,
+      2899,
+      1115,
+      48061,
+      3125,
+      21024,
+      416,
+      348,
+      21,
+      852,
+      877,
+      1551,
+      15030,
+      2391,
+      48061,
+      9505,
+      371,
+      627,
+      375,
+      442,
+      29891,
+      5708,
+      2120
+    ],
+    "new_ids": [
+      9505,
+      371,
+      627,
+      375,
+      442,
+      29891,
+      5708,
+      2120
+    ],
+    "new_text": "▁줬거든 ▁인제 ▁제 ▁그렇게 ▁생각해 ▁뜨더라고요 ▁외국에 겠다",
+    "text": "사 용 자: 오 늘 나 는\n어 시 스 턴 트: ▁줬거든 ▁인제 ▁제 ▁그렇게 ▁생각해 ▁뜨더라고요 ▁외국에 겠다"
+  },
+  "parity_pass_required": true,
+  "parity_passed": true,
+  "prompt": {
+    "ids": [
+      1638,
+      2899,
+      1115,
+      48061,
+      3125,
+      21024,
+      416,
+      348,
+      21,
+      852,
+      877,
+      1551,
+      15030,
+      2391,
+      48061
+    ],
+    "raw_text": "오늘 나는",
+    "source": "prompt_text",
+    "wrapped_text": "사용자: 오늘 나는\n어시스턴트:",
+    "wrapper": "dialogue-ko"
+  },
+  "runtime_gate": "real_prompt_text_wrapper_native_ffn_candidate_vs_cpu_reference_generation_compare",
+  "summary": {
+    "cpu_reference_fallback_preserved": true,
+    "default_false_preserved": true,
+    "generation_default_connected": false,
+    "pass": true
+  },
+  "tokenizer_loaded": true,
+  "tokenizer_manifest": "artifacts/tokenizer_manifest_v5_final.json",
+  "vocab_limit": 56253
+}
+```

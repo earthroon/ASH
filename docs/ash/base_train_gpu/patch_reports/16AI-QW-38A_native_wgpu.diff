@@ -1,0 +1,256 @@
+--- /mnt/data/qw38a_pristine/crates/model_core/src/native_wgpu.rs	2026-05-16 03:02:20.000000000 +0000
++++ /mnt/data/ash35e_r1/crates/model_core/src/native_wgpu.rs	2026-05-22 08:42:03.700442295 +0000
+@@ -1,6 +1,10 @@
+ use super::*;
+ use crate::model_layers::grouped_query_attention;
+-use std::collections::HashSet;
++use std::collections::{HashMap, HashSet};
++use std::fs::OpenOptions;
++use std::io::Write;
++use std::sync::atomic::{AtomicUsize, Ordering};
++use std::sync::OnceLock;
+ use crate::reference_math::{
+     add_batched,
+     apply_loras_to_batched_hidden,
+@@ -393,6 +397,233 @@
+     candidates
+ }
+ 
++
++// 16AI-QW-38A — Reserved Token Raw Logit Attractor Audit / Base LM Head Distribution Seal
++static QW38A_RAW_TOPK_STEP: AtomicUsize = AtomicUsize::new(0);
++static QW38A_TOKEN_META: OnceLock<Qw38ATokenMeta> = OnceLock::new();
++
++#[derive(Debug, Default)]
++struct Qw38ATokenMeta {
++    pieces: HashMap<usize, String>,
++    manifest_reserved: HashSet<usize>,
++    banned_reasons: HashMap<usize, String>,
++}
++
++fn qw38a_env_usize(name: &str, default: usize) -> usize {
++    std::env::var(name)
++        .ok()
++        .and_then(|v| v.parse::<usize>().ok())
++        .unwrap_or(default)
++}
++
++fn qw38a_metadata_path(env_name: &str, default_path: &str) -> String {
++    std::env::var(env_name).unwrap_or_else(|_| default_path.to_string())
++}
++
++fn qw38a_load_token_meta() -> Qw38ATokenMeta {
++    let mut meta = Qw38ATokenMeta::default();
++    let manifest_path = qw38a_metadata_path(
++        "ASH_TOKENIZER_MANIFEST_PATH",
++        "artifacts/tokenizer_manifest_v5_final.json",
++    );
++    if let Ok(text) = std::fs::read_to_string(&manifest_path) {
++        if let Ok(root) = serde_json::from_str::<serde_json::Value>(&text) {
++            if let Some(vocab) = root.get("vocab").and_then(|v| v.as_array()) {
++                for entry in vocab {
++                    let Some(id) = entry.get("id").and_then(|v| v.as_u64()).map(|v| v as usize) else {
++                        continue;
++                    };
++                    if let Some(token) = entry.get("token").and_then(|v| v.as_str()) {
++                        meta.pieces.insert(id, token.to_string());
++                    }
++                    if entry
++                        .get("is_reserved")
++                        .and_then(|v| v.as_bool())
++                        .unwrap_or(false)
++                    {
++                        meta.manifest_reserved.insert(id);
++                    }
++                }
++            }
++            if let Some(reserved) = root.get("reserved_tokens").and_then(|v| v.as_array()) {
++                for entry in reserved {
++                    if let Some(id) = entry.get("id").and_then(|v| v.as_u64()).map(|v| v as usize) {
++                        meta.manifest_reserved.insert(id);
++                        if let Some(token) = entry.get("token").and_then(|v| v.as_str()) {
++                            meta.pieces.entry(id).or_insert_with(|| token.to_string());
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    let banlist_path = qw38a_metadata_path(
++        "ASH_GENERATION_BANLIST_PATH",
++        "artifacts/tokenizer_generation_banlist_v5.json",
++    );
++    if let Ok(text) = std::fs::read_to_string(&banlist_path) {
++        if let Ok(root) = serde_json::from_str::<serde_json::Value>(&text) {
++            if let Some(ban) = root.get("ban").and_then(|v| v.as_array()) {
++                for entry in ban {
++                    let Some(id) = entry.get("id").and_then(|v| v.as_u64()).map(|v| v as usize) else {
++                        continue;
++                    };
++                    let reason = entry
++                        .get("reason")
++                        .and_then(|v| v.as_str())
++                        .unwrap_or("banned")
++                        .to_string();
++                    meta.banned_reasons.insert(id, reason.clone());
++                    if reason == "reserved" {
++                        meta.manifest_reserved.insert(id);
++                    }
++                    if let Some(token) = entry.get("token").and_then(|v| v.as_str()) {
++                        meta.pieces.entry(id).or_insert_with(|| token.to_string());
++                    }
++                }
++            }
++        }
++    }
++    meta
++}
++
++fn qw38a_token_meta() -> &'static Qw38ATokenMeta {
++    QW38A_TOKEN_META.get_or_init(qw38a_load_token_meta)
++}
++
++fn qw38a_piece(meta: &Qw38ATokenMeta, token_id: usize) -> String {
++    meta.pieces
++        .get(&token_id)
++        .cloned()
++        .unwrap_or_else(|| format!("<id:{}>", token_id))
++}
++
++fn qw38a_is_reserved(meta: &Qw38ATokenMeta, token_id: usize) -> bool {
++    meta.manifest_reserved.contains(&token_id)
++        || meta
++            .banned_reasons
++            .get(&token_id)
++            .map(|r| r == "reserved")
++            .unwrap_or(false)
++}
++
++fn qw38a_log_raw_topk_trace(
++    global_top_k: &[NativeVocabAtlasCandidate],
++    raw_top1_token_id: usize,
++    raw_top1_logit: f32,
++    atlas: &NativeVocabAtlas,
++) {
++    if !env_flag("ASH_RAW_TOPK_TRACE") {
++        return;
++    }
++    let step = QW38A_RAW_TOPK_STEP.fetch_add(1, Ordering::SeqCst);
++    let max_steps = qw38a_env_usize("ASH_RAW_TOPK_TRACE_MAX_STEPS", 32);
++    if step >= max_steps {
++        return;
++    }
++    let top_n = qw38a_env_usize("ASH_RAW_TOPK_TRACE_TOP_N", 16).max(1);
++    let meta = qw38a_token_meta();
++    let raw_top1_piece = qw38a_piece(meta, raw_top1_token_id);
++    let raw_top1_ban_reason = meta.banned_reasons.get(&raw_top1_token_id).cloned();
++    let raw_top1_is_banned = raw_top1_ban_reason.is_some();
++    let raw_top1_is_reserved = qw38a_is_reserved(meta, raw_top1_token_id);
++
++    let selected_top_k = global_top_k.iter().take(top_n).collect::<Vec<_>>();
++    let raw_topk_token_ids = selected_top_k
++        .iter()
++        .map(|c| c.token_id)
++        .collect::<Vec<_>>();
++    let raw_topk_pieces = selected_top_k
++        .iter()
++        .map(|c| qw38a_piece(meta, c.token_id))
++        .collect::<Vec<_>>();
++    let raw_topk_logits = selected_top_k.iter().map(|c| c.logit).collect::<Vec<_>>();
++    let raw_topk_is_banned = selected_top_k
++        .iter()
++        .map(|c| meta.banned_reasons.contains_key(&c.token_id))
++        .collect::<Vec<_>>();
++    let raw_topk_ban_reasons = selected_top_k
++        .iter()
++        .map(|c| meta.banned_reasons.get(&c.token_id).cloned())
++        .collect::<Vec<_>>();
++    let raw_topk_is_reserved = selected_top_k
++        .iter()
++        .map(|c| qw38a_is_reserved(meta, c.token_id))
++        .collect::<Vec<_>>();
++    let masked_top1 = global_top_k
++        .iter()
++        .find(|c| !meta.banned_reasons.contains_key(&c.token_id));
++    let masked_top1_token_id = masked_top1.map(|c| c.token_id);
++    let masked_top1_piece = masked_top1.map(|c| qw38a_piece(meta, c.token_id));
++    let masked_top1_logit = masked_top1.map(|c| c.logit);
++    let displaced = raw_top1_is_banned && masked_top1_token_id != Some(raw_top1_token_id);
++    let warning_codes = {
++        let mut out = Vec::new();
++        if raw_top1_is_reserved {
++            out.push("RAW_TOP1_RESERVED_ATTRACTOR");
++        }
++        if raw_top1_token_id == 13 {
++            out.push("TOKEN_13_RAW_TOP1_DOMINANT");
++        }
++        if displaced {
++            out.push("BAN_MASK_DISPLACEMENT_HIGH");
++        }
++        out
++    };
++
++    eprintln!(
++        "[16AI-QW-38A][raw_topk] step={} raw_top1={} piece={:?} logit={} banned={} reason={:?} reserved={} masked_top1={:?} masked_piece={:?} masked_logit={:?} displaced={} warnings={:?}",
++        step,
++        raw_top1_token_id,
++        raw_top1_piece,
++        raw_top1_logit,
++        raw_top1_is_banned,
++        raw_top1_ban_reason,
++        raw_top1_is_reserved,
++        masked_top1_token_id,
++        masked_top1_piece,
++        masked_top1_logit,
++        displaced,
++        warning_codes,
++    );
++
++    let record = serde_json::json!({
++        "patch_id": "16AI-QW-38A",
++        "decode_step": step,
++        "vocab_size": atlas.vocab_size,
++        "top_n": top_n,
++        "raw_top1_token_id": raw_top1_token_id,
++        "raw_top1_piece": raw_top1_piece,
++        "raw_top1_logit": raw_top1_logit,
++        "raw_top1_is_banned": raw_top1_is_banned,
++        "raw_top1_ban_reason": raw_top1_ban_reason,
++        "raw_top1_is_reserved": raw_top1_is_reserved,
++        "raw_topk_token_ids": raw_topk_token_ids,
++        "raw_topk_pieces": raw_topk_pieces,
++        "raw_topk_logits": raw_topk_logits,
++        "raw_topk_is_banned": raw_topk_is_banned,
++        "raw_topk_ban_reasons": raw_topk_ban_reasons,
++        "raw_topk_is_reserved": raw_topk_is_reserved,
++        "masked_top1_token_id": masked_top1_token_id,
++        "masked_top1_piece": masked_top1_piece,
++        "masked_top1_logit": masked_top1_logit,
++        "chosen_token_id": masked_top1_token_id,
++        "chosen_token_piece": masked_top1_piece,
++        "raw_top1_displaced_by_ban_mask": displaced,
++        "warning_codes": warning_codes,
++    });
++
++    let jsonl_path = std::env::var("ASH_RAW_TOPK_TRACE_JSONL")
++        .unwrap_or_else(|_| "workspace/qw38a_raw_topk_trace.jsonl".to_string());
++    if let Some(parent) = std::path::Path::new(&jsonl_path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
++        let _ = writeln!(file, "{}", record);
++    }
++}
++
+ fn build_native_vocab_atlas(
+     lm_head_cpu: &[f32],
+     vocab_size: usize,
+@@ -1937,6 +2168,7 @@
+             merged_logits.extend_from_slice(&tile_row);
+         }
+         let global_top_k = merge_atlas_top_k(atlas_top_k_candidates, tile_top_k);
++        qw38a_log_raw_topk_trace(&global_top_k, best_token_id, best_logit, atlas);
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

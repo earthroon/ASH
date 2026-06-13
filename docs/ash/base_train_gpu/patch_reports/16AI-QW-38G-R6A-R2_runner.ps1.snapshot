@@ -1,0 +1,112 @@
+--- /mnt/data/work_r6a_r2_orig/scripts/run_16AI_QW_38G_R6A_R1_pipeline_layout_audit.ps1	2026-05-22 13:35:43.000000000 +0000
++++ scripts/run_16AI_QW_38G_R6A_R2_burn_wgpu_owner_audit.ps1	2026-05-22 14:07:40.192915208 +0000
+@@ -5,86 +5,54 @@
+ )
+ 
+ $ErrorActionPreference = "Stop"
+-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+-
+ New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
+ 
+-$buildStdout = ".\workspace\build_qw38g_r6a_r1_stdout.log"
+-$buildStderr = ".\workspace\build_qw38g_r6a_r1_stderr.log"
+-$livePath = ".\workspace\infer_qw38g_r6a_r1_pipeline_layout_live.log"
+-$receiptPath = ".\workspace\qw38g_r6a_r1_runtime_receipt.json"
+-$auditPath = ".\workspace\qw38g_r6a_r1_pipeline_layout_audit.json"
+-
+ if ($Build) {
+-  Write-Host "[16AI-QW-38G-R6A-R1][build] cargo build --release example infer_only"
+-  $cargoArgs = @(
+-    "build",
+-    "--release",
+-    "--manifest-path", ".\crates\runtime\Cargo.toml",
+-    "--example", "infer_only"
+-  )
+-  $process = Start-Process `
+-    -FilePath "cargo.exe" `
+-    -ArgumentList $cargoArgs `
+-    -RedirectStandardOutput $buildStdout `
+-    -RedirectStandardError $buildStderr `
+-    -NoNewWindow `
+-    -Wait `
+-    -PassThru
+-  $buildExitCode = $process.ExitCode
+-  Write-Host "[16AI-QW-38G-R6A-R1][build_done] exit_code=$buildExitCode stdout=$buildStdout stderr=$buildStderr"
+-  if ($buildExitCode -ne 0) {
+-    Write-Host "[16AI-QW-38G-R6A-R1][build_error] exit_code=$buildExitCode"
+-    if (Test-Path $buildStderr) {
+-      Get-Content $buildStderr -Tail 120 -Encoding UTF8
+-    }
+-    exit $buildExitCode
++  Write-Host "[16AI-QW-38G-R6A-R2][build] cargo build --release example infer_only"
++  $buildLog = ".\workspace\build_qw38g_r6a_r2_live.log"
++  cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" | Tee-Object $buildLog
++  if ($LASTEXITCODE -ne 0) {
++    Write-Host "[16AI-QW-38G-R6A-R2][build_error] exit_code=$LASTEXITCODE log=$buildLog"
++    exit $LASTEXITCODE
+   }
++  Write-Host "[16AI-QW-38G-R6A-R2][build_done] exit_code=0 log=$buildLog"
+ }
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
+ 
+-$env:ASH_PIPELINE_LAYOUT_AUDIT = "1"
+-$env:ASH_PIPELINE_LAYOUT_AUDIT_VERBOSE = "1"
+-$env:ASH_PIPELINE_LAYOUT_AUDIT_DRY_RUN = "1"
+-$env:ASH_PIPELINE_LAYOUT_AUDIT_OUT = "workspace/qw38g_r6a_r1_pipeline_layout_audit.json"
+-$env:ASH_PIPELINE_LAYOUT_AUDIT_RECEIPT = "workspace/qw38g_r6a_r1_runtime_receipt.json"
+-
+-Write-Host "[16AI-QW-38G-R6A-R1][run] dry_run=1 max_new_tokens=$MaxNewTokens"
++$env:ASH_BURN_WGPU_OWNER_AUDIT = "1"
++$env:ASH_BURN_WGPU_OWNER_AUDIT_VERBOSE = "1"
++$env:ASH_BURN_WGPU_OWNER_AUDIT_DRY_RUN = "1"
++$env:ASH_BURN_WGPU_OWNER_AUDIT_OUT = "workspace/qw38g_r6a_r2_burn_wgpu_owner_audit.json"
++$env:ASH_BURN_WGPU_OWNER_AUDIT_RECEIPT = "workspace/qw38g_r6a_r2_runtime_receipt.json"
+ 
+ $exe = ".\target\release\examples\infer_only.exe"
+ if (!(Test-Path $exe)) {
+-  Write-Host "[16AI-QW-38G-R6A-R1][error] missing exe=$exe. Run with -Build first."
++  Write-Host "[16AI-QW-38G-R6A-R2][error] missing exe=$exe. Run with -Build first."
+   exit 1
+ }
+ 
+-& $exe `
+-  --model-spec ".\specs\model_spec_v5_48259.toml" `
+-  --tokenizer ".\artifacts\tokenizer_manifest_v5_final.json" `
+-  --checkpoint ".\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors" `
+-  --task freeform `
+-  --max-new-tokens $MaxNewTokens `
+-  --seed 42 `
+-  --text $Text `
+-  --json `
+-  2>&1 | Tee-Object $livePath
++$livePath = ".\workspace\infer_qw38g_r6a_r2_burn_wgpu_owner_live.log"
++Write-Host "[16AI-QW-38G-R6A-R2][run] dry_run=1 max_new_tokens=$MaxNewTokens"
+ 
++cmd /c "$exe --model-spec .\specs\model_spec_v5_48259.toml --tokenizer .\artifacts\tokenizer_manifest_v5_final.json --checkpoint .\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors --task freeform --max-new-tokens $MaxNewTokens --seed 42 --text \"$Text\" --json 2>&1" | Tee-Object $livePath
+ $code = $LASTEXITCODE
+-Write-Host "[16AI-QW-38G-R6A-R1][run_done] exit_code=$code live=$livePath"
++Write-Host "[16AI-QW-38G-R6A-R2][run_done] exit_code=$code live=$livePath"
+ if ($code -ne 0) { exit $code }
+ 
++$receiptPath = ".\workspace\qw38g_r6a_r2_runtime_receipt.json"
++$auditPath = ".\workspace\qw38g_r6a_r2_burn_wgpu_owner_audit.json"
+ if (!(Test-Path $receiptPath)) {
+-  Write-Host "[16AI-QW-38G-R6A-R1][error] receipt missing: $receiptPath"
++  Write-Host "[16AI-QW-38G-R6A-R2][error] receipt missing: $receiptPath"
+   exit 1
+ }
+ if (!(Test-Path $auditPath)) {
+-  Write-Host "[16AI-QW-38G-R6A-R1][error] audit missing: $auditPath"
++  Write-Host "[16AI-QW-38G-R6A-R2][error] audit missing: $auditPath"
+   exit 1
+ }
+ 
+-Write-Host "[16AI-QW-38G-R6A-R1][receipt] $receiptPath"
++Write-Host "[16AI-QW-38G-R6A-R2][receipt] $receiptPath"
+ Get-Content $receiptPath -Encoding UTF8
+-Write-Host "[16AI-QW-38G-R6A-R1][audit] $auditPath"
++Write-Host "[16AI-QW-38G-R6A-R2][audit] $auditPath"
+ Get-Content $auditPath -Encoding UTF8

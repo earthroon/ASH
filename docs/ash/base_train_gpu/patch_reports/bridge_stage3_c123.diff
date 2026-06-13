@@ -1,0 +1,85 @@
+--- /tmp/origstage3c/crates/lora_train/src/bridge.rs	2026-04-19 13:15:10.000000000 +0000
++++ /tmp/stage3c/crates/lora_train/src/bridge.rs	2026-04-19 13:25:35.103706370 +0000
+@@ -117,7 +117,8 @@
+     }
+ 
+     fn capture_padded_batch(
+-        &self,
++        &mut self,
++        batch_index: usize,
+         target_key: &str,
+         token_ids: &[u32],
+         lengths: &[usize],
+@@ -131,16 +132,37 @@
+                     max_seq_len,
+                     seq_lens: lengths.to_vec(),
+                 };
+-                match native.capture_module_io_native_padded_batch(&request, token_ids) {
+-                    Ok(captures) => {
+-                        println!(
+-                            "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={}",
+-                            target_key,
+-                            lengths.len(),
+-                            max_seq_len,
+-                        );
+-                        Ok(captures)
+-                    }
++                let sample_ids: Vec<u64> = (0..lengths.len()).map(|idx| idx as u64).collect();
++                let record_ids: Vec<Option<String>> = (0..lengths.len()).map(|_| None).collect();
++                match native.submit_module_trace_padded_batch(
++                    batch_index as u64,
++                    token_ids,
++                    request,
++                    sample_ids,
++                    record_ids,
++                ) {
++                    Ok(slot_id) => match native.try_collect_ready_module_trace(slot_id)? {
++                        Some((_meta, captures)) => {
++                            println!(
++                                "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={} slot_id={}",
++                                target_key,
++                                lengths.len(),
++                                max_seq_len,
++                                slot_id,
++                            );
++                            Ok(captures)
++                        }
++                        None => {
++                            println!(
++                                "[bridge][module_local][runtime] native trace slot pending target_key={} batch={} max_seq_len={} slot_id={} -> fallback",
++                                target_key,
++                                lengths.len(),
++                                max_seq_len,
++                                slot_id,
++                            );
++                            fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++                        }
++                    },
+                     Err(err) => {
+                         println!(
+                             "[bridge][module_local][runtime] native capture fallback target_key={} batch={} max_seq_len={} reason={}",
+@@ -159,7 +181,6 @@
+         }
+     }
+ }
+-
+ impl RawTextFeatureBridge {
+     pub fn extract_feature_store_from_paths(
+         &self,
+@@ -630,7 +651,7 @@
+         .unwrap_or(4)
+         .max(1);
+     let target_key = first.target_key.clone();
+-    let teacher_runtime = match bridge.config.model_kind {
++    let mut teacher_runtime = match bridge.config.model_kind {
+         BridgeModelKind::AshNative => {
+             let native = NativeWgpuModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
+             let fallback = ReferenceModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
+@@ -933,6 +954,7 @@
+         );
+         let t_capture = Instant::now();
+         let captures = teacher_runtime.capture_padded_batch(
++            batch.batch_index,
+             &target_key,
+             &padded_token_ids,
+             &seq_lens,

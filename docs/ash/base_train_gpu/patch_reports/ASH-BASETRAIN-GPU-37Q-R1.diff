@@ -1,0 +1,233 @@
+--- ash37p_r1_work/crates/base_train/src/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs	2026-06-11 09:46:52.000000000 +0000
++++ ash37q_r1_work/crates/base_train/src/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs	2026-06-13 09:27:25.832211233 +0000
+@@ -10,11 +10,18 @@
+ use std::path::Path;
+ use std::sync::mpsc;
+ 
+-const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37Q";
+-const TITLE: &str = "Selected Group Row-Block Multi-Workgroup Reduction Diagnostic Kernel / Cross-Workgroup Partial Readback Seal";
+-const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL_CROSS_WORKGROUP_PARTIAL_READBACK";
++const PATCH_ID: &str = "ASH-BASETRAIN-GPU-37Q-R1";
++const BASE_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37Q";
++const TITLE: &str = "Parallel Reduction Receipt Source Rebind / 37P-R1 PASS Receipt Locator No Placeholder Intake Seal / 37F Payload Receipt Reconfirm / Runtime Receipt Artifact Write Candidate / No Forward No Optimizer No Weight Mutation";
++const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37Q_R1_PARALLEL_REDUCTION_RECEIPT_SOURCE_REBIND_37P_R1_PASS_RECEIPT_LOCATOR_37F_PAYLOAD_RECONFIRM_RUNTIME_RECEIPT_WRITE_NO_FORWARD_NO_OPTIMIZER_NO_WEIGHT_MUTATION";
++const LEGACY_37Q_RUNTIME_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const R1_37Q_RUNTIME_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37Q_R1_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const DEFAULT_37P_R1_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37P_R1_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const DEFAULT_37F_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_37F_SELECTED_GROUP_ROW_BLOCK_GPU_UPLOAD_READBACK_SMOKE.json";
+ const EXPECTED_37P_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37P";
+ const EXPECTED_37P_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37P_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL_WORKGROUP_ARITHMETIC_SMOKE_NO_FORWARD";
++const EXPECTED_37P_R1_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37P-R1";
++const EXPECTED_37P_R1_STATUS_PREFIX: &str = "PASS_ASH_BASETRAIN_GPU_37P_R1";
+ const EXPECTED_37F_PATCH_ID: &str = "ASH-BASETRAIN-GPU-37F";
+ const EXPECTED_37F_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_37F_SELECTED_GROUP_ROW_BLOCK_GPU_UPLOAD_READBACK_SMOKE_ACTUAL_GPU_BUFFER_TO_CPU_DIGEST_VERIFICATION_NO_DISPATCH";
+ const EXPECTED_TOTAL_BYTES: u64 = 5_267_456;
+@@ -39,7 +46,12 @@
+ 
+ const BLOCK_37P_NOT_FOUND: &str = "BLOCKED_37P_RECEIPT_NOT_FOUND";
+ const BLOCK_37P_PARSE: &str = "BLOCKED_37P_RECEIPT_PARSE_FAILED";
+-const BLOCK_37P_NOT_PASS: &str = "BLOCKED_37P_NOT_PASS";
++const BLOCK_37P_NOT_PASS: &str = "BLOCKED_37P_RECEIPT_NOT_PASS";
++const BLOCK_37P_SCHEMA_MISMATCH: &str = "BLOCKED_37P_RECEIPT_SCHEMA_MISMATCH";
++const BLOCK_37P_UNSUPPORTED_PATCH_ID: &str = "BLOCKED_37P_RECEIPT_UNSUPPORTED_PATCH_ID";
++const BLOCK_37P_UNSUPPORTED_STATUS: &str = "BLOCKED_37P_RECEIPT_UNSUPPORTED_STATUS";
++const BLOCK_37P_R1_SOURCE_BINDING_MISSING: &str = "BLOCKED_37P_R1_SOURCE_BINDING_MISSING";
++const BLOCK_37P_R1_SOURCE_BINDING_NOT_PASS: &str = "BLOCKED_37P_R1_SOURCE_BINDING_NOT_PASS";
+ const BLOCK_PARALLEL_REDUCTION_SUMMARY_MISSING: &str = "BLOCKED_PARALLEL_REDUCTION_SUMMARY_MISSING";
+ const BLOCK_PARALLEL_REDUCTION_PLAN_MISSING: &str = "BLOCKED_PARALLEL_REDUCTION_PLAN_MISSING";
+ const BLOCK_PARALLEL_REDUCTION_EXPECTED_VALUES_MISSING: &str = "BLOCKED_PARALLEL_REDUCTION_EXPECTED_VALUES_MISSING";
+@@ -59,9 +71,9 @@
+ const BLOCK_37P_DIAGNOSTIC_BUFFER_SIZE_MISMATCH: &str = "BLOCKED_37P_DIAGNOSTIC_BUFFER_SIZE_MISMATCH";
+ const BLOCK_37P_WORKGROUP_MEMORY_MISSING: &str = "BLOCKED_37P_WORKGROUP_MEMORY_MISSING";
+ const BLOCK_37P_WORKGROUP_BARRIER_MISSING: &str = "BLOCKED_37P_WORKGROUP_BARRIER_MISSING";
+-const BLOCK_37F_NOT_FOUND: &str = "BLOCKED_37F_RECEIPT_NOT_FOUND";
+-const BLOCK_37F_PARSE: &str = "BLOCKED_37F_RECEIPT_PARSE_FAILED";
+-const BLOCK_37F_NOT_PASS: &str = "BLOCKED_37F_NOT_PASS";
++const BLOCK_37F_NOT_FOUND: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_NOT_FOUND";
++const BLOCK_37F_PARSE: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_PARSE_FAILED";
++const BLOCK_37F_NOT_PASS: &str = "BLOCKED_37F_PAYLOAD_RECEIPT_NOT_PASS";
+ const BLOCK_37F_SOURCE_RESULTS_MISSING: &str = "BLOCKED_37F_READBACK_SOURCE_RESULTS_MISSING";
+ const BLOCK_37F_DIGEST_RECEIPT_MISSING: &str = "BLOCKED_37F_READBACK_DIGEST_RECEIPT_MISSING";
+ const BLOCK_37F_SUMMARY_MISSING: &str = "BLOCKED_37F_UPLOAD_READBACK_SUMMARY_MISSING";
+@@ -209,7 +221,13 @@
+ pub fn ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel_bundle() -> Value {
+     let args = read_args();
+     let output = run(&args);
+-    receipt_json(&output)
++    let mut receipt = receipt_json(&output);
++    let artifact_write = write_runtime_receipts(&receipt);
++    if let Some(obj) = receipt.as_object_mut() {
++        obj.insert("artifact_write".to_string(), artifact_write);
++    }
++    let _ = write_runtime_receipts(&receipt);
++    receipt
+ }
+ 
+ fn run(args: &Args) -> Output {
+@@ -238,7 +256,7 @@
+         Ok(())
+     })();
+     match validation {
+-        Err(status) => block_output(args, parallel_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, "37P or 37F receipt did not satisfy the 37Q input contract."),
++        Err(status) => block_output(args, parallel_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, reason_for_status(status)),
+         Ok(()) => match read_payload_from_37f(&f_receipt) {
+             Err(status) => block_output(args, parallel_path, true, Some(o_digest), payload_path, true, Some(f_digest), Some(o_receipt), Some(f_receipt), None, None, None, status, "37F bounded payload segment read failed."),
+             Ok(payload_assembly) => match build_reduction_plan(&payload_assembly.bytes, args.sample_start_index, args.workgroup_count, args.samples_per_workgroup) {
+@@ -386,8 +404,13 @@
+ }
+ 
+ fn validate_37p_receipt(receipt: &Value) -> Result<(), &'static str> {
+-    require(str_value(receipt, "patch_id") == Some(EXPECTED_37P_PATCH_ID), BLOCK_37P_NOT_PASS)?;
+-    require(str_value(receipt, "status") == Some(EXPECTED_37P_STATUS), BLOCK_37P_NOT_PASS)?;
++    let patch_id = str_value(receipt, "patch_id").ok_or(BLOCK_37P_SCHEMA_MISMATCH)?;
++    let status = str_value(receipt, "status").ok_or(BLOCK_37P_SCHEMA_MISMATCH)?;
++    match patch_id {
++        EXPECTED_37P_PATCH_ID => require(status == EXPECTED_37P_STATUS, BLOCK_37P_UNSUPPORTED_STATUS)?,
++        EXPECTED_37P_R1_PATCH_ID => require(status.starts_with(EXPECTED_37P_R1_STATUS_PREFIX), BLOCK_37P_UNSUPPORTED_STATUS)?,
++        _ => return Err(BLOCK_37P_UNSUPPORTED_PATCH_ID),
++    }
+     require(str_value(receipt, "verdict") == Some("PASS"), BLOCK_37P_NOT_PASS)?;
+     require(bool_value(receipt, "pass") == Some(true), BLOCK_37P_NOT_PASS)?;
+     require(receipt.get("parallel_reduction_diagnostic_summary").is_some(), BLOCK_PARALLEL_REDUCTION_SUMMARY_MISSING)?;
+@@ -397,7 +420,17 @@
+     require(receipt.get("parallel_reduction_wgsl_contract").is_some(), BLOCK_PARALLEL_REDUCTION_WGSL_CONTRACT_MISSING)?;
+     require(receipt.get("parallel_reduction_dispatch_command_contract").is_some(), BLOCK_PARALLEL_REDUCTION_DISPATCH_COMMAND_CONTRACT_MISSING)?;
+     require(receipt.get("parallel_reduction_decode_receipt").is_some(), BLOCK_PARALLEL_REDUCTION_DECODE_RECEIPT_MISSING)?;
+-    require(receipt.get("source_binding").is_some(), BLOCK_SOURCE_BINDING_MISSING)?;
++    let source_binding = receipt.get("source_binding").ok_or(BLOCK_SOURCE_BINDING_MISSING)?;
++    match patch_id {
++        EXPECTED_37P_R1_PATCH_ID => {
++            require(bool_value(source_binding, "payload_37f_receipt_pass") == Some(true), BLOCK_37P_R1_SOURCE_BINDING_NOT_PASS)?;
++            require(bool_value(source_binding, "payload_37f_source_bytes_read") == Some(true), BLOCK_37P_R1_SOURCE_BINDING_NOT_PASS)?;
++            require(bool_value(source_binding, "placeholder_intake_detected") == Some(false), BLOCK_37P_R1_SOURCE_BINDING_MISSING)?;
++            require(bool_value(source_binding, "static_checks_used_as_runtime_receipt") == Some(false), BLOCK_37P_R1_SOURCE_BINDING_MISSING)?;
++            require(bool_value(source_binding, "bake_manifest_used_as_runtime_receipt") == Some(false), BLOCK_37P_R1_SOURCE_BINDING_MISSING)?;
++        }
++        _ => (),
++    }
+     let summary = receipt.get("parallel_reduction_diagnostic_summary").unwrap_or(&Value::Null);
+     require(bool_value(summary, "actual_dispatch_executed") == Some(true), BLOCK_37P_DISPATCH_NOT_EXECUTED)?;
+     require(bool_value(summary, "actual_readback_executed") == Some(true), BLOCK_37P_READBACK_NOT_EXECUTED)?;
+@@ -570,6 +603,7 @@
+     json!({
+         "acceptance_criteria": acceptance_criteria_json(output),
+         "patch_id": PATCH_ID,
++        "base_patch_id": BASE_PATCH_ID,
+         "title": TITLE,
+         "status": output.status,
+         "verdict": output.verdict,
+@@ -605,7 +639,11 @@
+     json!({
+         "actual_status": output.status,
+         "pass_status_expected": PASS_STATUS,
+-        "blocked_is_valid_sealed_result": false,
++        "blocked_is_valid_sealed_result": true,
++        "thirty_seven_p_r1_receipt_alias_required": "--parallel-reduction-receipt",
++        "thirty_seven_p_r1_status_prefix_allowed": EXPECTED_37P_R1_STATUS_PREFIX,
++        "thirty_seven_p_legacy_status_allowed": EXPECTED_37P_STATUS,
++        "runtime_receipt_artifact_write_required": true,
+         "actual_dispatch_required_on_pass": true,
+         "actual_readback_required_on_pass": true,
+         "all_partial_words_match_required_on_pass": true,
+@@ -632,16 +670,35 @@
+ }
+ 
+ fn source_binding_json(o_binding: &Value, _f_binding: &Value, o_summary: &Value, _f_summary: &Value, f_digest: &Value, output: &Output) -> Value {
++    let source_o = output.source_o.as_ref().unwrap_or(&Value::Null);
++    let source_f = output.source_f.as_ref().unwrap_or(&Value::Null);
+     json!({
+         "parallel_reduction_receipt_path": output.parallel_reduction_receipt_path,
+         "parallel_reduction_receipt_exists": output.parallel_reduction_receipt_exists,
+         "parallel_reduction_receipt_digest_hex": output.parallel_reduction_receipt_digest_hex,
++        "parallel_reduction_receipt_patch_id": str_value(source_o, "patch_id"),
++        "parallel_reduction_receipt_status": str_value(source_o, "status"),
++        "parallel_reduction_receipt_verdict": str_value(source_o, "verdict"),
++        "parallel_reduction_receipt_pass": bool_value(source_o, "pass"),
++        "parallel_reduction_receipt_supported_patch_id": is_supported_37p_patch_id(str_value(source_o, "patch_id")),
++        "parallel_reduction_receipt_supported_status": is_supported_37p_status(str_value(source_o, "patch_id"), str_value(source_o, "status")),
++        "thirty_seven_p_r1_source_binding_present": source_o.get("source_binding").is_some(),
++        "thirty_seven_p_r1_payload_37f_receipt_pass": o_binding.get("payload_37f_receipt_pass").cloned().unwrap_or(Value::Null),
++        "thirty_seven_p_r1_payload_37f_source_bytes_read": o_binding.get("payload_37f_source_bytes_read").cloned().unwrap_or(Value::Null),
++        "placeholder_intake_detected": o_binding.get("placeholder_intake_detected").cloned().unwrap_or(Value::Null),
++        "static_checks_used_as_runtime_receipt": o_binding.get("static_checks_used_as_runtime_receipt").cloned().unwrap_or(Value::Null),
++        "bake_manifest_used_as_runtime_receipt": o_binding.get("bake_manifest_used_as_runtime_receipt").cloned().unwrap_or(Value::Null),
+         "combined_parallel_reduction_contract_digest_hex": o_summary.get("combined_parallel_reduction_contract_digest_hex").cloned().unwrap_or(Value::Null),
+         "parallel_reduction_candidate_digest_hex": o_summary.get("parallel_reduction_candidate_digest_hex").cloned().unwrap_or(Value::Null),
+         "combined_row_block_parallel_reduction_diagnostic_digest_hex": o_summary.get("combined_row_block_parallel_reduction_diagnostic_digest_hex").cloned().unwrap_or(Value::Null),
+         "gpu_upload_readback_smoke_receipt_path": output.payload_receipt_path,
+         "gpu_upload_readback_smoke_receipt_exists": output.payload_receipt_exists,
+         "gpu_upload_readback_smoke_receipt_digest_hex": output.payload_receipt_digest_hex,
++        "payload_37f_receipt_patch_id": str_value(source_f, "patch_id"),
++        "payload_37f_receipt_status": str_value(source_f, "status"),
++        "payload_37f_receipt_verdict": str_value(source_f, "verdict"),
++        "payload_37f_receipt_pass": bool_value(source_f, "pass"),
++        "payload_37f_reconfirmed": output.payload_assembly.as_ref().map(|p| p.matches_cpu_digest && p.matches_gpu_digest).unwrap_or(false),
+         "combined_gpu_readback_source_byte_digest_hex": o_binding.get("combined_gpu_readback_source_byte_digest_hex").cloned().unwrap_or(Value::Null),
+         "combined_row_block_gpu_upload_readback_smoke_digest_hex": o_binding.get("combined_row_block_gpu_upload_readback_smoke_digest_hex").cloned().unwrap_or(Value::Null),
+         "cpu_source_payload_raw_sha256_hex": f_digest.get("cpu_source_payload_raw_sha256_hex").cloned().unwrap_or(Value::Null),
+@@ -862,7 +919,7 @@
+ }
+ 
+ fn next_stage_json(output: &Output) -> Value {
+-    json!({"next_stage_enabled":output.pass,"next_patch_if_pass":"ASH-BASETRAIN-GPU-37R","recommended_patch_title":"Selected Group Row-Block Cross-Workgroup Final Reduction Diagnostic Kernel / Partial Buffer To Final Aggregate Seal","next_patch_if_blocked_plan":"ASH-BASETRAIN-GPU-37Q-R1","next_patch_if_blocked_wgsl":"ASH-BASETRAIN-GPU-37Q-R2","next_patch_if_blocked_readback":"ASH-BASETRAIN-GPU-37Q-R3"})
++    json!({"next_stage_enabled":output.pass,"next_patch_if_pass":"ASH-BASETRAIN-GPU-37R","recommended_patch_title":"Selected Group Row-Block Cross-Workgroup Final Reduction Diagnostic Kernel / Partial Buffer To Final Aggregate Seal","next_patch_if_blocked_plan":"ASH-BASETRAIN-GPU-37Q-R1_LOCAL_RECEIPT_OR_37F_SOURCE_TRIAGE","next_patch_if_blocked_wgsl":"ASH-BASETRAIN-GPU-37Q-R2","next_patch_if_blocked_readback":"ASH-BASETRAIN-GPU-37Q-R3"})
+ }
+ 
+ fn payload_segment_receipt_json(payload: Option<&PayloadAssembly>) -> Value {
+@@ -1004,8 +1061,8 @@
+ }
+ 
+ fn read_args() -> Args {
+-    let mut parallel_reduction_receipt_path = None;
+-    let mut payload_receipt_path = None;
++    let mut parallel_reduction_receipt_path = Some(DEFAULT_37P_R1_RECEIPT_PATH.to_string());
++    let mut payload_receipt_path = Some(DEFAULT_37F_RECEIPT_PATH.to_string());
+     let mut backend = "auto".to_string();
+     let mut sample_start_index = 0u32;
+     let mut workgroup_count = EXPECTED_WORKGROUP_COUNT;
+@@ -1025,6 +1082,45 @@
+     Args { parallel_reduction_receipt_path, payload_receipt_path, backend, sample_start_index, workgroup_count, samples_per_workgroup }
+ }
+ 
++
++fn write_runtime_receipts(receipt: &Value) -> Value {
++    let _ = fs::create_dir_all("artifacts");
++    let bytes = serde_json::to_vec_pretty(receipt).unwrap_or_else(|_| b"{}".to_vec());
++    let r1_written = fs::write(R1_37Q_RUNTIME_RECEIPT_PATH, &bytes).is_ok();
++    let legacy_written = fs::write(LEGACY_37Q_RUNTIME_RECEIPT_PATH, &bytes).is_ok();
++    json!({
++        "runtime_receipt_written": r1_written,
++        "runtime_receipt_path": R1_37Q_RUNTIME_RECEIPT_PATH,
++        "legacy_runtime_receipt_written": legacy_written,
++        "legacy_runtime_receipt_path": LEGACY_37Q_RUNTIME_RECEIPT_PATH,
++        "stdout_only": false
++    })
++}
++
++fn reason_for_status(status: &'static str) -> &'static str {
++    match status {
++        BLOCK_37P_UNSUPPORTED_PATCH_ID => "37P receipt patch_id is not supported by the 37Q-R1 input contract.",
++        BLOCK_37P_UNSUPPORTED_STATUS => "37P receipt status is not a supported PASS status for the 37Q-R1 input contract.",
++        BLOCK_37P_R1_SOURCE_BINDING_MISSING => "37P-R1 source binding did not prove no-placeholder runtime intake.",
++        BLOCK_37P_R1_SOURCE_BINDING_NOT_PASS => "37P-R1 source binding did not prove a valid 37F payload receipt/source read.",
++        BLOCK_37P_NOT_PASS => "37P receipt was found but was not PASS.",
++        BLOCK_37F_NOT_PASS => "37F payload receipt was found but was not PASS.",
++        _ => "37P or 37F receipt did not satisfy the 37Q-R1 input contract.",
++    }
++}
++
++fn is_supported_37p_patch_id(patch_id: Option<&str>) -> bool {
++    matches!(patch_id, Some(EXPECTED_37P_PATCH_ID) | Some(EXPECTED_37P_R1_PATCH_ID))
++}
++
++fn is_supported_37p_status(patch_id: Option<&str>, status: Option<&str>) -> bool {
++    match (patch_id, status) {
++        (Some(EXPECTED_37P_PATCH_ID), Some(s)) => s == EXPECTED_37P_STATUS,
++        (Some(EXPECTED_37P_R1_PATCH_ID), Some(s)) => s.starts_with(EXPECTED_37P_R1_STATUS_PREFIX),
++        _ => false,
++    }
++}
++
+ fn str_value<'a>(value: &'a Value, key: &str) -> Option<&'a str> { value.get(key).and_then(Value::as_str) }
+ fn u64_value(value: &Value, key: &str) -> Option<u64> { value.get(key).and_then(Value::as_u64) }
+ fn bool_value(value: &Value, key: &str) -> Option<bool> { value.get(key).and_then(Value::as_bool) }

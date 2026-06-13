@@ -1,0 +1,31 @@
+SFT-GPU-OBS-07 static verification
+
+Checked files:
+- crates/ash_core/src/sft_gpu_candidate_apply_plan.rs
+- crates/ash_core/tests/sft_gpu_obs_07_candidate_apply_plan.rs
+- crates/lora_train/src/gpu_candidate_apply_plan.rs
+- crates/lora_train/tests/gpu_candidate_apply_plan.rs
+- crates/burn_webgpu_backend/src/gpu_candidate_apply_plan_signals.rs
+- crates/burn_webgpu_backend/tests/gpu_candidate_apply_plan_signals.rs
+
+Results:
+- delimiter balance: PASS
+- ash_core lib.rs export wiring: PASS
+- lora_train lib.rs export wiring: PASS
+- burn_webgpu_backend lib.rs export wiring: PASS
+- cargo/rustc/rustfmt availability: NOT AVAILABLE IN THIS CONTAINER
+- compile/test status: LOCAL PENDING
+
+No-apply boundary asserted by code/tests:
+- dry_run_only = true
+- apply_performed = false
+- current_pointer_update_performed = false
+- fallback_activation_performed = false
+- rollback_execution_performed = false
+- demotion_apply_performed = false
+- quarantine_apply_performed = false
+- registry_mutation_performed = false
+- lifecycle_mutation_performed = false
+- runtime_sft_training_performed = false
+- runtime_gradient_write_performed = false
+- runtime_optimizer_step_performed = false

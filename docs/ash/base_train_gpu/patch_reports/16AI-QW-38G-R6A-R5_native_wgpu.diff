@@ -1,0 +1,334 @@
+--- /mnt/data/r6a_r4_base/crates/model_core/src/native_wgpu.rs	2026-05-22 14:51:42.000000000 +0000
++++ /mnt/data/r6a_r5_work/crates/model_core/src/native_wgpu.rs	2026-05-23 01:55:02.486647159 +0000
+@@ -2245,6 +2245,323 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A-R5 — Backend Extension Operator Review / Apply Approval Queue Seal
++static QW38G_R6A_R5_REVIEW_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r5_enabled() -> bool {
++    env_flag("ASH_BACKEND_EXTENSION_OPERATOR_REVIEW") || env_flag("ASH_QW38G_R6A_R5_OPERATOR_REVIEW")
++}
++
++fn qw38g_r6a_r5_mode() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_OPERATOR_REVIEW_MODE")
++        .unwrap_or_else(|_| "draft".to_string())
++        .trim()
++        .to_ascii_lowercase()
++}
++
++fn qw38g_r6a_r5_dry_run_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_DRY_RUN_PATH")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r4_backend_extension_dry_run.json".to_string())
++}
++
++fn qw38g_r6a_r5_dry_run_receipt_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_DRY_RUN_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r4_backend_extension_dry_run_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r5_packet_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_REVIEW_PACKET")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r5_operator_review_packet.json".to_string())
++}
++
++fn qw38g_r6a_r5_receipt_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_REVIEW_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r5_operator_review_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r5_load_json(path: &str) -> Option<serde_json::Value> {
++    std::fs::read_to_string(path)
++        .ok()
++        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
++}
++
++fn qw38g_r6a_r5_bool_at(value: Option<&serde_json::Value>, key: &str, default: bool) -> bool {
++    value.and_then(|v| v.get(key)).and_then(|v| v.as_bool()).unwrap_or(default)
++}
++
++fn qw38g_r6a_r5_u64_at(value: Option<&serde_json::Value>, key: &str, default: u64) -> u64 {
++    value.and_then(|v| v.get(key)).and_then(|v| v.as_u64()).unwrap_or(default)
++}
++
++fn qw38g_r6a_r5_str_at(value: Option<&serde_json::Value>, key: &str, default: &str) -> String {
++    value
++        .and_then(|v| v.get(key))
++        .and_then(|v| v.as_str())
++        .unwrap_or(default)
++        .to_string()
++}
++
++fn qw38g_r6a_r5_backend_extension_operator_review() {
++    if !qw38g_r6a_r5_enabled() {
++        return;
++    }
++    if QW38G_R6A_R5_REVIEW_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++
++    let mode = qw38g_r6a_r5_mode();
++    let dry_run_path = qw38g_r6a_r5_dry_run_path();
++    let dry_run_receipt_path = qw38g_r6a_r5_dry_run_receipt_path();
++    let packet_path = qw38g_r6a_r5_packet_path();
++    let receipt_path = qw38g_r6a_r5_receipt_path();
++
++    eprintln!("[16AI-QW-38G-R6A-R5][start]");
++    eprintln!("[16AI-QW-38G-R6A-R5][env] mode={}", mode);
++
++    let dry_run = qw38g_r6a_r5_load_json(&dry_run_path);
++    let dry_run_receipt = qw38g_r6a_r5_load_json(&dry_run_receipt_path);
++    let dry_run_loaded = dry_run.is_some();
++    let dry_run_receipt_loaded = dry_run_receipt.is_some();
++    let dry_run_status = dry_run
++        .as_ref()
++        .and_then(|v| v.get("status"))
++        .and_then(|v| v.as_str())
++        .unwrap_or("MISSING_DRY_RUN")
++        .to_string();
++
++    eprintln!("[16AI-QW-38G-R6A-R5][dry_run_loaded] status={}", dry_run_status);
++
++    let shader_variant = dry_run.as_ref().and_then(|v| v.get("shader_variant_candidate"));
++    let pipeline_cache = dry_run.as_ref().and_then(|v| v.get("pipeline_cache_key_candidate"));
++    let bind_group = dry_run.as_ref().and_then(|v| v.get("bind_group_layout_candidate"));
++    let debug_buffer = dry_run.as_ref().and_then(|v| v.get("debug_buffer_binding_candidate"));
++    let mutation_guard = dry_run.as_ref().and_then(|v| v.get("mutation_guard"));
++
++    let shader_variant_generated = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "shader_variant_candidate_generated", false);
++    let pipeline_cache_generated = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "pipeline_cache_key_candidate_generated", false);
++    let bind_group_generated = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "bind_group_layout_candidate_generated", false);
++    let debug_buffer_generated = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "debug_buffer_binding_candidate_generated", false);
++    let normal_pipeline_unchanged = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "normal_pipeline_unchanged", false);
++    let normal_bind_group_layout_unchanged = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "normal_bind_group_layout_unchanged", false);
++    let mutation_guard_passed = qw38g_r6a_r5_bool_at(dry_run.as_ref(), "mutation_guard_passed", false)
++        && qw38g_r6a_r5_bool_at(mutation_guard, "guard_passed", false);
++
++    let cache_poisoning_risk = !qw38g_r6a_r5_bool_at(pipeline_cache, "normal_and_debug_separated", false)
++        || !qw38g_r6a_r5_bool_at(pipeline_cache, "cache_poisoning_guard_passed", false);
++    let binding_collision_risk = qw38g_r6a_r5_bool_at(bind_group, "existing_binding_collision_detected", false);
++    let normal_pipeline_mutation_risk = !normal_pipeline_unchanged
++        || qw38g_r6a_r5_bool_at(mutation_guard, "pipeline_cache_mutation_performed", false)
++        || qw38g_r6a_r5_bool_at(mutation_guard, "pipeline_layout_mutation_performed", false);
++    let normal_layout_mutation_risk = !normal_bind_group_layout_unchanged
++        || qw38g_r6a_r5_bool_at(mutation_guard, "bind_group_layout_mutation_performed", false)
++        || qw38g_r6a_r5_bool_at(mutation_guard, "bind_group_mutation_performed", false);
++    let full_vector_readback_risk = !qw38g_r6a_r5_bool_at(debug_buffer, "scalar_only", false)
++        || !qw38g_r6a_r5_bool_at(debug_buffer, "full_vector_readback_forbidden", false);
++    let debug_shader_without_buffer_risk = shader_variant_generated && !debug_buffer_generated;
++
++    let mut warning_codes: Vec<String> = Vec::new();
++    let mut status = "PENDING_OPERATOR_REVIEW".to_string();
++    let mut review_state = "DRAFT".to_string();
++    let mut approved_for_next_patch = false;
++    let mut next_patch_allowed: Option<String> = None;
++    let mut recommended_next_patch = "16AI-QW-38G-R6A-R5_APPROVE_OR_HOLD".to_string();
++
++    if !dry_run_loaded || !dry_run_receipt_loaded {
++        status = "INVALID_DRY_RUN_SOURCE".to_string();
++        review_state = "INVALID_DRY_RUN_SOURCE".to_string();
++        warning_codes.push("INVALID_DRY_RUN_SOURCE".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_BACKEND_EXTENSION_APPLY_DRY_RUN".to_string();
++    } else if dry_run_status != "PASS_BACKEND_EXTENSION_APPLY_DRY_RUN" {
++        status = "INVALID_DRY_RUN_SOURCE".to_string();
++        review_state = "INVALID_DRY_RUN_SOURCE".to_string();
++        warning_codes.push("DRY_RUN_NOT_PASS".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_BACKEND_EXTENSION_APPLY_DRY_RUN".to_string();
++    } else if !mutation_guard_passed {
++        status = "MUTATION_GUARD_FAILED".to_string();
++        review_state = "MUTATION_GUARD_FAILED".to_string();
++        warning_codes.push("MUTATION_GUARD_FAILED".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_NO_APPLY_HARDENING".to_string();
++    } else if cache_poisoning_risk {
++        status = "CACHE_POISONING_RISK".to_string();
++        review_state = "CACHE_POISONING_RISK".to_string();
++        warning_codes.push("CACHE_POISONING_RISK".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_CACHE_KEY_SEPARATION_FIX".to_string();
++    } else if binding_collision_risk {
++        status = "BINDING_COLLISION_RISK".to_string();
++        review_state = "BINDING_COLLISION_RISK".to_string();
++        warning_codes.push("BINDING_COLLISION_RISK".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_BINDING_SLOT_RESOLVER".to_string();
++    } else if full_vector_readback_risk {
++        status = "FULL_VECTOR_POLICY_VIOLATION".to_string();
++        review_state = "FULL_VECTOR_POLICY_VIOLATION".to_string();
++        warning_codes.push("FULL_VECTOR_POLICY_VIOLATION".to_string());
++        recommended_next_patch = "16AI-QW-38G-R6A-R4_SCALAR_ONLY_POLICY_FIX".to_string();
++    } else {
++        warning_codes.push("OPERATOR_APPROVAL_REQUIRED_FOR_NEXT_STEP".to_string());
++        warning_codes.push("APPLY_NOT_PERFORMED_IN_R5".to_string());
++        match mode.as_str() {
++            "approve" => {
++                status = "APPROVED_FOR_BACKEND_EXTENSION_APPLY_CANDIDATE".to_string();
++                review_state = "APPROVED_FOR_APPLY_DRY_RUN".to_string();
++                approved_for_next_patch = true;
++                next_patch_allowed = Some("16AI-QW-38G-R6A-R6_BACKEND_EXTENSION_APPLY_CANDIDATE".to_string());
++                recommended_next_patch = "16AI-QW-38G-R6A-R6_BACKEND_EXTENSION_APPLY_CANDIDATE".to_string();
++            }
++            "hold" => {
++                status = "HOLD_FOR_OPERATOR_REVIEW".to_string();
++                review_state = "HOLD_FOR_REVIEW".to_string();
++                warning_codes.push("HOLD_FOR_REVIEW".to_string());
++                recommended_next_patch = "16AI-QW-38G-R6A-R5_REVIEW_REQUIRED".to_string();
++            }
++            "reject" => {
++                status = "REJECTED_BY_OPERATOR".to_string();
++                review_state = "REJECTED".to_string();
++                warning_codes.push("REJECTED_BY_OPERATOR".to_string());
++                recommended_next_patch = "16AI-QW-38G-R6A-R5_REJECTED_NO_APPLY".to_string();
++            }
++            _ => {
++                status = "PENDING_OPERATOR_REVIEW".to_string();
++                review_state = "DRAFT".to_string();
++            }
++        }
++    }
++
++    let candidate_summary = serde_json::json!({
++        "shader_variant_candidate_generated": shader_variant_generated,
++        "pipeline_cache_key_candidate_generated": pipeline_cache_generated,
++        "bind_group_layout_candidate_generated": bind_group_generated,
++        "debug_buffer_binding_candidate_generated": debug_buffer_generated,
++        "target_shader": qw38g_r6a_r5_str_at(shader_variant, "target_shader", "burn_tensor_matmul_vocab_atlas_tile"),
++        "debug_variant_id": qw38g_r6a_r5_str_at(shader_variant, "debug_variant_id", "burn_tensor_matmul_vocab_atlas_tile_debug_scalar_tap"),
++        "selected_group": bind_group.and_then(|v| v.get("selected_group")).cloned().unwrap_or(serde_json::Value::Null),
++        "selected_slot": bind_group.and_then(|v| v.get("selected_slot")).cloned().unwrap_or(serde_json::Value::Null),
++        "scalar_only": qw38g_r6a_r5_bool_at(debug_buffer, "scalar_only", false),
++        "planned_records": qw38g_r6a_r5_u64_at(debug_buffer, "planned_records", 0),
++        "planned_bytes": qw38g_r6a_r5_u64_at(debug_buffer, "planned_bytes", 0),
++        "max_bytes": qw38g_r6a_r5_u64_at(debug_buffer, "max_bytes", 0),
++        "normal_pipeline_unchanged": normal_pipeline_unchanged,
++        "normal_bind_group_layout_unchanged": normal_bind_group_layout_unchanged,
++        "mutation_guard_passed": mutation_guard_passed
++    });
++
++    let risk_level = if status == "PENDING_OPERATOR_REVIEW" || status == "APPROVED_FOR_BACKEND_EXTENSION_APPLY_CANDIDATE" {
++        "medium"
++    } else {
++        "blocked"
++    };
++    let risk_summary = serde_json::json!({
++        "cache_poisoning_risk": cache_poisoning_risk,
++        "binding_collision_risk": binding_collision_risk,
++        "normal_pipeline_mutation_risk": normal_pipeline_mutation_risk,
++        "normal_layout_mutation_risk": normal_layout_mutation_risk,
++        "full_vector_readback_risk": full_vector_readback_risk,
++        "debug_shader_without_buffer_risk": debug_shader_without_buffer_risk,
++        "rollback_required": true,
++        "risk_level": risk_level,
++        "risk_notes": [
++            "dry-run candidate passed but backend mutation has not been applied",
++            "apply must remain blocked until operator decision is approved",
++            "debug shader must never run without a bound debug buffer"
++        ]
++    });
++
++    let all_requirements_met = dry_run_loaded
++        && dry_run_receipt_loaded
++        && dry_run_status == "PASS_BACKEND_EXTENSION_APPLY_DRY_RUN"
++        && !cache_poisoning_risk
++        && !binding_collision_risk
++        && !normal_pipeline_mutation_risk
++        && !normal_layout_mutation_risk
++        && !full_vector_readback_risk
++        && mutation_guard_passed;
++
++    let approval_requirements = serde_json::json!({
++        "require_operator_approval": true,
++        "require_clean_dry_run": true,
++        "require_cache_key_separation": true,
++        "require_no_binding_collision": true,
++        "require_scalar_only": true,
++        "require_no_normal_pipeline_mutation": true,
++        "require_rollback_plan": true,
++        "all_requirements_met": all_requirements_met,
++        "unmet_requirements": if all_requirements_met { serde_json::json!([]) } else { serde_json::json!(warning_codes.clone()) }
++    });
++
++    let operator_decision = serde_json::json!({
++        "decision": mode.clone(),
++        "approved_for_next_patch": approved_for_next_patch,
++        "next_patch_allowed": next_patch_allowed.clone(),
++        "operator_note": std::env::var("ASH_BACKEND_EXTENSION_OPERATOR_NOTE").ok(),
++        "decision_timestamp_unix_ms": qw38g_r3_now_ms(),
++        "decision_receipt_required": true
++    });
++
++    eprintln!(
++        "[16AI-QW-38G-R6A-R5][candidate_summary] shader_variant={} cache_key={} bind_group={} debug_buffer={}",
++        shader_variant_generated,
++        pipeline_cache_generated,
++        bind_group_generated,
++        debug_buffer_generated
++    );
++    eprintln!("[16AI-QW-38G-R6A-R5][risk_summary] risk_level={}", risk_level);
++    eprintln!("[16AI-QW-38G-R6A-R5][approval_requirements] all_met={} approval_required=true", all_requirements_met);
++    eprintln!("[16AI-QW-38G-R6A-R5][operator_decision] decision={} next_patch_allowed={:?}", mode, next_patch_allowed);
++
++    let packet = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R5",
++        "source_patch_id": "16AI-QW-38G-R6A-R4",
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "review_state": review_state,
++        "review_mode": mode,
++        "dry_run_path": dry_run_path,
++        "dry_run_receipt_path": dry_run_receipt_path,
++        "dry_run_loaded": dry_run_loaded,
++        "dry_run_receipt_loaded": dry_run_receipt_loaded,
++        "dry_run_status": dry_run_status,
++        "candidate_summary": candidate_summary,
++        "risk_summary": risk_summary,
++        "approval_requirements": approval_requirements,
++        "operator_decision": operator_decision,
++        "apply_performed": false,
++        "shader_write_performed": false,
++        "pipeline_layout_mutation_performed": false,
++        "bind_group_layout_mutation_performed": false,
++        "bind_group_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warning_codes
++    });
++
++    qw38g_r6a_r2_write_json(&packet_path, &packet);
++    let packet_written = qw38g_r6a_r2_path_written(&packet_path);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R5",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "review_state": packet.get("review_state").cloned().unwrap_or_else(|| serde_json::json!("DRAFT")),
++        "review_mode": packet.get("review_mode").cloned().unwrap_or_else(|| serde_json::json!("draft")),
++        "dry_run_loaded": dry_run_loaded,
++        "dry_run_receipt_loaded": dry_run_receipt_loaded,
++        "dry_run_status": packet.get("dry_run_status").cloned().unwrap_or_else(|| serde_json::json!("MISSING_DRY_RUN")),
++        "approval_required": true,
++        "approved_for_next_patch": approved_for_next_patch,
++        "next_patch_allowed": next_patch_allowed,
++        "apply_performed": false,
++        "review_packet_path": packet_path,
++        "review_packet_written": packet_written,
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": packet.get("recommended_next_patch").cloned().unwrap_or_else(|| serde_json::json!("16AI-QW-38G-R6A-R5_APPROVE_OR_HOLD")),
++        "warning_codes": packet.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([]))
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R5][review_packet_written] path={}", qw38g_r6a_r5_packet_path());
++    eprintln!("[16AI-QW-38G-R6A-R5][receipt_written] path={}", qw38g_r6a_r5_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R5][done] status={}", receipt.get("status").and_then(|v| v.as_str()).unwrap_or("UNKNOWN"));
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -5077,6 +5394,7 @@
+         qw38g_r6a_r2_burn_wgpu_owner_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r3_backend_debug_binding_extension_spec();
+         qw38g_r6a_r4_backend_extension_apply_dry_run();
++        qw38g_r6a_r5_backend_extension_operator_review();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

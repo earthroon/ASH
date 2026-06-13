@@ -1,0 +1,20 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37N-R1",
+  "source_patch_id": "ASH-BASETRAIN-GPU-37N",
+  "title": "Payload Receipt Digest Alias Buildfix / Local Payload Digest Variable Rebind Seal",
+  "status": "BAKED_STATIC_BUILD_FIX",
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_37n_selected_group_row_block_multi_word_diagnostic_kernel.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37N-R1.md",
+    "patch_reports/ASH-BASETRAIN-GPU-37N-R1_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_37N_R1_STATIC_CHECKS.json",
+    "artifacts/ASH_BASETRAIN_GPU_37N_R1_STATIC_CHECKS.txt",
+    "artifacts/ASH_BASETRAIN_GPU_37N_R1_BAKE_MANIFEST.json"
+  ],
+  "build_error_repaired": "E0425 cannot find value payload_receipt_digest_hex",
+  "repair": "Output field payload_receipt_digest_hex now receives payload_digest_hex explicitly in block_output initializer.",
+  "live_upstream_receipts_included": false,
+  "sha256_files_included": false,
+  "cargo_available": false,
+  "cargo_check_executed": false
+}

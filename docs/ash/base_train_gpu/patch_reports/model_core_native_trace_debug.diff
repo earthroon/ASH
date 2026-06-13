@@ -1,0 +1,174 @@
+--- /tmp/ashorig/crates/model_core/src/lib.rs	2026-04-19 13:58:15.000000000 +0000
++++ /tmp/ashpatch/crates/model_core/src/lib.rs	2026-04-19 14:14:03.305673449 +0000
+@@ -2707,14 +2707,52 @@
+             padded_token_ids.len(),
+         );
+ 
++        let runtime_handles_ok = self.runtime_handles.is_some();
++        let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
++        let gpu_sampling_ok = self.gpu_sampling_runtime.is_some();
++        let raw_bridge_ok = self.same_device_raw_bridge().is_some();
++        println!(
++            "[native-trace][submit][precheck] target_key={} slot_id={} batch_size={} max_seq_len={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
++            request.target_key,
++            slot_id,
++            request.batch_size,
++            request.max_seq_len,
++            runtime_handles_ok,
++            atlas_dispatcher_ok,
++            gpu_sampling_ok,
++            raw_bridge_ok,
++        );
++
+         let handles = self
+             .same_device_runtime_handles()
+             .cloned()
+-            .ok_or_else(|| anyhow!("native trace runtime handles unavailable for target_key={}", request.target_key))?;
++            .ok_or_else(|| anyhow!(
++                "native trace runtime unavailable: target_key={} slot_id={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
++                request.target_key,
++                slot_id,
++                runtime_handles_ok,
++                atlas_dispatcher_ok,
++                gpu_sampling_ok,
++                raw_bridge_ok,
++            ))?;
+         let bridge = self
+             .same_device_raw_bridge()
+-            .ok_or_else(|| anyhow!("native same-device raw bridge unavailable for target_key={}", request.target_key))?;
++            .ok_or_else(|| anyhow!(
++                "native same-device raw bridge unavailable: target_key={} slot_id={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} raw_bridge_ok={}",
++                request.target_key,
++                slot_id,
++                runtime_handles_ok,
++                atlas_dispatcher_ok,
++                gpu_sampling_ok,
++                raw_bridge_ok,
++            ))?;
+ 
++        println!(
++            "[native-trace][submit] stage=trace_hidden_pair target_key={} slot_id={} padded_tokens={}",
++            request.target_key,
++            slot_id,
++            padded_token_ids.len(),
++        );
+         let (input_tensor, output_tensor, actual_in, actual_out) =
+             self.trace_module_native_hidden_pair(request, padded_token_ids)?;
+         ensure!(
+@@ -2728,12 +2766,28 @@
+         );
+ 
+         let mut stats = BridgeStats::default();
++        println!(
++            "[native-trace][submit] stage=bridge_native_tensor target_key={} slot_id={}",
++            request.target_key,
++            slot_id,
++        );
+         let input_lease = bridge
+             .bridge_native_tensor_f32("module_trace_input", &input_tensor, &mut stats)
+             .map_err(|err| anyhow!("failed to bridge native module trace input: {err}"))?;
+         let output_lease = bridge
+             .bridge_native_tensor_f32("module_trace_output", &output_tensor, &mut stats)
+             .map_err(|err| anyhow!("failed to bridge native module trace output: {err}"))?;
++        println!(
++            "[native-trace][submit][raw-borrow] target_key={} slot_id={} input_zero_copy={} output_zero_copy={} input_vendor_path={} output_vendor_path={} input_offset={} output_offset={}",
++            request.target_key,
++            slot_id,
++            input_lease.active_handle.is_zero_copy_candidate(),
++            output_lease.active_handle.is_zero_copy_candidate(),
++            input_lease.active_handle.vendor_access_path,
++            output_lease.active_handle.vendor_access_path,
++            input_lease.buffer_offset,
++            output_lease.buffer_offset,
++        );
+ 
+         ensure!(
+             input_lease.active_handle.is_zero_copy_candidate(),
+@@ -2768,6 +2822,16 @@
+             mapped_at_creation: false,
+         }));
+ 
++        println!(
++            "[native-trace][submit] stage=create_staging target_key={} slot_id={} input_bytes={} output_bytes={} stats_bridged={} stats_zero_copy={} stats_fallback={}",
++            request.target_key,
++            slot_id,
++            input_byte_len,
++            output_byte_len,
++            stats.bridged_tensor_count,
++            stats.zero_copy_tensor_count,
++            stats.fallback_tensor_count,
++        );
+         let mut encoder = handles.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+             label: Some("module_trace_readback_encoder"),
+         });
+@@ -2785,6 +2849,13 @@
+             0,
+             output_byte_len.max(4) as u64,
+         );
++        println!(
++            "[native-trace][submit] stage=queue_submit target_key={} slot_id={} input_bytes={} output_bytes={}",
++            request.target_key,
++            slot_id,
++            input_byte_len,
++            output_byte_len,
++        );
+         handles.queue.submit(Some(encoder.finish()));
+ 
+         {
+@@ -2831,10 +2902,31 @@
+             return Ok(false);
+         }
+ 
++        let runtime_handles_ok = self.runtime_handles.is_some();
++        let atlas_dispatcher_ok = self.atlas_dispatcher.is_some();
++        let gpu_sampling_ok = self.gpu_sampling_runtime.is_some();
++        println!(
++            "[native-trace][poll][precheck] target_key={} slot_id={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} map_requested={} input_ready={} output_ready={}",
++            ticket.target_key,
++            ticket.slot_id,
++            runtime_handles_ok,
++            atlas_dispatcher_ok,
++            gpu_sampling_ok,
++            ticket.map_requested,
++            ticket.input_ready,
++            ticket.output_ready,
++        );
+         let handles = self
+             .same_device_runtime_handles()
+             .cloned()
+-            .ok_or_else(|| anyhow!("native trace runtime handles unavailable for target_key={}", ticket.target_key))?;
++            .ok_or_else(|| anyhow!(
++                "native trace poll runtime unavailable: target_key={} slot_id={} runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={}",
++                ticket.target_key,
++                ticket.slot_id,
++                runtime_handles_ok,
++                atlas_dispatcher_ok,
++                gpu_sampling_ok,
++            ))?;
+         let slot = self
+             .trace_ring
+             .slots
+@@ -3192,6 +3284,14 @@
+         let runtime_handles = try_extract_runtime_handles(&device);
+         let gpu_sampling_runtime = runtime_handles.as_ref().map(GpuSamplingRuntime::from_handles);
+         let gpu_penalty_runtime = runtime_handles.as_ref().map(GpuPenaltyPass::from_handles);
++        let atlas_dispatcher = HeadwiseAtlasDispatcher::try_new_default().ok();
++        println!(
++            "[native-trace][init] runtime_handles_ok={} atlas_dispatcher_ok={} gpu_sampling_ok={} gpu_penalty_ok={}",
++            runtime_handles.is_some(),
++            atlas_dispatcher.is_some(),
++            gpu_sampling_runtime.is_some(),
++            gpu_penalty_runtime.is_some(),
++        );
+         let model = load_full_checkpoint_into_model::<NativeInferenceBackend>(&spec, &full, &device);
+ 
+         Ok(Self {
+@@ -3202,7 +3302,7 @@
+             runtime_handles,
+             gpu_sampling_runtime,
+             gpu_penalty_runtime,
+-            atlas_dispatcher: HeadwiseAtlasDispatcher::try_new_default().ok(),
++            atlas_dispatcher,
+             text_density_gate_runtime: None,
+             text_density_state: NativeTextDensityState::default(),
+             structure_routing_state: StructureRoutingState::default(),

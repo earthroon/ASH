@@ -1,0 +1,74 @@
+--- /mnt/data/qw35b_pristine/crates/runtime/src/infer.rs	2026-05-22 06:38:02.000000000 +0000
++++ /mnt/data/qw35e_work/crates/runtime/src/infer.rs	2026-05-22 07:23:17.001958874 +0000
+@@ -71,6 +71,23 @@
+ static GPU_SAMPLING_AUTO_CALIBRATION_STATE: OnceLock<
+     Mutex<Option<GpuSamplingAutoCalibrationState>>,
+ > = OnceLock::new();
++
++fn q35e_env_truthy(name: &str) -> bool {
++    matches!(
++        std::env::var(name).ok().as_deref(),
++        Some("1")
++            | Some("true")
++            | Some("TRUE")
++            | Some("on")
++            | Some("ON")
++            | Some("yes")
++            | Some("YES")
++    )
++}
++
++fn q35e_force_no_lora_enabled() -> bool {
++    q35e_env_truthy("ASH_FORCE_NO_LORA")
++}
+ #[derive(Debug, Clone, Default)]
+ struct GpuSamplingPersistentRuntimeMetadata {
+     status: Option<GpuSamplingPersistentStateStatus>,
+@@ -2627,7 +2644,16 @@
+         req.text_routing_prior.as_ref(),
+     );
+ 
+-    let loaded_loras = if req.lora_json_paths.is_empty() {
++    let force_no_lora = q35e_force_no_lora_enabled();
++    let loaded_loras = if force_no_lora {
++        if !req.lora_json_paths.is_empty() {
++            eprintln!(
++                "[16AI-QW-35E][base_only] force_no_lora=true requested_lora_json_paths={} action=skip_load",
++                req.lora_json_paths.len()
++            );
++        }
++        Vec::new()
++    } else if req.lora_json_paths.is_empty() {
+         Vec::new()
+     } else {
+         load_runtime_lora_attachments_from_json_paths(&req.lora_json_paths)?
+@@ -2676,7 +2702,14 @@
+         .as_ref()
+         .map(AshDecisionEngine::from_policy_bundle)
+         .unwrap_or_else(|| AshDecisionEngine::new("ash_policy_v1"));
+-    let decision = decision_engine.decide(&decision_input);
++    let mut decision = decision_engine.decide(&decision_input);
++    if force_no_lora && !decision.selected_lora_ids.is_empty() {
++        eprintln!(
++            "[16AI-QW-35E][base_only] clearing_selected_lora_ids={:?}",
++            decision.selected_lora_ids
++        );
++        decision.selected_lora_ids.clear();
++    }
+     let output_guard_spec = loaded_policy_bundle
+         .as_ref()
+         .and_then(|bundle| bundle.output_guard_spec.clone());
+@@ -2703,6 +2736,13 @@
+     eprintln!("[debug] loaded_loras = {}", loaded_loras.len());
+     eprintln!("[debug] attached_loras = {}", attached.len());
+     eprintln!(
++        "[16AI-QW-35E][semantic_split] force_no_lora={} selected_lora_ids={:?} loaded_loras={} attached_loras={}",
++        force_no_lora,
++        decision.selected_lora_ids,
++        loaded_loras.len(),
++        attached.len()
++    );
++    eprintln!(
+         "[debug] attach_resolution reason={} selected={} attached={} missing={}",
+         attach_resolution.attach_resolution_reason,
+         attach_resolution.selected_count,

@@ -1,0 +1,67 @@
+--- /mnt/data/ash_directmode_orig/crates/runtime/examples/infer_only.rs	2026-06-03 06:36:26.000000000 +0000
++++ /mnt/data/ash_directmode_work/crates/runtime/examples/infer_only.rs	2026-06-03 07:36:54.985215721 +0000
+@@ -50,9 +50,10 @@
+   --text <string>            or --text-file <path>
+ 
+ Runtime source:
+-  --runtime-profile <path>   default: specs/runtime_profile.toml when present
+-  --model-spec <path>        required when runtime profile is omitted
+-  --tokenizer <path>         required when runtime profile is omitted
++  --runtime-profile <path>   use an explicit runtime profile
++  --model-spec <path>        direct mode model spec; requires --tokenizer
++  --tokenizer <path>         direct mode tokenizer manifest; requires --model-spec
++  no runtime source flags     default: specs/runtime_profile.toml when present
+ 
+ Optional:
+   --task <name>              default: freeform
+@@ -255,15 +256,25 @@
+     }
+ 
+     let has_runtime_profile = cli.runtime_profile.is_some();
+-    if !has_runtime_profile && cli.model_spec.is_none() {
++    let has_direct_model_spec = cli.model_spec.is_some();
++    let has_direct_tokenizer = cli.tokenizer.is_some();
++    let has_direct_runtime_inputs = has_direct_model_spec || has_direct_tokenizer;
++
++    if has_runtime_profile && has_direct_runtime_inputs {
+         return Err(anyhow!(
+-            "--model-spec is required when --runtime-profile is omitted\n\n{}",
++            "choose either --runtime-profile or direct --model-spec/--tokenizer, not both\n\n{}",
+             usage()
+         ));
+     }
+-    if !has_runtime_profile && cli.tokenizer.is_none() {
++    if has_direct_runtime_inputs && !has_direct_model_spec {
+         return Err(anyhow!(
+-            "--tokenizer is required when --runtime-profile is omitted\n\n{}",
++            "--model-spec is required when using direct runtime inputs\n\n{}",
++            usage()
++        ));
++    }
++    if has_direct_runtime_inputs && !has_direct_tokenizer {
++        return Err(anyhow!(
++            "--tokenizer is required when using direct runtime inputs\n\n{}",
+             usage()
+         ));
+     }
+@@ -402,11 +413,17 @@
+     apply_qw55a_cli_env(&cli);
+     let input_text = load_text(&cli)?;
+ 
++    let direct_runtime_inputs = cli.model_spec.is_some() || cli.tokenizer.is_some();
++    let runtime_profile_path = if direct_runtime_inputs {
++        cli.runtime_profile
++    } else {
++        cli.runtime_profile
++            .or_else(|| Some(PathBuf::from("specs/runtime_profile.toml")))
++    };
++
+     let req = StandardInferRequest {
+         request_id: cli.request_id,
+-        runtime_profile_path: cli
+-            .runtime_profile
+-            .or_else(|| Some(PathBuf::from("specs/runtime_profile.toml"))),
++        runtime_profile_path,
+         model_spec_path: cli.model_spec,
+         tokenizer_manifest_path: cli.tokenizer,
+         task: Some(cli.task),

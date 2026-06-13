@@ -1,0 +1,8 @@
+--- qw_tok_train00_orig/crates/model_core/src/lib.rs	2026-06-03 06:08:49.000000000 +0000
++++ qw_tok_train00_work/crates/model_core/src/lib.rs	2026-06-03 08:25:32.661607022 +0000
+@@ -1387,3 +1387,5 @@
+ pub use tokenizer_v5_first_attention_compute_probe::*;
+ mod tokenizer_v5_attention_compute_rerun;
+ pub use tokenizer_v5_attention_compute_rerun::*;
++mod tokenizer_v5_checkpoint_rebind_inspector;
++pub use tokenizer_v5_checkpoint_rebind_inspector::*;

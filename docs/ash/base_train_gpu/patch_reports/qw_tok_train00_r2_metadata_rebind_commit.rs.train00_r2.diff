@@ -1,0 +1,29 @@
+--- /dev/null	2026-06-03 05:19:45.773060743 +0000
++++ crates/model_core/src/bin/qw_tok_train00_r2_metadata_rebind_commit.rs	2026-06-03 09:00:15.131701252 +0000
+@@ -0,0 +1,26 @@
++use model_core::{
++    qw_tok_train00_r2_config_from_args, run_qw_tok_train00_r2_metadata_rebind_commit,
++    write_qw_tok_train00_r2_artifacts,
++};
++use std::{env, path::Path};
++
++fn main() {
++    let args: Vec<String> = env::args().skip(1).collect();
++    let cfg = qw_tok_train00_r2_config_from_args(&args);
++    match run_qw_tok_train00_r2_metadata_rebind_commit(cfg) {
++        Ok(report) => {
++            if let Err(err) = write_qw_tok_train00_r2_artifacts(Path::new("."), &report) {
++                eprintln!("failed to write QW-TOK-TRAIN-00-R2 artifacts: {}", err);
++                std::process::exit(2);
++            }
++            println!("{}", report.status);
++            if report.status.starts_with("FAIL_") {
++                std::process::exit(1);
++            }
++        }
++        Err(err) => {
++            eprintln!("QW-TOK-TRAIN-00-R2 metadata rebind commit failed: {}", err);
++            std::process::exit(2);
++        }
++    }
++}

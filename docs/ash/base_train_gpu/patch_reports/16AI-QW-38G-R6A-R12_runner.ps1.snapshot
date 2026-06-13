@@ -1,0 +1,92 @@
+# run_16AI_QW_38G_R6A_R12_root_cause_split_plan.ps1
+param(
+  [switch]$Build,
+  [int]$Seed = 42,
+  [int]$MaxNewTokens = 1,
+  [string]$InputTextFile = ".\workspace\qw38g_r6a_r2_input.txt"
+)
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
+
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+if (!(Test-Path $InputTextFile)) {
+  "1+1은?" | Set-Content $InputTextFile -Encoding UTF8
+}
+
+function Clear-AshPatchEnv {
+  $names = @(
+    "ASH_ROOT_CAUSE_SPLIT_PLAN", "ASH_ROOT_CAUSE_SPLIT_PLAN_MODE",
+    "ASH_R10_R2_AGGREGATION_SOURCE", "ASH_R10_R2_AGGREGATION_RECEIPT", "ASH_R10_R2_AGGREGATION_TRACE",
+    "ASH_R8_SCALAR_SOURCE", "ASH_R11_MARGIN_SOURCE", "ASH_LM_HEAD_ROW_AUDIT_SOURCE",
+    "ASH_ROOT_CAUSE_SPLIT_PLAN_OUT", "ASH_ROOT_CAUSE_SPLIT_PLAN_RECEIPT", "ASH_ROOT_CAUSE_SPLIT_PLAN_REPORT",
+    "ASH_BACKEND_EXTENSION_PRODUCTION_APPLY", "ASH_DEBUG_BUFFER_FULL_VECTOR",
+    "ASH_MUTATE_LM_HEAD_ROW", "ASH_MUTATE_TOKENIZER", "ASH_MUTATE_BAN_MASK"
+  )
+  foreach ($n in $names) { Remove-Item "Env:$n" -ErrorAction SilentlyContinue }
+}
+
+function Invoke-InferOnly {
+  param(
+    [int]$Seed,
+    [string]$LiveLog
+  )
+  $exe = ".\target\release\examples\infer_only.exe"
+  if (!(Test-Path $exe)) {
+    Write-Host "[16AI-QW-38G-R6A-R12][error] infer_only.exe missing; rerun with -Build"
+    exit 1
+  }
+  Write-Host "[16AI-QW-38G-R6A-R12][run] seed=$Seed live=$LiveLog"
+  $cmd = "$exe --model-spec .\specs\model_spec_v5_48259.toml --tokenizer .\artifacts\tokenizer_manifest_v5_final.json --checkpoint .\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors --task freeform --max-new-tokens $MaxNewTokens --seed $Seed --text-file $InputTextFile --json 2>&1"
+  cmd /c $cmd | Tee-Object $LiveLog
+  $code = $LASTEXITCODE
+  Write-Host "[16AI-QW-38G-R6A-R12][run_done] exit_code=$code live=$LiveLog"
+  if ($code -ne 0) { exit $code }
+}
+
+if ($Build) {
+  Write-Host "[16AI-QW-38G-R6A-R12][build] cargo build --release example infer_only"
+  cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" |
+    Tee-Object ".\workspace\build_qw38g_r6a_r12_live.log"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[16AI-QW-38G-R6A-R12][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r12_live.log"
+    exit $LASTEXITCODE
+  }
+  Write-Host "[16AI-QW-38G-R6A-R12][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r12_live.log"
+}
+
+Clear-AshPatchEnv
+$env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+$env:ASH_FORCE_NO_LORA = "1"
+$env:ASH_ROOT_CAUSE_SPLIT_PLAN = "1"
+$env:ASH_ROOT_CAUSE_SPLIT_PLAN_MODE = "final_boundary_vs_lm_head"
+$env:ASH_R10_R2_AGGREGATION_SOURCE = "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_summary.json"
+$env:ASH_R10_R2_AGGREGATION_RECEIPT = "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_receipt.json"
+$env:ASH_R10_R2_AGGREGATION_TRACE = "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_trace.jsonl"
+$env:ASH_R8_SCALAR_SOURCE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json"
+$env:ASH_R11_MARGIN_SOURCE = "workspace/qw38g_r6a_r11_projection_margin_summary.json"
+$env:ASH_LM_HEAD_ROW_AUDIT_SOURCE = "workspace/qw38a_lm_head_row_norm_report.json"
+$env:ASH_ROOT_CAUSE_SPLIT_PLAN_OUT = "workspace/qw38g_r6a_r12_root_cause_split_plan.json"
+$env:ASH_ROOT_CAUSE_SPLIT_PLAN_RECEIPT = "workspace/qw38g_r6a_r12_root_cause_split_plan_receipt.json"
+$env:ASH_ROOT_CAUSE_SPLIT_PLAN_REPORT = "workspace/qw38g_r6a_r12_root_cause_split_plan_report.md"
+
+Invoke-InferOnly -Seed $Seed -LiveLog ".\workspace\infer_qw38g_r6a_r12_root_cause_split_plan_live.log"
+
+$paths = @(
+  ".\workspace\qw38g_r6a_r12_root_cause_split_plan_receipt.json",
+  ".\workspace\qw38g_r6a_r12_root_cause_split_plan.json",
+  ".\workspace\qw38g_r6a_r12_root_cause_split_plan_report.md"
+)
+foreach ($p in $paths) {
+  if (Test-Path $p) {
+    Write-Host "[16AI-QW-38G-R6A-R12][artifact] $p"
+    Get-Content $p -Encoding UTF8
+  } else {
+    Write-Host "[16AI-QW-38G-R6A-R12][warn] artifact missing: $p"
+  }
+}

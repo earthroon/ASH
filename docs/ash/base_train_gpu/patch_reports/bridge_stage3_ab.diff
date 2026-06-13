@@ -1,0 +1,133 @@
+--- /tmp/stage3ab_orig/crates/lora_train/src/bridge.rs	2026-04-19 13:01:38.000000000 +0000
++++ /tmp/stage3ab/crates/lora_train/src/bridge.rs	2026-04-19 13:10:27.390991481 +0000
+@@ -8,7 +8,7 @@
+ use tokenizer_core::{NativeTokenizer, TokenizerEngine, TokenizerManifest};
+ 
+ use crate::{
+-    config::{FeatureBridgeConfig, LoraTrainConfig},
++    config::{BridgeModelKind, FeatureBridgeConfig, LoraTrainConfig},
+     dataset::{stream_packed_samples, JsonlDatasetStats},
+     feature_store::{
+         FeatureShardBuffer, FeatureShardMeta, FeatureStoreManifest, ModuleLocalFeatureShardBuffer, write_feature_shard, write_module_local_feature_shard,
+@@ -100,6 +100,66 @@
+     )
+ }
+ 
++enum ModuleLocalCaptureRuntime {
++    NativeFirst {
++        native: NativeWgpuModel,
++        fallback: ReferenceModel,
++    },
++    Reference(ReferenceModel),
++}
++
++impl ModuleLocalCaptureRuntime {
++    fn mode_label(&self) -> &'static str {
++        match self {
++            Self::NativeFirst { .. } => "native_first",
++            Self::Reference(_) => "reference_only",
++        }
++    }
++
++    fn capture_padded_batch(
++        &self,
++        target_key: &str,
++        token_ids: &[u32],
++        lengths: &[usize],
++        max_seq_len: usize,
++    ) -> Result<Vec<model_core::CapturedModuleIo>> {
++        match self {
++            Self::NativeFirst { native, fallback } => {
++                let request = model_core::ModuleTraceTapRequest {
++                    target_key: target_key.to_string(),
++                    batch_size: lengths.len(),
++                    max_seq_len,
++                    seq_lens: lengths.to_vec(),
++                };
++                match native.capture_module_io_native_padded_batch(&request, token_ids) {
++                    Ok(captures) => {
++                        println!(
++                            "[bridge][module_local][runtime] native capture ok target_key={} batch={} max_seq_len={}",
++                            target_key,
++                            lengths.len(),
++                            max_seq_len,
++                        );
++                        Ok(captures)
++                    }
++                    Err(err) => {
++                        println!(
++                            "[bridge][module_local][runtime] native capture fallback target_key={} batch={} max_seq_len={} reason={}",
++                            target_key,
++                            lengths.len(),
++                            max_seq_len,
++                            err,
++                        );
++                        fallback.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++                    }
++                }
++            }
++            Self::Reference(reference) => {
++                reference.capture_module_io_padded_batch(token_ids, lengths, max_seq_len, target_key)
++            }
++        }
++    }
++}
++
+ impl RawTextFeatureBridge {
+     pub fn extract_feature_store_from_paths(
+         &self,
+@@ -537,7 +597,26 @@
+     fs::create_dir_all(&work_dir)?;
+     let rows_per_shard = bridge.config.feature_store_rows_per_shard.max(1);
+     let full_model_path = resolve_teacher_full_model_path(&bridge.config, &cfg.model_path)?;
+-    let teacher = ReferenceModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
++    let module_local_teacher_batch_size = bridge
++        .config
++        .module_local_teacher_batch_size
++        .unwrap_or(4)
++        .max(1);
++    let target_key = first.target_key.clone();
++    let teacher_runtime = match bridge.config.model_kind {
++        BridgeModelKind::AshNative => {
++            let native = NativeWgpuModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
++            let fallback = ReferenceModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
++            ModuleLocalCaptureRuntime::NativeFirst { native, fallback }
++        }
++    };
++    println!(
++        "[bridge][module_local][runtime] selected mode={} target_key={} rows_per_shard={} teacher_batch_size={}",
++        teacher_runtime.mode_label(),
++        target_key,
++        rows_per_shard,
++        module_local_teacher_batch_size,
++    );
+     let tokenizer_manifest = TokenizerManifest::load_json(&bridge.config.tokenizer_path)?;
+ 
+     let mut report = BridgeExtractionReport::default();
+@@ -548,12 +627,6 @@
+     let mut total_rows = 0usize;
+     let mut total_tokens = 0usize;
+     let mut max_seq_len_seen = 0usize;
+-    let module_local_teacher_batch_size = bridge
+-        .config
+-        .module_local_teacher_batch_size
+-        .unwrap_or(4)
+-        .max(1);
+-    let target_key = first.target_key.clone();
+ 
+     let (prepared_tx, prepared_rx) = sync_channel::<PreparedModuleLocalBatch>(4);
+     let (shard_tx, shard_rx) = sync_channel::<FrozenModuleLocalShard>(2);
+@@ -733,11 +806,11 @@
+         let max_batch_seq_len = batch.max_batch_seq_len;
+         let padded_token_ids = batch.padded_token_ids;
+         let t_capture = Instant::now();
+-        let captures = teacher.capture_module_io_padded_batch(
++        let captures = teacher_runtime.capture_padded_batch(
++            &target_key,
+             &padded_token_ids,
+             &seq_lens,
+             max_batch_seq_len,
+-            &target_key,
+         )?;
+         let capture_sec = t_capture.elapsed().as_secs_f64();
+         if captures.len() != batch_size {

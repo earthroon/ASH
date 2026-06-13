@@ -1,0 +1,908 @@
+--- /dev/null	2026-06-03 05:19:45.773060743 +0000
++++ /tmp/r2new.rs	2026-06-03 09:01:19.065580013 +0000
+@@ -0,0 +1,905 @@
++use anyhow::{anyhow, Context, Result};
++use serde::{Deserialize, Serialize};
++use serde_json::{Map, Value};
++use sha2::{Digest, Sha256};
++use std::collections::{BTreeMap, BTreeSet};
++use std::fs::{self, File};
++use std::io::{BufReader, BufWriter, Read, Write};
++use std::path::{Path, PathBuf};
++
++pub const QW_TOK_TRAIN00_R2_PATCH_ID: &str = "QW-TOK-TRAIN-00-R2";
++pub const QW_TOK_TRAIN00_R2_TITLE: &str =
++    "Safetensors Metadata Tokenizer Hash Rebind Commit / No Weight Tensor Mutation Seal";
++pub const QW_TOK_TRAIN00_R2_REPORT_PATH: &str =
++    "artifacts/qw_tok_train00_r2_metadata_rebind_commit_report.json";
++pub const QW_TOK_TRAIN00_R2_ORIGINAL_FINGERPRINT_PATH: &str =
++    "artifacts/qw_tok_train00_r2_original_checkpoint_fingerprint.json";
++pub const QW_TOK_TRAIN00_R2_REBOUND_FINGERPRINT_PATH: &str =
++    "artifacts/qw_tok_train00_r2_rebound_checkpoint_fingerprint.json";
++pub const QW_TOK_TRAIN00_R2_PAYLOAD_PARITY_PATH: &str =
++    "artifacts/qw_tok_train00_r2_tensor_payload_parity_receipt.json";
++pub const QW_TOK_TRAIN00_R2_HEADER_BEFORE_AFTER_PATH: &str =
++    "artifacts/qw_tok_train00_r2_header_metadata_before_after_receipt.json";
++pub const QW_TOK_TRAIN00_R2_NO_MUTATION_PATH: &str =
++    "artifacts/qw_tok_train00_r2_no_weight_mutation_receipt.json";
++pub const QW_TOK_TRAIN00_R2_OPERATOR_APPROVAL_PATH: &str =
++    "artifacts/qw_tok_train00_r2_operator_approval_receipt.json";
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2Config {
++    pub model_spec_path: String,
++    pub tokenizer_manifest_path: String,
++    pub checkpoint_path: String,
++    pub candidate_checkpoint_path: String,
++    pub report_out_path: String,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub approve_write_new_checkpoint: bool,
++    pub allow_in_place_overwrite: bool,
++    pub allow_training: bool,
++    pub allow_weight_tensor_mutation: bool,
++    pub allow_decode_execution: bool,
++}
++
++impl Default for QwTokTrain00R2Config {
++    fn default() -> Self {
++        Self {
++            model_spec_path: "specs/model_spec_v5_48259.toml".to_string(),
++            tokenizer_manifest_path: "tokenizer_v5/artifacts/tokenizer_manifest_v5_final.json".to_string(),
++            checkpoint_path: "tokenizer_v5/artifacts/full_model_vocab_v5_resized.safetensors".to_string(),
++            candidate_checkpoint_path: "tokenizer_v5/artifacts/full_model_vocab_v5_resized.train00_r2_metadata_rebound.safetensors".to_string(),
++            report_out_path: QW_TOK_TRAIN00_R2_REPORT_PATH.to_string(),
++            expected_model_spec_id: "model_tinyllama_1p1b_v5_48259".to_string(),
++            expected_vocab_size: 48_259,
++            approve_write_new_checkpoint: false,
++            allow_in_place_overwrite: false,
++            allow_training: false,
++            allow_weight_tensor_mutation: false,
++            allow_decode_execution: false,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2ModelSpecSsot {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub model_spec_id: Option<String>,
++    pub model_name: Option<String>,
++    pub vocab_size: Option<usize>,
++    pub expected_model_spec_id: String,
++    pub expected_vocab_size: usize,
++    pub model_spec_id_match: bool,
++    pub vocab_size_match: bool,
++    pub v4_residue_detected: bool,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2RuntimeTokenizerSsot {
++    pub path: String,
++    pub exists: bool,
++    pub readable: bool,
++    pub tokenizer_id: Option<String>,
++    pub manifest_id: Option<String>,
++    pub tokenizer_spec_id: Option<String>,
++    pub top_level_manifest_hash_present: bool,
++    pub hashes_manifest_hash: Option<String>,
++    pub sentencepiece_model_hash: Option<String>,
++    pub sentencepiece_vocab_hash: Option<String>,
++    pub vocab_hash: Option<String>,
++    pub reserved_tokens_hash_present: bool,
++    pub vocab_len: Option<usize>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2CheckpointFingerprint {
++    pub path: String,
++    pub exists: bool,
++    pub file_size_bytes: Option<u64>,
++    pub header_length_bytes: Option<u64>,
++    pub payload_length_bytes: Option<u64>,
++    pub file_sha256: Option<String>,
++    pub header_sha256: Option<String>,
++    pub payload_sha256: Option<String>,
++    pub tensor_descriptor_hash: Option<String>,
++    pub tensor_key_count: usize,
++    pub tensor_keys_first_32: Vec<String>,
++    pub metadata: BTreeMap<String, String>,
++    pub metadata_keys: Vec<String>,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2HeaderBeforeAfterReceipt {
++    pub original_checkpoint_path: String,
++    pub rebound_checkpoint_path: String,
++    pub candidate_written: bool,
++    pub metadata_commit_executed: bool,
++    pub in_place_overwrite_executed: bool,
++    pub metadata_before: BTreeMap<String, String>,
++    pub metadata_after: BTreeMap<String, String>,
++    pub metadata_changed_keys: Vec<String>,
++    pub tensor_descriptors_changed: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2TensorPayloadParityReceipt {
++    pub parity_known: bool,
++    pub original_payload_sha256: Option<String>,
++    pub rebound_payload_sha256: Option<String>,
++    pub payload_sha256_match: Option<bool>,
++    pub original_tensor_descriptor_hash: Option<String>,
++    pub rebound_tensor_descriptor_hash: Option<String>,
++    pub tensor_descriptor_hash_match: Option<bool>,
++    pub original_file_sha256: Option<String>,
++    pub rebound_file_sha256: Option<String>,
++    pub file_sha256_expected_to_change: bool,
++    pub file_sha256_changed: Option<bool>,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2OperatorApprovalReceipt {
++    pub operator_approval_required: bool,
++    pub operator_approval_present: bool,
++    pub approved_action: Option<String>,
++    pub in_place_overwrite_approved: bool,
++    pub weight_tensor_mutation_approved: bool,
++    pub output_checkpoint_path: String,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2NoWeightMutationReceipt {
++    pub training_executed: bool,
++    pub forward_training_executed: bool,
++    pub backward_executed: bool,
++    pub gradient_created: bool,
++    pub optimizer_created: bool,
++    pub optimizer_step_executed: bool,
++    pub decode_generation_executed: bool,
++    pub weight_tensor_mutation_executed: bool,
++    pub embedding_mutation_executed: bool,
++    pub lm_head_mutation_executed: bool,
++    pub transformer_block_mutation_executed: bool,
++    pub tensor_payload_decoded: bool,
++    pub tensor_payload_reordered: bool,
++    pub tensor_shape_changed: bool,
++    pub original_checkpoint_in_place_overwritten: bool,
++}
++
++impl Default for QwTokTrain00R2NoWeightMutationReceipt {
++    fn default() -> Self {
++        Self {
++            training_executed: false,
++            forward_training_executed: false,
++            backward_executed: false,
++            gradient_created: false,
++            optimizer_created: false,
++            optimizer_step_executed: false,
++            decode_generation_executed: false,
++            weight_tensor_mutation_executed: false,
++            embedding_mutation_executed: false,
++            lm_head_mutation_executed: false,
++            transformer_block_mutation_executed: false,
++            tensor_payload_decoded: false,
++            tensor_payload_reordered: false,
++            tensor_shape_changed: false,
++            original_checkpoint_in_place_overwritten: false,
++        }
++    }
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct QwTokTrain00R2Report {
++    pub patch_id: String,
++    pub title: String,
++    pub status: String,
++    pub checkpoint_rewrite_mode: String,
++    pub original_checkpoint_preserved: bool,
++    pub new_checkpoint_candidate_written: bool,
++    pub model_spec_ssot: QwTokTrain00R2ModelSpecSsot,
++    pub runtime_tokenizer_ssot: QwTokTrain00R2RuntimeTokenizerSsot,
++    pub original_checkpoint_fingerprint: QwTokTrain00R2CheckpointFingerprint,
++    pub rebound_checkpoint_fingerprint: Option<QwTokTrain00R2CheckpointFingerprint>,
++    pub header_before_after: QwTokTrain00R2HeaderBeforeAfterReceipt,
++    pub tensor_payload_parity: QwTokTrain00R2TensorPayloadParityReceipt,
++    pub operator_approval: QwTokTrain00R2OperatorApprovalReceipt,
++    pub no_weight_mutation: QwTokTrain00R2NoWeightMutationReceipt,
++    pub failures: Vec<String>,
++    pub warnings: Vec<String>,
++}
++
++pub fn qw_tok_train00_r2_config_from_args(args: &[String]) -> QwTokTrain00R2Config {
++    let mut cfg = QwTokTrain00R2Config::default();
++    let mut iter = args.iter();
++    while let Some(arg) = iter.next() {
++        match arg.as_str() {
++            "--model-spec" => {
++                if let Some(value) = iter.next() {
++                    cfg.model_spec_path = value.clone();
++                }
++            }
++            "--tokenizer" | "--tokenizer-manifest" => {
++                if let Some(value) = iter.next() {
++                    cfg.tokenizer_manifest_path = value.clone();
++                }
++            }
++            "--checkpoint" => {
++                if let Some(value) = iter.next() {
++                    cfg.checkpoint_path = value.clone();
++                }
++            }
++            "--candidate-out" | "--out-checkpoint" => {
++                if let Some(value) = iter.next() {
++                    cfg.candidate_checkpoint_path = value.clone();
++                }
++            }
++            "--report-out" | "--out" => {
++                if let Some(value) = iter.next() {
++                    cfg.report_out_path = value.clone();
++                }
++            }
++            "--approve-write-new-checkpoint" => {
++                cfg.approve_write_new_checkpoint = true;
++            }
++            "--allow-in-place-overwrite" => {
++                cfg.allow_in_place_overwrite = true;
++            }
++            _ => {}
++        }
++    }
++    cfg
++}
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let mut hasher = Sha256::new();
++    hasher.update(bytes);
++    format!("{:x}", hasher.finalize())
++}
++
++fn sha256_reader<R: Read>(reader: &mut R) -> Result<String> {
++    let mut hasher = Sha256::new();
++    let mut buf = [0u8; 1024 * 1024];
++    loop {
++        let n = reader.read(&mut buf)?;
++        if n == 0 {
++            break;
++        }
++        hasher.update(&buf[..n]);
++    }
++    Ok(format!("{:x}", hasher.finalize()))
++}
++
++fn value_to_metadata_string(value: &Value) -> String {
++    value.as_str().map(str::to_string).unwrap_or_else(|| value.to_string())
++}
++
++fn metadata_map_to_json(metadata: &BTreeMap<String, String>) -> Value {
++    let mut obj = Map::new();
++    for (key, value) in metadata {
++        obj.insert(key.clone(), Value::String(value.clone()));
++    }
++    Value::Object(obj)
++}
++
++fn descriptor_value(header: &Value) -> Value {
++    let mut out = BTreeMap::<String, Value>::new();
++    if let Some(obj) = header.as_object() {
++        for (key, value) in obj {
++            if key != "__metadata__" {
++                out.insert(key.clone(), value.clone());
++            }
++        }
++    }
++    serde_json::to_value(out).unwrap_or(Value::Null)
++}
++
++fn parse_metadata(header: &Value) -> BTreeMap<String, String> {
++    let mut out = BTreeMap::new();
++    if let Some(obj) = header.get("__metadata__").and_then(Value::as_object) {
++        for (key, value) in obj {
++            out.insert(key.clone(), value_to_metadata_string(value));
++        }
++    }
++    out
++}
++
++fn tensor_keys_first_32(header: &Value) -> (usize, Vec<String>) {
++    let mut keys = Vec::new();
++    if let Some(obj) = header.as_object() {
++        for key in obj.keys() {
++            if key != "__metadata__" {
++                keys.push(key.clone());
++            }
++        }
++    }
++    keys.sort();
++    let count = keys.len();
++    (count, keys.into_iter().take(32).collect())
++}
++
++fn inspect_model_spec(path: &Path, cfg: &QwTokTrain00R2Config) -> QwTokTrain00R2ModelSpecSsot {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut readable = false;
++    let mut model_spec_id = None;
++    let mut model_name = None;
++    let mut vocab_size = None;
++    let mut v4_residue_detected = false;
++
++    if exists {
++        match fs::read_to_string(path) {
++            Ok(text) => {
++                readable = true;
++                v4_residue_detected = text.contains("model_tinyllama_1p1b_v4")
++                    || text.contains("TinyLlama 1.1B V4")
++                    || text.contains("V4 vocab 56832")
++                    || text.contains("56832");
++                match text.parse::<toml::Value>() {
++                    Ok(value) => {
++                        model_spec_id = value.get("model_spec_id").and_then(|v| v.as_str()).map(str::to_string);
++                        model_name = value.get("model_name").and_then(|v| v.as_str()).map(str::to_string);
++                        vocab_size = value
++                            .get("dimensions")
++                            .and_then(|d| d.get("vocab_size"))
++                            .and_then(|v| v.as_integer())
++                            .map(|v| v as usize)
++                            .or_else(|| value.get("vocab_size").and_then(|v| v.as_integer()).map(|v| v as usize));
++                    }
++                    Err(err) => failures.push(format!("model_spec_toml_parse_failed: {err}")),
++                }
++            }
++            Err(err) => failures.push(format!("model_spec_read_failed: {err}")),
++        }
++    } else {
++        failures.push("model_spec_missing".to_string());
++    }
++
++    let model_spec_id_match = model_spec_id.as_deref() == Some(cfg.expected_model_spec_id.as_str());
++    let vocab_size_match = vocab_size == Some(cfg.expected_vocab_size);
++    if !model_spec_id_match {
++        failures.push("model_spec_id_not_v5_48259".to_string());
++    }
++    if !vocab_size_match {
++        failures.push("vocab_size_not_48259".to_string());
++    }
++    if v4_residue_detected {
++        warnings.push("v4_residue_detected_in_model_spec".to_string());
++    }
++
++    QwTokTrain00R2ModelSpecSsot {
++        path: path.display().to_string(),
++        exists,
++        readable,
++        model_spec_id,
++        model_name,
++        vocab_size,
++        expected_model_spec_id: cfg.expected_model_spec_id.clone(),
++        expected_vocab_size: cfg.expected_vocab_size,
++        model_spec_id_match,
++        vocab_size_match,
++        v4_residue_detected,
++        failures,
++        warnings,
++    }
++}
++
++fn inspect_runtime_tokenizer(path: &Path, expected_vocab_size: usize) -> QwTokTrain00R2RuntimeTokenizerSsot {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut readable = false;
++    let mut tokenizer_id = None;
++    let mut manifest_id = None;
++    let mut tokenizer_spec_id = None;
++    let mut top_level_manifest_hash_present = false;
++    let mut hashes_manifest_hash = None;
++    let mut sentencepiece_model_hash = None;
++    let mut sentencepiece_vocab_hash = None;
++    let mut vocab_hash = None;
++    let mut reserved_tokens_hash_present = false;
++    let mut vocab_len = None;
++
++    if exists {
++        match fs::read_to_string(path) {
++            Ok(text) => {
++                readable = true;
++                match serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
++                    Ok(value) => {
++                        tokenizer_id = value.get("tokenizer_id").and_then(Value::as_str).map(str::to_string);
++                        manifest_id = value.get("manifest_id").and_then(Value::as_str).map(str::to_string);
++                        tokenizer_spec_id = value.get("tokenizer_spec_id").and_then(Value::as_str).map(str::to_string);
++                        top_level_manifest_hash_present = value.get("manifest_hash").is_some();
++                        vocab_len = value.get("vocab").and_then(Value::as_array).map(|items| items.len());
++                        if let Some(hashes) = value.get("hashes") {
++                            hashes_manifest_hash = hashes.get("manifest_hash").and_then(Value::as_str).map(str::to_string);
++                            sentencepiece_model_hash = hashes.get("sentencepiece_model_hash").and_then(Value::as_str).map(str::to_string);
++                            sentencepiece_vocab_hash = hashes.get("sentencepiece_vocab_hash").and_then(Value::as_str).map(str::to_string);
++                            vocab_hash = hashes.get("vocab_hash").and_then(Value::as_str).map(str::to_string);
++                            reserved_tokens_hash_present = hashes.get("reserved_tokens_hash").is_some();
++                        }
++                    }
++                    Err(err) => failures.push(format!("tokenizer_manifest_json_parse_failed: {err}")),
++                }
++            }
++            Err(err) => failures.push(format!("tokenizer_manifest_read_failed: {err}")),
++        }
++    } else {
++        failures.push("tokenizer_manifest_missing".to_string());
++    }
++
++    if top_level_manifest_hash_present {
++        failures.push("top_level_manifest_hash_present".to_string());
++    }
++    if hashes_manifest_hash.is_none() {
++        failures.push("hashes_manifest_hash_missing".to_string());
++    }
++    if vocab_len != Some(expected_vocab_size) {
++        failures.push("tokenizer_manifest_vocab_len_not_48259".to_string());
++    }
++    if vocab_hash.is_none() {
++        warnings.push("hashes_vocab_hash_missing".to_string());
++    }
++
++    QwTokTrain00R2RuntimeTokenizerSsot {
++        path: path.display().to_string(),
++        exists,
++        readable,
++        tokenizer_id,
++        manifest_id,
++        tokenizer_spec_id,
++        top_level_manifest_hash_present,
++        hashes_manifest_hash,
++        sentencepiece_model_hash,
++        sentencepiece_vocab_hash,
++        vocab_hash,
++        reserved_tokens_hash_present,
++        vocab_len,
++        failures,
++        warnings,
++    }
++}
++
++fn inspect_safetensors_fingerprint(path: &Path) -> QwTokTrain00R2CheckpointFingerprint {
++    let mut failures = Vec::new();
++    let mut warnings = Vec::new();
++    let exists = path.exists();
++    let mut file_size_bytes = None;
++    let mut header_length_bytes = None;
++    let mut payload_length_bytes = None;
++    let mut file_sha256 = None;
++    let mut header_sha256 = None;
++    let mut payload_sha256 = None;
++    let mut tensor_descriptor_hash = None;
++    let mut tensor_key_count = 0usize;
++    let mut tensor_keys = Vec::new();
++    let mut metadata = BTreeMap::new();
++
++    if !exists {
++        warnings.push("checkpoint_file_missing".to_string());
++        return QwTokTrain00R2CheckpointFingerprint {
++            path: path.display().to_string(),
++            exists,
++            file_size_bytes,
++            header_length_bytes,
++            payload_length_bytes,
++            file_sha256,
++            header_sha256,
++            payload_sha256,
++            tensor_descriptor_hash,
++            tensor_key_count,
++            tensor_keys_first_32: tensor_keys,
++            metadata,
++            metadata_keys: Vec::new(),
++            failures,
++            warnings,
++        };
++    }
++
++    match fs::metadata(path) {
++        Ok(stat) => file_size_bytes = Some(stat.len()),
++        Err(err) => warnings.push(format!("checkpoint_stat_failed: {err}")),
++    }
++
++    match File::open(path) {
++        Ok(mut file) => {
++            let mut len_buf = [0u8; 8];
++            if let Err(err) = file.read_exact(&mut len_buf) {
++                failures.push(format!("safetensors_header_len_read_failed: {err}"));
++            } else {
++                let header_len = u64::from_le_bytes(len_buf);
++                header_length_bytes = Some(header_len);
++                let mut header_bytes = vec![0u8; header_len as usize];
++                if let Err(err) = file.read_exact(&mut header_bytes) {
++                    failures.push(format!("safetensors_header_read_failed: {err}"));
++                } else {
++                    header_sha256 = Some(sha256_hex(&header_bytes));
++                    match serde_json::from_slice::<Value>(&header_bytes) {
++                        Ok(header) => {
++                            metadata = parse_metadata(&header);
++                            let (count, first) = tensor_keys_first_32(&header);
++                            tensor_key_count = count;
++                            tensor_keys = first;
++                            tensor_descriptor_hash = serde_json::to_vec(&descriptor_value(&header))
++                                .ok()
++                                .map(|bytes| sha256_hex(&bytes));
++                        }
++                        Err(err) => failures.push(format!("safetensors_header_json_parse_failed: {err}")),
++                    }
++                    match sha256_reader(&mut file) {
++                        Ok(hash) => payload_sha256 = Some(hash),
++                        Err(err) => failures.push(format!("payload_sha256_stream_failed: {err}")),
++                    }
++                }
++            }
++        }
++        Err(err) => failures.push(format!("checkpoint_open_failed: {err}")),
++    }
++
++    if let (Some(total), Some(header_len)) = (file_size_bytes, header_length_bytes) {
++        payload_length_bytes = total.checked_sub(8 + header_len);
++    }
++
++    match File::open(path) {
++        Ok(mut file) => match sha256_reader(&mut file) {
++            Ok(hash) => file_sha256 = Some(hash),
++            Err(err) => warnings.push(format!("file_sha256_stream_failed: {err}")),
++        },
++        Err(err) => warnings.push(format!("file_sha256_open_failed: {err}")),
++    }
++
++    let metadata_keys = metadata.keys().cloned().collect();
++
++    QwTokTrain00R2CheckpointFingerprint {
++        path: path.display().to_string(),
++        exists,
++        file_size_bytes,
++        header_length_bytes,
++        payload_length_bytes,
++        file_sha256,
++        header_sha256,
++        payload_sha256,
++        tensor_descriptor_hash,
++        tensor_key_count,
++        tensor_keys_first_32: tensor_keys,
++        metadata,
++        metadata_keys,
++        failures,
++        warnings,
++    }
++}
++
++fn build_metadata_after(
++    metadata_before: &BTreeMap<String, String>,
++    model_spec: &QwTokTrain00R2ModelSpecSsot,
++    tokenizer: &QwTokTrain00R2RuntimeTokenizerSsot,
++) -> BTreeMap<String, String> {
++    let mut after = metadata_before.clone();
++
++    for key in [
++        "model_spec_id",
++        "model_name",
++        "tokenizer_id",
++        "tokenizer_manifest_id",
++        "tokenizer_spec_id",
++        "tokenizer_hash",
++        "tokenizer_manifest_hash",
++        "tokenizer_vocab_hash",
++        "vocab_hash",
++        "sentencepiece_model_hash",
++        "sentencepiece_vocab_hash",
++        "vocab_size",
++    ] {
++        if let Some(old) = after.get(key).cloned() {
++            let original_key = format!("original_{key}");
++            after.entry(original_key).or_insert(old);
++        }
++    }
++
++    if let Some(value) = &tokenizer.tokenizer_id {
++        after.insert("tokenizer_id".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.manifest_id {
++        after.insert("tokenizer_manifest_id".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.tokenizer_spec_id {
++        after.insert("tokenizer_spec_id".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.hashes_manifest_hash {
++        after.insert("tokenizer_manifest_hash".to_string(), value.clone());
++        after.insert("tokenizer_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.vocab_hash {
++        after.insert("tokenizer_vocab_hash".to_string(), value.clone());
++        after.insert("vocab_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.sentencepiece_model_hash {
++        after.insert("sentencepiece_model_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &tokenizer.sentencepiece_vocab_hash {
++        after.insert("sentencepiece_vocab_hash".to_string(), value.clone());
++    }
++    if let Some(value) = &model_spec.model_spec_id {
++        after.insert("model_spec_id".to_string(), value.clone());
++    }
++    if let Some(value) = &model_spec.model_name {
++        after.insert("model_name".to_string(), value.clone());
++    }
++    if let Some(value) = model_spec.vocab_size {
++        after.insert("vocab_size".to_string(), value.to_string());
++    }
++
++    after.insert("rebind_patch_id".to_string(), QW_TOK_TRAIN00_R2_PATCH_ID.to_string());
++    after.insert("weight_tensor_mutation".to_string(), "false".to_string());
++    after.insert("training_executed".to_string(), "false".to_string());
++    after
++}
++
++fn changed_keys(before: &BTreeMap<String, String>, after: &BTreeMap<String, String>) -> Vec<String> {
++    let mut keys = BTreeSet::new();
++    keys.extend(before.keys().cloned());
++    keys.extend(after.keys().cloned());
++    keys.into_iter()
++        .filter(|key| before.get(key) != after.get(key))
++        .collect()
++}
++
++fn make_rebound_header(original_header: &Value, metadata_after: &BTreeMap<String, String>) -> Value {
++    let mut rebound = original_header.clone();
++    if let Some(obj) = rebound.as_object_mut() {
++        obj.insert("__metadata__".to_string(), metadata_map_to_json(metadata_after));
++    }
++    rebound
++}
++
++fn read_safetensors_header(path: &Path) -> Result<(u64, Vec<u8>, Value)> {
++    let mut file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
++    let mut len_buf = [0u8; 8];
++    file.read_exact(&mut len_buf)
++        .with_context(|| format!("failed to read safetensors header length from {}", path.display()))?;
++    let header_len = u64::from_le_bytes(len_buf);
++    let mut header_bytes = vec![0u8; header_len as usize];
++    file.read_exact(&mut header_bytes)
++        .with_context(|| format!("failed to read safetensors header from {}", path.display()))?;
++    let header = serde_json::from_slice::<Value>(&header_bytes)
++        .with_context(|| format!("failed to parse safetensors header JSON from {}", path.display()))?;
++    Ok((header_len, header_bytes, header))
++}
++
++fn assert_not_same_path(input: &Path, output: &Path) -> Result<()> {
++    if input == output {
++        anyhow::bail!("in-place safetensors overwrite is forbidden by QW-TOK-TRAIN-00-R2");
++    }
++    if input.exists() && output.exists() {
++        let input_canon = fs::canonicalize(input)?;
++        let output_canon = fs::canonicalize(output)?;
++        if input_canon == output_canon {
++            anyhow::bail!("in-place safetensors overwrite is forbidden by QW-TOK-TRAIN-00-R2");
++        }
++    }
++    Ok(())
++}
++
++fn write_rebound_safetensors(input: &Path, output: &Path, rebound_header: &Value) -> Result<()> {
++    assert_not_same_path(input, output)?;
++    if let Some(parent) = output.parent() {
++        fs::create_dir_all(parent)?;
++    }
++
++    let (old_header_len, _old_header_bytes, _old_header) = read_safetensors_header(input)?;
++    let new_header_bytes = serde_json::to_vec(rebound_header)?;
++    let new_header_len = new_header_bytes.len() as u64;
++
++    let mut reader = BufReader::new(File::open(input)?);
++    let mut discard = vec![0u8; (8 + old_header_len) as usize];
++    reader.read_exact(&mut discard)?;
++
++    let mut writer = BufWriter::new(File::create(output)?);
++    writer.write_all(&new_header_len.to_le_bytes())?;
++    writer.write_all(&new_header_bytes)?;
++    std::io::copy(&mut reader, &mut writer)?;
++    writer.flush()?;
++    Ok(())
++}
++
++fn build_parity(
++    original: &QwTokTrain00R2CheckpointFingerprint,
++    rebound: &Option<QwTokTrain00R2CheckpointFingerprint>,
++) -> QwTokTrain00R2TensorPayloadParityReceipt {
++    if let Some(rebound) = rebound {
++        let payload_match = match (&original.payload_sha256, &rebound.payload_sha256) {
++            (Some(a), Some(b)) => Some(a == b),
++            _ => None,
++        };
++        let descriptor_match = match (&original.tensor_descriptor_hash, &rebound.tensor_descriptor_hash) {
++            (Some(a), Some(b)) => Some(a == b),
++            _ => None,
++        };
++        let file_changed = match (&original.file_sha256, &rebound.file_sha256) {
++            (Some(a), Some(b)) => Some(a != b),
++            _ => None,
++        };
++        QwTokTrain00R2TensorPayloadParityReceipt {
++            parity_known: payload_match.is_some() && descriptor_match.is_some(),
++            original_payload_sha256: original.payload_sha256.clone(),
++            rebound_payload_sha256: rebound.payload_sha256.clone(),
++            payload_sha256_match: payload_match,
++            original_tensor_descriptor_hash: original.tensor_descriptor_hash.clone(),
++            rebound_tensor_descriptor_hash: rebound.tensor_descriptor_hash.clone(),
++            tensor_descriptor_hash_match: descriptor_match,
++            original_file_sha256: original.file_sha256.clone(),
++            rebound_file_sha256: rebound.file_sha256.clone(),
++            file_sha256_expected_to_change: true,
++            file_sha256_changed: file_changed,
++        }
++    } else {
++        QwTokTrain00R2TensorPayloadParityReceipt {
++            parity_known: false,
++            original_payload_sha256: original.payload_sha256.clone(),
++            rebound_payload_sha256: None,
++            payload_sha256_match: None,
++            original_tensor_descriptor_hash: original.tensor_descriptor_hash.clone(),
++            rebound_tensor_descriptor_hash: None,
++            tensor_descriptor_hash_match: None,
++            original_file_sha256: original.file_sha256.clone(),
++            rebound_file_sha256: None,
++            file_sha256_expected_to_change: true,
++            file_sha256_changed: None,
++        }
++    }
++}
++
++pub fn run_qw_tok_train00_r2_metadata_rebind_commit(cfg: QwTokTrain00R2Config) -> Result<QwTokTrain00R2Report> {
++    if cfg.allow_training || cfg.allow_weight_tensor_mutation || cfg.allow_decode_execution {
++        anyhow::bail!("QW-TOK-TRAIN-00-R2 forbids training, tensor mutation, and decode execution");
++    }
++    if cfg.allow_in_place_overwrite {
++        anyhow::bail!("QW-TOK-TRAIN-00-R2 forbids in-place checkpoint overwrite");
++    }
++
++    let model_spec = inspect_model_spec(Path::new(&cfg.model_spec_path), &cfg);
++    let tokenizer = inspect_runtime_tokenizer(Path::new(&cfg.tokenizer_manifest_path), cfg.expected_vocab_size);
++    let checkpoint_path = PathBuf::from(&cfg.checkpoint_path);
++    let candidate_path = PathBuf::from(&cfg.candidate_checkpoint_path);
++    let original = inspect_safetensors_fingerprint(&checkpoint_path);
++
++    let metadata_after = build_metadata_after(&original.metadata, &model_spec, &tokenizer);
++    let metadata_changed_keys = changed_keys(&original.metadata, &metadata_after);
++
++    let mut failures = Vec::new();
++    failures.extend(model_spec.failures.clone());
++    failures.extend(tokenizer.failures.clone());
++    failures.extend(original.failures.clone());
++
++    let mut warnings = Vec::new();
++    warnings.extend(model_spec.warnings.clone());
++    warnings.extend(tokenizer.warnings.clone());
++    warnings.extend(original.warnings.clone());
++
++    let mut candidate_written = false;
++    let mut rebound: Option<QwTokTrain00R2CheckpointFingerprint> = None;
++    let mut tensor_descriptors_changed = false;
++
++    if cfg.approve_write_new_checkpoint {
++        if !checkpoint_path.exists() {
++            failures.push("approved_write_requested_but_checkpoint_missing".to_string());
++        } else {
++            assert_not_same_path(&checkpoint_path, &candidate_path)?;
++            let (_header_len, _header_bytes, header) = read_safetensors_header(&checkpoint_path)?;
++            let rebound_header = make_rebound_header(&header, &metadata_after);
++            let original_desc_hash = serde_json::to_vec(&descriptor_value(&header)).ok().map(|b| sha256_hex(&b));
++            let rebound_desc_hash = serde_json::to_vec(&descriptor_value(&rebound_header)).ok().map(|b| sha256_hex(&b));
++            tensor_descriptors_changed = original_desc_hash != rebound_desc_hash;
++            if tensor_descriptors_changed {
++                failures.push("tensor_descriptors_changed_before_write_blocked".to_string());
++            } else {
++                write_rebound_safetensors(&checkpoint_path, &candidate_path, &rebound_header)?;
++                candidate_written = true;
++                rebound = Some(inspect_safetensors_fingerprint(&candidate_path));
++            }
++        }
++    } else {
++        warnings.push("operator_approval_missing_candidate_not_written".to_string());
++    }
++
++    let parity = build_parity(&original, &rebound);
++    if candidate_written {
++        if parity.payload_sha256_match != Some(true) {
++            failures.push("payload_sha256_parity_failed".to_string());
++        }
++        if parity.tensor_descriptor_hash_match != Some(true) {
++            failures.push("tensor_descriptor_hash_parity_failed".to_string());
++        }
++    }
++
++    let header_before_after = QwTokTrain00R2HeaderBeforeAfterReceipt {
++        original_checkpoint_path: cfg.checkpoint_path.clone(),
++        rebound_checkpoint_path: cfg.candidate_checkpoint_path.clone(),
++        candidate_written,
++        metadata_commit_executed: candidate_written,
++        in_place_overwrite_executed: false,
++        metadata_before: original.metadata.clone(),
++        metadata_after: metadata_after.clone(),
++        metadata_changed_keys,
++        tensor_descriptors_changed,
++    };
++
++    let operator_approval = QwTokTrain00R2OperatorApprovalReceipt {
++        operator_approval_required: true,
++        operator_approval_present: cfg.approve_write_new_checkpoint,
++        approved_action: cfg.approve_write_new_checkpoint.then(|| {
++            "write new safetensors checkpoint with rebound metadata only".to_string()
++        }),
++        in_place_overwrite_approved: false,
++        weight_tensor_mutation_approved: false,
++        output_checkpoint_path: cfg.candidate_checkpoint_path.clone(),
++    };
++
++    let no_weight_mutation = QwTokTrain00R2NoWeightMutationReceipt::default();
++
++    let status = if failures.is_empty() && candidate_written && parity.payload_sha256_match == Some(true) && parity.tensor_descriptor_hash_match == Some(true) {
++        "PASS_QW_TOK_TRAIN00_R2_METADATA_REBIND_COMMIT_PAYLOAD_PARITY"
++    } else if failures.is_empty() && !candidate_written {
++        "PARTIAL_QW_TOK_TRAIN00_R2_OPERATOR_APPROVAL_REQUIRED_NO_WRITE"
++    } else if failures.is_empty() && candidate_written {
++        "PARTIAL_QW_TOK_TRAIN00_R2_CANDIDATE_WRITTEN_PARITY_UNKNOWN"
++    } else {
++        "FAIL_QW_TOK_TRAIN00_R2_METADATA_REBIND_COMMIT"
++    }
++    .to_string();
++
++    Ok(QwTokTrain00R2Report {
++        patch_id: QW_TOK_TRAIN00_R2_PATCH_ID.to_string(),
++        title: QW_TOK_TRAIN00_R2_TITLE.to_string(),
++        status,
++        checkpoint_rewrite_mode: "new_output_file_only".to_string(),
++        original_checkpoint_preserved: true,
++        new_checkpoint_candidate_written: candidate_written,
++        model_spec_ssot: model_spec,
++        runtime_tokenizer_ssot: tokenizer,
++        original_checkpoint_fingerprint: original,
++        rebound_checkpoint_fingerprint: rebound,
++        header_before_after,
++        tensor_payload_parity: parity,
++        operator_approval,
++        no_weight_mutation,
++        failures,
++        warnings,
++    })
++}
++
++fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
++    if let Some(parent) = path.parent() {
++        fs::create_dir_all(parent)?;
++    }
++    fs::write(path, serde_json::to_vec_pretty(value)?).with_context(|| format!("failed to write {}", path.display()))?;
++    Ok(())
++}
++
++pub fn write_qw_tok_train00_r2_artifacts(root: &Path, report: &QwTokTrain00R2Report) -> Result<()> {
++    write_json(&root.join(&report_path_or_default(report)), report)?;
++    write_json(&root.join(QW_TOK_TRAIN00_R2_ORIGINAL_FINGERPRINT_PATH), &report.original_checkpoint_fingerprint)?;
++    if let Some(rebound) = &report.rebound_checkpoint_fingerprint {
++        write_json(&root.join(QW_TOK_TRAIN00_R2_REBOUND_FINGERPRINT_PATH), rebound)?;
++    } else {
++        write_json(&root.join(QW_TOK_TRAIN00_R2_REBOUND_FINGERPRINT_PATH), &serde_json::json!({
++            "candidate_written": false,
++            "reason": "operator approval missing, checkpoint missing, or write failed before rebound fingerprint"
++        }))?;
++    }
++    write_json(&root.join(QW_TOK_TRAIN00_R2_PAYLOAD_PARITY_PATH), &report.tensor_payload_parity)?;
++    write_json(&root.join(QW_TOK_TRAIN00_R2_HEADER_BEFORE_AFTER_PATH), &report.header_before_after)?;
++    write_json(&root.join(QW_TOK_TRAIN00_R2_NO_MUTATION_PATH), &report.no_weight_mutation)?;
++    write_json(&root.join(QW_TOK_TRAIN00_R2_OPERATOR_APPROVAL_PATH), &report.operator_approval)?;
++    Ok(())
++}
++
++fn report_path_or_default(_report: &QwTokTrain00R2Report) -> String {
++    QW_TOK_TRAIN00_R2_REPORT_PATH.to_string()
++}

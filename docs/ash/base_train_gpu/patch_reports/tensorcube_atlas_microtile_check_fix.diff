@@ -1,0 +1,10 @@
+--- /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/src/tensorcube_atlas_microtile.rs.before_tensorcube_check_fix	2026-06-03 06:17:32.381849663 +0000
++++ /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/src/tensorcube_atlas_microtile.rs	2026-06-03 06:17:34.418684631 +0000
+@@ -694,6 +694,7 @@
+         token_masked: false,
+         vocab_removed: false,
+         model_weight_mutation: false,
++        created_at_unix_ms: now_unix_ms.max(1),
+     };
+ 
+     let receipt = Qw55a0Vtc8ToVtc16ModeReceipt {

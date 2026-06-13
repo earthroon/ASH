@@ -1,0 +1,16 @@
+[static] RUN-10B train-from-features heartbeat bake
+[ok] added crates/lora_train/src/train_from_features_heartbeat.rs
+[ok] exported heartbeat API from crates/lora_train/src/lib.rs
+[ok] added train_from_features_heartbeat config field and defaults
+[ok] added manual initializer closure in pipeline.rs
+[ok] added smoke config train_from_features_heartbeat block
+[ok] inserted manifest load / shard load / adapter write / manifest update / final receipt events in sft_feature_store.rs
+[ok] inserted step_start / forward_done / loss_computed / backward_done / optimizer_update_done events in lm_head_vocab_atlas.rs
+[ok] added train_from_features_heartbeat integration tests
+[info] cargo/rustc unavailable in bake container; local cargo verification required
+[ok] crates/lora_train/src/train_from_features_heartbeat.rs delimiter_balance unclosed=0
+[ok] crates/lora_train/src/config.rs delimiter_balance unclosed=0
+[ok] crates/lora_train/src/sft_feature_store.rs delimiter_balance unclosed=0
+[ok] crates/lora_train/src/lm_head_vocab_atlas.rs delimiter_balance unclosed=0
+[ok] crates/lora_train/tests/train_from_features_heartbeat.rs delimiter_balance unclosed=0
+[ok] crates/lora_train/src/lib.rs delimiter_balance unclosed=0

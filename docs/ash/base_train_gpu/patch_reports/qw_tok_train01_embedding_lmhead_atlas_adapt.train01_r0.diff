@@ -1,0 +1,25 @@
+--- /mnt/data/train01_inspect/crates/model_core/src/bin/qw_tok_train01_embedding_lmhead_atlas_adapt.rs	2026-06-04 04:02:11.000000000 +0000
++++ /mnt/data/qw_tok_train01_work/crates/model_core/src/bin/qw_tok_train01_embedding_lmhead_atlas_adapt.rs	2026-06-04 04:30:59.209180833 +0000
+@@ -1,5 +1,6 @@
+ use model_core::{
+     qw_tok_train01_config_from_args,
++    qw_tok_train01_failure_summary_json,
+     run_qw_tok_train01_embedding_lmhead_atlas_adaptation,
+     write_qw_tok_train01_artifacts,
+ };
+@@ -14,10 +15,14 @@
+                 eprintln!("failed to write QW-TOK-TRAIN-01 artifacts: {}", err);
+                 std::process::exit(2);
+             }
+-            println!("{}", report.status);
+             if report.status.starts_with("FAIL_") {
++                match qw_tok_train01_failure_summary_json(&report) {
++                    Ok(summary) => eprintln!("{}", summary),
++                    Err(err) => eprintln!("failed to render QW-TOK-TRAIN-01-R0 failure summary: {}", err),
++                }
+                 std::process::exit(1);
+             }
++            println!("{}", report.status);
+         }
+         Err(err) => {
+             eprintln!("QW-TOK-TRAIN-01 embedding/lm_head atlas adaptation failed: {}", err);

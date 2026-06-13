@@ -1,0 +1,22 @@
+--- /mnt/data/ash_logfix_orig/crates/model_core/src/tokenizer_v5_embedding_tensor_read_probe.rs	2026-06-03 05:32:23.000000000 +0000
++++ crates/model_core/src/tokenizer_v5_embedding_tensor_read_probe.rs	2026-06-03 06:26:24.892609688 +0000
+@@ -414,6 +414,10 @@
+     }
+     let path_receipt = build_qw_tok_map08_checkpoint_path_receipt(path.as_deref(), &path_source);
+     if !path_receipt.path_receipt_passed {
++        let pending_reason = path_receipt
++            .pending_reason
++            .clone()
++            .unwrap_or_else(|| QW_TOK_MAP08_PENDING_CHECKPOINT_PATH_MISSING.to_string());
+         return Ok(build_qw_tok_map08_pending_report(
+             config,
+             path_receipt,
+@@ -424,7 +428,7 @@
+             empty_qw_tok_map08_value_sanity_receipt(),
+             build_qw_tok_map08_no_transformer_forward_receipt(false, false, false, false, false, false, false, false, false),
+             build_qw_tok_map08_no_weight_mutation_receipt(false, false, false, false, false, false, false),
+-            path_receipt.pending_reason.clone().unwrap_or_else(|| QW_TOK_MAP08_PENDING_CHECKPOINT_PATH_MISSING.to_string()),
++            pending_reason,
+             metadata_warnings,
+         ));
+     }

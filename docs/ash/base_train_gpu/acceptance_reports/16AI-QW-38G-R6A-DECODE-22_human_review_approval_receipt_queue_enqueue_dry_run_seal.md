@@ -1,0 +1,61 @@
+# 16AI-QW-38G-R6A-DECODE-22
+## Human Review Approval Receipt / Queue Enqueue Dry-run Seal
+
+status: PASS_STATIC_HUMAN_REVIEW_APPROVAL_DRY_RUN_CONTRACT
+domain_ssot: en_to_ko_translation_subtitle_machine
+depends_on:
+  - 16AI-QW-38G-R6A-DECODE-04
+  - 16AI-QW-38G-R6A-DECODE-18
+  - 16AI-QW-38G-R6A-DECODE-19
+  - 16AI-QW-38G-R6A-DECODE-20
+  - 16AI-QW-38G-R6A-DECODE-21
+
+human_review_approval_policy_created_count: 1
+human_review_approval_dry_run_receipt_created_count: 8
+deterministic_key_created_count: 8
+approval_granted_count: 3
+approval_denied_count: 1
+approval_pending_count: 2
+approval_not_required_count: 1
+missing_queue_candidate_receipt_skip_count: 1
+dry_run_passed_count: 1
+dry_run_blocked_approval_pending_count: 2
+dry_run_blocked_approval_denied_count: 1
+dry_run_not_required_auto_accept_count: 1
+dry_run_requires_repair_count: 1
+dry_run_requires_more_calibration_evidence_count: 1
+dry_run_skipped_missing_queue_candidate_receipt_count: 1
+would_enqueue_if_real_run_count: 1
+real_enqueue_allowed_count: 0
+real_enqueue_executed_count: 0
+queue_enqueue_executed_count: 0
+reviewer_assignment_executed_count: 0
+external_ticket_creation_executed_count: 0
+notification_executed_count: 0
+candidate_commit_executed_count: 0
+candidate_reject_executed_count: 0
+rewrite_executed_count: 0
+compression_executed_count: 0
+retry_decode_executed_count: 0
+subtitle_export_executed_count: 0
+runtime_decode_executed_count: 0
+model_forward_executed_count: 0
+sampling_executed_count: 0
+duplicate_receipt_key_count: 0
+domain_ssot_mismatch_count: 0
+
+decode21_human_review_queue_candidate_receipt_required: true
+decode20_score_threshold_calibration_receipt_required: true
+decode19_final_quality_score_receipt_required: true
+decode18_final_commit_receipt_required: true
+decode04_quality_score_approval_dry_run_slot_extended: true
+
+## Canonical receipt keys
+- approval_granted_dry_run: q4sha256:d935861420d42fb103a9c59d645ab99568065a7fc4f78412edf4fef71cf1e5ea
+- approval_denied: q4sha256:61560a5b925257f2daaee878528186e0dcc95988112929ff73e9deca45d9d011
+- approval_pending: q4sha256:b8102982c41a1181eb2dd03eefa3843fcc720b382fd8c8ada0978a5ca8a850df
+- auto_accept_no_queue: q4sha256:e3127de4bd6b209e6aa750feae3d78f05b680088671c565d7d00f542b3855188
+- missing_queue_candidate_receipt: q4sha256:178ee261f28a0469fef550887f1ea7c0a6ac84eedf0a9ca80c70120545d119fe
+- repair_required_dry_run: q4sha256:9ff095a96209b2ae4b33f3081b2f01b527d05ced3524a1c4a27513f937160b4c
+- calibration_insufficient_dry_run: q4sha256:282b19b4bafcbf1a22fecfe19e93fcceb8f789edfe960a3bb0c317829eb29eb6
+- reject_rework_approval_required: q4sha256:0f898db67774f8390097a9d6605aabd531e876eb8e24db671b7052d7b7249b94

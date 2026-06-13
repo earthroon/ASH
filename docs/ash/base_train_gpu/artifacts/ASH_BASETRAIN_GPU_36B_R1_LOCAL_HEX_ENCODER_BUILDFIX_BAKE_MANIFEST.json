@@ -1,0 +1,32 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36B-R1",
+  "title": "Local Hex Encoder Buildfix / Remove Unlinked Hex Crate Dependency No Logic Change Seal",
+  "base_patch_id": "ASH-BASETRAIN-GPU-36B",
+  "baked_static_status": "BUILDFIX_STATIC_PATCH_ONLY",
+  "dependency_policy": {
+    "new_cargo_dependency_added": false,
+    "cargo_toml_changed": false,
+    "removed_unlinked_hex_crate_call": true,
+    "local_lower_hex_encoder_present": true,
+    "lookup_table_hex_encoder_present": true
+  },
+  "logic_policy": {
+    "no_logic_change_intended": true,
+    "bounded_window_policy_changed": false,
+    "f32_stats_policy_changed": false,
+    "receipt_schema_changed": false,
+    "runtime_guard_changed": false
+  },
+  "path_isolation": {
+    "previous_r3b_receipt_same_path_included": false,
+    "previous_36_receipt_same_path_included": false,
+    "previous_36a_receipt_same_path_included": false,
+    "static_samples_use_isolated_paths": true
+  },
+  "files": {
+    "rust_src_sha256": "c1ab6c946c6fe5c15703418384e836df4639d02ae8e6f61dc9d4c7829170944b",
+    "rust_bin_sha256": "dee0ee853e5549235a9b732ac22aa7c86d588222c05ab878d112f390fdf96670",
+    "static_receipt_sha256": "7ef81182515e282682f615ec22c8746af277f8f9a5851fa76526231403ae6e54"
+  },
+  "next_patch_if_36b_pass": "ASH-BASETRAIN-GPU-36C"
+}

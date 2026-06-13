@@ -1,0 +1,45 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36D",
+  "title": "Bounded Weight Slice Row Sample Continuity Probe / Row Boundary Sanity To Adjacent Window Continuity No Full Tensor No GPU Upload Seal",
+  "files": [
+    {
+      "path": "crates/base_train/src/ash_basetrain_gpu_36d_bounded_weight_slice_row_sample_continuity_probe.rs",
+      "sha256": "a1bed589f31e3b0f374c2c6c0cecfcb91329eaefa4341b0bf67c76c691885aaa",
+      "bytes": 64524
+    },
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_36d_bounded_weight_slice_row_sample_continuity_probe.rs",
+      "sha256": "500bec67ffb5245c039a1e05336e695a9c531036c5e1ac7b964662d27e24b367",
+      "bytes": 795
+    },
+    {
+      "path": "acceptance_reports/ASH-BASETRAIN-GPU-36D.md",
+      "sha256": "5f518547ebaec309e3707e5bfb3dba818b069fd0bcc259ed4e22112b3c4a99a7",
+      "bytes": 2068
+    },
+    {
+      "path": "patch_reports/ASH-BASETRAIN-GPU-36D_bake_report.md",
+      "sha256": "e6da800b4b0c9551ce42364c54c0a54a2404785f9ce112b550a215d25cb05ae2",
+      "bytes": 1384
+    },
+    {
+      "path": "artifacts/ASH_BASETRAIN_GPU_36D_BOUNDED_WEIGHT_SLICE_ROW_SAMPLE_CONTINUITY_PROBE.json",
+      "sha256": "e880dda07bac43c4ed595ceea1f43042b83f250f1bbc6875be90bd7d6cac6d58",
+      "bytes": 4355
+    },
+    {
+      "path": "artifacts/ASH_BASETRAIN_GPU_36D_STATIC_CHECKS.txt",
+      "sha256": "13f4c2b0ff489ff52161ab5aa5b3f402f6eb9e816d1b4ec4ab5789bbdade4044",
+      "bytes": 593
+    }
+  ],
+  "cargo_build_executed": false,
+  "cargo_build_blocked_reason": "cargo/rustc unavailable in bake container",
+  "live_input_receipt_overwrite_guard": {
+    "r3b": false,
+    "gpu36": false,
+    "gpu36a": false,
+    "gpu36b": false,
+    "gpu36c": false
+  }
+}

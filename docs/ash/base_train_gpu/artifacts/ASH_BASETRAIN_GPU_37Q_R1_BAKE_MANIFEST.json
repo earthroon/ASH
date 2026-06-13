@@ -1,0 +1,40 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37Q-R1",
+  "base_patch_id": "ASH-BASETRAIN-GPU-37Q",
+  "title": "Parallel Reduction Receipt Source Rebind / 37P-R1 PASS Receipt Locator No Placeholder Intake Seal / 37F Payload Receipt Reconfirm / Runtime Receipt Artifact Write Candidate / No Forward No Optimizer No Weight Mutation",
+  "status": "BAKED_STATIC_ONLY",
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs",
+    "specs/ASH_BASETRAIN_GPU_37Q_R1_SPEC.md",
+    "artifacts/ASH_BASETRAIN_GPU_37Q_R1_STATIC_CHECKS.json",
+    "artifacts/ASH_BASETRAIN_GPU_37Q_R1_STATIC_CHECKS.txt",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37Q-R1.md",
+    "patch_reports/ASH-BASETRAIN-GPU-37Q-R1.diff"
+  ],
+  "file_sha256": {
+    "crates/base_train/src/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs": "77750fc8468c23c9b7d365788671344209438576ac1baedf01773d25e459ae48",
+    "crates/base_train/src/bin/ash_basetrain_gpu_37q_selected_group_row_block_multi_workgroup_reduction_diagnostic_kernel.rs": "c1baef3e221ad830a5110554f37162ec076368c63e1d4c7d3f183b621d29b91d",
+    "specs/ASH_BASETRAIN_GPU_37Q_R1_SPEC.md": "20c3c545f255e83c18827bf05e4c92930665ec02e2808d9118497a906600067d",
+    "artifacts/ASH_BASETRAIN_GPU_37Q_R1_STATIC_CHECKS.json": "5b36ff2df5a2ba59aa83ac033f8e9500786d2f421f0958f6849d82aa1566a57b",
+    "artifacts/ASH_BASETRAIN_GPU_37Q_R1_STATIC_CHECKS.txt": "e9d7dc2490b8a579e1db6e04c8edd01efc6fb5df605bbbf71244c649ebb322b0",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37Q-R1.md": "d4fdf2965731321a298d4391a934cbfd5299ba73be405758e30a17a0e9411f7d",
+    "patch_reports/ASH-BASETRAIN-GPU-37Q-R1.diff": "cf3c215d2c7e206a55d78f31c61f6b5b81be6eca3d7c4d1a6d8102b7fb443097"
+  },
+  "runtime_receipt_paths": [
+    "artifacts/ASH_BASETRAIN_GPU_37Q_R1_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json",
+    "artifacts/ASH_BASETRAIN_GPU_37Q_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json"
+  ],
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-37R",
+  "guards": [
+    "no forward",
+    "no hidden state",
+    "no logits",
+    "no backward",
+    "no optimizer",
+    "no safetensors mutation",
+    "no checkpoint"
+  ]
+}

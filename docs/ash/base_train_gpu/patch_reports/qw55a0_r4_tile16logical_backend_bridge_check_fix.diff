@@ -1,0 +1,11 @@
+--- /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/tests/qw55a0_r4_tile16logical_backend_bridge.rs.before_tensorcube_check_fix	2026-06-03 06:17:32.416475786 +0000
++++ /mnt/data/ash_map12r1_work/crates/burn_webgpu_backend/tests/qw55a0_r4_tile16logical_backend_bridge.rs	2026-06-03 06:17:34.419936857 +0000
+@@ -7,7 +7,7 @@
+         logical_col_offset: col,
+         physical_tile_rows: 8,
+         physical_tile_cols: 8,
+-        values_row_major: [0.0; 64],
++        values_row_major: vec![0.0; 64],
+         creates_contiguous_16x16_tile: false,
+     }
+ }

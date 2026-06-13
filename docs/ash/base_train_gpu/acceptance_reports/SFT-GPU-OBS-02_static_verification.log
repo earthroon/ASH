@@ -1,0 +1,111 @@
+SFT-GPU-OBS-02 static verification log
+timestamp_utc: 2026-05-19T06:30:37Z
+
+[toolchain]
+cargo: unavailable
+rustc: unavailable
+rustfmt: unavailable
+
+[exports]
+crates/ash_core/src/lib.rs:449:pub mod sft_gpu_long_horizon_health_ledger;
+crates/ash_core/src/lib.rs:450:pub use sft_gpu_long_horizon_health_ledger::*;
+crates/burn_webgpu_backend/src/lib.rs:282:pub mod gpu_runtime_drift_ledger;
+crates/burn_webgpu_backend/src/lib.rs:283:pub use gpu_runtime_drift_ledger::*;
+crates/lora_train/src/lib.rs:322:pub mod gpu_adapter_health_ledger;
+crates/lora_train/src/lib.rs:323:pub use gpu_adapter_health_ledger::*;
+
+[required files]
+OK crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs
+OK crates/ash_core/tests/sft_gpu_obs_02_long_horizon_health_ledger.rs
+OK crates/lora_train/src/gpu_adapter_health_ledger.rs
+OK crates/lora_train/tests/gpu_adapter_health_ledger.rs
+OK crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs
+OK crates/burn_webgpu_backend/tests/gpu_runtime_drift_ledger.rs
+OK acceptance_reports/SFT-GPU-OBS-02_long_horizon_health_ledger.md
+OK docs/roadmap/SFT-GPU-OBS-02_after_bake.md
+OK patch_reports/SFT-GPU-OBS-02_bake_report.md
+
+[grep contract]
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:pub enum AshLongHorizonHealthMetricKind {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:impl AshLongHorizonHealthMetricKind {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub texture_sample_weight_fetch_detected: bool,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:            texture_sample_weight_fetch_detected: false,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:pub struct AshLongHorizonGpuHealthLedgerInput {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub health_trend_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub runtime_drift_ledger_event_id: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub runtime_drift_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub health_trend_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub append_only: bool,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:pub struct AshLongHorizonGpuAdapterHealthLedgerSeal {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub health_trend_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub runtime_drift_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:pub struct AshLongHorizonGpuHealthLedgerReport {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub runtime_drift_event: Option<AshGpuRuntimeDriftLedgerEvent>,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub ledger_seal: Option<AshLongHorizonGpuAdapterHealthLedgerSeal>,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub health_trend_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub runtime_drift_digest: String,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    pub append_only_confirmed: bool,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    input: &AshLongHorizonGpuHealthLedgerInput,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:) -> AshLongHorizonGpuHealthLedgerReport {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    AshLongHorizonGpuHealthLedgerReport {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_event: None,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        health_trend_digest: String::new(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_digest: String::new(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        append_only_confirmed: false,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:fn validate_sources(input: &AshLongHorizonGpuHealthLedgerInput) -> Option<AshSftGpuObs02Decision> {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:fn validate_observations(input: &AshLongHorizonGpuHealthLedgerInput) -> Option<AshSftGpuObs02Decision> {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:fn validate_guard(input: &AshLongHorizonGpuHealthLedgerInput) -> Option<AshSftGpuObs02Decision> {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    if input.guard.texture_sample_weight_fetch_detected {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    input: &AshLongHorizonGpuHealthLedgerInput,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:) -> AshLongHorizonGpuHealthLedgerReport {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    let health_trend_digest = digest_str_fields(&[
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        health_trend_digest: health_trend_digest.clone(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        &health_trend_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    let runtime_drift_digest = digest_str_fields(&[
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        &health_trend_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    let runtime_drift_event = AshGpuRuntimeDriftLedgerEvent {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_ledger_event_id: format!("runtime_drift_ledger_event:{}", runtime_drift_digest),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_digest: runtime_drift_digest.clone(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        health_trend_digest: health_trend_digest.clone(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        append_only: true,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        &health_trend_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        &runtime_drift_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    let ledger_seal = AshLongHorizonGpuAdapterHealthLedgerSeal {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        health_trend_digest: health_trend_digest.clone(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_digest: runtime_drift_digest.clone(),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        append_only_confirmed: true,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    AshLongHorizonGpuHealthLedgerReport {
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_event: Some(runtime_drift_event),
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        health_trend_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        runtime_drift_digest,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        append_only_confirmed: true,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:pub fn sft_gpu_obs_02_report_is_append_only(
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:    report: &AshLongHorizonGpuHealthLedgerReport,
+crates/ash_core/src/sft_gpu_long_horizon_health_ledger.rs:        && report.append_only_confirmed
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    build_long_horizon_gpu_adapter_health_ledger, AshLongHorizonGpuHealthLedgerInput,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    AshLongHorizonGpuHealthLedgerReport, AshRuntimeDriftSeverity, AshSftGpuObs02Decision,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    pub health_trend_digest: String,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    pub runtime_drift_digest: String,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    pub append_only_confirmed: bool,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    input: &AshLongHorizonGpuHealthLedgerInput,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:) -> AshLongHorizonGpuHealthLedgerReport {
+crates/lora_train/src/gpu_adapter_health_ledger.rs:    report: &AshLongHorizonGpuHealthLedgerReport,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        &report.health_trend_digest,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        &report.runtime_drift_digest,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        &report.append_only_confirmed.to_string(),
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        health_trend_digest: report.health_trend_digest.clone(),
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        runtime_drift_digest: report.runtime_drift_digest.clone(),
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        append_only_confirmed: report.append_only_confirmed,
+crates/lora_train/src/gpu_adapter_health_ledger.rs:pub fn gpu_adapter_health_ledger_summary_is_append_only(
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        && !summary.health_trend_digest.trim().is_empty()
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        && !summary.runtime_drift_digest.trim().is_empty()
+crates/lora_train/src/gpu_adapter_health_ledger.rs:        && summary.append_only_confirmed
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:    pub health_trend_reporting_allowed: bool,
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:    pub texture_sample_weight_fetch_allowed: bool,
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:            health_trend_reporting_allowed: true,
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:            texture_sample_weight_fetch_allowed: false,
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:pub fn backend_gpu_runtime_drift_ledger_boundary() -> BackendGpuRuntimeDriftLedgerBoundary {
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:pub fn gpu_runtime_drift_ledger_boundary_is_append_only(
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:        && boundary.health_trend_reporting_allowed
+crates/burn_webgpu_backend/src/gpu_runtime_drift_ledger.rs:        && !boundary.texture_sample_weight_fetch_allowed

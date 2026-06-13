@@ -1,0 +1,30 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37R-R2",
+  "base_patch_id": "ASH-BASETRAIN-GPU-37R",
+  "status": "PASS",
+  "verdict": "PASS",
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "checks": {
+    "patch_id_r2_present": true,
+    "base_patch_id_present": true,
+    "accepts_37q_r1_patch_id": true,
+    "accepts_37q_r1_status_prefix": true,
+    "legacy_37q_kept": true,
+    "unsupported_patch_split": true,
+    "unsupported_status_split": true,
+    "parse_failed_not_used_for_unsupported_patch": true,
+    "source_binding_validation": true,
+    "partial_matrix_validation": true,
+    "summary_validation": true,
+    "runtime_receipt_path_r2": true,
+    "legacy_receipt_write": true,
+    "artifact_write_field": true,
+    "no_forward_guard": true,
+    "no_optimizer_guard": true,
+    "no_weight_mutation_guard": true,
+    "next_38_on_pass": true
+  },
+  "checked_at_utc": "2026-06-13T09:41:19Z",
+  "note": "Static source inspection only. Local cargo/GPU run must be performed by operator."
+}

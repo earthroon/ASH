@@ -1,0 +1,517 @@
+--- /tmp/ash_orig/crates/lora_train/src/bridge.rs	2026-04-19 11:55:29.000000000 +0000
++++ /tmp/ash_patch/crates/lora_train/src/bridge.rs	2026-04-19 12:58:05.357163254 +0000
+@@ -1,7 +1,9 @@
+-use anyhow::{bail, Result};
++use anyhow::{anyhow, bail, Result};
+ use model_core::{resolve_runtime_lora_target_module_dims, ModelSpec, NativeWgpuModel, ReferenceModel};
+ use std::fs;
+ use std::path::{Path, PathBuf};
++use std::sync::mpsc::sync_channel;
++use std::thread;
+ use std::time::Instant;
+ use tokenizer_core::{NativeTokenizer, TokenizerEngine, TokenizerManifest};
+ 
+@@ -476,7 +478,7 @@
+     let first = plan
+         .attachments
+         .first()
+-        .ok_or_else(|| anyhow::anyhow!("module-local feature extraction requires at least one attachment target"))?;
++        .ok_or_else(|| anyhow!("module-local feature extraction requires at least one attachment target"))?;
+     let expected_target_key = format!("layers.{}.{}", first.layer_idx, first.target);
+     if first.target_key.as_str() != expected_target_key {
+         bail!(
+@@ -493,6 +495,36 @@
+             first.target,
+         );
+     }
++
++    #[derive(Debug)]
++    struct PreparedModuleLocalBatch {
++        batch_index: usize,
++        record_ids: Vec<Option<String>>,
++        input_ids: Vec<Vec<u32>>,
++        seq_lens: Vec<usize>,
++        max_batch_seq_len: usize,
++    }
++
++    #[derive(Debug)]
++    struct FrozenModuleLocalShard {
++        shard_id: usize,
++        shard_name: String,
++        shard_path: PathBuf,
++        shard_rel_path: String,
++        rows: usize,
++        tokens: usize,
++        max_seq_len: usize,
++        buffer: ModuleLocalFeatureShardBuffer,
++    }
++
++    #[derive(Debug, Default)]
++    struct PrepStageSummary {
++        stats: JsonlDatasetStats,
++        skipped_too_short: usize,
++        prepared_batches: usize,
++        prepared_rows: usize,
++    }
++
+     let bridge = RawTextFeatureBridgeBuilder::new(cfg)?.build()?;
+     let spec = ModelSpec::load_toml(&cfg.model_path)?;
+     let (input_dim, output_dim) = resolve_runtime_lora_target_module_dims(&spec, &first.target_key)?;
+@@ -507,12 +539,10 @@
+     let full_model_path = resolve_teacher_full_model_path(&bridge.config, &cfg.model_path)?;
+     let teacher = ReferenceModel::from_full_checkpoints(spec.clone(), &[full_model_path.as_path()])?;
+     let tokenizer_manifest = TokenizerManifest::load_json(&bridge.config.tokenizer_path)?;
+-    let tokenizer = NativeTokenizer::from_manifest(tokenizer_manifest.clone());
+ 
+     let mut report = BridgeExtractionReport::default();
+     let started = Instant::now();
+     let mut shard_buffer = ModuleLocalFeatureShardBuffer::new(input_dim, output_dim);
+-    let mut shards = Vec::<FeatureShardMeta>::new();
+     let mut shard_id = 0usize;
+     let mut sample_id = 0i64;
+     let mut total_rows = 0usize;
+@@ -523,98 +553,185 @@
+         .module_local_teacher_batch_size
+         .unwrap_or(4)
+         .max(1);
++    let target_key = first.target_key.clone();
+ 
+-    #[derive(Debug)]
+-    struct PendingModuleLocalSample {
+-        all_ids: Vec<u32>,
+-        record_id: Option<String>,
+-    }
++    let (prepared_tx, prepared_rx) = sync_channel::<PreparedModuleLocalBatch>(4);
++    let (shard_tx, shard_rx) = sync_channel::<FrozenModuleLocalShard>(2);
+ 
+-    let mut flush_shard = |buf: &mut ModuleLocalFeatureShardBuffer,
+-                           shard_id: usize,
+-                           cumulative_rows: usize,
+-                           cumulative_tokens: usize,
+-                           shards: &mut Vec<FeatureShardMeta>|
+-     -> Result<()> {
+-        if buf.is_empty() {
+-            return Ok(());
++    let prep_bridge = bridge.clone();
++    let prep_paths = train_paths.to_vec();
++    let prep_tokenizer_manifest = tokenizer_manifest.clone();
++    let prep_handle = thread::spawn(move || -> Result<PrepStageSummary> {
++        let tokenizer = NativeTokenizer::from_manifest(prep_tokenizer_manifest.clone());
++        let mut summary = PrepStageSummary::default();
++        let mut pending_ids: Vec<Vec<u32>> = Vec::with_capacity(module_local_teacher_batch_size);
++        let mut pending_record_ids: Vec<Option<String>> = Vec::with_capacity(module_local_teacher_batch_size);
++        let mut pending_seq_lens: Vec<usize> = Vec::with_capacity(module_local_teacher_batch_size);
++        let mut batch_index = 0usize;
++
++        let flush_prepared_batch = |
++            pending_ids: &mut Vec<Vec<u32>>,
++            pending_record_ids: &mut Vec<Option<String>>,
++            pending_seq_lens: &mut Vec<usize>,
++            batch_index: &mut usize,
++            summary: &mut PrepStageSummary,
++        | -> Result<()> {
++            if pending_ids.is_empty() {
++                return Ok(());
++            }
++            let max_batch_seq_len = pending_seq_lens.iter().copied().max().unwrap_or(0);
++            let batch = PreparedModuleLocalBatch {
++                batch_index: *batch_index,
++                record_ids: std::mem::take(pending_record_ids),
++                input_ids: std::mem::take(pending_ids),
++                seq_lens: std::mem::take(pending_seq_lens),
++                max_batch_seq_len,
++            };
++            summary.prepared_batches += 1;
++            summary.prepared_rows += batch.input_ids.len();
++            println!(
++                "[bridge][module_local][prep] batch={} rows={} max_batch_seq_len={} pending_capacity={}",
++                batch.batch_index,
++                batch.input_ids.len(),
++                batch.max_batch_seq_len,
++                module_local_teacher_batch_size,
++            );
++            prepared_tx
++                .send(batch)
++                .map_err(|_| anyhow!("module-local prepare stage failed to send prepared batch"))?;
++            *batch_index += 1;
++            Ok(())
++        };
++
++        let stats = stream_packed_samples(&prep_paths, max_samples, max_seq_len, |sample, record_id| {
++            let mut prompt_ids = tokenizer.encode(&sample.prompt)?;
++            let mut response_ids = tokenizer.encode(&sample.response)?;
++            if prep_bridge.config.bos {
++                prompt_ids.insert(0, prep_tokenizer_manifest.special_tokens.bos.id);
++            }
++            if prep_bridge.config.eos {
++                response_ids.push(prep_tokenizer_manifest.special_tokens.eos.id);
++            }
++            let mut all_ids = prompt_ids;
++            all_ids.extend(response_ids);
++            if all_ids.len() < 2 {
++                summary.skipped_too_short += 1;
++                return Ok(());
++            }
++            if all_ids.len() > max_seq_len {
++                all_ids.truncate(max_seq_len);
++            }
++
++            pending_seq_lens.push(all_ids.len());
++            pending_ids.push(all_ids);
++            pending_record_ids.push(record_id.map(|s| s.to_string()));
++
++            if pending_ids.len() >= module_local_teacher_batch_size {
++                flush_prepared_batch(
++                    &mut pending_ids,
++                    &mut pending_record_ids,
++                    &mut pending_seq_lens,
++                    &mut batch_index,
++                    &mut summary,
++                )?;
++            }
++            Ok(())
++        })?;
++
++        flush_prepared_batch(
++            &mut pending_ids,
++            &mut pending_record_ids,
++            &mut pending_seq_lens,
++            &mut batch_index,
++            &mut summary,
++        )?;
++
++        summary.stats = stats;
++        drop(prepared_tx);
++        Ok(summary)
++    });
++
++    let write_started = started;
++    let writer_handle = thread::spawn(move || -> Result<Vec<FeatureShardMeta>> {
++        let mut shards = Vec::<FeatureShardMeta>::new();
++        while let Ok(frozen) = shard_rx.recv() {
++            let t_write = Instant::now();
++            let byte_size = write_module_local_feature_shard(&frozen.shard_path, &frozen.buffer)?;
++            let write_sec = t_write.elapsed().as_secs_f64();
++            shards.push(FeatureShardMeta {
++                shard_id: frozen.shard_id,
++                path: frozen.shard_rel_path,
++                rows: frozen.rows,
++                total_tokens: frozen.tokens,
++                max_seq_len: frozen.max_seq_len,
++                hidden_tensor: "module_input".to_string(),
++                target_tensor: "module_output".to_string(),
++                seq_lens_tensor: "seq_lens".to_string(),
++                offsets_tensor: "offsets".to_string(),
++                prompt_lens_tensor: None,
++                sample_ids_tensor: Some("sample_ids".to_string()),
++                byte_size: Some(byte_size),
++            });
++            let elapsed = write_started.elapsed().as_secs_f64().max(1e-9);
++            println!(
++                "[bridge][module_local][write] shard_id={} rows={} total_tokens={} bytes={} write_sec={:.2}s elapsed={:.2}s path={}",
++                frozen.shard_id,
++                frozen.rows,
++                frozen.tokens,
++                byte_size,
++                write_sec,
++                elapsed,
++                frozen.shard_path.display(),
++            );
++        }
++        Ok(shards)
++    });
++
++    let freeze_current_shard = |
++        shard_buffer: &mut ModuleLocalFeatureShardBuffer,
++        shard_id: usize,
++    | -> Result<Option<FrozenModuleLocalShard>> {
++        if shard_buffer.is_empty() {
++            return Ok(None);
+         }
+         let shard_name = format!("module_local_{:05}.safetensors", shard_id);
+         let shard_path = PathBuf::from(&work_dir).join(&shard_name);
+-        let shard_rel_path = PathBuf::from("feature_store_work").join(&shard_name);
+-        let rows = buf.rows;
+-        let tokens = buf.total_tokens;
+-        let max_seq_len = buf.max_seq_len;
+-        let t_write = Instant::now();
+-        let byte_size = write_module_local_feature_shard(&shard_path, buf)?;
+-        let write_sec = t_write.elapsed().as_secs_f64();
+-        shards.push(FeatureShardMeta {
+-            shard_id,
+-            path: shard_rel_path.to_string_lossy().replace('\\', "/"),
+-            rows,
+-            total_tokens: tokens,
+-            max_seq_len,
+-            hidden_tensor: "module_input".to_string(),
+-            target_tensor: "module_output".to_string(),
+-            seq_lens_tensor: "seq_lens".to_string(),
+-            offsets_tensor: "offsets".to_string(),
+-            prompt_lens_tensor: None,
+-            sample_ids_tensor: Some("sample_ids".to_string()),
+-            byte_size: Some(byte_size),
+-        });
+-        let elapsed = started.elapsed().as_secs_f64().max(1e-9);
+-        println!(
+-            "[bridge][module_local] flushed shard_id={} rows={} total_tokens={} bytes={} write_sec={:.2}s elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} path={}",
++        let shard_rel_path = PathBuf::from("feature_store_work")
++            .join(&shard_name)
++            .to_string_lossy()
++            .replace('\\', "/");
++        let frozen = FrozenModuleLocalShard {
+             shard_id,
+-            rows,
+-            tokens,
+-            byte_size,
+-            write_sec,
+-            elapsed,
+-            cumulative_rows as f64 / elapsed,
+-            cumulative_tokens as f64 / elapsed,
+-            shard_path.display(),
+-        );
+-        *buf = ModuleLocalFeatureShardBuffer::new(buf.input_dim, buf.output_dim);
+-        Ok(())
++            shard_name,
++            shard_path,
++            shard_rel_path,
++            rows: shard_buffer.rows,
++            tokens: shard_buffer.total_tokens,
++            max_seq_len: shard_buffer.max_seq_len,
++            buffer: std::mem::replace(
++                shard_buffer,
++                ModuleLocalFeatureShardBuffer::new(input_dim, output_dim),
++            ),
++        };
++        Ok(Some(frozen))
+     };
+ 
+-    let mut pending = Vec::<PendingModuleLocalSample>::new();
+-    let target_key = first.target_key.clone();
+-
+-    let mut flush_module_local_teacher_batch = |
+-        pending_value: &mut Vec<PendingModuleLocalSample>,
+-        shard_buffer: &mut ModuleLocalFeatureShardBuffer,
+-        report: &mut BridgeExtractionReport,
+-        total_rows: &mut usize,
+-        total_tokens: &mut usize,
+-        max_seq_len_seen: &mut usize,
+-        sample_id: &mut i64,
+-        shard_id: &mut usize,
+-        shards: &mut Vec<FeatureShardMeta>,
+-    | -> Result<()> {
+-        if pending_value.is_empty() {
+-            return Ok(());
+-        }
+-
+-        let batch_size = pending_value.len();
+-        let record_ids: Vec<Option<String>> = pending_value.iter().map(|p| p.record_id.clone()).collect();
+-        let batch_input_ids: Vec<Vec<u32>> = pending_value.iter().map(|p| p.all_ids.clone()).collect();
+-
++    while let Ok(batch) = prepared_rx.recv() {
++        let batch_size = batch.input_ids.len();
++        let record_ids = batch.record_ids;
++        let batch_input_ids = batch.input_ids;
+         let t_capture = Instant::now();
+         let captures = teacher.capture_module_io_ids_batch(&batch_input_ids, &target_key)?;
+         let capture_sec = t_capture.elapsed().as_secs_f64();
+-        if captures.len() != batch_input_ids.len() {
++        if captures.len() != batch_size {
+             bail!(
+                 "module-local batch capture count mismatch: target_key={} requested={} returned={}",
+                 target_key,
+-                batch_input_ids.len(),
++                batch_size,
+                 captures.len(),
+             );
+         }
+ 
+-        pending_value.clear();
+-
+         let t_pack = Instant::now();
+         for (idx, capture) in captures.into_iter().enumerate() {
+             if capture.input_dim != input_dim || capture.output_dim != output_dim {
+@@ -627,15 +744,15 @@
+                     capture.output_dim,
+                 );
+             }
+-            shard_buffer.push_row(&capture.module_input, &capture.module_output, *sample_id)?;
+-            *sample_id += 1;
++            shard_buffer.push_row(&capture.module_input, &capture.module_output, sample_id)?;
++            sample_id += 1;
+             report.samples_seen += 1;
+             report.feature_batches += 1;
+             report.max_observed_seq_len = report.max_observed_seq_len.max(capture.seq_len);
+             report.selected_tokens_total += capture.seq_len;
+-            *total_rows += 1;
+-            *total_tokens += capture.seq_len;
+-            *max_seq_len_seen = (*max_seq_len_seen).max(capture.seq_len);
++            total_rows += 1;
++            total_tokens += capture.seq_len;
++            max_seq_len_seen = max_seq_len_seen.max(capture.seq_len);
+             if report.samples_seen == 1 || report.samples_seen % module_local_teacher_batch_size == 0 {
+                 let elapsed = started.elapsed().as_secs_f64().max(1e-9);
+                 println!(
+@@ -648,91 +765,67 @@
+                     output_dim,
+                     capture.input_dim,
+                     capture.output_dim,
+-                    *total_rows,
++                    total_rows,
+                     elapsed,
+                     report.samples_seen as f64 / elapsed,
+-                    *total_tokens as f64 / elapsed,
++                    total_tokens as f64 / elapsed,
+                     capture_sec,
+                     record_ids[idx].as_deref().unwrap_or(""),
+                 );
+             }
+             if shard_buffer.rows >= rows_per_shard {
+-                flush_shard(shard_buffer, *shard_id, *total_rows, *total_tokens, shards)?;
+-                *shard_id += 1;
++                if let Some(frozen) = freeze_current_shard(&mut shard_buffer, shard_id)? {
++                    println!(
++                        "[bridge][module_local][queue] enqueue shard_id={} rows={} total_tokens={} path={}",
++                        frozen.shard_id,
++                        frozen.rows,
++                        frozen.tokens,
++                        frozen.shard_path.display(),
++                    );
++                    shard_tx
++                        .send(frozen)
++                        .map_err(|_| anyhow!("module-local writer stage failed to receive frozen shard"))?;
++                    shard_id += 1;
++                }
+             }
+         }
+ 
+         let pack_sec = t_pack.elapsed().as_secs_f64();
+         println!(
+-            "[bridge][module_local][timing] target_key={} batch={} capture_sec={:.2} pack_sec={:.2} rows_after={}",
++            "[bridge][module_local][timing] target_key={} batch={} prepared_max_seq_len={} capture_sec={:.2} pack_sec={:.2} rows_after={}",
+             target_key,
+             batch_size,
++            batch.max_batch_seq_len,
+             capture_sec,
+             pack_sec,
+-            *total_rows,
++            total_rows,
+         );
++    }
+ 
+-        Ok(())
+-    };
+-
+-    let stats = stream_packed_samples(
+-        train_paths,
+-        max_samples,
+-        max_seq_len,
+-        |sample, record_id| {
+-            let mut prompt_ids = tokenizer.encode(&sample.prompt)?;
+-            let mut response_ids = tokenizer.encode(&sample.response)?;
+-            if bridge.config.bos {
+-                prompt_ids.insert(0, tokenizer_manifest.special_tokens.bos.id);
+-            }
+-            if bridge.config.eos {
+-                response_ids.push(tokenizer_manifest.special_tokens.eos.id);
+-            }
+-            let mut all_ids = prompt_ids;
+-            all_ids.extend(response_ids);
+-            if all_ids.len() < 2 {
+-                report.samples_skipped += 1;
+-                return Ok(());
+-            }
+-            if all_ids.len() > max_seq_len {
+-                all_ids.truncate(max_seq_len);
+-            }
+-
+-            pending.push(PendingModuleLocalSample {
+-                all_ids,
+-                record_id: record_id.map(|s| s.to_string()),
+-            });
+-
+-            if pending.len() >= module_local_teacher_batch_size {
+-                flush_module_local_teacher_batch(
+-                    &mut pending,
+-                    &mut shard_buffer,
+-                    &mut report,
+-                    &mut total_rows,
+-                    &mut total_tokens,
+-                    &mut max_seq_len_seen,
+-                    &mut sample_id,
+-                    &mut shard_id,
+-                    &mut shards,
+-                )?;
+-            }
+-            Ok(())
+-        },
+-    )?;
+-
+-    flush_module_local_teacher_batch(
+-        &mut pending,
+-        &mut shard_buffer,
+-        &mut report,
+-        &mut total_rows,
+-        &mut total_tokens,
+-        &mut max_seq_len_seen,
+-        &mut sample_id,
+-        &mut shard_id,
+-        &mut shards,
+-    )?;
++    if let Some(frozen) = freeze_current_shard(&mut shard_buffer, shard_id)? {
++        println!(
++            "[bridge][module_local][queue] enqueue final shard_id={} rows={} total_tokens={} path={}",
++            frozen.shard_id,
++            frozen.rows,
++            frozen.tokens,
++            frozen.shard_path.display(),
++        );
++        shard_tx
++            .send(frozen)
++            .map_err(|_| anyhow!("module-local writer stage failed to receive final frozen shard"))?;
++    }
++    drop(shard_tx);
+ 
+-    flush_shard(&mut shard_buffer, shard_id, total_rows, total_tokens, &mut shards)?;
++    let prep_summary = prep_handle
++        .join()
++        .map_err(|_| anyhow!("module-local prepare stage panicked"))??;
++    report.samples_skipped += prep_summary.skipped_too_short;
++    let prepared_batches = prep_summary.prepared_batches;
++    let stats = prep_summary.stats;
++
++    let shards = writer_handle
++        .join()
++        .map_err(|_| anyhow!("module-local writer stage panicked"))??;
+ 
+     let manifest = FeatureStoreManifest {
+         version: 1,
+@@ -743,10 +836,10 @@
+         tokenizer_path: bridge.config.tokenizer_path.clone(),
+         teacher_full_model_path: full_model_path.to_string_lossy().to_string(),
+         hidden_size: input_dim,
+-        vocab_size: 0,
++        vocab_size: tokenizer_manifest.vocab.len(),
+         dtype: "f16".to_string(),
+         max_seq_len: max_seq_len_seen,
+-        rows_per_shard: rows_per_shard,
++        rows_per_shard,
+         num_rows: total_rows,
+         total_tokens,
+         target_strategy: "module_local_io".to_string(),
+@@ -761,7 +854,7 @@
+     };
+     let elapsed = started.elapsed().as_secs_f64().max(1e-9);
+     println!(
+-        "[bridge][module_local] complete family=module_lora target_key={} expected={} -> {} rows={} total_tokens={} shards={} max_seq_len={} elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} work_dir={}",
++        "[bridge][module_local] complete family=module_lora target_key={} expected={} -> {} rows={} total_tokens={} shards={} max_seq_len={} prepared_batches={} elapsed={:.2}s samp_per_sec={:.2} tok_per_sec={:.2} work_dir={}",
+         first.target_key,
+         input_dim,
+         output_dim,
+@@ -769,6 +862,7 @@
+         manifest.total_tokens,
+         manifest.shards.len(),
+         manifest.max_seq_len,
++        prepared_batches,
+         elapsed,
+         manifest.num_rows as f64 / elapsed,
+         manifest.total_tokens as f64 / elapsed,

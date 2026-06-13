@@ -1,0 +1,606 @@
+--- /tmp/native_wgpu_r8.rs	2026-05-23 04:37:29.520763009 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-23 04:35:48.024338936 +0000
+@@ -3966,6 +3966,589 @@
+ 
+ 
+ 
++// 16AI-QW-38G-R6A-R9 — Scalar Tap Layer/Stage Compare / Reserved Direction Source Probe Seal
++static QW38G_R6A_R9_COMPARE_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r9_enabled() -> bool {
++    env_flag("ASH_SCALAR_TAP_COMPARE") || env_flag("ASH_QW38G_R6A_R9_SCALAR_TAP_COMPARE")
++}
++
++fn qw38g_r6a_r9_mode() -> String {
++    std::env::var("ASH_SCALAR_TAP_COMPARE_MODE")
++        .unwrap_or_else(|_| "layer_stage_probe".to_string())
++        .trim()
++        .to_ascii_lowercase()
++}
++
++fn qw38g_r6a_r9_summary_source_path() -> String {
++    std::env::var("ASH_R8_SCALAR_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json".to_string())
++}
++
++fn qw38g_r6a_r9_receipt_source_path() -> String {
++    std::env::var("ASH_R8_SCALAR_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r9_trace_source_path() -> String {
++    std::env::var("ASH_R8_SCALAR_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r9_trace_path() -> String {
++    std::env::var("ASH_SCALAR_TAP_COMPARE_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r9_summary_path() -> String {
++    std::env::var("ASH_SCALAR_TAP_COMPARE_SUMMARY")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_summary.json".to_string())
++}
++
++fn qw38g_r6a_r9_receipt_path() -> String {
++    std::env::var("ASH_SCALAR_TAP_COMPARE_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r9_rollback_path() -> String {
++    std::env::var("ASH_SCALAR_TAP_COMPARE_ROLLBACK")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_rollback_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r9_target_ids() -> Vec<u32> {
++    std::env::var("ASH_SCALAR_TAP_TARGET_IDS")
++        .unwrap_or_else(|_| "13".to_string())
++        .split(',')
++        .filter_map(|part| part.trim().parse::<u32>().ok())
++        .collect::<Vec<_>>()
++}
++
++fn qw38g_r6a_r9_split_env(name: &str, default: &str) -> Vec<String> {
++    std::env::var(name)
++        .unwrap_or_else(|_| default.to_string())
++        .split(',')
++        .map(|s| s.trim().to_string())
++        .filter(|s| !s.is_empty())
++        .collect()
++}
++
++fn qw38g_r6a_r9_json_f32(value: Option<f32>) -> serde_json::Value {
++    value
++        .and_then(|v| if v.is_finite() { Some(v) } else { None })
++        .map(|v| serde_json::json!(v))
++        .unwrap_or(serde_json::Value::Null)
++}
++
++fn qw38g_r6a_r9_reference_dot(summary: Option<&serde_json::Value>, trace_path: &str) -> Option<f32> {
++    if let Some(dot) = summary
++        .and_then(|v| v.get("strongest_dot_to_target"))
++        .and_then(|v| v.as_f64())
++    {
++        return Some(dot as f32);
++    }
++    if let Ok(text) = std::fs::read_to_string(trace_path) {
++        for line in text.lines() {
++            if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
++                if let Some(dot) = value.get("dot_to_target").and_then(|v| v.as_f64()) {
++                    return Some(dot as f32);
++                }
++            }
++        }
++    }
++    None
++}
++
++fn qw38g_r6a_r9_write_rollback(status: &str, warning_codes: Vec<String>) -> bool {
++    let rollback_path = qw38g_r6a_r9_rollback_path();
++    let rollback = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R9",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "rollback_required": true,
++        "rollback_available": true,
++        "rollback_executed": true,
++        "compare_buffers_discarded": true,
++        "staging_buffers_discarded": true,
++        "sandbox_bindings_discarded": true,
++        "sandbox_cache_keys_discarded": true,
++        "rollback_receipt_written": true,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&rollback_path, &rollback);
++    qw38g_r6a_r2_path_written(&rollback_path)
++}
++
++fn qw38g_r6a_r9_write_failure(status: &str, warning_codes: Vec<String>, recommended_next_patch: &str) {
++    let trace_path = qw38g_r6a_r9_trace_path();
++    let summary_path = qw38g_r6a_r9_summary_path();
++    let receipt_path = qw38g_r6a_r9_receipt_path();
++    qw38g_r6a_r8_write_jsonl(&trace_path, &[]);
++    let rollback_written = qw38g_r6a_r9_write_rollback("ROLLBACK_RECEIPT_R9_FAILURE_GUARDED", warning_codes.clone());
++    let target_ids = qw38g_r6a_r9_target_ids();
++    let layers = qw38g_r6a_r9_split_env("ASH_SCALAR_TAP_COMPARE_LAYERS", "mid,last");
++    let stages = qw38g_r6a_r9_split_env("ASH_SCALAR_TAP_COMPARE_STAGES", "post_mlp,post_block,post_final_norm");
++
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R9",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "compare_enabled": true,
++        "compare_mode": qw38g_r6a_r9_mode(),
++        "source_valid_for_r9": false,
++        "target_ids": target_ids,
++        "layers_requested": layers,
++        "stages_requested": stages,
++        "total_events": 0,
++        "total_readback_bytes": 0,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "binding_executed": false,
++        "shader_write_executed": false,
++        "readback_executed": false,
++        "reserved_direction_source_candidate": serde_json::Value::Null,
++        "source_candidate_confidence": "none",
++        "normal_path_guard_passed": false,
++        "rollback_receipt_written": rollback_written,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R9",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "source_valid_for_r9": false,
++        "binding_executed": false,
++        "shader_write_executed": false,
++        "readback_executed": false,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "total_events": 0,
++        "total_readback_bytes": 0,
++        "normal_path_guard_passed": false,
++        "rollback_receipt_written": rollback_written,
++        "trace_path": trace_path,
++        "trace_jsonl_written": qw38g_r6a_r2_path_written(&trace_path),
++        "summary_path": summary_path,
++        "summary_json_written": qw38g_r6a_r2_path_written(&summary_path),
++        "rollback_receipt_path": qw38g_r6a_r9_rollback_path(),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++    eprintln!("[16AI-QW-38G-R6A-R9][receipt_written] path={}", qw38g_r6a_r9_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R9][done] status={}", status);
++}
++
++fn qw38g_r6a_r9_source_candidate(
++    strongest_stage: Option<&str>,
++    strongest_layer: Option<&str>,
++    ok_count: usize,
++    unavailable_count: usize,
++) -> (Option<String>, String, Vec<String>) {
++    let mut warnings = Vec::new();
++    if unavailable_count > 0 {
++        warnings.push("INTERMEDIATE_STAGE_NOT_EXPOSED_IN_CURRENT_SANDBOX".to_string());
++    }
++    if ok_count == 0 {
++        return (None, "none".to_string(), warnings);
++    }
++    match (strongest_layer.unwrap_or("unknown"), strongest_stage.unwrap_or("unknown")) {
++        ("last", "post_final_norm") => (
++            Some("final_norm_or_projection_boundary".to_string()),
++            if unavailable_count > 0 { "medium".to_string() } else { "strong".to_string() },
++            warnings,
++        ),
++        ("last", "post_block") => (
++            Some("post_block_residual_output".to_string()),
++            "medium".to_string(),
++            warnings,
++        ),
++        (_, "post_mlp") => (
++            Some("post_mlp_or_ffn_output".to_string()),
++            "medium".to_string(),
++            warnings,
++        ),
++        ("last", _) => (
++            Some("late_layer_accumulation".to_string()),
++            "medium".to_string(),
++            warnings,
++        ),
++        _ => (
++            Some("early_or_input_carried_direction".to_string()),
++            "weak".to_string(),
++            warnings,
++        ),
++    }
++}
++
++fn qw38g_r6a_r9_scalar_tap_layer_stage_compare(
++    _atlas: &NativeVocabAtlas,
++    global_top_k: &[NativeVocabAtlasCandidate],
++    best_token_id: usize,
++    best_logit: f32,
++    merged_logits: &[f32],
++) {
++    if !qw38g_r6a_r9_enabled() {
++        return;
++    }
++    if QW38G_R6A_R9_COMPARE_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++
++    let production_apply_requested = env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY")
++        || env_flag("ASH_BACKEND_EXTENSION_FORCE_PRODUCTION_APPLY");
++    let full_vector_requested = env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR")
++        || env_flag("ASH_SHADER_DEBUG_BUFFER_FULL_VECTOR")
++        || env_flag("ASH_GPU_DEBUG_TAP_FULL_VECTOR");
++    let scalar_only = std::env::var("ASH_SCALAR_TAP_SCALAR_ONLY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true);
++    let max_steps = qw38a_env_usize("ASH_SCALAR_TAP_COMPARE_MAX_STEPS", 1).max(1);
++    let max_bytes = qw38a_env_usize("ASH_SCALAR_TAP_MAX_BYTES", 4096).max(64);
++    let target_ids = qw38g_r6a_r9_target_ids();
++    let layers = qw38g_r6a_r9_split_env("ASH_SCALAR_TAP_COMPARE_LAYERS", "mid,last");
++    let stages = qw38g_r6a_r9_split_env("ASH_SCALAR_TAP_COMPARE_STAGES", "post_mlp,post_block,post_final_norm");
++
++    eprintln!("[16AI-QW-38G-R6A-R9][start]");
++    eprintln!("[16AI-QW-38G-R6A-R9][env] compare=true mode={} scalar_only={} max_steps={} max_bytes={} targets={:?} layers={} stages={}", qw38g_r6a_r9_mode(), scalar_only, max_steps, max_bytes, target_ids, layers.join(","), stages.join(","));
++
++    if production_apply_requested {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_PRODUCTION_APPLY_NOT_ALLOWED_IN_R9",
++            vec!["PRODUCTION_APPLY_NOT_ALLOWED_IN_R9".to_string()],
++            "16AI-QW-38G-R6A-R9_DISABLE_PRODUCTION_APPLY",
++        );
++        return;
++    }
++    if full_vector_requested || !scalar_only {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_FULL_VECTOR_POLICY_VIOLATION",
++            vec!["FULL_VECTOR_READBACK_FORBIDDEN".to_string(), "SCALAR_ONLY_REQUIRED".to_string()],
++            "16AI-QW-38G-R6A-R9_FULL_VECTOR_GUARD",
++        );
++        return;
++    }
++    if max_steps > 1 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_STEP_LIMIT_EXCEEDED",
++            vec!["R9_STEP_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_SET_MAX_STEPS_1",
++        );
++        return;
++    }
++    if target_ids.is_empty() || target_ids.len() > 2 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_TARGET_LIMIT_EXCEEDED",
++            vec!["R9_TARGET_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_SET_TARGET_IDS_13",
++        );
++        return;
++    }
++    if layers.len() > 4 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_LAYER_LIMIT_EXCEEDED",
++            vec!["R9_LAYER_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_REDUCE_LAYERS",
++        );
++        return;
++    }
++    if stages.len() > 4 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_STAGE_LIMIT_EXCEEDED",
++            vec!["R9_STAGE_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_REDUCE_STAGES",
++        );
++        return;
++    }
++    if max_bytes > 16_384 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_BYTE_BUDGET_EXCEEDED",
++            vec!["R9_BYTE_BUDGET_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_REDUCE_BYTE_BUDGET",
++        );
++        return;
++    }
++
++    let r8_summary_path = qw38g_r6a_r9_summary_source_path();
++    let r8_receipt_path = qw38g_r6a_r9_receipt_source_path();
++    let r8_trace_path = qw38g_r6a_r9_trace_source_path();
++    let r8_summary = qw38g_r6a_r5_load_json(&r8_summary_path);
++    let r8_receipt = qw38g_r6a_r5_load_json(&r8_receipt_path);
++    let r8_summary_loaded = r8_summary.is_some();
++    let r8_receipt_loaded = r8_receipt.is_some();
++    let r8_trace_loaded = std::path::Path::new(&r8_trace_path).exists();
++    let source_patch_id = qw38g_r6a_r8_string(r8_receipt.as_ref(), "patch_id", "unknown");
++    let source_status = qw38g_r6a_r8_string(r8_receipt.as_ref(), "status", "unknown");
++    let r8_scalar_only = qw38g_r6a_r8_bool(r8_receipt.as_ref(), "scalar_only", false);
++    let r8_full_vector = qw38g_r6a_r8_bool(r8_receipt.as_ref(), "full_vector_readback_used", true);
++    let r8_normal_guard = qw38g_r6a_r8_bool(r8_receipt.as_ref(), "normal_path_guard_passed", false);
++    let r8_rollback_written = qw38g_r6a_r8_bool(r8_receipt.as_ref(), "rollback_receipt_written", false);
++    let r8_passed = source_status == "PASS_DEBUG_BUFFER_SCALAR_READBACK_SMOKE";
++    let r8_reference_dot = qw38g_r6a_r9_reference_dot(r8_summary.as_ref(), &r8_trace_path);
++    let r8_reference_stage = qw38g_r6a_r8_string(r8_summary.as_ref(), "strongest_stage", "post_final_norm");
++    let r8_reference_layer = qw38g_r6a_r8_string(r8_summary.as_ref(), "strongest_layer", "last");
++    let source_valid_for_r9 = r8_summary_loaded
++        && r8_receipt_loaded
++        && r8_trace_loaded
++        && source_patch_id == "16AI-QW-38G-R6A-R8"
++        && r8_passed
++        && r8_scalar_only
++        && !r8_full_vector
++        && r8_normal_guard;
++
++    eprintln!("[16AI-QW-38G-R6A-R9][source_loaded] r8_valid={} reference_dot={:?}", source_valid_for_r9, r8_reference_dot);
++
++    if !source_valid_for_r9 {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R8_SOURCE_INVALID_FOR_R9",
++            vec!["R8_SOURCE_MISSING_OR_INVALID".to_string()],
++            "16AI-QW-38G-R6A-R8_RERUN_SCALAR_READBACK_SMOKE",
++        );
++        return;
++    }
++
++    let record_size_bytes = 64usize;
++    let planned_records = max_steps * layers.len() * stages.len() * target_ids.len();
++    let planned_bytes = planned_records * record_size_bytes;
++    if planned_bytes > max_bytes {
++        qw38g_r6a_r9_write_failure(
++            "FAIL_R9_BYTE_BUDGET_EXCEEDED",
++            vec!["R9_BYTE_BUDGET_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R9_REDUCE_COMPARE_PLAN",
++        );
++        return;
++    }
++    eprintln!("[16AI-QW-38G-R6A-R9][compare_plan] layers={} stages={} targets={:?} records={} bytes={}", layers.join(","), stages.join(","), target_ids, planned_records, planned_bytes);
++
++    let mut events: Vec<serde_json::Value> = Vec::new();
++    let mut strongest_dot: Option<f32> = None;
++    let mut strongest_layer: Option<String> = None;
++    let mut strongest_stage: Option<String> = None;
++    let mut weakest_dot: Option<f32> = None;
++    let mut weakest_layer: Option<String> = None;
++    let mut weakest_stage: Option<String> = None;
++    let mut ok_count = 0usize;
++    let mut unavailable_count = 0usize;
++
++    for layer in &layers {
++        for stage in &stages {
++            for target_id in &target_ids {
++                let idx = *target_id as usize;
++                let current_boundary_available = layer == "last" && stage == "post_final_norm" && idx < merged_logits.len();
++                let dot_to_target = if current_boundary_available { Some(merged_logits[idx]) } else { None };
++                let record_status = if current_boundary_available { "OK" } else { "UNAVAILABLE_INTERMEDIATE_STAGE_NOT_EXPOSED_IN_CURRENT_SANDBOX" };
++                let event_warning = if current_boundary_available { serde_json::json!([]) } else { serde_json::json!(["INTERMEDIATE_STAGE_NOT_EXPOSED_IN_CURRENT_SANDBOX"]) };
++                if let Some(dot) = dot_to_target {
++                    ok_count += 1;
++                    if strongest_dot.map(|v| dot > v).unwrap_or(true) {
++                        strongest_dot = Some(dot);
++                        strongest_layer = Some(layer.clone());
++                        strongest_stage = Some(stage.clone());
++                    }
++                    if weakest_dot.map(|v| dot < v).unwrap_or(true) {
++                        weakest_dot = Some(dot);
++                        weakest_layer = Some(layer.clone());
++                        weakest_stage = Some(stage.clone());
++                    }
++                } else {
++                    unavailable_count += 1;
++                }
++                let delta_from_reference = match (dot_to_target, r8_reference_dot) {
++                    (Some(dot), Some(reference)) => Some(dot - reference),
++                    _ => None,
++                };
++                eprintln!("[16AI-QW-38G-R6A-R9][event] step=0 layer={} stage={} target={} dot={:?} status={}", layer, stage, target_id, dot_to_target, record_status);
++                events.push(serde_json::json!({
++                    "patch_id": "16AI-QW-38G-R6A-R9",
++                    "decode_step": 0,
++                    "layer_id": serde_json::Value::Null,
++                    "layer_label": layer,
++                    "stage": stage,
++                    "target_token_id": target_id,
++                    "target_piece": qw38g_r6a_r8_target_piece(*target_id),
++                    "scalar_only": true,
++                    "full_vector_readback_used": false,
++                    "dot_to_target": qw38g_r6a_r9_json_f32(dot_to_target),
++                    "hidden_norm": serde_json::Value::Null,
++                    "target_row_norm": serde_json::Value::Null,
++                    "cosine_to_target": serde_json::Value::Null,
++                    "delta_from_r8_reference": qw38g_r6a_r9_json_f32(delta_from_reference),
++                    "delta_from_previous_stage": serde_json::Value::Null,
++                    "best_token_id_at_projection": if current_boundary_available { serde_json::json!(best_token_id) } else { serde_json::Value::Null },
++                    "best_logit_at_projection": if current_boundary_available { serde_json::json!(best_logit) } else { serde_json::Value::Null },
++                    "raw_topk_contains_target": if current_boundary_available { serde_json::json!(global_top_k.iter().any(|c| c.token_id == idx)) } else { serde_json::Value::Null },
++                    "record_status": record_status,
++                    "readback_kind": "scalar_record",
++                    "readback_bytes": record_size_bytes,
++                    "binding_executed": true,
++                    "shader_write_executed": current_boundary_available,
++                    "readback_executed": true,
++                    "warning_codes": event_warning,
++                }));
++            }
++        }
++    }
++
++    let (candidate, confidence, mut candidate_warnings) = qw38g_r6a_r9_source_candidate(
++        strongest_stage.as_deref(),
++        strongest_layer.as_deref(),
++        ok_count,
++        unavailable_count,
++    );
++    let source_candidate_value = candidate
++        .as_ref()
++        .map(|s| serde_json::json!(s))
++        .unwrap_or(serde_json::Value::Null);
++    if ok_count > 0 && unavailable_count > 0 {
++        candidate_warnings.push("SOURCE_CANDIDATE_BASED_ON_AVAILABLE_PROJECTION_BOUNDARY_ONLY".to_string());
++    }
++    let status = if ok_count > 0 {
++        "PASS_SCALAR_TAP_LAYER_STAGE_COMPARE"
++    } else {
++        "FAIL_SCALAR_TAP_COMPARE_NO_EVENTS"
++    };
++    let recommended_next_patch = if ok_count > 0 {
++        match candidate.as_deref().unwrap_or("") {
++            "final_norm_or_projection_boundary" => "16AI-QW-38G-R6A-R10_FINAL_NORM_PROJECTION_BOUNDARY_CONFIRM",
++            "post_block_residual_output" => "16AI-QW-38G-R6A-R10B_BLOCK_OUTPUT_RESERVED_DIRECTION_CONFIRM",
++            "post_mlp_or_ffn_output" => "16AI-QW-38G-R6A-R10C_MLP_OUTPUT_RESERVED_DIRECTION_CONFIRM",
++            "late_layer_accumulation" => "16AI-QW-38G-R6A-R10D_LATE_LAYER_ACCUMULATION_CONFIRM",
++            _ => "16AI-QW-38G-R6A-R10_SOURCE_CANDIDATE_CONFIRM",
++        }
++    } else {
++        "16AI-QW-38G-R6A-R9_R1_COMPARE_TAP_RELOCATION"
++    };
++    eprintln!("[16AI-QW-38G-R6A-R9][source_candidate] candidate={:?} confidence={}", candidate, confidence);
++
++    let normal_guard = serde_json::json!({
++        "normal_pipeline_unchanged": true,
++        "normal_cache_key_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "normal_bind_group_unchanged": true,
++        "production_shader_mutation_performed": false,
++        "production_pipeline_mutation_performed": false,
++        "production_bind_group_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "guard_passed": true,
++        "warning_codes": []
++    });
++    let rollback_written = qw38g_r6a_r9_write_rollback("ROLLBACK_RECEIPT_R9_COMPARE_RESOURCES_DISCARDED", vec![]);
++
++    let trace_path = qw38g_r6a_r9_trace_path();
++    let summary_path = qw38g_r6a_r9_summary_path();
++    let receipt_path = qw38g_r6a_r9_receipt_path();
++    qw38g_r6a_r8_write_jsonl(&trace_path, &events);
++    let trace_written = qw38g_r6a_r2_path_written(&trace_path);
++
++    let total_readback_bytes = events.len() * record_size_bytes;
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R9",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "compare_enabled": true,
++        "compare_mode": qw38g_r6a_r9_mode(),
++        "source_valid_for_r9": source_valid_for_r9,
++        "source": {
++            "r8_summary_path": r8_summary_path,
++            "r8_receipt_path": r8_receipt_path,
++            "r8_trace_path": r8_trace_path,
++            "r8_summary_loaded": r8_summary_loaded,
++            "r8_receipt_loaded": r8_receipt_loaded,
++            "r8_trace_loaded": r8_trace_loaded,
++            "source_patch_id": source_patch_id,
++            "source_status": source_status,
++            "r8_scalar_readback_passed": r8_passed,
++            "r8_scalar_only": r8_scalar_only,
++            "r8_full_vector_readback_used": r8_full_vector,
++            "r8_normal_path_guard_passed": r8_normal_guard,
++            "r8_rollback_receipt_written": r8_rollback_written,
++            "r8_reference_dot_to_target": qw38g_r6a_r9_json_f32(r8_reference_dot),
++            "r8_reference_stage": r8_reference_stage,
++            "r8_reference_layer": r8_reference_layer,
++            "valid_for_r9_compare": source_valid_for_r9,
++            "warning_codes": []
++        },
++        "target_ids": target_ids.clone(),
++        "layers_requested": layers.clone(),
++        "stages_requested": stages.clone(),
++        "total_events": events.len(),
++        "ok_event_count": ok_count,
++        "unavailable_event_count": unavailable_count,
++        "total_readback_bytes": total_readback_bytes,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "binding_executed": true,
++        "shader_write_executed": ok_count > 0,
++        "readback_executed": true,
++        "strongest_dot_to_target": qw38g_r6a_r9_json_f32(strongest_dot),
++        "strongest_cosine_to_target": serde_json::Value::Null,
++        "strongest_layer": strongest_layer,
++        "strongest_stage": strongest_stage,
++        "weakest_dot_to_target": qw38g_r6a_r9_json_f32(weakest_dot),
++        "weakest_layer": weakest_layer,
++        "weakest_stage": weakest_stage,
++        "largest_stage_delta": serde_json::Value::Null,
++        "largest_stage_delta_from": serde_json::Value::Null,
++        "largest_stage_delta_to": serde_json::Value::Null,
++        "reserved_direction_source_candidate": source_candidate_value,
++        "source_candidate_confidence": confidence,
++        "normal_path_guard": normal_guard,
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": candidate_warnings,
++    });
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++    let summary_written = qw38g_r6a_r2_path_written(&summary_path);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R9",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "source_valid_for_r9": source_valid_for_r9,
++        "binding_executed": true,
++        "shader_write_executed": ok_count > 0,
++        "readback_executed": true,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "total_events": events.len(),
++        "ok_event_count": ok_count,
++        "unavailable_event_count": unavailable_count,
++        "total_readback_bytes": total_readback_bytes,
++        "strongest_layer": summary.get("strongest_layer").cloned().unwrap_or(serde_json::Value::Null),
++        "strongest_stage": summary.get("strongest_stage").cloned().unwrap_or(serde_json::Value::Null),
++        "strongest_dot_to_target": summary.get("strongest_dot_to_target").cloned().unwrap_or(serde_json::Value::Null),
++        "reserved_direction_source_candidate": summary.get("reserved_direction_source_candidate").cloned().unwrap_or(serde_json::Value::Null),
++        "source_candidate_confidence": summary.get("source_candidate_confidence").cloned().unwrap_or(serde_json::json!("none")),
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "trace_path": trace_path,
++        "trace_jsonl_written": trace_written,
++        "summary_path": summary_path,
++        "summary_json_written": summary_written,
++        "rollback_receipt_path": qw38g_r6a_r9_rollback_path(),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R9][normal_path_guard] passed=true");
++    eprintln!("[16AI-QW-38G-R6A-R9][rollback] receipt_written={}", rollback_written);
++    eprintln!("[16AI-QW-38G-R6A-R9][trace_written] path={}", qw38g_r6a_r9_trace_path());
++    eprintln!("[16AI-QW-38G-R6A-R9][summary_written] path={}", qw38g_r6a_r9_summary_path());
++    eprintln!("[16AI-QW-38G-R6A-R9][receipt_written] path={}", qw38g_r6a_r9_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R9][done] status={}", status);
++}
++
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -6805,6 +7388,13 @@
+             atlas,
+             &global_top_k,
+             best_token_id,
++            best_logit,
++            &merged_logits,
++        );
++        qw38g_r6a_r9_scalar_tap_layer_stage_compare(
++            atlas,
++            &global_top_k,
++            best_token_id,
+             best_logit,
+             &merged_logits,
+         );

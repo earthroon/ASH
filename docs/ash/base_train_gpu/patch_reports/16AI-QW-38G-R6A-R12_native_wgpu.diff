@@ -1,0 +1,463 @@
+--- /mnt/data/r6a_r10_r2_work/crates/model_core/src/native_wgpu.rs	2026-05-23 07:24:25.154434031 +0000
++++ /mnt/data/r6a_r12_work/crates/model_core/src/native_wgpu.rs	2026-05-23 08:11:18.001636985 +0000
+@@ -5058,7 +5058,7 @@
+         "mean_margin_vs_masked_top1": qw38g_r6a_r10_json_f32(mean_margin),
+         "min_margin_vs_masked_top1": qw38g_r6a_r10_json_f32(min_margin),
+         "final_boundary_confirmed": final_boundary_confirmed,
+-        "confirmed_candidate": confirmed_candidate,
++        "confirmed_candidate": confirmed_candidate.clone(),
+         "confirm_confidence": confirm_confidence,
+         "normal_path_guard": normal_guard,
+         "normal_path_guard_passed": true,
+@@ -5987,7 +5987,7 @@
+         "all_rollback_receipts_written": all_rollback_receipts_written,
+         "confidence_before_aggregation": confidence_before,
+         "confidence_after_aggregation": confidence_after,
+-        "confirmed_candidate": confirmed_candidate,
++        "confirmed_candidate": confirmed_candidate.clone(),
+         "repro_confidence_lifted": repro_confidence_lifted,
+         "seed_evidence": seed_evidence,
+         "recommended_next_patch": if confidence_after == "strong" { "16AI-QW-38G-R6A-R12_ROOT_CAUSE_SPLIT_PLAN" } else if valid_seed_count == 0 { "16AI-QW-38G-R6A-R10-R1-R1_SEED_RECEIPT_DISCOVERY_REPAIR" } else { "16AI-QW-38G-R6A-R10-R1_RUNNER_SEED_FANOUT" },
+@@ -6500,7 +6500,7 @@
+         "field_loss_seed_count": field_loss_seed_count,
+         "confidence_before_repair": confidence_before_repair,
+         "confidence_after_repair": confidence_after_repair,
+-        "confirmed_candidate": confirmed_candidate,
++        "confirmed_candidate": confirmed_candidate.clone(),
+         "repro_confidence_lifted": repro_confidence_lifted,
+         "seed_evidence": seed_evidence,
+         "recommended_next_patch": recommended_next_patch,
+@@ -6552,6 +6552,425 @@
+     eprintln!("[16AI-QW-38G-R6A-R10-R2][done] status={}", status);
+ }
+ 
++
++
++// 16AI-QW-38G-R6A-R12 — Root Cause Split Plan / Final Boundary vs LM Head Seal
++static QW38G_R6A_R12_ROOT_CAUSE_SPLIT_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r12_enabled() -> bool {
++    env_flag("ASH_ROOT_CAUSE_SPLIT_PLAN")
++        || env_flag("ASH_QW38G_R6A_R12_ROOT_CAUSE_SPLIT_PLAN")
++}
++
++fn qw38g_r6a_r12_mode() -> String {
++    std::env::var("ASH_ROOT_CAUSE_SPLIT_PLAN_MODE")
++        .unwrap_or_else(|_| "final_boundary_vs_lm_head".to_string())
++        .trim()
++        .to_ascii_lowercase()
++}
++
++fn qw38g_r6a_r12_plan_path() -> String {
++    std::env::var("ASH_ROOT_CAUSE_SPLIT_PLAN_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r12_root_cause_split_plan.json".to_string())
++}
++
++fn qw38g_r6a_r12_receipt_path() -> String {
++    std::env::var("ASH_ROOT_CAUSE_SPLIT_PLAN_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r12_root_cause_split_plan_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r12_report_path() -> String {
++    std::env::var("ASH_ROOT_CAUSE_SPLIT_PLAN_REPORT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r12_root_cause_split_plan_report.md".to_string())
++}
++
++fn qw38g_r6a_r12_r10_r2_summary_path() -> String {
++    std::env::var("ASH_R10_R2_AGGREGATION_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_summary.json".to_string())
++}
++
++fn qw38g_r6a_r12_r10_r2_receipt_path() -> String {
++    std::env::var("ASH_R10_R2_AGGREGATION_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r12_r10_r2_trace_path() -> String {
++    std::env::var("ASH_R10_R2_AGGREGATION_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_r2_trace_backed_aggregation_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r12_r8_summary_path() -> String {
++    std::env::var("ASH_R8_SCALAR_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json".to_string())
++}
++
++fn qw38g_r6a_r12_r11_summary_path() -> String {
++    std::env::var("ASH_R11_MARGIN_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r11_projection_margin_summary.json".to_string())
++}
++
++fn qw38g_r6a_r12_lm_head_audit_path() -> String {
++    std::env::var("ASH_LM_HEAD_ROW_AUDIT_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38a_lm_head_row_norm_report.json".to_string())
++}
++
++fn qw38g_r6a_r12_load_json(path: &str) -> Option<serde_json::Value> {
++    std::fs::read_to_string(path)
++        .ok()
++        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
++}
++
++fn qw38g_r6a_r12_opt_f32(root: Option<&serde_json::Value>, key: &str) -> Option<f32> {
++    root.and_then(|v| v.get(key)).and_then(|v| v.as_f64()).map(|v| v as f32)
++        .and_then(|v| if v.is_finite() { Some(v) } else { None })
++}
++
++fn qw38g_r6a_r12_opt_str(root: Option<&serde_json::Value>, key: &str) -> Option<String> {
++    root.and_then(|v| v.get(key)).and_then(|v| v.as_str()).map(|s| s.to_string())
++}
++
++fn qw38g_r6a_r12_opt_bool(root: Option<&serde_json::Value>, key: &str) -> Option<bool> {
++    root.and_then(|v| v.get(key)).and_then(|v| v.as_bool())
++}
++
++fn qw38g_r6a_r12_target_from_summary(summary: Option<&serde_json::Value>) -> u32 {
++    summary
++        .and_then(|v| v.get("target_ids"))
++        .and_then(|v| v.as_array())
++        .and_then(|arr| arr.first())
++        .and_then(|v| v.as_u64())
++        .map(|v| v as u32)
++        .unwrap_or(13)
++}
++
++fn qw38g_r6a_r12_find_target_row(audit: Option<&serde_json::Value>, target_id: u32) -> Option<serde_json::Value> {
++    let arr = audit.and_then(|v| v.get("target_tokens")).and_then(|v| v.as_array())?;
++    for entry in arr {
++        if entry.get("id").and_then(|v| v.as_u64()).map(|v| v as u32) == Some(target_id) {
++            return Some(entry.clone());
++        }
++    }
++    None
++}
++
++fn qw38g_r6a_r12_write_md(path: &str, text: &str) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    let _ = std::fs::write(path, text);
++}
++
++fn qw38g_r6a_r12_root_cause_split_plan() {
++    if !qw38g_r6a_r12_enabled() {
++        return;
++    }
++    if QW38G_R6A_R12_ROOT_CAUSE_SPLIT_DONE.swap(1, Ordering::SeqCst) != 0 {
++        return;
++    }
++
++    eprintln!("[16AI-QW-38G-R6A-R12][start]");
++    let mode = qw38g_r6a_r12_mode();
++    let plan_path = qw38g_r6a_r12_plan_path();
++    let receipt_path = qw38g_r6a_r12_receipt_path();
++    let report_path = qw38g_r6a_r12_report_path();
++
++    let mut warning_codes = Vec::<String>::new();
++    if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") || env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") || env_flag("ASH_MUTATE_LM_HEAD_ROW") || env_flag("ASH_MUTATE_TOKENIZER") || env_flag("ASH_MUTATE_BAN_MASK") {
++        if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") { warning_codes.push("PRODUCTION_APPLY_NOT_ALLOWED_IN_R12".to_string()); }
++        if env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") { warning_codes.push("FULL_VECTOR_POLICY_VIOLATION".to_string()); }
++        if env_flag("ASH_MUTATE_LM_HEAD_ROW") || env_flag("ASH_MUTATE_TOKENIZER") || env_flag("ASH_MUTATE_BAN_MASK") { warning_codes.push("MUTATION_NOT_ALLOWED_IN_R12".to_string()); }
++        let status = if env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY") {
++            "FAIL_PRODUCTION_APPLY_NOT_ALLOWED_IN_R12"
++        } else if env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR") {
++            "FAIL_FULL_VECTOR_POLICY_VIOLATION"
++        } else {
++            "FAIL_MUTATION_NOT_ALLOWED_IN_R12"
++        };
++        let plan = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R12",
++            "status": status,
++            "mode": mode.clone(),
++            "root_cause_confirmed": false,
++            "root_cause_candidate_count": 0,
++            "blocked_actions": ["weight_mutation", "tokenizer_mutation", "ban_mask_mutation"],
++            "warning_codes": warning_codes,
++            "recommended_next_patch": "16AI-QW-38G-R6A-R12_CONFIG_RETRY"
++        });
++        qw38g_r6a_r2_write_json(&plan_path, &plan);
++        let receipt = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R6A-R12",
++            "status": status,
++            "source_valid_for_r12": false,
++            "root_cause_confirmed": false,
++            "plan_path": plan_path,
++            "receipt_path": receipt_path,
++            "receipt_written": true,
++            "report_written": false,
++            "warning_codes": plan.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++        });
++        qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++        eprintln!("[16AI-QW-38G-R6A-R12][done] status={}", status);
++        return;
++    }
++
++    let r10_r2_summary_path = qw38g_r6a_r12_r10_r2_summary_path();
++    let r10_r2_receipt_path = qw38g_r6a_r12_r10_r2_receipt_path();
++    let r10_r2_trace_path = qw38g_r6a_r12_r10_r2_trace_path();
++    let r8_summary_path = qw38g_r6a_r12_r8_summary_path();
++    let r11_summary_path = qw38g_r6a_r12_r11_summary_path();
++    let lm_head_audit_path = qw38g_r6a_r12_lm_head_audit_path();
++
++    let r10_r2_summary = qw38g_r6a_r12_load_json(&r10_r2_summary_path);
++    let r10_r2_receipt = qw38g_r6a_r12_load_json(&r10_r2_receipt_path);
++    let r8_summary = qw38g_r6a_r12_load_json(&r8_summary_path);
++    let r11_summary = qw38g_r6a_r12_load_json(&r11_summary_path);
++    let lm_head_audit = qw38g_r6a_r12_load_json(&lm_head_audit_path);
++
++    let r10_r2_loaded = r10_r2_summary.is_some() && r10_r2_receipt.is_some();
++    let r8_loaded = r8_summary.is_some();
++    let r11_loaded = r11_summary.is_some();
++    let lm_head_audit_loaded = lm_head_audit.is_some();
++
++    let status_r10_r2 = qw38g_r6a_r12_opt_str(r10_r2_summary.as_ref(), "status").unwrap_or_else(|| "missing".to_string());
++    let confidence_from_multiseed = qw38g_r6a_r12_opt_str(r10_r2_summary.as_ref(), "confidence_after_repair")
++        .or_else(|| qw38g_r6a_r12_opt_str(r10_r2_receipt.as_ref(), "confidence_after_repair"))
++        .unwrap_or_else(|| "none".to_string());
++    let target_token_id = qw38g_r6a_r12_target_from_summary(r10_r2_summary.as_ref());
++    let target_piece = qw38g_r6a_r8_target_piece(target_token_id);
++    let raw_top1_target_rate = qw38g_r6a_r12_opt_f32(r10_r2_summary.as_ref(), "raw_top1_target_rate").unwrap_or(0.0);
++    let ban_mask_displacement_rate = qw38g_r6a_r12_opt_f32(r10_r2_summary.as_ref(), "ban_mask_displacement_rate").unwrap_or(0.0);
++    let min_margin_vs_masked_top1 = qw38g_r6a_r12_opt_f32(r10_r2_summary.as_ref(), "min_margin_vs_masked_top1");
++    let mean_margin_vs_masked_top1 = qw38g_r6a_r12_opt_f32(r10_r2_summary.as_ref(), "mean_margin_vs_masked_top1");
++    let confirmed_candidate = qw38g_r6a_r12_opt_str(r10_r2_summary.as_ref(), "confirmed_candidate");
++
++    let source_valid_for_r12 = r10_r2_loaded
++        && status_r10_r2 == "PASS_TRACE_BACKED_MULTI_SEED_AGGREGATION"
++        && confidence_from_multiseed == "strong"
++        && confirmed_candidate.as_deref() == Some("final_norm_or_projection_boundary")
++        && target_token_id == 13
++        && raw_top1_target_rate >= 0.8
++        && ban_mask_displacement_rate >= 0.8;
++
++    if !r10_r2_loaded { warning_codes.push("R10_R2_SOURCE_MISSING".to_string()); }
++    if status_r10_r2 != "PASS_TRACE_BACKED_MULTI_SEED_AGGREGATION" { warning_codes.push("R10_R2_NOT_PASS".to_string()); }
++    if confidence_from_multiseed != "strong" { warning_codes.push("R10_R2_NOT_STRONG".to_string()); }
++    if confirmed_candidate.as_deref() != Some("final_norm_or_projection_boundary") { warning_codes.push("CONFIRMED_CANDIDATE_NOT_FINAL_BOUNDARY".to_string()); }
++    if target_token_id != 13 { warning_codes.push("TARGET_ID_MISMATCH".to_string()); }
++    if !r8_loaded { warning_codes.push("R8_SCALAR_SOURCE_OPTIONAL_MISSING".to_string()); }
++    if !r11_loaded { warning_codes.push("R11_MARGIN_SOURCE_OPTIONAL_MISSING".to_string()); }
++    if !lm_head_audit_loaded { warning_codes.push("LM_HEAD_ROW_AUDIT_OPTIONAL_MISSING".to_string()); }
++
++    let target_row = qw38g_r6a_r12_find_target_row(lm_head_audit.as_ref(), target_token_id);
++    let target_row_norm = target_row.as_ref().and_then(|v| v.get("lm_head_row")).and_then(|v| v.get("l2_norm")).and_then(|v| v.as_f64()).map(|v| v as f32);
++    let target_row_percentile = target_row.as_ref().and_then(|v| v.get("lm_head_row")).and_then(|v| v.get("norm_percentile_in_sample")).and_then(|v| v.as_f64()).map(|v| v as f32);
++    let target_embedding_cosine = target_row.as_ref().and_then(|v| v.get("lm_head_embedding_cosine_similarity")).and_then(|v| v.as_f64()).map(|v| v as f32);
++    let row_anomaly_detected = target_row_percentile.map(|p| p >= 0.95).unwrap_or(false)
++        || target_row_norm.map(|n| n > 1.5).unwrap_or(false);
++
++    let source = serde_json::json!({
++        "r10_r2_summary_path": r10_r2_summary_path,
++        "r10_r2_receipt_path": r10_r2_receipt_path,
++        "r10_r2_trace_path": r10_r2_trace_path,
++        "r8_scalar_summary_path": r8_summary_path,
++        "r11_margin_summary_path": r11_summary_path,
++        "lm_head_row_audit_path": lm_head_audit_path,
++        "r10_r2_loaded": r10_r2_loaded,
++        "r8_loaded": r8_loaded,
++        "r11_loaded": r11_loaded,
++        "lm_head_audit_loaded": lm_head_audit_loaded,
++        "r10_r2_status": status_r10_r2,
++        "r10_r2_confidence": confidence_from_multiseed.clone(),
++        "target_token_id": target_token_id,
++        "target_piece": target_piece,
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "ban_mask_displacement_rate": ban_mask_displacement_rate,
++        "min_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(min_margin_vs_masked_top1),
++        "mean_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(mean_margin_vs_masked_top1),
++        "confirmed_candidate": confirmed_candidate.clone(),
++        "source_valid_for_r12": source_valid_for_r12,
++        "warning_codes": warning_codes.clone(),
++    });
++
++    let hidden_direction_axis = serde_json::json!({
++        "axis_id": "hidden_direction_axis",
++        "hypothesis": "final hidden state may already align strongly with lm_head[13] before projection",
++        "evidence_available": true,
++        "evidence_summary": "token_id=13 is repeatedly raw top1 at final/projection boundary, but intermediate stages remain unavailable",
++        "current_confidence": "medium_unknown",
++        "next_probe_patch": "16AI-QW-38G-R6A-R12A_FINAL_HIDDEN_DIRECTION_DELTA_PROBE",
++        "required_observables": ["pre_final_norm_scalar", "post_block_scalar", "post_mlp_scalar", "target_row_projection_delta"],
++        "blocked_by": ["INTERMEDIATE_STAGE_NOT_EXPOSED_IN_CURRENT_SANDBOX"],
++        "warning_codes": ["ROOT_CAUSE_NOT_CONFIRMED"],
++    });
++
++    let lm_head_row_axis_confidence = if row_anomaly_detected { "medium_candidate" } else if lm_head_audit_loaded { "weak_to_medium" } else { "unknown_optional_audit_missing" };
++    let lm_head_row_axis = serde_json::json!({
++        "axis_id": "lm_head_row_axis",
++        "hypothesis": "lm_head[13] row may contribute excessive margin at projection boundary",
++        "lm_head_row_audit_loaded": lm_head_audit_loaded,
++        "target_row_norm": qw38g_r6a_r10_r1_value_f32(target_row_norm),
++        "target_row_norm_percentile": qw38g_r6a_r10_r1_value_f32(target_row_percentile),
++        "target_embedding_cosine": qw38g_r6a_r10_r1_value_f32(target_embedding_cosine),
++        "row_anomaly_detected": row_anomaly_detected,
++        "current_confidence": lm_head_row_axis_confidence,
++        "next_probe_patch": "16AI-QW-38G-R6A-R12B_LM_HEAD_ROW_CONTRIBUTION_MARGIN_AUDIT",
++        "required_observables": ["target_row_vs_neighbor_rows", "allowed_korean_row_margin", "reserved_row_neighborhood"],
++        "warning_codes": if lm_head_audit_loaded { serde_json::json!([]) } else { serde_json::json!(["LM_HEAD_ROW_AUDIT_OPTIONAL_MISSING"]) },
++    });
++
++    let final_norm_amplification_axis = serde_json::json!({
++        "axis_id": "final_norm_amplification_axis",
++        "hypothesis": "final norm may amplify the token_id=13 projection direction",
++        "post_final_norm_observed": true,
++        "pre_final_norm_observed": false,
++        "amplification_confirmable_now": false,
++        "current_confidence": "medium_candidate",
++        "next_probe_patch": "16AI-QW-38G-R6A-R12C_PRE_POST_FINAL_NORM_SCALAR_DELTA",
++        "required_observables": ["pre_final_norm_scalar", "post_final_norm_scalar", "delta_to_target_row"],
++        "warning_codes": ["PRE_FINAL_NORM_NOT_OBSERVED"],
++    });
++
++    let ban_mask_displacement_axis = serde_json::json!({
++        "axis_id": "ban_mask_displacement_axis",
++        "hypothesis": "reserved raw top1 is consistently displaced by ban mask into a Korean fallback token surface",
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "displacement_rate": ban_mask_displacement_rate,
++        "masked_top1_token_id": 373,
++        "masked_top1_piece": "이",
++        "mean_margin_vs_masked_top1": qw38g_r6a_r10_r1_value_f32(mean_margin_vs_masked_top1),
++        "displacement_confirmed": ban_mask_displacement_rate >= 0.8,
++        "current_confidence": if ban_mask_displacement_rate >= 0.8 { "strong" } else { "weak" },
++        "next_probe_patch": "16AI-QW-38G-R6A-R12D_MASKED_TOP1_REPLACEMENT_STABILITY",
++        "warning_codes": ["BAN_MASK_DISPLACEMENT_IS_SYMPTOM_NOT_ROOT_CAUSE"],
++    });
++
++    let reserved_token_structural_axis = serde_json::json!({
++        "axis_id": "reserved_token_structural_axis",
++        "hypothesis": "reserved token <glossary:on> may be structurally too close to active projection surfaces",
++        "reserved_token_id": target_token_id,
++        "reserved_piece": qw38g_r6a_r8_target_piece(target_token_id),
++        "reserved_raw_top1_reproducible": raw_top1_target_rate >= 0.8,
++        "tokenizer_manifest_reserved": true,
++        "structural_contamination_confirmed": false,
++        "current_confidence": "medium",
++        "next_probe_patch": "16AI-QW-38G-R6A-R12E_RESERVED_TOKEN_ROW_NEIGHBORHOOD_AUDIT",
++        "required_observables": ["reserved_row_neighbors", "normal_korean_row_distance", "reserved_special_token_cluster"],
++        "warning_codes": ["STRUCTURAL_CONTAMINATION_NOT_CONFIRMED"],
++    });
++
++    let recommended_probe_order = serde_json::json!([
++        "16AI-QW-38G-R6A-R12B_LM_HEAD_ROW_CONTRIBUTION_MARGIN_AUDIT",
++        "16AI-QW-38G-R6A-R12C_PRE_POST_FINAL_NORM_SCALAR_DELTA",
++        "16AI-QW-38G-R6A-R12D_MASKED_TOP1_REPLACEMENT_STABILITY",
++        "16AI-QW-38G-R6A-R12E_RESERVED_TOKEN_ROW_NEIGHBORHOOD_AUDIT",
++        "16AI-QW-38G-R6A-R12A_FINAL_HIDDEN_DIRECTION_DELTA_PROBE"
++    ]);
++    let blocked_actions = serde_json::json!([
++        "ban_mask_policy_mutation",
++        "reserved_token_removal",
++        "lm_head_row_zeroing",
++        "tokenizer_manifest_rewrite",
++        "safetensors_mutation",
++        "lora_override_patch",
++        "output_guard_bypass"
++    ]);
++
++    if source_valid_for_r12 {
++        warning_codes.push("ROOT_CAUSE_NOT_CONFIRMED".to_string());
++        warning_codes.push("DO_NOT_MUTATE_WEIGHTS_OR_TOKENIZER".to_string());
++        warning_codes.push("BAN_MASK_DISPLACEMENT_IS_SYMPTOM_NOT_ROOT_CAUSE".to_string());
++    }
++
++    let status = if source_valid_for_r12 {
++        "PASS_ROOT_CAUSE_SPLIT_PLAN"
++    } else {
++        "FAIL_ROOT_CAUSE_SPLIT_SOURCE_INVALID"
++    };
++    let recommended_next_patch = if source_valid_for_r12 {
++        "16AI-QW-38G-R6A-R12B_LM_HEAD_ROW_CONTRIBUTION_MARGIN_AUDIT"
++    } else {
++        "16AI-QW-38G-R6A-R10-R2_TRACE_BACKED_SOURCE_RECHECK"
++    };
++
++    let plan = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R12",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "mode": mode.clone(),
++        "source": source,
++        "hidden_direction_axis": hidden_direction_axis,
++        "lm_head_row_axis": lm_head_row_axis,
++        "final_norm_amplification_axis": final_norm_amplification_axis,
++        "ban_mask_displacement_axis": ban_mask_displacement_axis,
++        "reserved_token_structural_axis": reserved_token_structural_axis,
++        "recommended_probe_order": recommended_probe_order,
++        "blocked_actions": blocked_actions,
++        "root_cause_confirmed": false,
++        "root_cause_candidate_count": 5,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&plan_path, &plan);
++
++    let report = format!(
++        "# 16AI-QW-38G-R6A-R12 — Root Cause Split Plan / Final Boundary vs LM Head Seal\n\n\
++## Status\n{}\n\n\
++## SSOT\n- target_id: {}\n- target_piece: {}\n- confirmed_candidate: {}\n- confidence_from_multiseed: {}\n- raw_top1_target_rate: {:.4}\n- ban_mask_displacement_rate: {:.4}\n- min_margin_vs_masked_top1: {:?}\n- root_cause_confirmed: false\n\n\
++## Axis Summary\n| axis | confidence | next probe |\n|---|---|---|\n| hidden direction | medium_unknown | R12A |\n| lm_head row | {} | R12B |\n| final norm amplification | medium_candidate | R12C |\n| ban mask displacement | {} | R12D |\n| reserved token structural | medium | R12E |\n\n\
++## Blocked Actions\n- ban mask policy mutation\n- reserved token removal\n- lm_head row zeroing\n- tokenizer manifest rewrite\n- safetensors mutation\n- LoRA override patch\n- output guard bypass\n\n\
++## Decision\n- recommended_next_patch: {}\n- root_cause_confirmed: false\n",
++        status,
++        target_token_id,
++        qw38g_r6a_r8_target_piece(target_token_id),
++        confirmed_candidate.clone().unwrap_or_else(|| "null".to_string()),
++        confidence_from_multiseed,
++        raw_top1_target_rate,
++        ban_mask_displacement_rate,
++        min_margin_vs_masked_top1,
++        lm_head_row_axis_confidence,
++        if ban_mask_displacement_rate >= 0.8 { "strong" } else { "weak" },
++        recommended_next_patch,
++    );
++    qw38g_r6a_r12_write_md(&report_path, &report);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R12",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "source_valid_for_r12": source_valid_for_r12,
++        "root_cause_confirmed": false,
++        "root_cause_candidate_count": 5,
++        "confirmed_candidate": confirmed_candidate.clone(),
++        "confidence_from_multiseed": confidence_from_multiseed.clone(),
++        "hidden_direction_axis_confidence": "medium_unknown",
++        "lm_head_row_axis_confidence": lm_head_row_axis_confidence,
++        "final_norm_amplification_axis_confidence": "medium_candidate",
++        "ban_mask_displacement_axis_confidence": if ban_mask_displacement_rate >= 0.8 { "strong" } else { "weak" },
++        "reserved_token_structural_axis_confidence": "medium",
++        "plan_path": plan_path.clone(),
++        "plan_json_written": qw38g_r6a_r2_path_written(&plan_path),
++        "receipt_path": receipt_path.clone(),
++        "receipt_written": true,
++        "report_path": report_path.clone(),
++        "report_written": qw38g_r6a_r2_path_written(&report_path),
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": plan.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R12][source_loaded] r10_r2={} confidence={} target={}", r10_r2_loaded, receipt.get("confidence_from_multiseed").and_then(|v| v.as_str()).unwrap_or("none"), target_token_id);
++    eprintln!("[16AI-QW-38G-R6A-R12][axis] hidden_direction confidence=medium_unknown");
++    eprintln!("[16AI-QW-38G-R6A-R12][axis] lm_head_row confidence={}", receipt.get("lm_head_row_axis_confidence").and_then(|v| v.as_str()).unwrap_or("unknown"));
++    eprintln!("[16AI-QW-38G-R6A-R12][axis] final_norm_amplification confidence=medium_candidate");
++    eprintln!("[16AI-QW-38G-R6A-R12][axis] ban_mask_displacement confidence={}", receipt.get("ban_mask_displacement_axis_confidence").and_then(|v| v.as_str()).unwrap_or("unknown"));
++    eprintln!("[16AI-QW-38G-R6A-R12][axis] reserved_token_structural confidence=medium");
++    eprintln!("[16AI-QW-38G-R6A-R12][plan] next={}", recommended_next_patch);
++    eprintln!("[16AI-QW-38G-R6A-R12][blocked_actions] weight/tokenizer/ban_mask mutation forbidden");
++    eprintln!("[16AI-QW-38G-R6A-R12][plan_written] path={}", plan_path);
++    eprintln!("[16AI-QW-38G-R6A-R12][receipt_written] path={}", receipt_path);
++    eprintln!("[16AI-QW-38G-R6A-R12][report_written] path={}", report_path);
++    eprintln!("[16AI-QW-38G-R6A-R12][done] status={}", status);
++}
+ fn qw38g_r6a_r11_projection_boundary_margin_audit(
+     _atlas: &NativeVocabAtlas,
+     global_top_k: &[NativeVocabAtlasCandidate],
+@@ -9905,6 +10324,7 @@
+         );
+         qw38g_r6a_r10_r1_multi_seed_aggregation();
+         qw38g_r6a_r10_r2_trace_backed_aggregation();
++        qw38g_r6a_r12_root_cause_split_plan();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

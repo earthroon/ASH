@@ -1,0 +1,30 @@
+{
+  "run_name": "tinyllama_1p1b_v5_guarded_train_from_feature_store_4096step",
+  "artifact_family": "shared_hidden_token_adapter",
+  "target": "classifier.shared_hidden_token_head",
+  "candidate_step": 4096,
+  "trained_batches": 4096,
+  "trained_tokens": 786432,
+  "final_loss": 0.002024,
+  "final_loss_finite": true,
+  "final_loss_threshold": 0.01,
+  "final_loss_threshold_pass": true,
+  "checkpoint_written": true,
+  "adapter_safetensors_path": "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_train_from_feature_store_4096step\\artifacts\\shared_hidden_token_adapter\\classifier_shared_hidden_token_head_step_04096.adapter.safetensors",
+  "adapter_json_path": "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_train_from_feature_store_4096step\\artifacts\\shared_hidden_token_adapter\\classifier_shared_hidden_token_head_step_04096.adapter.json",
+  "adapter_safetensors_exists": true,
+  "adapter_json_exists": true,
+  "source_feature_store_manifest": "D:\\1111113232\\DUST\\1\\ash_pass3\\workspace\\lora_runs\\tinyllama_1p1b_v5_guarded_dump_full_gpu_cap192\\feature_store_work\\feature_store_manifest.json",
+  "source_feature_store_shards": 2519,
+  "observed_max_loaded_shard": 52,
+  "bridge_dump_only": false,
+  "bridge_extract_only": false,
+  "acceptance_status": "candidate_pending_eval",
+  "reason": [
+    "feature_store_ingest_passed",
+    "multi_shard_training_passed",
+    "loss_converged_below_eval_candidate_threshold",
+    "checkpoint_written",
+    "full_training_deferred_before_eval"
+  ]
+}

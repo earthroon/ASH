@@ -1,0 +1,9 @@
+--- /mnt/data/qw_tok_train01_orig/crates/model_core/src/lib.rs	2026-06-03 09:00:15.000000000 +0000
++++ crates/model_core/src/lib.rs	2026-06-04 04:02:13.323551107 +0000
+@@ -1395,3 +1395,6 @@
+ 
+ mod tokenizer_v5_safetensors_metadata_rebind_commit;
+ pub use tokenizer_v5_safetensors_metadata_rebind_commit::*;
++
++mod tokenizer_v5_embedding_lmhead_atlas_adaptation;
++pub use tokenizer_v5_embedding_lmhead_atlas_adaptation::*;

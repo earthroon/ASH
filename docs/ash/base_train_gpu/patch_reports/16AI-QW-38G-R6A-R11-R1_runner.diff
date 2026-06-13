@@ -1,0 +1,94 @@
+--- /mnt/data/r6a_r11_orig/scripts/run_16AI_QW_38G_R6A_R11_projection_margin_audit.ps1	2026-05-23 05:43:25.000000000 +0000
++++ /mnt/data/r6a_r11_r1_work/scripts/run_16AI_QW_38G_R6A_R11_R1_projection_margin_reachability.ps1	2026-05-23 06:16:46.644041147 +0000
+@@ -23,14 +23,14 @@
+ }
+ 
+ if ($Build) {
+-  Write-Host "[16AI-QW-38G-R6A-R11][build] cargo build --release example infer_only"
++  Write-Host "[16AI-QW-38G-R6A-R11-R1][build] cargo build --release example infer_only"
+   cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" |
+-    Tee-Object ".\workspace\build_qw38g_r6a_r11_live.log"
++    Tee-Object ".\workspace\build_qw38g_r6a_r11_r1_live.log"
+   if ($LASTEXITCODE -ne 0) {
+-    Write-Host "[16AI-QW-38G-R6A-R11][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r11_live.log"
++    Write-Host "[16AI-QW-38G-R6A-R11-R1][build_done] exit_code=$LASTEXITCODE log=.\workspace\build_qw38g_r6a_r11_r1_live.log"
+     exit $LASTEXITCODE
+   }
+-  Write-Host "[16AI-QW-38G-R6A-R11][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r11_live.log"
++  Write-Host "[16AI-QW-38G-R6A-R11-R1][build_done] exit_code=0 log=.\workspace\build_qw38g_r6a_r11_r1_live.log"
+ }
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+@@ -38,6 +38,8 @@
+ 
+ $env:ASH_PROJECTION_MARGIN_AUDIT = "1"
+ $env:ASH_PROJECTION_MARGIN_AUDIT_MODE = "masked_top1_compare"
++$env:ASH_PROJECTION_MARGIN_HOOK_TRACE = "1"
++$env:ASH_PROJECTION_MARGIN_RECEIPT_FALLBACK = "1"
+ 
+ $env:ASH_R8_SCALAR_SOURCE = "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json"
+ $env:ASH_R8_SCALAR_RECEIPT = "workspace/qw38g_r6a_r8_debug_buffer_scalar_receipt.json"
+@@ -60,45 +62,34 @@
+ $env:ASH_PROJECTION_MARGIN_SUMMARY = "workspace/qw38g_r6a_r11_projection_margin_summary.json"
+ $env:ASH_PROJECTION_MARGIN_RECEIPT = "workspace/qw38g_r6a_r11_projection_margin_receipt.json"
+ $env:ASH_PROJECTION_MARGIN_ROLLBACK = "workspace/qw38g_r6a_r11_projection_margin_rollback_receipt.json"
++$env:ASH_PROJECTION_MARGIN_REACHABILITY = "workspace/qw38g_r6a_r11_r1_projection_margin_reachability.json"
+ 
+ $exe = ".\target\release\examples\infer_only.exe"
+ if (!(Test-Path $exe)) {
+-  Write-Host "[16AI-QW-38G-R6A-R11][error] infer_only.exe missing; rerun with -Build"
++  Write-Host "[16AI-QW-38G-R6A-R11-R1][error] infer_only.exe missing; rerun with -Build"
+   exit 1
+ }
+ 
+-Write-Host "[16AI-QW-38G-R6A-R11][run] margin_audit=1 mode=masked_top1_compare targets=$TargetIds top_n=$TopN min_margin=$MinMargin max_new_tokens=$MaxNewTokens"
++Write-Host "[16AI-QW-38G-R6A-R11-R1][run] reachability=1 fallback=1 margin_audit=1 targets=$TargetIds top_n=$TopN min_margin=$MinMargin max_new_tokens=$MaxNewTokens"
+ $cmd = "$exe --model-spec .\specs\model_spec_v5_48259.toml --tokenizer .\artifacts\tokenizer_manifest_v5_final.json --checkpoint .\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors --task freeform --max-new-tokens $MaxNewTokens --seed $CurrentSeed --text-file $InputTextFile --json 2>&1"
+ cmd /c $cmd | Tee-Object ".\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+ $code = $LASTEXITCODE
+-Write-Host "[16AI-QW-38G-R6A-R11][run_done] exit_code=$code live=.\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
++Write-Host "[16AI-QW-38G-R6A-R11-R1][run_done] exit_code=$code live=.\workspace\infer_qw38g_r6a_r11_projection_margin_live.log"
+ 
+-if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R11][receipt] .\workspace\qw38g_r6a_r11_projection_margin_receipt.json"
+-  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json" -Encoding UTF8
+-} else {
+-  Write-Host "[16AI-QW-38G-R6A-R11][warn] receipt missing: .\workspace\qw38g_r6a_r11_projection_margin_receipt.json"
+-}
+-
+-if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_summary.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R11][summary] .\workspace\qw38g_r6a_r11_projection_margin_summary.json"
+-  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_summary.json" -Encoding UTF8
+-} else {
+-  Write-Host "[16AI-QW-38G-R6A-R11][warn] summary missing: .\workspace\qw38g_r6a_r11_projection_margin_summary.json"
+-}
+-
+-if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl") {
+-  Write-Host "[16AI-QW-38G-R6A-R11][trace] .\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl"
+-  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl" -Encoding UTF8
+-} else {
+-  Write-Host "[16AI-QW-38G-R6A-R11][warn] trace missing: .\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl"
+-}
+-
+-if (Test-Path ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json") {
+-  Write-Host "[16AI-QW-38G-R6A-R11][rollback] .\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json"
+-  Get-Content ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json" -Encoding UTF8
+-} else {
+-  Write-Host "[16AI-QW-38G-R6A-R11][warn] rollback receipt missing: .\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json"
++$paths = @(
++  ".\workspace\qw38g_r6a_r11_projection_margin_receipt.json",
++  ".\workspace\qw38g_r6a_r11_projection_margin_summary.json",
++  ".\workspace\qw38g_r6a_r11_projection_margin_trace.jsonl",
++  ".\workspace\qw38g_r6a_r11_projection_margin_rollback_receipt.json",
++  ".\workspace\qw38g_r6a_r11_r1_projection_margin_reachability.json"
++)
++foreach ($p in $paths) {
++  if (Test-Path $p) {
++    Write-Host "[16AI-QW-38G-R6A-R11-R1][artifact] $p"
++    Get-Content $p -Encoding UTF8
++  } else {
++    Write-Host "[16AI-QW-38G-R6A-R11-R1][warn] artifact missing: $p"
++  }
+ }
+ 
+ exit $code

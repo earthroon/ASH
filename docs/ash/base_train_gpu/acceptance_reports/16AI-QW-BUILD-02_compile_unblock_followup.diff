@@ -1,0 +1,109 @@
+--- /mnt/data/qw_build_fix_base/crates/tokenizer_core/tests/hangul_qwave_graph_serialization.rs	2026-05-20 08:13:55.000000000 +0000
++++ crates/tokenizer_core/tests/hangul_qwave_graph_serialization.rs	2026-05-22 00:58:35.269652815 +0000
+@@ -319,10 +319,10 @@
+ fn qw10_rejects_graph_recompute_or_tokenizer_mutation() {
+     let policy = policy();
+     let bundle = bundle();
+-    let mut input = input(&policy, &bundle);
+-    input.graph_recompute_performed = true;
++    let mut graph_input = input(&policy, &bundle);
++    graph_input.graph_recompute_performed = true;
+     let err = build_qwave_graph_serialization_manifest(
+-        &input,
++        &graph_input,
+         &bundle,
+         trace_files(&bundle),
+         diagnostic(&bundle),
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/lib.rs	2026-05-21 03:15:40.000000000 +0000
++++ crates/lora_train/src/lib.rs	2026-05-22 00:58:35.271238709 +0000
+@@ -1085,7 +1085,7 @@
+     qwave_runtime_canary_execution_next_stage,
+     qwave_runtime_canary_execution_risk_level,
+     qwave_runtime_canary_feature_flag_execution_valid,
+-    qwave_runtime_canary_rollback_disable_ready,
++    qwave_runtime_canary_rollback_disable_ready as qwave_runtime_canary_execution_rollback_disable_ready,
+     qwave_runtime_canary_telemetry_window_ready,
+     qwave_runtime_operator_toggle_valid,
+     QWaveRuntimeCanaryAppliedPercentageReport,
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/lm_head_vocab_atlas_gpu_export.rs	2026-05-20 02:31:38.000000000 +0000
++++ crates/lora_train/src/lm_head_vocab_atlas_gpu_export.rs	2026-05-22 00:59:20.032860091 +0000
+@@ -277,7 +277,7 @@
+     fs::write(artifact_dir.join("vocab_atlas_gpu_export_report.json"), serde_json::to_vec_pretty(export)?)?;
+     fs::write(artifact_dir.join("vocab_atlas_gpu_train_step_seal.json"), serde_json::to_vec_pretty(seal)?)?;
+     let md = format!(
+-        "# SFT-GPU-8H-G train step seal\n\n- status: `{}`\n- target_key: `{}`\n- projection: `{}`\n- mean_loss: `{:.6}`\n- update_applied: `{}`\n- lora_a_delta_norm: `{:.8}`\n- lora_b_delta_norm: `{:.8}`\n- logits_readback: `{}`\n- full_weight_readback: `{}`\n- adapter_manifest: `{}`\n- adapter_model: `{}`\n- next: `{}`\n",
++        "# SFT-GPU-8H-G train step seal\n\n- status: `{}`\n- target_key: `{}`\n- projection: `{}`\n- mean_loss: `{:.6}`\n- update_applied: `{}`\n- lora_a_delta_norm: `{:.8}`\n- lora_b_delta_norm: `{:.8}`\n- first_step_zero_a_delta_allowed: `{}`\n- a_delta_required: `{}`\n- b_delta_required: `{}`\n- logits_readback: `{}`\n- full_weight_readback: `{}`\n- adapter_manifest: `{}`\n- adapter_model: `{}`\n- next: `{}`\n",
+         seal.status,
+         seal.target_key,
+         seal.projection,
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/qwave_conditioning_train_candidate.rs	2026-05-20 11:46:06.000000000 +0000
++++ crates/lora_train/src/qwave_conditioning_train_candidate.rs	2026-05-22 00:58:35.282309199 +0000
+@@ -817,7 +817,7 @@
+     source: &QWaveConditioningTrainSourceProjectionRef,
+     report: &QWaveConditioningGradientBoundaryReport,
+ ) -> f32 {
+-    let mut score = 0.35;
++    let mut score: f32 = 0.35;
+     if source.finite_passed { score += 0.15; }
+     if source.adapter_weight_unchanged && source.lora_a_unchanged && source.lora_b_unchanged { score += 0.15; }
+     if source.base_model_unchanged { score += 0.10; }
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/qwave_runtime_apply_gate.rs	2026-05-20 14:22:12.000000000 +0000
++++ crates/lora_train/src/qwave_runtime_apply_gate.rs	2026-05-22 00:58:35.283856513 +0000
+@@ -763,7 +763,7 @@
+     telemetry: &QWaveRuntimeTelemetryActivationPlan,
+     operator_acknowledged: bool,
+ ) -> f32 {
+-    let mut score = 0.0;
++    let mut score: f32 = 0.0;
+     if matches!(shadow.outcome, QWaveRuntimeApplyShadowOutcome::ShadowImproved) { score += 0.35; }
+     if shadow.output_no_regression { score += 0.10; }
+     if shadow.korean_prompt_no_regression { score += 0.10; }
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/qwave_runtime_canary_apply_candidate.rs	2026-05-21 01:16:07.000000000 +0000
++++ crates/lora_train/src/qwave_runtime_canary_apply_candidate.rs	2026-05-22 00:58:35.285045659 +0000
+@@ -1043,7 +1043,7 @@
+     safety: &QWaveRuntimeCanarySafetyReadinessReport,
+     telemetry: &QWaveRuntimeCanaryTelemetryPreflightPlan,
+ ) -> f32 {
+-    let mut score = 0.0;
++    let mut score: f32 = 0.0;
+     if apply.apply_gate_only && apply.feature_flag_ready && apply.rollback_pointer_ready && apply.telemetry_plan_ready { score += 0.20; }
+     if rollback.disable_gate_only && rollback.safe_disable_candidate_ready && rollback.closeout_ready { score += 0.25; }
+     if percentage.canary_percentage_valid && percentage.clamped_canary_percentage > 0.0 { score += 0.20; }
+--- /mnt/data/qw_build_fix_base/crates/lora_train/src/real_batch_parallel_train_run.rs	2026-05-20 05:11:03.000000000 +0000
++++ crates/lora_train/src/real_batch_parallel_train_run.rs	2026-05-22 00:58:35.286004967 +0000
+@@ -476,6 +476,9 @@
+         .map(|s| s.mean_loss)
+         .fold(f32::NEG_INFINITY, f32::max);
+     let final_step = step_receipts.last().ok_or(RealBatchParallelTrainRunError::MissingStepReceipts)?;
++    let final_loss_value = final_step.mean_loss;
++    let final_a_delta_norm_value = final_step.a_delta_norm;
++    let final_b_delta_norm_value = final_step.b_delta_norm;
+ 
+     let all_losses_finite = step_receipts.iter().all(|s| s.loss_finite && finite(s.mean_loss));
+     let all_grads_finite = step_receipts.iter().all(|s| {
+@@ -558,9 +561,9 @@
+         bool_s(multi_step_train_verified),
+         bool_s(batch_parallel_path_verified),
+         bool_s(artifact_created),
+-        f32_s(final_step.mean_loss),
+-        f32_s(final_step.a_delta_norm),
+-        f32_s(final_step.b_delta_norm),
++        f32_s(final_loss_value),
++        f32_s(final_a_delta_norm_value),
++        f32_s(final_b_delta_norm_value),
+     ]);
+ 
+     Ok(RealBatchParallelTrainRunReceipt {
+@@ -611,9 +614,9 @@
+         loss_clamp_used,
+         min_loss_observed: min_loss,
+         max_loss_observed: max_loss,
+-        final_loss: final_step.mean_loss,
+-        final_a_delta_norm: final_step.a_delta_norm,
+-        final_b_delta_norm: final_step.b_delta_norm,
++        final_loss: final_loss_value,
++        final_a_delta_norm: final_a_delta_norm_value,
++        final_b_delta_norm: final_b_delta_norm_value,
+         decision: RealBatchParallelTrainRunDecision::RealBatchParallelTrainRunPassed,
+         guard_passed: true,
+         validation_warnings: Vec::new(),

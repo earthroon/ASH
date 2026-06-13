@@ -1,0 +1,31 @@
+# SFT-GPU-BUILD-02 Static Verification
+
+- generated_utc: 2026-05-19T08:06:25.054176+00:00
+- check_command_ssot: `cargo check -p ash_core -p lora_train -p burn_webgpu_backend`
+- cargo_available_in_bake_container: false
+- sherpa_rs_sys_excluded_from_main_gpu_sft_check: true
+
+## crates/lora_train/src/lm_head_vocab_atlas_gpu_multistep.rs
+- exists: true
+- braces_open_close: 56/56
+- brackets_open_close: 4/4
+- parens_open_close: 133/133
+
+## crates/lora_train/src/lm_head_runtime_delta_verify.rs
+- exists: true
+- braces_open_close: 104/104
+- brackets_open_close: 39/39
+- parens_open_close: 220/220
+
+## crates/lora_train/src/lm_head_vocab_atlas_quality_eval.rs
+- exists: true
+- braces_open_close: 88/88
+- brackets_open_close: 11/11
+- parens_open_close: 277/277
+
+## Targeted Checks
+- multistep uses atlas.vocab_tile_size: PASS
+- multistep uses atlas.parallel_tile_groups: PASS
+- multistep no longer uses seal.vocab_tile_size: PASS
+- multistep no longer uses seal.parallel_tile_groups: PASS
+- runtime delta verify report derives Deserialize: PASS

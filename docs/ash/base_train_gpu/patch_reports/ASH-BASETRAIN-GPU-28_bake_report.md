@@ -1,0 +1,45 @@
+# ASH-BASETRAIN-GPU-28 Bake Report
+
+## Baked Files
+
+```txt
+crates/base_train/src/ash_basetrain_gpu_28_gradient_buffer_allocation_candidate.rs
+crates/base_train/src/bin/ash_basetrain_gpu_28_gradient_buffer_allocation_candidate.rs
+ASH_BASETRAIN_GPU_28_GRADIENT_BUFFER_ALLOCATION_CANDIDATE_STATE.json
+ASH_BASETRAIN_GPU_28_SOURCE_27_VALIDATION.json
+ASH_BASETRAIN_GPU_28_GRADIENT_ALLOCATION_CANDIDATE.json
+ASH_BASETRAIN_GPU_28_GRADIENT_BUFFER_DESCRIPTOR.json
+ASH_BASETRAIN_GPU_28_BUFFER_USAGE_CONTRACT.json
+ASH_BASETRAIN_GPU_28_ALLOCATION_SIZE_ALIGNMENT_CONTRACT.json
+ASH_BASETRAIN_GPU_28_ALLOCATION_BOUNDARY_RECEIPT.json
+ASH_BASETRAIN_GPU_28_ALLOCATION_NO_WRITE_GUARD.json
+ASH_BASETRAIN_GPU_28_MODEL_WEIGHT_GRADIENT_DENYLIST_REVALIDATION.json
+ASH_BASETRAIN_GPU_28_BODY_TRAINING_CLAIM_GUARD_REVALIDATION.json
+ASH_BASETRAIN_GPU_28_NO_BACKWARD_NO_OPTIMIZER_CONTRACT.json
+ASH_BASETRAIN_GPU_28_CONTROL_FLOW_LUT_RECEIPT.json
+ASH_BASETRAIN_GPU_28_VERDICT_LUT_RECEIPT.json
+ASH_BASETRAIN_GPU_28_OPERATOR_RUN_PACKET.json
+ASH_BASETRAIN_GPU_28_EXPECTED_BUNDLE.json
+ASH_BASETRAIN_GPU_28_STATIC_CHECKS.txt
+ASH_BASETRAIN_GPU_28_LOCAL_VALIDATION.txt
+ASH_BASETRAIN_GPU_28_OPERATOR_COMMANDS.ps1
+ASH_BASETRAIN_GPU_HANDOFF_AFTER_28.md
+acceptance_reports/ASH-BASETRAIN-GPU-28.md
+patch_reports/ASH-BASETRAIN-GPU-28_bake_report.md
+```
+
+## Boundary
+
+```txt
+OPENED = gpu device acquisition + logits gradient candidate buffer allocation
+CLOSED = gradient write / gradient value computation / compute dispatch / backward / optimizer / model weight gradient / body training claim
+```
+
+## Container Validation
+
+```txt
+cargo_available = false
+cargo_build = NOT_EXECUTED_IN_CONTAINER
+cargo_run = NOT_EXECUTED_IN_CONTAINER
+local_runtime_required = true
+```

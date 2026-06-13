@@ -1,0 +1,46 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36F",
+  "title": "CPU Tensor View Candidate Materialization Preflight / Candidate Envelope To Bounded Row View Plan No Full Tensor No GPU Upload Seal",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-36E_bounded_weight_slice_row_continuity_promotion_gate_baked.zip",
+  "added_files": [
+    "crates/base_train/src/ash_basetrain_gpu_36f_cpu_tensor_view_candidate_materialization_preflight.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_36f_cpu_tensor_view_candidate_materialization_preflight.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-36F.md",
+    "patch_reports/ASH-BASETRAIN-GPU-36F_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_36F_CPU_TENSOR_VIEW_CANDIDATE_MATERIALIZATION_PREFLIGHT.json",
+    "artifacts/ASH_BASETRAIN_GPU_36F_STATIC_CHECKS.txt",
+    "artifacts/ASH_BASETRAIN_GPU_36F_BAKE_MANIFEST.json"
+  ],
+  "removed_live_input_receipts": [
+    "artifacts/ASH_BASETRAIN_GPU_36E_BOUNDED_WEIGHT_SLICE_ROW_CONTINUITY_PROMOTION_GATE.json"
+  ],
+  "static_baked_verdict": "BLOCKED_36E_RECEIPT_NOT_FOUND",
+  "source_sha256": "b01ab833cb6195bfd01d574031763bfefddfed3d414a52f2cf27633adcb3838c",
+  "bin_sha256": "c1693851063132a17760378a8239d3a955df74a5d89280450f2c1fe5b0ee41f3",
+  "static_receipt_sha256": "22abce4af7666eff9181e8405a8398ff3c15447f328013a50abc05ab1c374404",
+  "guards": {
+    "receipt_only_materialization_preflight": true,
+    "file_open_used": false,
+    "bounded_row_read_executed": false,
+    "f32_decode_executed": false,
+    "cpu_tensor_view_materialized": false,
+    "selected_group_full_slice_read": false,
+    "full_tensor_load_executed": false,
+    "gpu_upload_executed": false,
+    "safetensors_mutation_present": false,
+    "live_input_36e_receipt_same_path_included": false
+  },
+  "rust_control_flow_policy": {
+    "policy": "minimize_if_use_match_and_lookup_tables",
+    "if_keyword_count": 0,
+    "match_keyword_present": true
+  },
+  "static_checks": {
+    "hex_crate_reference_present": false,
+    "source_safetensors_file_open_call_present": false,
+    "seek_call_present": false,
+    "read_to_end_call_present": false,
+    "mmap_runtime_call_present": true,
+    "wgpu_runtime_call_present": false
+  }
+}

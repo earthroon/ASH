@@ -1,0 +1,30 @@
+--- /mnt/data/ash_runtime_envfix_orig/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-06-02 15:19:50.000000000 +0000
++++ /mnt/data/ash_logfix_work/crates/burn_webgpu_backend/src/gpu_sampling.rs	2026-06-03 06:37:29.000612999 +0000
+@@ -2879,21 +2879,21 @@
+ 
+     #[test]
+     fn env_parser_is_fail_safe() {
+-        std::env::remove_var("ASH_GPU_SAMPLING_PARALLEL");
++        unsafe { std::env::remove_var("ASH_GPU_SAMPLING_PARALLEL") };
+         assert_eq!(GpuSamplingParallelMode::from_env(), GpuSamplingParallelMode::Shadow);
+ 
+-        std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "0");
++        unsafe { std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "0") };
+         assert_eq!(GpuSamplingParallelMode::from_env(), GpuSamplingParallelMode::Off);
+ 
+-        std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "true");
++        unsafe { std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "true") };
+         assert_eq!(GpuSamplingParallelMode::from_env(), GpuSamplingParallelMode::On);
+ 
+-        std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "strict");
++        unsafe { std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "strict") };
+         assert_eq!(GpuSamplingParallelMode::from_env(), GpuSamplingParallelMode::Strict);
+ 
+-        std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "definitely-not-a-mode");
++        unsafe { std::env::set_var("ASH_GPU_SAMPLING_PARALLEL", "definitely-not-a-mode") };
+         assert_eq!(GpuSamplingParallelMode::from_env(), GpuSamplingParallelMode::Shadow);
+-        std::env::remove_var("ASH_GPU_SAMPLING_PARALLEL");
++        unsafe { std::env::remove_var("ASH_GPU_SAMPLING_PARALLEL") };
+     }
+ }
+ 

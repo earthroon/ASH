@@ -1,0 +1,85 @@
+--- /mnt/data/r6a_r4_script.ps1	2026-05-23 01:55:58.875231880 +0000
++++ /mnt/data/r6a_r5_work/scripts/run_16AI_QW_38G_R6A_R5_operator_review.ps1	2026-05-23 01:55:18.108827943 +0000
+@@ -1,6 +1,8 @@
+ param(
+   [switch]$Build,
+   [switch]$RunOnly,
++  [ValidateSet("draft", "approve", "hold", "reject")]
++  [string]$ReviewMode = "draft",
+   [int]$MaxNewTokens = 1
+ )
+ 
+@@ -11,49 +13,54 @@
+ 
+ New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
+ 
+-$buildLog = ".\workspace\build_qw38g_r6a_r4_live.log"
+-$liveLog = ".\workspace\infer_qw38g_r6a_r4_backend_extension_dry_run_live.log"
+-$inputPath = ".\workspace\qw38g_r6a_r4_input.txt"
++$buildLog = ".\workspace\build_qw38g_r6a_r5_live.log"
++$liveLog = if ($ReviewMode -eq "approve") {
++  ".\workspace\infer_qw38g_r6a_r5_operator_review_approve_live.log"
++} else {
++  ".\workspace\infer_qw38g_r6a_r5_operator_review_live.log"
++}
++$inputPath = ".\workspace\qw38g_r6a_r5_input.txt"
+ [System.IO.File]::WriteAllText($inputPath, "1+1은?", [System.Text.UTF8Encoding]::new($false))
+ 
+ if ($Build -and -not $RunOnly) {
+-  Write-Host "[16AI-QW-38G-R6A-R4][build] cargo build --release example infer_only"
++  Write-Host "[16AI-QW-38G-R6A-R5][build] cargo build --release example infer_only"
+   cmd /c "cargo build --release --manifest-path .\crates\runtime\Cargo.toml --example infer_only 2>&1" | Tee-Object $buildLog
+   $buildCode = $LASTEXITCODE
+-  Write-Host "[16AI-QW-38G-R6A-R4][build_done] exit_code=$buildCode log=$buildLog"
++  Write-Host "[16AI-QW-38G-R6A-R5][build_done] exit_code=$buildCode log=$buildLog"
+   if ($buildCode -ne 0) { exit $buildCode }
+ }
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
+-$env:ASH_BACKEND_EXTENSION_DRY_RUN = "1"
+-$env:ASH_BACKEND_EXTENSION_DRY_RUN_VERBOSE = "1"
+-$env:ASH_BACKEND_EXTENSION_SPEC_PATH = "workspace/qw38g_r6a_r3_backend_debug_binding_extension_spec.json"
+-$env:ASH_BACKEND_EXTENSION_DRY_RUN_OUT = "workspace/qw38g_r6a_r4_backend_extension_dry_run.json"
++$env:ASH_BACKEND_EXTENSION_OPERATOR_REVIEW = "1"
++$env:ASH_BACKEND_EXTENSION_OPERATOR_REVIEW_MODE = $ReviewMode
++$env:ASH_BACKEND_EXTENSION_DRY_RUN_PATH = "workspace/qw38g_r6a_r4_backend_extension_dry_run.json"
+ $env:ASH_BACKEND_EXTENSION_DRY_RUN_RECEIPT = "workspace/qw38g_r6a_r4_backend_extension_dry_run_receipt.json"
++$env:ASH_BACKEND_EXTENSION_REVIEW_PACKET = "workspace/qw38g_r6a_r5_operator_review_packet.json"
++$env:ASH_BACKEND_EXTENSION_REVIEW_RECEIPT = "workspace/qw38g_r6a_r5_operator_review_receipt.json"
+ 
+ $exe = ".\target\release\examples\infer_only.exe"
+ $cmd = "`"$exe`" --model-spec `".\specs\model_spec_v5_48259.toml`" --tokenizer `".\artifacts\tokenizer_manifest_v5_final.json`" --checkpoint `".\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors`" --task freeform --max-new-tokens $MaxNewTokens --seed 42 --text-file `"$inputPath`" --json"
+ 
+-Write-Host "[16AI-QW-38G-R6A-R4][run] dry_run=1 max_new_tokens=$MaxNewTokens"
++Write-Host "[16AI-QW-38G-R6A-R5][run] mode=$ReviewMode max_new_tokens=$MaxNewTokens"
+ cmd /c "$cmd 2>&1" | Tee-Object $liveLog
+ $runCode = $LASTEXITCODE
+-Write-Host "[16AI-QW-38G-R6A-R4][run_done] exit_code=$runCode live=$liveLog"
++Write-Host "[16AI-QW-38G-R6A-R5][run_done] exit_code=$runCode live=$liveLog"
+ if ($runCode -ne 0) { exit $runCode }
+ 
+-$receipt = ".\workspace\qw38g_r6a_r4_backend_extension_dry_run_receipt.json"
+-$dryRun = ".\workspace\qw38g_r6a_r4_backend_extension_dry_run.json"
++$receipt = ".\workspace\qw38g_r6a_r5_operator_review_receipt.json"
++$packet = ".\workspace\qw38g_r6a_r5_operator_review_packet.json"
+ if (Test-Path $receipt) {
+-  Write-Host "[16AI-QW-38G-R6A-R4][receipt] $receipt"
++  Write-Host "[16AI-QW-38G-R6A-R5][receipt] $receipt"
+   Get-Content $receipt -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R4][error] missing receipt: $receipt"
++  Write-Host "[16AI-QW-38G-R6A-R5][error] missing receipt: $receipt"
+   exit 1
+ }
+-if (Test-Path $dryRun) {
+-  Write-Host "[16AI-QW-38G-R6A-R4][dry_run] $dryRun"
+-  Get-Content $dryRun -Encoding UTF8
++if (Test-Path $packet) {
++  Write-Host "[16AI-QW-38G-R6A-R5][packet] $packet"
++  Get-Content $packet -Encoding UTF8
+ } else {
+-  Write-Host "[16AI-QW-38G-R6A-R4][error] missing dry-run: $dryRun"
++  Write-Host "[16AI-QW-38G-R6A-R5][error] missing review packet: $packet"
+   exit 1
+ }

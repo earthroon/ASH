@@ -1,0 +1,41 @@
+{
+  "commit": "16AF",
+  "title": "Native Atlas FFN SiLU/SwiGLU Inference Re-Enable Seal",
+  "source_ssot": "16_af_native_atlas_ffn_patch_roadmap (1).md",
+  "body_ssot": "ash_pass3_commit16P3R_row_gather_telemetry_fallback_seal.zip",
+  "scope": "standalone FFN layer parity probe; generation path not connected",
+  "implemented": [
+    "native-owned WGPU FFN dispatcher in burn_webgpu_backend",
+    "single-token gate/up projection plus SiLU/SwiGLU plus down projection WGSL compute path",
+    "model_core CPU-reference-vs-native parity probe harness",
+    "weight layout report for gate/up/down shapes",
+    "synthetic hidden vector helper for standalone probe input",
+    "source-only patch file and infer_debug scan files"
+  ],
+  "preserved": [
+    "16Y safe path",
+    "16AA timestamp query feature request path",
+    "16AB headwise/raw/qkv bridge disable gate",
+    "16AC reference safe generation fallback",
+    "16P-3R row_gather telemetry completion"
+  ],
+  "non_goals_respected": [
+    "CPU fallback not removed",
+    "attention native path not restored",
+    "KV cache not restored",
+    "generation path not wired before parity pass"
+  ],
+  "forbidden_scan_new_16af_files_line_count": 0,
+  "cargo_check_status": "not_executed: cargo command unavailable in container",
+  "modified_files": [
+    "crates/burn_webgpu_backend/src/native_atlas_ffn.rs",
+    "crates/burn_webgpu_backend/src/lib.rs",
+    "crates/model_core/src/native_atlas_ffn_probe.rs",
+    "crates/model_core/src/lib.rs",
+    "infer_debug/16AF_ffn_silu_refs.txt",
+    "infer_debug/16AF_native_atlas_shader_refs.txt",
+    "infer_debug/16AF_forbidden_path_scan.txt",
+    "patches/16AF_native_atlas_ffn_source_only.patch"
+  ],
+  "timestamp_utc": "2026-05-06T04:42:10.442282Z"
+}

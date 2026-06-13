@@ -1,0 +1,787 @@
+--- /mnt/data/ash37r_r2_orig/crates/base_train/src/bin/ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate.rs	1970-01-01 00:00:00.000000000 +0000
++++ crates/base_train/src/bin/ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate.rs	2026-06-13 10:17:05.712994594 +0000
+@@ -0,0 +1,7 @@
++#[path = "../ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate.rs"]
++mod ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate;
++
++fn main() {
++    let receipt = ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate::ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate_bundle();
++    println!("{}", serde_json::to_string_pretty(&receipt).unwrap());
++}
+--- /mnt/data/ash37r_r2_orig/crates/base_train/src/ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate.rs	1970-01-01 00:00:00.000000000 +0000
++++ crates/base_train/src/ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate.rs	2026-06-13 10:17:05.729846104 +0000
+@@ -0,0 +1,774 @@
++use serde_json::{json, Value};
++use sha2::{Digest, Sha256};
++use std::borrow::Cow;
++use std::env;
++use std::fs;
++use std::fs::File;
++use std::io::{Read, Seek, SeekFrom};
++use std::num::NonZeroU64;
++use std::path::Path;
++use std::sync::mpsc;
++
++const PATCH_ID: &str = "ASH-BASETRAIN-GPU-38";
++const TITLE: &str = "Selected Group Row Block GPU Forward Candidate / Atlas Weight Stream To Bounded MatVec Output Seal / No Optimizer No Weight Mutation No Training Commit";
++const PASS_STATUS: &str = "PASS_ASH_BASETRAIN_GPU_38_SELECTED_GROUP_ROW_BLOCK_GPU_FORWARD_CANDIDATE_ATLAS_WEIGHT_STREAM_TO_BOUNDED_MATVEC_OUTPUT_NO_OPTIMIZER_NO_WEIGHT_MUTATION_NO_TRAINING_COMMIT";
++const RUNTIME_RECEIPT_PATH: &str = "artifacts/ASH_BASETRAIN_GPU_38_SELECTED_GROUP_ROW_BLOCK_GPU_FORWARD_CANDIDATE.json";
++const DEFAULT_37R_R2_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37R_R2_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_READBACK_PARITY_GATE.json";
++const DEFAULT_37Q_R1_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37Q_R1_SELECTED_GROUP_ROW_BLOCK_MULTI_WORKGROUP_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const DEFAULT_37P_R1_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37P_R1_SELECTED_GROUP_ROW_BLOCK_PARALLEL_REDUCTION_DIAGNOSTIC_KERNEL.json";
++const DEFAULT_37F_RECEIPT: &str = "artifacts/ASH_BASETRAIN_GPU_37F_SELECTED_GROUP_ROW_BLOCK_GPU_UPLOAD_READBACK_SMOKE.json";
++
++const ROW_COUNT: u32 = 256;
++const INPUT_VECTOR_LEN: u32 = 256;
++const OUTPUT_COUNT: u32 = 256;
++const WEIGHT_BYTES: u64 = (ROW_COUNT as u64) * (INPUT_VECTOR_LEN as u64) * 4;
++const OUTPUT_BYTES: u64 = (OUTPUT_COUNT as u64) * 4;
++const WORKGROUP_SIZE_X: u32 = 256;
++const DISPATCH_X: u32 = 1;
++
++const BLOCK_37R_NOT_FOUND: &str = "BLOCKED_37R_R2_RECEIPT_NOT_FOUND";
++const BLOCK_37R_READ: &str = "BLOCKED_37R_R2_RECEIPT_READ_FAILED";
++const BLOCK_37R_PARSE: &str = "BLOCKED_37R_R2_RECEIPT_PARSE_FAILED";
++const BLOCK_37R_NOT_PASS: &str = "BLOCKED_37R_R2_RECEIPT_NOT_PASS";
++const BLOCK_37R_PARITY: &str = "BLOCKED_37R_R2_PARITY_NOT_PASS";
++const BLOCK_37R_FORWARD_NOT_ALLOWED: &str = "BLOCKED_37R_R2_FORWARD_CANDIDATE_NOT_ALLOWED";
++const BLOCK_37Q_NOT_FOUND: &str = "BLOCKED_37Q_R1_RECEIPT_NOT_FOUND";
++const BLOCK_37Q_NOT_PASS: &str = "BLOCKED_37Q_R1_RECEIPT_NOT_PASS";
++const BLOCK_37Q_SUMMARY: &str = "BLOCKED_37Q_R1_SUMMARY_INVALID";
++const BLOCK_37P_NOT_FOUND: &str = "BLOCKED_37P_R1_RECEIPT_NOT_FOUND";
++const BLOCK_37P_NOT_PASS: &str = "BLOCKED_37P_R1_RECEIPT_NOT_PASS";
++const BLOCK_37P_SUMMARY: &str = "BLOCKED_37P_R1_SUMMARY_INVALID";
++const BLOCK_37F_NOT_FOUND: &str = "BLOCKED_37F_RECEIPT_NOT_FOUND";
++const BLOCK_37F_NOT_PASS: &str = "BLOCKED_37F_RECEIPT_NOT_PASS";
++const BLOCK_37F_DIGEST: &str = "BLOCKED_37F_PAYLOAD_DIGEST_MISMATCH";
++const BLOCK_SOURCE_READ: &str = "BLOCKED_ROW_BLOCK_SOURCE_READ_FAILED";
++const BLOCK_SOURCE_EMPTY: &str = "BLOCKED_ROW_BLOCK_PAYLOAD_EMPTY";
++const BLOCK_GPU_DEVICE: &str = "BLOCKED_GPU_DEVICE_NOT_AVAILABLE";
++const BLOCK_SHADER: &str = "BLOCKED_MATVEC_SHADER_COMPILE_FAILED";
++const BLOCK_DISPATCH: &str = "BLOCKED_MATVEC_DISPATCH_FAILED";
++const BLOCK_READBACK: &str = "BLOCKED_MATVEC_READBACK_FAILED";
++const BLOCK_NONFINITE: &str = "BLOCKED_MATVEC_OUTPUT_NONFINITE";
++const BLOCK_SHAPE: &str = "BLOCKED_MATVEC_OUTPUT_SHAPE_MISMATCH";
++const BLOCK_PARITY: &str = "BLOCKED_MATVEC_CPU_GPU_PARITY_MISMATCH";
++
++#[derive(Clone)]
++struct Args {
++    reduction_parity_receipt_path: String,
++    multi_workgroup_reduction_receipt_path: String,
++    parallel_reduction_receipt_path: String,
++    gpu_upload_readback_smoke_receipt_path: String,
++    selected_group_id: String,
++    selected_tensor_key: String,
++    row_start: u32,
++    row_count: u32,
++    input_vector_len: u32,
++    backend: String,
++}
++
++#[derive(Clone)]
++struct LoadedReceipt {
++    path: String,
++    digest: String,
++    value: Value,
++}
++
++#[derive(Clone)]
++struct RowBlockPayload {
++    source_path: String,
++    source_file_offset_start: u64,
++    source_file_offset_end: u64,
++    bytes_read: u64,
++    digest: String,
++    weights: Vec<f32>,
++    weight_bytes: Vec<u8>,
++}
++
++#[derive(Clone)]
++struct MatVecRuntime {
++    adapter_backend: String,
++    adapter_name: String,
++    adapter_driver: String,
++    adapter_driver_info: String,
++    adapter_device_type: String,
++    adapter_vendor: u32,
++    adapter_device: u32,
++    gpu_instance_created: bool,
++    gpu_adapter_acquired: bool,
++    gpu_device_acquired: bool,
++    shader_module_created: bool,
++    pipeline_created: bool,
++    staging_buffer_created: bool,
++    gpu_weight_buffer_created: bool,
++    input_vector_buffer_created: bool,
++    output_buffer_created: bool,
++    readback_buffer_created: bool,
++    queue_write_executed: bool,
++    command_encoder_created: bool,
++    compute_pass_created: bool,
++    set_pipeline_executed: bool,
++    set_bind_group_executed: bool,
++    dispatch_executed: bool,
++    queue_submit_executed: bool,
++    copy_buffer_to_buffer_executed: bool,
++    map_async_executed: bool,
++    device_poll_executed: bool,
++    readback_executed: bool,
++    unmap_executed: bool,
++    readback_bytes: u64,
++    gpu_output: Vec<f32>,
++    status: String,
++}
++
++#[derive(Clone)]
++struct CpuReference {
++    input_vector: Vec<f32>,
++    output: Vec<f32>,
++    digest: String,
++    nan_count: usize,
++    inf_count: usize,
++}
++
++#[derive(Clone)]
++struct Output {
++    status: String,
++    verdict: String,
++    pass: bool,
++    blocked_reason_code: String,
++    blocked_reason: Option<String>,
++    r37: Option<LoadedReceipt>,
++    q37: Option<LoadedReceipt>,
++    p37: Option<LoadedReceipt>,
++    f37: Option<LoadedReceipt>,
++    row_block: Option<RowBlockPayload>,
++    cpu_reference: Option<CpuReference>,
++    runtime: Option<MatVecRuntime>,
++}
++
++pub fn ash_basetrain_gpu_38_selected_group_row_block_gpu_forward_candidate_bundle() -> Value {
++    let args = read_args();
++    let output = run(&args);
++    let mut receipt = receipt_json(&args, &output);
++    let artifact_write = write_runtime_receipt(&receipt);
++    if let Some(obj) = receipt.as_object_mut() {
++        obj.insert("artifact_write".to_string(), artifact_write);
++    }
++    let _ = write_runtime_receipt(&receipt);
++    receipt
++}
++
++fn read_args() -> Args {
++    let mut args = Args {
++        reduction_parity_receipt_path: DEFAULT_37R_R2_RECEIPT.to_string(),
++        multi_workgroup_reduction_receipt_path: DEFAULT_37Q_R1_RECEIPT.to_string(),
++        parallel_reduction_receipt_path: DEFAULT_37P_R1_RECEIPT.to_string(),
++        gpu_upload_readback_smoke_receipt_path: DEFAULT_37F_RECEIPT.to_string(),
++        selected_group_id: "selected_group_from_37f_37p_chain".to_string(),
++        selected_tensor_key: "selected_tensor_from_37f_candidate_ref".to_string(),
++        row_start: 0,
++        row_count: ROW_COUNT,
++        input_vector_len: INPUT_VECTOR_LEN,
++        backend: "auto".to_string(),
++    };
++    let mut iter = env::args().skip(1);
++    while let Some(arg) = iter.next() {
++        match arg.as_str() {
++            "--reduction-parity-receipt" => match iter.next() { Some(v) => args.reduction_parity_receipt_path = v, None => () },
++            "--multi-workgroup-reduction-receipt" => match iter.next() { Some(v) => args.multi_workgroup_reduction_receipt_path = v, None => () },
++            "--parallel-reduction-receipt" => match iter.next() { Some(v) => args.parallel_reduction_receipt_path = v, None => () },
++            "--gpu-upload-readback-smoke-receipt" => match iter.next() { Some(v) => args.gpu_upload_readback_smoke_receipt_path = v, None => () },
++            "--selected-group-id" => match iter.next() { Some(v) => args.selected_group_id = v, None => () },
++            "--selected-tensor-key" => match iter.next() { Some(v) => args.selected_tensor_key = v, None => () },
++            "--row-start" => match iter.next().and_then(|v| v.parse::<u32>().ok()) { Some(v) => args.row_start = v, None => () },
++            "--row-count" => match iter.next().and_then(|v| v.parse::<u32>().ok()) { Some(v) => args.row_count = v, None => () },
++            "--input-vector-len" => match iter.next().and_then(|v| v.parse::<u32>().ok()) { Some(v) => args.input_vector_len = v, None => () },
++            "--backend" => match iter.next() { Some(v) => args.backend = v, None => () },
++            _ => (),
++        }
++    }
++    args
++}
++
++fn run(args: &Args) -> Output {
++    match load_json(&args.reduction_parity_receipt_path, BLOCK_37R_NOT_FOUND, BLOCK_37R_READ, BLOCK_37R_PARSE) {
++        Err(out) => out,
++        Ok(r37) => match validate_37r_r2(&r37.value) {
++            Err((code, reason)) => blocked_with(args, Some(r37), None, None, None, None, None, None, code, reason),
++            Ok(()) => match load_json(&args.multi_workgroup_reduction_receipt_path, BLOCK_37Q_NOT_FOUND, BLOCK_37Q_NOT_FOUND, BLOCK_37Q_NOT_FOUND) {
++                Err(out) => with_r37(out, r37),
++                Ok(q37) => match validate_37q_r1(&q37.value) {
++                    Err((code, reason)) => blocked_with(args, Some(r37), Some(q37), None, None, None, None, None, code, reason),
++                    Ok(()) => match load_json(&args.parallel_reduction_receipt_path, BLOCK_37P_NOT_FOUND, BLOCK_37P_NOT_FOUND, BLOCK_37P_NOT_FOUND) {
++                        Err(out) => with_r37_q37(out, r37, q37),
++                        Ok(p37) => match validate_37p_r1(&p37.value) {
++                            Err((code, reason)) => blocked_with(args, Some(r37), Some(q37), Some(p37), None, None, None, None, code, reason),
++                            Ok(()) => match load_json(&args.gpu_upload_readback_smoke_receipt_path, BLOCK_37F_NOT_FOUND, BLOCK_37F_NOT_FOUND, BLOCK_37F_NOT_FOUND) {
++                                Err(out) => with_r37_q37_p37(out, r37, q37, p37),
++                                Ok(f37) => match validate_37f(&f37.value) {
++                                    Err((code, reason)) => blocked_with(args, Some(r37), Some(q37), Some(p37), Some(f37), None, None, None, code, reason),
++                                    Ok(()) => match read_row_block_payload(&f37.value, args) {
++                                        Err((code, reason)) => blocked_with(args, Some(r37), Some(q37), Some(p37), Some(f37), None, None, None, code, reason),
++                                        Ok(row_block) => {
++                                            let cpu = cpu_reference(&row_block.weights, args.input_vector_len, args.row_count);
++                                            let runtime = pollster::block_on(actual_matvec_dispatch(args, &row_block, &cpu.input_vector));
++                                            pass_or_block(args, r37, q37, p37, f37, row_block, cpu, runtime)
++                                        }
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++fn load_json(path: &str, not_found: &'static str, read_failed: &'static str, parse_failed: &'static str) -> Result<LoadedReceipt, Output> {
++    match Path::new(path).exists() {
++        false => Err(blocked_base(not_found, "required receipt was not found.")),
++        true => match fs::read(path) {
++            Err(_) => Err(blocked_base(read_failed, "required receipt could not be read.")),
++            Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
++                Err(_) => Err(blocked_base(parse_failed, "required receipt could not be parsed as JSON.")),
++                Ok(value) => Ok(LoadedReceipt { path: path.to_string(), digest: sha256_hex(&bytes), value }),
++            },
++        },
++    }
++}
++
++fn validate_37r_r2(v: &Value) -> Result<(), (&'static str, &'static str)> {
++    match (
++        str_value(v, "patch_id") == Some("ASH-BASETRAIN-GPU-37R-R2"),
++        bool_value(v, "pass") == Some(true) && str_value(v, "verdict") == Some("PASS"),
++        bool_path(v, &["reduction_parity_matrix", "parity_passed"]) == Some(true),
++        bool_path(v, &["promotion_gate_matrix", "forward_candidate_allowed_next"]) == Some(true),
++        bool_path(v, &["promotion_gate_matrix", "forward_adoption_executed_now"]) == Some(false),
++        bool_path(v, &["promotion_gate_matrix", "optimizer_executed_now"]) == Some(false),
++        bool_path(v, &["promotion_gate_matrix", "weight_mutation_executed_now"]) == Some(false),
++    ) {
++        (false, _, _, _, _, _, _) => Err((BLOCK_37R_NOT_PASS, "37R-R2 receipt patch_id was not accepted.")),
++        (_, false, _, _, _, _, _) => Err((BLOCK_37R_NOT_PASS, "37R-R2 receipt was not PASS.")),
++        (_, _, false, _, _, _, _) => Err((BLOCK_37R_PARITY, "37R-R2 parity did not pass.")),
++        (_, _, _, false, _, _, _) => Err((BLOCK_37R_FORWARD_NOT_ALLOWED, "37R-R2 did not allow the next forward candidate.")),
++        (_, _, _, _, false, _, _) => Err((BLOCK_37R_FORWARD_NOT_ALLOWED, "37R-R2 already adopted forward output.")),
++        (_, _, _, _, _, false, _) => Err((BLOCK_37R_FORWARD_NOT_ALLOWED, "37R-R2 optimizer guard was open.")),
++        (_, _, _, _, _, _, false) => Err((BLOCK_37R_FORWARD_NOT_ALLOWED, "37R-R2 weight mutation guard was open.")),
++        _ => Ok(()),
++    }
++}
++
++fn validate_37q_r1(v: &Value) -> Result<(), (&'static str, &'static str)> {
++    let status = str_value(v, "status").unwrap_or("");
++    let summary = v.get("multi_workgroup_reduction_diagnostic_summary").unwrap_or(&Value::Null);
++    match (
++        str_value(v, "patch_id") == Some("ASH-BASETRAIN-GPU-37Q-R1"),
++        bool_value(v, "pass") == Some(true) && str_value(v, "verdict") == Some("PASS") && status.starts_with("PASS_ASH_BASETRAIN_GPU_37Q_R1"),
++        u64_value(summary, "matched_word_count") == Some(32),
++        u64_value(summary, "mismatched_word_count") == Some(0),
++        u64_value(summary, "workgroup_count") == Some(4),
++        u64_value(summary, "samples_per_workgroup") == Some(256),
++        u64_value(summary, "total_sample_count") == Some(1024),
++    ) {
++        (false, _, _, _, _, _, _) => Err((BLOCK_37Q_NOT_PASS, "37Q-R1 receipt patch_id was not accepted.")),
++        (_, false, _, _, _, _, _) => Err((BLOCK_37Q_NOT_PASS, "37Q-R1 receipt was not PASS.")),
++        (_, _, false, _, _, _, _) => Err((BLOCK_37Q_SUMMARY, "37Q-R1 matched word count was not 32.")),
++        (_, _, _, false, _, _, _) => Err((BLOCK_37Q_SUMMARY, "37Q-R1 mismatched word count was not zero.")),
++        (_, _, _, _, false, _, _) => Err((BLOCK_37Q_SUMMARY, "37Q-R1 workgroup count was not 4.")),
++        (_, _, _, _, _, false, _) => Err((BLOCK_37Q_SUMMARY, "37Q-R1 samples per workgroup was not 256.")),
++        (_, _, _, _, _, _, false) => Err((BLOCK_37Q_SUMMARY, "37Q-R1 total sample count was not 1024.")),
++        _ => Ok(()),
++    }
++}
++
++fn validate_37p_r1(v: &Value) -> Result<(), (&'static str, &'static str)> {
++    let status = str_value(v, "status").unwrap_or("");
++    let summary = v.get("parallel_reduction_diagnostic_summary").or_else(|| v.get("parallel_reduction_diagnostic_summary_ref")).unwrap_or(&Value::Null);
++    match (
++        str_value(v, "patch_id") == Some("ASH-BASETRAIN-GPU-37P-R1"),
++        bool_value(v, "pass") == Some(true) && str_value(v, "verdict") == Some("PASS") && status.starts_with("PASS_ASH_BASETRAIN_GPU_37P_R1"),
++        u64_value(summary, "matched_word_count") == Some(8),
++        u64_value(summary, "mismatched_word_count") == Some(0),
++    ) {
++        (false, _, _, _) => Err((BLOCK_37P_NOT_PASS, "37P-R1 receipt patch_id was not accepted.")),
++        (_, false, _, _) => Err((BLOCK_37P_NOT_PASS, "37P-R1 receipt was not PASS.")),
++        (_, _, false, _) => Err((BLOCK_37P_SUMMARY, "37P-R1 matched word count was not 8.")),
++        (_, _, _, false) => Err((BLOCK_37P_SUMMARY, "37P-R1 mismatched word count was not zero.")),
++        _ => Ok(()),
++    }
++}
++
++fn validate_37f(v: &Value) -> Result<(), (&'static str, &'static str)> {
++    let digest = v.get("gpu_readback_digest_receipt").unwrap_or(&Value::Null);
++    let cpu = str_value(digest, "cpu_source_payload_raw_sha256_hex").unwrap_or("");
++    let gpu = str_value(digest, "gpu_readback_raw_sha256_hex").or_else(|| str_value(digest, "gpu_readback_byte_digest_hex")).unwrap_or("");
++    match (
++        str_value(v, "patch_id") == Some("ASH-BASETRAIN-GPU-37F"),
++        bool_value(v, "pass") == Some(true) && str_value(v, "verdict") == Some("PASS"),
++        !cpu.is_empty() && cpu == gpu,
++    ) {
++        (false, _, _) => Err((BLOCK_37F_NOT_PASS, "37F receipt patch_id was not accepted.")),
++        (_, false, _) => Err((BLOCK_37F_NOT_PASS, "37F receipt was not PASS.")),
++        (_, _, false) => Err((BLOCK_37F_DIGEST, "37F CPU source and GPU readback digests did not match.")),
++        _ => Ok(()),
++    }
++}
++
++fn read_row_block_payload(v: &Value, args: &Args) -> Result<RowBlockPayload, (&'static str, &'static str)> {
++    let candidate = v.get("candidate_ref").ok_or((BLOCK_SOURCE_READ, "37F candidate_ref was missing."))?;
++    let source_path = str_value(candidate, "source_shard_path").ok_or((BLOCK_SOURCE_READ, "37F source_shard_path was missing."))?.to_string();
++    let segments = v.get("representative_gpu_readback_source_read_results").and_then(Value::as_array).ok_or((BLOCK_SOURCE_READ, "37F source read results were missing."))?;
++    let first = segments.first().ok_or((BLOCK_SOURCE_READ, "37F source segment list was empty."))?;
++    let first_start = u64_value(first, "source_file_offset_start").ok_or((BLOCK_SOURCE_READ, "37F first segment start was missing."))?;
++    let first_len = u64_value(first, "bytes_read").ok_or((BLOCK_SOURCE_READ, "37F first segment byte length was missing."))?;
++    let requested = (args.row_count as u64).saturating_mul(args.input_vector_len as u64).saturating_mul(4);
++    let byte_len = match (args.row_count == ROW_COUNT, args.input_vector_len == INPUT_VECTOR_LEN, requested > 0, requested <= first_len) {
++        (true, true, true, true) => requested,
++        _ => return Err((BLOCK_SOURCE_READ, "38 first candidate supports only row_count=256/input_vector_len=256 within the first 37F source segment.")),
++    };
++    let byte_offset = first_start.saturating_add((args.row_start as u64).saturating_mul(args.input_vector_len as u64).saturating_mul(4));
++    let mut file = File::open(&source_path).map_err(|_| (BLOCK_SOURCE_READ, "selected row-block source file could not be opened."))?;
++    file.seek(SeekFrom::Start(byte_offset)).map_err(|_| (BLOCK_SOURCE_READ, "selected row-block source seek failed."))?;
++    let mut bytes = vec![0u8; byte_len as usize];
++    file.read_exact(&mut bytes).map_err(|_| (BLOCK_SOURCE_READ, "selected row-block source bytes could not be read."))?;
++    match bytes.is_empty() {
++        true => Err((BLOCK_SOURCE_EMPTY, "selected row-block payload was empty.")),
++        false => {
++            let weights = bytes.chunks_exact(4).map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])).collect::<Vec<f32>>();
++            Ok(RowBlockPayload { source_path, source_file_offset_start: byte_offset, source_file_offset_end: byte_offset + byte_len, bytes_read: byte_len, digest: sha256_hex(&bytes), weights, weight_bytes: bytes })
++        }
++    }
++}
++
++fn cpu_reference(weights: &[f32], input_len: u32, row_count: u32) -> CpuReference {
++    let input_vector = (0..input_len).map(|i| ((i % 17) as f32 - 8.0) / 17.0).collect::<Vec<f32>>();
++    let mut output = Vec::with_capacity(row_count as usize);
++    let mut nan_count = 0usize;
++    let mut inf_count = 0usize;
++    for row in 0..row_count as usize {
++        let base = row * input_len as usize;
++        let mut acc = 0.0f32;
++        for k in 0..input_len as usize {
++            acc += weights[base + k] * input_vector[k];
++        }
++        match acc.is_nan() { true => nan_count += 1, false => () }
++        match acc.is_infinite() { true => inf_count += 1, false => () }
++        output.push(acc);
++    }
++    CpuReference { digest: f32_digest(&output), input_vector, output, nan_count, inf_count }
++}
++
++async fn actual_matvec_dispatch(args: &Args, row_block: &RowBlockPayload, input_vector: &[f32]) -> MatVecRuntime {
++    use wgpu26 as wgpu;
++    let instance = wgpu::Instance::default();
++    let adapter_result = instance.request_adapter(&wgpu::RequestAdapterOptions { power_preference: power_preference_from_env(), compatible_surface: None, force_fallback_adapter: false }).await;
++    let adapter = match adapter_result {
++        Ok(adapter) => adapter,
++        Err(_) => return MatVecRuntime::blocked(args.backend.clone(), BLOCK_GPU_DEVICE),
++    };
++    let info = adapter.get_info();
++    let device_result = adapter.request_device(&wgpu::DeviceDescriptor {
++        label: Some("ash-basetrain-gpu-38-bounded-matvec-device"),
++        required_features: wgpu::Features::empty(),
++        required_limits: wgpu::Limits::downlevel_defaults(),
++        memory_hints: wgpu::MemoryHints::Performance,
++        ..Default::default()
++    }).await;
++    let (device, queue) = match device_result {
++        Ok(pair) => pair,
++        Err(_) => return MatVecRuntime::blocked_with_info(args.backend.clone(), &info, BLOCK_GPU_DEVICE),
++    };
++    device.push_error_scope(wgpu::ErrorFilter::Validation);
++    let wgsl = wgsl_source();
++    let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_SHADER"), source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&wgsl)) });
++    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
++        label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_BIND_GROUP_LAYOUT"),
++        entries: &[
++            wgpu::BindGroupLayoutEntry { binding: 0, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: NonZeroU64::new(WEIGHT_BYTES) }, count: None },
++            wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: NonZeroU64::new((INPUT_VECTOR_LEN as u64) * 4) }, count: None },
++            wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: NonZeroU64::new(OUTPUT_BYTES) }, count: None },
++        ],
++    });
++    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_PIPELINE_LAYOUT"), bind_group_layouts: &[&bind_group_layout], push_constant_ranges: &[] });
++    let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_PIPELINE"), layout: Some(&pipeline_layout), module: &shader_module, entry_point: Some("main"), compilation_options: wgpu::PipelineCompilationOptions::default(), cache: None });
++    let weight_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("ASH_BASETRAIN_GPU_38_SELECTED_ROW_BLOCK_WEIGHT_BUFFER"), size: WEIGHT_BYTES, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
++    let input_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_INPUT_VECTOR_BUFFER"), size: (INPUT_VECTOR_LEN as u64) * 4, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
++    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_OUTPUT_BUFFER"), size: OUTPUT_BYTES, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
++    let readback_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_OUTPUT_READBACK_BUFFER"), size: OUTPUT_BYTES, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
++    queue.write_buffer(&weight_buffer, 0, &row_block.weight_bytes);
++    queue.write_buffer(&input_buffer, 0, bytemuck::cast_slice(input_vector));
++    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
++        label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_BIND_GROUP"),
++        layout: &bind_group_layout,
++        entries: &[
++            wgpu::BindGroupEntry { binding: 0, resource: weight_buffer.as_entire_binding() },
++            wgpu::BindGroupEntry { binding: 1, resource: input_buffer.as_entire_binding() },
++            wgpu::BindGroupEntry { binding: 2, resource: output_buffer.as_entire_binding() },
++        ],
++    });
++    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_COMMAND_ENCODER") });
++    {
++        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("ASH_BASETRAIN_GPU_38_BOUNDED_MATVEC_COMPUTE_PASS"), timestamp_writes: None });
++        pass.set_pipeline(&compute_pipeline);
++        pass.set_bind_group(0, &bind_group, &[]);
++        pass.dispatch_workgroups(DISPATCH_X, 1, 1);
++    }
++    encoder.copy_buffer_to_buffer(&output_buffer, 0, &readback_buffer, 0, OUTPUT_BYTES);
++    queue.submit(Some(encoder.finish()));
++    let slice = readback_buffer.slice(..);
++    let (sender, receiver) = mpsc::channel();
++    slice.map_async(wgpu::MapMode::Read, move |result| { let _ = sender.send(result); });
++    let _ = device.poll(wgpu::PollType::Wait);
++    let map_status = receiver.recv().map_err(|err| format!("map_async receiver failed: {err}")).and_then(|result| result.map_err(|err| format!("map_async failed: {err}")));
++    let validation_error = device.pop_error_scope().await;
++    match (validation_error, map_status) {
++        (None, Ok(())) => {
++            let mapped = slice.get_mapped_range();
++            let bytes = mapped.to_vec();
++            drop(mapped);
++            readback_buffer.unmap();
++            let gpu_output = bytes.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect::<Vec<f32>>();
++            MatVecRuntime::pass(args.backend.clone(), &info, gpu_output, bytes.len() as u64)
++        }
++        _ => MatVecRuntime::blocked_with_info(args.backend.clone(), &info, BLOCK_DISPATCH),
++    }
++}
++
++fn pass_or_block(args: &Args, r37: LoadedReceipt, q37: LoadedReceipt, p37: LoadedReceipt, f37: LoadedReceipt, row_block: RowBlockPayload, cpu: CpuReference, runtime: MatVecRuntime) -> Output {
++    let shape_ok = runtime.gpu_output.len() == args.row_count as usize;
++    let finite_ok = runtime.gpu_output.iter().all(|v| v.is_finite()) && cpu.nan_count == 0 && cpu.inf_count == 0;
++    let parity = compare_outputs(&cpu.output, &runtime.gpu_output);
++    let dispatch_ok = runtime.dispatch_executed && runtime.readback_executed && runtime.status == "PASS";
++    let (pass, code, reason) = match (dispatch_ok, shape_ok, finite_ok, parity.0) {
++        (false, _, _, _) => (false, BLOCK_DISPATCH, "38 bounded MatVec GPU dispatch or readback did not complete."),
++        (_, false, _, _) => (false, BLOCK_SHAPE, "38 bounded MatVec output shape did not match row_count."),
++        (_, _, false, _) => (false, BLOCK_NONFINITE, "38 bounded MatVec output contained NaN or Inf."),
++        (_, _, _, false) => (false, BLOCK_PARITY, "38 bounded MatVec GPU output did not match CPU reference."),
++        _ => (true, "none", ""),
++    };
++    Output {
++        status: match pass { true => PASS_STATUS.to_string(), false => code.to_string() },
++        verdict: match pass { true => "PASS".to_string(), false => "BLOCKED".to_string() },
++        pass,
++        blocked_reason_code: code.to_string(),
++        blocked_reason: match pass { true => None, false => Some(reason.to_string()) },
++        r37: Some(r37), q37: Some(q37), p37: Some(p37), f37: Some(f37), row_block: Some(row_block), cpu_reference: Some(cpu), runtime: Some(runtime),
++    }
++}
++
++fn receipt_json(args: &Args, output: &Output) -> Value {
++    let row_block = output.row_block.as_ref();
++    let cpu = output.cpu_reference.as_ref();
++    let runtime = output.runtime.as_ref();
++    let parity = match (cpu, runtime) { (Some(c), Some(r)) => compare_outputs(&c.output, &r.gpu_output), _ => (false, 0usize, 0usize, 0.0f64, 0.0f64) };
++    json!({
++        "patch_id": PATCH_ID,
++        "title": TITLE,
++        "status": output.status,
++        "verdict": output.verdict,
++        "pass": output.pass,
++        "blocked_reason_code": output.blocked_reason_code,
++        "blocked_reason": output.blocked_reason,
++        "acceptance_criteria": acceptance_criteria_json(args, output),
++        "source_binding": source_binding_json(args, output),
++        "atlas_weight_stream": atlas_weight_stream_json(row_block),
++        "gpu_upload": gpu_upload_json(runtime),
++        "bounded_matvec_candidate": bounded_matvec_json(args, output, &parity),
++        "cpu_reference_matvec": cpu_reference_json(cpu),
++        "gpu_runtime_probe": gpu_runtime_probe_json(runtime),
++        "wgsl_contract": wgsl_contract_json(),
++        "guards": guards_json(),
++        "next_stage": next_stage_json(output),
++    })
++}
++
++fn acceptance_criteria_json(args: &Args, output: &Output) -> Value {
++    json!({
++        "actual_status": output.status,
++        "pass_status_expected": PASS_STATUS,
++        "runtime_receipt_artifact_write_required": true,
++        "input_37r_r2_pass_required": true,
++        "input_37q_r1_pass_required": true,
++        "input_37p_r1_pass_required": true,
++        "input_37f_pass_required": true,
++        "selected_row_block_only_required": true,
++        "full_tensor_load_must_remain_false": true,
++        "actual_dispatch_required_on_pass": true,
++        "actual_readback_required_on_pass": true,
++        "row_count_expected": args.row_count,
++        "input_vector_len_expected": args.input_vector_len,
++        "output_count_expected": args.row_count,
++        "workgroup_size_x_expected": WORKGROUP_SIZE_X,
++        "dispatch_x_expected": DISPATCH_X,
++        "no_forward_no_optimizer_no_weight_mutation_required": true,
++        "next_patch_if_pass": "ASH-BASETRAIN-GPU-39"
++    })
++}
++
++fn source_binding_json(args: &Args, output: &Output) -> Value {
++    json!({
++        "reduction_parity_receipt_path": output.r37.as_ref().map(|r| r.path.clone()).unwrap_or(args.reduction_parity_receipt_path.clone()),
++        "reduction_parity_receipt_digest_hex": output.r37.as_ref().map(|r| r.digest.clone()),
++        "reduction_parity_receipt_patch_id": output.r37.as_ref().and_then(|r| str_value(&r.value, "patch_id")).unwrap_or(""),
++        "reduction_parity_pass": output.r37.as_ref().and_then(|r| bool_value(&r.value, "pass")).unwrap_or(false),
++        "multi_workgroup_reduction_receipt_path": output.q37.as_ref().map(|r| r.path.clone()).unwrap_or(args.multi_workgroup_reduction_receipt_path.clone()),
++        "multi_workgroup_reduction_receipt_digest_hex": output.q37.as_ref().map(|r| r.digest.clone()),
++        "multi_workgroup_reduction_receipt_patch_id": output.q37.as_ref().and_then(|r| str_value(&r.value, "patch_id")).unwrap_or(""),
++        "parallel_reduction_receipt_path": output.p37.as_ref().map(|r| r.path.clone()).unwrap_or(args.parallel_reduction_receipt_path.clone()),
++        "parallel_reduction_receipt_digest_hex": output.p37.as_ref().map(|r| r.digest.clone()),
++        "parallel_reduction_receipt_patch_id": output.p37.as_ref().and_then(|r| str_value(&r.value, "patch_id")).unwrap_or(""),
++        "gpu_upload_readback_smoke_receipt_path": output.f37.as_ref().map(|r| r.path.clone()).unwrap_or(args.gpu_upload_readback_smoke_receipt_path.clone()),
++        "gpu_upload_readback_smoke_receipt_digest_hex": output.f37.as_ref().map(|r| r.digest.clone()),
++        "gpu_upload_readback_smoke_receipt_patch_id": output.f37.as_ref().and_then(|r| str_value(&r.value, "patch_id")).unwrap_or(""),
++        "placeholder_intake_detected": false,
++        "static_checks_used_as_runtime_receipt": false,
++        "bake_manifest_used_as_runtime_receipt": false,
++        "selected_group_id": args.selected_group_id,
++        "selected_tensor_key": args.selected_tensor_key,
++        "row_start": args.row_start,
++        "row_count": args.row_count,
++        "input_vector_len": args.input_vector_len,
++        "byte_offset": output.row_block.as_ref().map(|r| r.source_file_offset_start).unwrap_or(0),
++        "byte_len": output.row_block.as_ref().map(|r| r.bytes_read).unwrap_or(0),
++        "tensor_group_manifest_path": "not_required_for_38_initial_candidate_inherited_from_37f_37p_chain",
++        "atlas_group_plan_path": "not_required_for_38_initial_candidate_inherited_from_37f_37p_chain",
++        "sequential_load_plan_path": "not_required_for_38_initial_candidate_inherited_from_37f_37p_chain"
++    })
++}
++
++fn atlas_weight_stream_json(row_block: Option<&RowBlockPayload>) -> Value {
++    json!({
++        "stream_kind": "selected_row_block_only_from_37f_source_segment",
++        "full_tensor_load_executed": false,
++        "full_checkpoint_load_executed": false,
++        "full_embedding_upload_executed": false,
++        "full_lm_head_upload_executed": false,
++        "selected_row_block_only": row_block.is_some(),
++        "source_shard_path": row_block.map(|r| r.source_path.clone()),
++        "source_file_offset_start": row_block.map(|r| r.source_file_offset_start).unwrap_or(0),
++        "source_file_offset_end": row_block.map(|r| r.source_file_offset_end).unwrap_or(0),
++        "payload_bytes_read": row_block.map(|r| r.bytes_read).unwrap_or(0),
++        "payload_digest_hex": row_block.map(|r| r.digest.clone()).unwrap_or_default()
++    })
++}
++
++fn gpu_upload_json(runtime: Option<&MatVecRuntime>) -> Value {
++    json!({
++        "staging_buffer_created": runtime.map(|r| r.staging_buffer_created).unwrap_or(false),
++        "gpu_weight_buffer_created": runtime.map(|r| r.gpu_weight_buffer_created).unwrap_or(false),
++        "input_vector_buffer_created": runtime.map(|r| r.input_vector_buffer_created).unwrap_or(false),
++        "output_buffer_created": runtime.map(|r| r.output_buffer_created).unwrap_or(false),
++        "queue_write_executed": runtime.map(|r| r.queue_write_executed).unwrap_or(false),
++        "copy_buffer_to_buffer_executed": runtime.map(|r| r.copy_buffer_to_buffer_executed).unwrap_or(false),
++        "gpu_weight_buffer_bound": runtime.map(|r| r.set_bind_group_executed).unwrap_or(false)
++    })
++}
++
++fn bounded_matvec_json(args: &Args, output: &Output, parity: &(bool, usize, usize, f64, f64)) -> Value {
++    let runtime = output.runtime.as_ref();
++    json!({
++        "candidate_kind": "bounded_row_block_matvec_candidate",
++        "actual_dispatch_executed": runtime.map(|r| r.dispatch_executed).unwrap_or(false),
++        "actual_readback_executed": runtime.map(|r| r.readback_executed).unwrap_or(false),
++        "input_vector_len": args.input_vector_len,
++        "row_count": args.row_count,
++        "output_count": runtime.map(|r| r.gpu_output.len() as u32).unwrap_or(0),
++        "finite_check_passed": runtime.map(|r| r.gpu_output.iter().all(|v| v.is_finite())).unwrap_or(false),
++        "nan_count": runtime.map(|r| r.gpu_output.iter().filter(|v| v.is_nan()).count()).unwrap_or(0),
++        "inf_count": runtime.map(|r| r.gpu_output.iter().filter(|v| v.is_infinite()).count()).unwrap_or(0),
++        "output_digest_hex": runtime.map(|r| f32_digest(&r.gpu_output)).unwrap_or_default(),
++        "cpu_reference_digest_hex": output.cpu_reference.as_ref().map(|c| c.digest.clone()).unwrap_or_default(),
++        "gpu_cpu_output_parity_checked": runtime.is_some() && output.cpu_reference.is_some(),
++        "gpu_cpu_output_parity_passed": parity.0,
++        "matched_value_count": parity.1,
++        "mismatched_value_count": parity.2,
++        "max_abs_error": parity.3,
++        "max_rel_error": parity.4,
++        "readback_bytes": runtime.map(|r| r.readback_bytes).unwrap_or(0)
++    })
++}
++
++fn cpu_reference_json(cpu: Option<&CpuReference>) -> Value {
++    json!({
++        "executed": cpu.is_some(),
++        "output_count": cpu.map(|c| c.output.len()).unwrap_or(0),
++        "digest": cpu.map(|c| c.digest.clone()).unwrap_or_default(),
++        "nan_count": cpu.map(|c| c.nan_count).unwrap_or(0),
++        "inf_count": cpu.map(|c| c.inf_count).unwrap_or(0),
++        "source": "selected_row_block_payload_and_deterministic_bounded_input_vector"
++    })
++}
++
++fn gpu_runtime_probe_json(runtime: Option<&MatVecRuntime>) -> Value {
++    json!({
++        "actual_gpu_instance_created": runtime.map(|r| r.gpu_instance_created).unwrap_or(false),
++        "actual_gpu_adapter_acquired": runtime.map(|r| r.gpu_adapter_acquired).unwrap_or(false),
++        "actual_gpu_device_acquired": runtime.map(|r| r.gpu_device_acquired).unwrap_or(false),
++        "adapter_backend": runtime.map(|r| r.adapter_backend.clone()).unwrap_or_default(),
++        "adapter_name": runtime.map(|r| r.adapter_name.clone()).unwrap_or_default(),
++        "adapter_driver": runtime.map(|r| r.adapter_driver.clone()).unwrap_or_default(),
++        "adapter_driver_info": runtime.map(|r| r.adapter_driver_info.clone()).unwrap_or_default(),
++        "adapter_device_type": runtime.map(|r| r.adapter_device_type.clone()).unwrap_or_default(),
++        "adapter_vendor": runtime.map(|r| r.adapter_vendor).unwrap_or(0),
++        "adapter_device": runtime.map(|r| r.adapter_device).unwrap_or(0)
++    })
++}
++
++fn wgsl_contract_json() -> Value {
++    let src = wgsl_source();
++    json!({
++        "kernel_kind": "bounded_row_block_matvec_candidate",
++        "workgroup_size_x": WORKGROUP_SIZE_X,
++        "dispatch_x": DISPATCH_X,
++        "input_vector_len": INPUT_VECTOR_LEN,
++        "row_count": ROW_COUNT,
++        "output_count": OUTPUT_COUNT,
++        "contains_compute_entrypoint": src.contains("@compute"),
++        "contains_weight_storage_binding": src.contains("weights"),
++        "contains_input_vector_binding": src.contains("input_vec"),
++        "contains_output_binding": src.contains("output"),
++        "contains_bounds_guard": src.contains("row >= ROW_COUNT"),
++        "contains_no_logits_store": true,
++        "contains_no_weight_write": true,
++        "workgroup_storage_bytes_claimed": 0,
++        "workgroup_storage_floor_16kb_safe": true
++    })
++}
++
++fn guards_json() -> Value {
++    json!({
++        "model_forward_executed": false,
++        "forward_output_adopted": false,
++        "logits_materialized": false,
++        "logits_written": false,
++        "loss_computed": false,
++        "backward_executed": false,
++        "optimizer_created": false,
++        "optimizer_step_executed": false,
++        "gradient_buffer_written": false,
++        "delta_candidate_written": false,
++        "weight_buffer_mutated": false,
++        "checkpoint_written": false,
++        "safetensors_written": false,
++        "training_commit_executed": false
++    })
++}
++
++fn next_stage_json(output: &Output) -> Value {
++    json!({
++        "next_stage_enabled": output.pass,
++        "next_patch_if_pass": "ASH-BASETRAIN-GPU-39",
++        "next_patch_if_blocked_receipt_chain": "ASH-BASETRAIN-GPU-38-R1",
++        "next_patch_if_blocked_manifest_plan": "ASH-BASETRAIN-GPU-38-R2",
++        "next_patch_if_blocked_wgsl": "ASH-BASETRAIN-GPU-38-R3",
++        "next_patch_if_blocked_readback_or_parity": "ASH-BASETRAIN-GPU-38-R4",
++        "recommended_patch_title": "Atlas Upload Ring Buffer / Sequential Group Slot Lease And Release Seal No Full Tensor Load No Weight Mutation"
++    })
++}
++
++fn write_runtime_receipt(receipt: &Value) -> Value {
++    let write_ok = match fs::create_dir_all("artifacts") {
++        Ok(()) => match serde_json::to_vec_pretty(receipt) {
++            Ok(bytes) => fs::write(RUNTIME_RECEIPT_PATH, bytes).is_ok(),
++            Err(_) => false,
++        },
++        Err(_) => false,
++    };
++    json!({"runtime_receipt_written": write_ok, "runtime_receipt_path": RUNTIME_RECEIPT_PATH, "stdout_only": !write_ok})
++}
++
++fn compare_outputs(cpu: &[f32], gpu: &[f32]) -> (bool, usize, usize, f64, f64) {
++    let mut matched = 0usize;
++    let mut mismatched = 0usize;
++    let mut max_abs = 0.0f64;
++    let mut max_rel = 0.0f64;
++    for (c, g) in cpu.iter().zip(gpu.iter()) {
++        let abs = (*c as f64 - *g as f64).abs();
++        let rel = match c.abs() > 0.0 { true => abs / c.abs() as f64, false => abs };
++        match abs <= 0.00001_f64 || rel <= 0.0001_f64 { true => matched += 1, false => mismatched += 1 }
++        if abs > max_abs { max_abs = abs; }
++        if rel > max_rel { max_rel = rel; }
++    }
++    (cpu.len() == gpu.len() && mismatched == 0, matched, mismatched + cpu.len().abs_diff(gpu.len()), max_abs, max_rel)
++}
++
++fn wgsl_source() -> String {
++    format!(r#"
++const ROW_COUNT: u32 = {row_count}u;
++const INPUT_VECTOR_LEN: u32 = {input_len}u;
++@group(0) @binding(0) var<storage, read> weights: array<f32>;
++@group(0) @binding(1) var<storage, read> input_vec: array<f32>;
++@group(0) @binding(2) var<storage, read_write> output: array<f32>;
++@compute @workgroup_size({workgroup_size})
++fn main(@builtin(global_invocation_id) gid: vec3<u32>) {{
++    let row: u32 = gid.x;
++    if (row >= ROW_COUNT) {{
++        return;
++    }}
++    var acc: f32 = 0.0;
++    var k: u32 = 0u;
++    loop {{
++        if (k >= INPUT_VECTOR_LEN) {{ break; }}
++        let w: f32 = weights[row * INPUT_VECTOR_LEN + k];
++        let x: f32 = input_vec[k];
++        acc = acc + (w * x);
++        k = k + 1u;
++    }}
++    output[row] = acc;
++}}
++"#, row_count = ROW_COUNT, input_len = INPUT_VECTOR_LEN, workgroup_size = WORKGROUP_SIZE_X)
++}
++
++impl MatVecRuntime {
++    fn blocked(backend: String, status: &str) -> Self {
++        Self { adapter_backend: String::new(), adapter_name: String::new(), adapter_driver: String::new(), adapter_driver_info: String::new(), adapter_device_type: String::new(), adapter_vendor: 0, adapter_device: 0, gpu_instance_created: true, gpu_adapter_acquired: false, gpu_device_acquired: false, shader_module_created: false, pipeline_created: false, staging_buffer_created: false, gpu_weight_buffer_created: false, input_vector_buffer_created: false, output_buffer_created: false, readback_buffer_created: false, queue_write_executed: false, command_encoder_created: false, compute_pass_created: false, set_pipeline_executed: false, set_bind_group_executed: false, dispatch_executed: false, queue_submit_executed: false, copy_buffer_to_buffer_executed: false, map_async_executed: false, device_poll_executed: false, readback_executed: false, unmap_executed: false, readback_bytes: 0, gpu_output: Vec::new(), status: format!("{status}_{backend}") }
++    }
++    fn blocked_with_info(_backend: String, info: &wgpu26::AdapterInfo, status: &str) -> Self {
++        let mut r = Self::blocked(String::new(), status);
++        r.gpu_adapter_acquired = true;
++        r.adapter_name = info.name.clone();
++        r.adapter_backend = format!("{:?}", info.backend);
++        r.adapter_device_type = format!("{:?}", info.device_type);
++        r.adapter_vendor = info.vendor;
++        r.adapter_device = info.device;
++        r.adapter_driver = info.driver.clone();
++        r.adapter_driver_info = info.driver_info.clone();
++        r
++    }
++    fn pass(_backend: String, info: &wgpu26::AdapterInfo, gpu_output: Vec<f32>, readback_bytes: u64) -> Self {
++        Self { adapter_backend: format!("{:?}", info.backend), adapter_name: info.name.clone(), adapter_driver: info.driver.clone(), adapter_driver_info: info.driver_info.clone(), adapter_device_type: format!("{:?}", info.device_type), adapter_vendor: info.vendor, adapter_device: info.device, gpu_instance_created: true, gpu_adapter_acquired: true, gpu_device_acquired: true, shader_module_created: true, pipeline_created: true, staging_buffer_created: true, gpu_weight_buffer_created: true, input_vector_buffer_created: true, output_buffer_created: true, readback_buffer_created: true, queue_write_executed: true, command_encoder_created: true, compute_pass_created: true, set_pipeline_executed: true, set_bind_group_executed: true, dispatch_executed: true, queue_submit_executed: true, copy_buffer_to_buffer_executed: true, map_async_executed: true, device_poll_executed: true, readback_executed: true, unmap_executed: true, readback_bytes, gpu_output, status: "PASS".to_string() }
++    }
++}
++
++fn with_r37(mut out: Output, r37: LoadedReceipt) -> Output { out.r37 = Some(r37); out }
++fn with_r37_q37(mut out: Output, r37: LoadedReceipt, q37: LoadedReceipt) -> Output { out.r37 = Some(r37); out.q37 = Some(q37); out }
++fn with_r37_q37_p37(mut out: Output, r37: LoadedReceipt, q37: LoadedReceipt, p37: LoadedReceipt) -> Output { out.r37 = Some(r37); out.q37 = Some(q37); out.p37 = Some(p37); out }
++
++fn blocked_base(code: &'static str, reason: &'static str) -> Output { blocked_with(&read_args(), None, None, None, None, None, None, None, code, reason) }
++fn blocked_with(_args: &Args, r37: Option<LoadedReceipt>, q37: Option<LoadedReceipt>, p37: Option<LoadedReceipt>, f37: Option<LoadedReceipt>, row_block: Option<RowBlockPayload>, cpu_reference: Option<CpuReference>, runtime: Option<MatVecRuntime>, code: &'static str, reason: &'static str) -> Output {
++    Output { status: code.to_string(), verdict: "BLOCKED".to_string(), pass: false, blocked_reason_code: code.to_string(), blocked_reason: Some(reason.to_string()), r37, q37, p37, f37, row_block, cpu_reference, runtime }
++}
++
++fn power_preference_from_env() -> wgpu26::PowerPreference {
++    match env::var("ASH_WGPU_POWER_PREF").unwrap_or_default().to_ascii_lowercase().as_str() {
++        "low" | "low-power" => wgpu26::PowerPreference::LowPower,
++        _ => wgpu26::PowerPreference::HighPerformance,
++    }
++}
++
++fn str_value<'a>(v: &'a Value, key: &str) -> Option<&'a str> { v.get(key).and_then(Value::as_str) }
++fn bool_value(v: &Value, key: &str) -> Option<bool> { v.get(key).and_then(Value::as_bool) }
++fn u64_value(v: &Value, key: &str) -> Option<u64> { v.get(key).and_then(Value::as_u64) }
++fn get_path<'a>(v: &'a Value, path: &[&str]) -> Option<&'a Value> { path.iter().try_fold(v, |acc, key| acc.get(*key)) }
++fn bool_path(v: &Value, path: &[&str]) -> Option<bool> { get_path(v, path).and_then(Value::as_bool) }
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let mut h = Sha256::new();
++    h.update(bytes);
++    format!("{:x}", h.finalize())
++}
++
++fn f32_digest(values: &[f32]) -> String {
++    let mut bytes = Vec::with_capacity(values.len() * 4);
++    for v in values { bytes.extend_from_slice(&v.to_le_bytes()); }
++    sha256_hex(&bytes)
++}

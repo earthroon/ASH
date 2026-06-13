@@ -1,0 +1,36 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-36G",
+  "title": "Bounded Row View Read Smoke / Row View Plan To Limited Full Row Bytes No Full Tensor No GPU Upload Seal",
+  "baked_from": "ash_pass3_ASH-BASETRAIN-GPU-36F_cpu_tensor_view_candidate_materialization_preflight_baked.zip",
+  "source_files_added": [
+    "crates/base_train/src/ash_basetrain_gpu_36g_bounded_row_view_read_smoke.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_36g_bounded_row_view_read_smoke.rs"
+  ],
+  "artifact_files_added": [
+    "artifacts/ASH_BASETRAIN_GPU_36G_BOUNDED_ROW_VIEW_READ_SMOKE.json",
+    "artifacts/ASH_BASETRAIN_GPU_36G_STATIC_CHECKS.txt"
+  ],
+  "reports_added": [
+    "acceptance_reports/ASH-BASETRAIN-GPU-36G.md",
+    "patch_reports/ASH-BASETRAIN-GPU-36G_bake_report.md"
+  ],
+  "static_receipt_status": "BLOCKED_36F_RECEIPT_NOT_FOUND",
+  "source_sha256": "db6407e756609c48dcc342fa6f0f5363a3074f8970961c8988b2104c6b81d7bc",
+  "bin_sha256": "cfe3b6cb95217d937fed229fa780f43409e16aef4de3b09802e6047c64a7ac6b",
+  "static_receipt_sha256": "8522174f88e5bdb0fc8003109bdf7cdb2e8d0ae84200ac03c408157e42e4b780",
+  "guards": {
+    "file_open_used_on_pass": true,
+    "bounded_row_read_executed_on_pass": true,
+    "bounded_row_read_total_bytes_on_pass": 24576,
+    "f32_decode_executed": false,
+    "cpu_tensor_view_materialized": false,
+    "selected_group_full_slice_read": false,
+    "full_tensor_load_executed": false,
+    "gpu_upload_executed": false,
+    "safetensors_mutation_present": false
+  },
+  "overwrite_guard": {
+    "live_input_36f_receipt_same_path_included": false
+  },
+  "local_build_required": true
+}

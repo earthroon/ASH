@@ -1,0 +1,32 @@
+# SFT-GPU-OBS-03 Static Verification Log
+
+generated_at_utc=2026-05-19T06:40:26Z
+
+## Toolchain
+cargo=rustc=rustfmt=
+## Export wiring
+451:pub mod sft_gpu_operator_health_review;
+452:pub use sft_gpu_operator_health_review::*;
+324:pub mod gpu_health_review_queue;
+325:pub use gpu_health_review_queue::*;
+284:pub mod gpu_health_review_signals;
+285:pub use gpu_health_review_signals::*;
+
+## File presence
+PRESENT crates/ash_core/src/sft_gpu_operator_health_review.rs
+PRESENT crates/ash_core/tests/sft_gpu_obs_03_operator_health_review.rs
+PRESENT crates/lora_train/src/gpu_health_review_queue.rs
+PRESENT crates/lora_train/tests/gpu_health_review_queue.rs
+PRESENT crates/burn_webgpu_backend/src/gpu_health_review_signals.rs
+PRESENT crates/burn_webgpu_backend/tests/gpu_health_review_signals.rs
+PRESENT acceptance_reports/SFT-GPU-OBS-03_operator_health_review.md
+PRESENT docs/roadmap/SFT-GPU-OBS-03_after_bake.md
+PRESENT patch_reports/SFT-GPU-OBS-03_bake_report.md
+
+## Delimiter balance
+BALANCE_OK crates/ash_core/src/sft_gpu_operator_health_review.rs
+BALANCE_OK crates/ash_core/tests/sft_gpu_obs_03_operator_health_review.rs
+BALANCE_OK crates/lora_train/src/gpu_health_review_queue.rs
+BALANCE_OK crates/lora_train/tests/gpu_health_review_queue.rs
+BALANCE_OK crates/burn_webgpu_backend/src/gpu_health_review_signals.rs
+BALANCE_OK crates/burn_webgpu_backend/tests/gpu_health_review_signals.rs

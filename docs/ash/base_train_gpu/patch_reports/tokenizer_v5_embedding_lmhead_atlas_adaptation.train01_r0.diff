@@ -1,0 +1,143 @@
+--- /mnt/data/train01_inspect/crates/model_core/src/tokenizer_v5_embedding_lmhead_atlas_adaptation.rs	2026-06-04 04:02:11.000000000 +0000
++++ /mnt/data/qw_tok_train01_work/crates/model_core/src/tokenizer_v5_embedding_lmhead_atlas_adaptation.rs	2026-06-04 04:31:12.509331932 +0000
+@@ -1,6 +1,6 @@
+ use anyhow::{anyhow, Context, Result};
+ use serde::{Deserialize, Serialize};
+-use serde_json::Value;
++use serde_json::{json, Value};
+ use sha2::{Digest, Sha256};
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::fs::{self, File};
+@@ -403,10 +403,40 @@
+     out.v4_residue_detected = text.contains("1p1b_v4") || text.contains("V4") || text.contains("56832");
+     match text.parse::<toml::Value>() {
+         Ok(value) => {
+-            out.model_spec_id = value.get("model_spec_id").and_then(|v| v.as_str()).map(str::to_string);
+-            out.model_name = value.get("model_name").and_then(|v| v.as_str()).map(str::to_string);
+-            out.vocab_size = value.get("model").and_then(|m| m.get("vocab_size")).and_then(|v| v.as_integer()).or_else(|| value.get("vocab_size").and_then(|v| v.as_integer())).map(|v| v as usize);
+-            out.hidden_size = value.get("model").and_then(|m| m.get("hidden_size")).and_then(|v| v.as_integer()).or_else(|| value.get("hidden_size").and_then(|v| v.as_integer())).map(|v| v as usize);
++            out.model_spec_id = read_toml_string_candidates(
++                &value,
++                &[
++                    &["model_spec_id"],
++                    &["model", "model_spec_id"],
++                    &["identity", "model_spec_id"],
++                ],
++            );
++            out.model_name = read_toml_string_candidates(
++                &value,
++                &[
++                    &["model_name"],
++                    &["model", "model_name"],
++                    &["identity", "model_name"],
++                ],
++            );
++            out.vocab_size = read_toml_usize_candidates(
++                &value,
++                &[
++                    &["vocab_size"],
++                    &["model", "vocab_size"],
++                    &["dimensions", "vocab_size"],
++                    &["architecture", "vocab_size"],
++                ],
++            );
++            out.hidden_size = read_toml_usize_candidates(
++                &value,
++                &[
++                    &["hidden_size"],
++                    &["model", "hidden_size"],
++                    &["dimensions", "hidden_size"],
++                    &["architecture", "hidden_size"],
++                ],
++            );
+         }
+         Err(err) => out.failures.push(format!("model_spec_toml_parse_failed:{err}")),
+     }
+@@ -420,6 +450,42 @@
+     out
+ }
+ 
++
++fn read_toml_path<'a>(value: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
++    let mut current = value;
++    for segment in path {
++        current = current.get(*segment)?;
++    }
++    Some(current)
++}
++
++fn read_toml_string_candidates(value: &toml::Value, paths: &[&[&str]]) -> Option<String> {
++    for path in paths {
++        if let Some(s) = read_toml_path(value, path).and_then(|v| v.as_str()) {
++            return Some(s.to_string());
++        }
++    }
++    None
++}
++
++fn read_toml_usize_candidates(value: &toml::Value, paths: &[&[&str]]) -> Option<usize> {
++    for path in paths {
++        if let Some(v) = read_toml_path(value, path) {
++            if let Some(i) = v.as_integer() {
++                if i >= 0 {
++                    return Some(i as usize);
++                }
++            }
++            if let Some(s) = v.as_str() {
++                if let Ok(parsed) = s.trim().parse::<usize>() {
++                    return Some(parsed);
++                }
++            }
++        }
++    }
++    None
++}
++
+ fn read_tokenizer_ssot(cfg: &QwTokTrain01Config) -> QwTokTrain01TokenizerSsot {
+     let path = Path::new(&cfg.tokenizer_manifest_path);
+     let exists = path.exists();
+@@ -778,6 +844,44 @@
+     if b == 0 { 0 } else { (a + b - 1) / b }
+ }
+ 
++
++pub fn qw_tok_train01_failure_summary_json(report: &QwTokTrain01Report) -> Result<String> {
++    let summary = json!({
++        "patch_id": "QW-TOK-TRAIN-01-R0",
++        "base_patch_id": QW_TOK_TRAIN01_PATCH_ID,
++        "status": report.status.clone(),
++        "failed_stage": if report.failures.is_empty() { Value::Null } else { Value::String("precondition".to_string()) },
++        "model_spec_failures": report.model_spec_ssot.failures.clone(),
++        "tokenizer_failures": report.tokenizer_ssot.failures.clone(),
++        "tensor_probe_failures": report.tensor_key_probe.failures.clone(),
++        "model_spec": {
++            "model_spec_id": report.model_spec_ssot.model_spec_id.clone(),
++            "model_name": report.model_spec_ssot.model_name.clone(),
++            "vocab_size": report.model_spec_ssot.vocab_size,
++            "hidden_size": report.model_spec_ssot.hidden_size,
++            "expected_vocab_size": report.model_spec_ssot.expected_vocab_size,
++            "expected_hidden_size": report.model_spec_ssot.expected_hidden_size
++        },
++        "tensor_probe": {
++            "embedding_key": report.tensor_key_probe.embedding_key.clone(),
++            "lm_head_key": report.tensor_key_probe.lm_head_key.clone(),
++            "embedding_shape": report.tensor_key_probe.embedding_shape.clone(),
++            "lm_head_shape": report.tensor_key_probe.lm_head_shape.clone(),
++            "vocab_size_match": report.tensor_key_probe.vocab_size_match,
++            "hidden_size_match": report.tensor_key_probe.hidden_size_match
++        },
++        "no_training_seal": {
++            "training_executed": report.training_receipt.training_executed,
++            "gradient_created": report.training_receipt.gradient_created,
++            "optimizer_created": report.training_receipt.optimizer_created,
++            "gpu_kernel_executed": report.training_receipt.gpu_kernel_executed,
++            "checkpoint_write_executed": report.checkpoint_write_receipt.candidate_write_executed,
++            "transformer_block_update_executed": report.no_transformer_update_receipt.transformer_block_update_executed
++        }
++    });
++    Ok(serde_json::to_string_pretty(&summary)?)
++}
++
+ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+     if let Some(parent) = path.parent() {
+         fs::create_dir_all(parent)?;

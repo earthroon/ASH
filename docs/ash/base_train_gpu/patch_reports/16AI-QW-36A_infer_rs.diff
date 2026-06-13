@@ -1,0 +1,137 @@
+--- /tmp/infer_before.rs	2026-05-22 06:38:51.662069450 +0000
++++ crates/runtime/src/infer.rs	2026-05-22 06:38:02.499009787 +0000
+@@ -1999,6 +1999,34 @@
+     prompt.push('\n');
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum RuntimePromptTemplateId {
++    ControlV5Current,
++    AshDialogueKo,
++    HybridTaskDialogueKo,
++}
++
++impl RuntimePromptTemplateId {
++    fn from_env() -> Self {
++        match std::env::var("ASH_PROMPT_TEMPLATE")
++            .unwrap_or_else(|_| "control_v5_current".to_string())
++            .as_str()
++        {
++            "ash_dialogue_ko" => RuntimePromptTemplateId::AshDialogueKo,
++            "hybrid_task_dialogue_ko" => RuntimePromptTemplateId::HybridTaskDialogueKo,
++            _ => RuntimePromptTemplateId::ControlV5Current,
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            RuntimePromptTemplateId::ControlV5Current => "control_v5_current",
++            RuntimePromptTemplateId::AshDialogueKo => "ash_dialogue_ko",
++            RuntimePromptTemplateId::HybridTaskDialogueKo => "hybrid_task_dialogue_ko",
++        }
++    }
++}
++
+ fn build_response_anchor(resolved_task: &str) -> &'static str {
+     match resolved_task {
+         "translation_assist" => "<response:translation>",
+@@ -2008,17 +2036,15 @@
+     }
+ }
+ 
+-fn build_prompt(
+-    decision: &AshDecision,
+-    input_text: &str,
++fn emit_runtime_prompt_context(
++    prompt: &mut String,
+     glossary: &[String],
+     tm: &[String],
+     hints: Option<&QWaveInferenceHints>,
+     text_prior: Option<&StructureRoutingPrior>,
+-) -> String {
+-    let mut prompt = format!("<task:{}>\n", decision.resolved_task);
++) {
+     if let Some(h) = hints {
+-        emit_audio_bucket_tags(&mut prompt, h);
++        emit_audio_bucket_tags(prompt, h);
+         if let Some(observer_id) = &h.delta_k_observer_id {
+             prompt.push_str("<audio:delta_k_observer>");
+             prompt.push_str(observer_id);
+@@ -2045,7 +2071,7 @@
+         }
+     }
+     if let Some(prior) = text_prior {
+-        emit_text_prior_tags(&mut prompt, prior);
++        emit_text_prior_tags(prompt, prior);
+     }
+     if !glossary.is_empty() {
+         prompt.push_str("<glossary:on>\n");
+@@ -2063,14 +2089,45 @@
+             prompt.push('\n');
+         }
+     }
+-    prompt.push_str(input_text);
+-    if !prompt.ends_with('\n') {
+-        prompt.push('\n');
++}
++
++fn build_prompt(
++    decision: &AshDecision,
++    input_text: &str,
++    glossary: &[String],
++    tm: &[String],
++    hints: Option<&QWaveInferenceHints>,
++    text_prior: Option<&StructureRoutingPrior>,
++) -> String {
++    match RuntimePromptTemplateId::from_env() {
++        RuntimePromptTemplateId::AshDialogueKo => {
++            let mut prompt = String::new();
++            prompt.push_str("사용자: ");
++            prompt.push_str(input_text.trim());
++            prompt.push_str("\n애쉬:");
++            prompt
++        }
++        RuntimePromptTemplateId::HybridTaskDialogueKo => {
++            let mut prompt = format!("<task:{}>\n<lang:ko>\n", decision.resolved_task);
++            emit_runtime_prompt_context(&mut prompt, glossary, tm, hints, text_prior);
++            prompt.push_str("사용자: ");
++            prompt.push_str(input_text.trim());
++            prompt.push_str("\n애쉬:");
++            prompt
++        }
++        RuntimePromptTemplateId::ControlV5Current => {
++            let mut prompt = format!("<task:{}>\n", decision.resolved_task);
++            emit_runtime_prompt_context(&mut prompt, glossary, tm, hints, text_prior);
++            prompt.push_str(input_text);
++            if !prompt.ends_with('\n') {
++                prompt.push('\n');
++            }
++            prompt.push_str("<response:start>\n");
++            prompt.push_str(build_response_anchor(&decision.resolved_task));
++            prompt.push('\n');
++            prompt
++        }
+     }
+-    prompt.push_str("<response:start>\n");
+-    prompt.push_str(build_response_anchor(&decision.resolved_task));
+-    prompt.push('\n');
+-    prompt
+ }
+ 
+ fn infer_recent_repeat_ratio(token_ids: &[u32]) -> f32 {
+@@ -2661,6 +2718,15 @@
+         req.qwave_hints.as_ref(),
+         req.text_routing_prior.as_ref(),
+     );
++    let prompt_template_id = RuntimePromptTemplateId::from_env();
++    eprintln!(
++        "[debug] prompt_template_id = {}",
++        prompt_template_id.as_str()
++    );
++    eprintln!(
++        "[debug] prompt_text_preview = {:?}",
++        prompt.chars().take(240).collect::<String>()
++    );
+ 
+     let prompt_ids = tokenizer.encode(&prompt)?;
+     let mut banned_token_ids: Vec<u32> = manifest

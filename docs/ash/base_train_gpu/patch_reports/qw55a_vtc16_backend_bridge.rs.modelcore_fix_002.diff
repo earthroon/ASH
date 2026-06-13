@@ -1,0 +1,28 @@
+--- /mnt/data/ash_logfix_orig/crates/model_core/src/qw55a_vtc16_backend_bridge.rs	2026-06-02 15:19:50.000000000 +0000
++++ crates/model_core/src/qw55a_vtc16_backend_bridge.rs	2026-06-03 06:26:24.889597266 +0000
+@@ -88,7 +88,7 @@
+     pub logical_col_offset: usize,
+     pub physical_tile_rows: usize,
+     pub physical_tile_cols: usize,
+-    pub values_row_major: [f32; 64],
++    pub values_row_major: Vec<f32>,
+     pub source_matrix: String,
+     pub creates_contiguous_16x16_tile: bool,
+ }
+@@ -408,7 +408,7 @@
+                 logical_col_offset: *col_offset,
+                 physical_tile_rows: 8,
+                 physical_tile_cols: 8,
+-                values_row_major: values,
++                values_row_major: values.to_vec(),
+                 source_matrix: matrix_name.to_string(),
+                 creates_contiguous_16x16_tile: false,
+             }
+@@ -427,6 +427,7 @@
+                 && block.logical_col_offset == *col
+                 && block.physical_tile_rows == 8
+                 && block.physical_tile_cols == 8
++                && block.values_row_major.len() == 64
+                 && !block.creates_contiguous_16x16_tile
+         })
+     })

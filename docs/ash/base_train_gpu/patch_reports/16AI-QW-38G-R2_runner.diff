@@ -1,0 +1,145 @@
+--- ash38g_r1/scripts/run_16AI_QW_38G_layerwise_reserved_direction.ps1	2026-05-22 09:41:22.694304971 +0000
++++ qw38g_r2/scripts/run_16AI_QW_38G_layerwise_reserved_direction.ps1	2026-05-22 10:03:55.388721745 +0000
+@@ -10,8 +10,9 @@
+   [int]$TopN = 8,
+   [int]$MaxSteps = 4,
+   [string]$Layers = "0,mid,last",
+-  [string]$Stages = "embed,post_attn,post_mlp,post_final_norm",
+-  [string]$OutDir = ".\workspace"
++  [string]$Stages = "post_mlp,post_final_norm",
++  [string]$OutDir = ".\workspace",
++  [switch]$Quiet
+ )
+ 
+ $ErrorActionPreference = "Continue"
+@@ -26,6 +27,7 @@
+ 
+ $stdoutPath = Join-Path $OutDir "infer_qw38g_layerwise_reserved_direction_stdout.json"
+ $stderrPath = Join-Path $OutDir "infer_qw38g_layerwise_reserved_direction_stderr.log"
++$livePath = Join-Path $OutDir "infer_qw38g_live_console.log"
+ $rawJsonlPath = Join-Path $OutDir "qw38a_raw_topk_trace.jsonl"
+ $hiddenJsonlPath = Join-Path $OutDir "qw38d_hidden_projection_trace.jsonl"
+ $layerJsonlPath = Join-Path $OutDir "qw38g_layerwise_reserved_direction_trace.jsonl"
+@@ -37,6 +39,9 @@
+ Remove-Item $layerJsonlPath -ErrorAction SilentlyContinue
+ Remove-Item $summaryPath -ErrorAction SilentlyContinue
+ Remove-Item $receiptPath -ErrorAction SilentlyContinue
++Remove-Item $livePath -ErrorAction SilentlyContinue
++Remove-Item $stdoutPath -ErrorAction SilentlyContinue
++Remove-Item $stderrPath -ErrorAction SilentlyContinue
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
+@@ -56,6 +61,7 @@
+ $env:ASH_LAYERWISE_RESERVED_SUMMARY_JSON = $summaryPath
+ $env:ASH_LAYERWISE_RESERVED_RECEIPT_JSON = $receiptPath
+ $env:ASH_LAYERWISE_RESERVED_TARGET_ID = "13"
++$env:ASH_QW38G_R2_HEARTBEAT = "1"
+ $env:ASH_TOKENIZER_MANIFEST_PATH = $Tokenizer
+ $env:ASH_GENERATION_BANLIST_PATH = $Banlist
+ 
+@@ -75,65 +81,66 @@
+   "--json"
+ )
+ 
+-Write-Host "[16AI-QW-38G][run] force_no_lora=true prompt_template=ash_dialogue_ko top_n=$TopN max_steps=$MaxSteps layers=$Layers stages=$Stages"
+-Write-Host "[16AI-QW-38G][cargo] stdout=$stdoutPath"
+-Write-Host "[16AI-QW-38G][cargo] stderr=$stderrPath"
+-Write-Host "[16AI-QW-38G][trace] layer_jsonl=$layerJsonlPath hidden_jsonl=$hiddenJsonlPath raw_jsonl=$rawJsonlPath"
++Write-Host "[16AI-QW-38G-R2][start] force_no_lora=true prompt_template=ash_dialogue_ko top_n=$TopN max_steps=$MaxSteps layers=$Layers stages=$Stages"
++Write-Host "[16AI-QW-38G-R2][paths] live=$livePath receipt=$receiptPath summary=$summaryPath trace=$layerJsonlPath"
++Write-Host "[16AI-QW-38G-R2][build] cargo build --release example infer_only"
+ 
+-Write-Host "[16AI-QW-38G-R1][build] cargo build --release example infer_only"
+ $buildProcess = Start-Process `
+   -FilePath "cargo.exe" `
+   -ArgumentList $buildArgsList `
+-  -RedirectStandardOutput (Join-Path $OutDir "build_qw38g_r1_stdout.log") `
+-  -RedirectStandardError (Join-Path $OutDir "build_qw38g_r1_stderr.log") `
++  -RedirectStandardOutput (Join-Path $OutDir "build_qw38g_r2_stdout.log") `
++  -RedirectStandardError (Join-Path $OutDir "build_qw38g_r2_stderr.log") `
+   -NoNewWindow `
+   -Wait `
+   -PassThru
+ 
+ if ($buildProcess.ExitCode -ne 0) {
+-  Write-Host "[16AI-QW-38G-R1][error] cargo build failed exit_code=$($buildProcess.ExitCode)"
+-  Get-Content (Join-Path $OutDir "build_qw38g_r1_stderr.log") -Tail 120 -Encoding UTF8
++  Write-Host "[16AI-QW-38G-R2][error] cargo build failed exit_code=$($buildProcess.ExitCode)"
++  Get-Content (Join-Path $OutDir "build_qw38g_r2_stderr.log") -Tail 120 -Encoding UTF8
+   exit $buildProcess.ExitCode
+ }
+ 
+-Write-Host "[16AI-QW-38G-R1][run] exe=$exePath"
+-$process = Start-Process `
+-  -FilePath $exePath `
+-  -ArgumentList $runArgsList `
+-  -RedirectStandardOutput $stdoutPath `
+-  -RedirectStandardError $stderrPath `
+-  -NoNewWindow `
+-  -Wait `
+-  -PassThru
++Write-Host "[16AI-QW-38G-R2][run_live] exe=$exePath"
++if ($Quiet) {
++  $process = Start-Process `
++    -FilePath $exePath `
++    -ArgumentList $runArgsList `
++    -RedirectStandardOutput $stdoutPath `
++    -RedirectStandardError $stderrPath `
++    -NoNewWindow `
++    -Wait `
++    -PassThru
++  $code = $process.ExitCode
++} else {
++  & $exePath @runArgsList 2>&1 | Tee-Object -FilePath $livePath
++  $code = $LASTEXITCODE
++}
+ 
+-$code = $process.ExitCode
+-Write-Host "[16AI-QW-38G-R1][run] exit_code=$code stdout=$stdoutPath stderr=$stderrPath"
++Write-Host "[16AI-QW-38G-R2][run_done] exit_code=$code live=$livePath"
+ 
+ if ($code -ne 0) {
+-  Write-Host "[16AI-QW-38G-R1][error] infer_only failed with exit code $code"
+-  if (Test-Path $stderrPath) {
+-    Write-Host "[16AI-QW-38G-R1][stderr_tail] $stderrPath"
+-    Get-Content $stderrPath -Tail 120 -Encoding UTF8
+-  }
++  Write-Host "[16AI-QW-38G-R2][error] infer_only failed with exit code $code"
+   exit $code
+ }
+ 
+-if (!(Test-Path $layerJsonlPath)) {
+-  Write-Host "[16AI-QW-38G][error] layerwise trace missing: $layerJsonlPath"
++if (!(Test-Path $receiptPath)) {
++  Write-Host "[16AI-QW-38G-R2][error] runtime receipt missing: $receiptPath"
++  if (Test-Path $livePath) { Get-Content $livePath -Tail 120 -Encoding UTF8 }
+   exit 1
+ }
+ 
+-if (!(Test-Path $summaryPath)) {
+-  Write-Host "[16AI-QW-38G-R1][error] Rust-native layerwise summary missing: $summaryPath"
+-  exit 1
+-}
++Write-Host "[16AI-QW-38G-R2][receipt] $receiptPath"
++Get-Content $receiptPath -Encoding UTF8
+ 
+-if (!(Test-Path $receiptPath)) {
+-  Write-Host "[16AI-QW-38G-R1][error] Rust-native runtime receipt missing: $receiptPath"
+-  exit 1
++if (!(Test-Path $layerJsonlPath)) {
++  Write-Host "[16AI-QW-38G-R2][warn] layerwise trace missing: $layerJsonlPath"
++} else {
++  Write-Host "[16AI-QW-38G-R2][layer_trace] $layerJsonlPath"
+ }
+ 
+-Write-Host "[16AI-QW-38G-R1][ok] exit_code=0 rust_native_summary=true python_postprocess_required=false"
+-Write-Host "[16AI-QW-38G-R1][layer_trace] $layerJsonlPath"
+-Write-Host "[16AI-QW-38G-R1][summary] $summaryPath"
+-Write-Host "[16AI-QW-38G-R1][receipt] $receiptPath"
++if (!(Test-Path $summaryPath)) {
++  Write-Host "[16AI-QW-38G-R2][warn] layerwise summary missing: $summaryPath"
++} else {
++  Write-Host "[16AI-QW-38G-R2][summary] $summaryPath"
++  Get-Content $summaryPath -Encoding UTF8
++}

@@ -1,0 +1,78 @@
+--- r6a_r1_orig/scripts/run_16AI_QW_38G_R6A_debug_binding.ps1	2026-05-22 13:01:14.000000000 +0000
++++ r6a_r1_work/scripts/run_16AI_QW_38G_R6A_debug_binding.ps1	2026-05-22 13:08:17.760914681 +0000
+@@ -33,14 +33,36 @@
+ $env:ASH_HIDDEN_PROJECTION_TOP_N = "8"
+ 
+ if ($Build) {
+-  Write-Host "[16AI-QW-38G-R6A][build] cargo build --release example infer_only"
+-  cargo build --release --manifest-path ".\crates\runtime\Cargo.toml" --example infer_only `
+-    1> ".\workspace\build_qw38g_r6a_stdout.log" `
+-    2> ".\workspace\build_qw38g_r6a_stderr.log"
+-  if ($LASTEXITCODE -ne 0) {
+-    Write-Host "[16AI-QW-38G-R6A][build_error] exit_code=$LASTEXITCODE"
+-    Get-Content ".\workspace\build_qw38g_r6a_stderr.log" -Tail 120 -Encoding UTF8
+-    exit $LASTEXITCODE
++  Write-Host "[16AI-QW-38G-R6A-R1][build] cargo build --release example infer_only"
++  $buildStdout = ".\workspace\build_qw38g_r6a_stdout.log"
++  $buildStderr = ".\workspace\build_qw38g_r6a_stderr.log"
++  Remove-Item $buildStdout,$buildStderr -ErrorAction SilentlyContinue
++
++  $cargoArgs = @(
++    "build",
++    "--release",
++    "--manifest-path", ".\crates\runtime\Cargo.toml",
++    "--example", "infer_only"
++  )
++
++  $process = Start-Process `
++    -FilePath "cargo.exe" `
++    -ArgumentList $cargoArgs `
++    -RedirectStandardOutput $buildStdout `
++    -RedirectStandardError $buildStderr `
++    -NoNewWindow `
++    -Wait `
++    -PassThru
++
++  $buildExitCode = $process.ExitCode
++  Write-Host "[16AI-QW-38G-R6A-R1][build_done] exit_code=$buildExitCode stdout=$buildStdout stderr=$buildStderr"
++
++  if ($buildExitCode -ne 0) {
++    Write-Host "[16AI-QW-38G-R6A-R1][build_error] exit_code=$buildExitCode"
++    if (Test-Path $buildStderr) {
++      Get-Content $buildStderr -Tail 120 -Encoding UTF8
++    }
++    exit $buildExitCode
+   }
+ }
+ 
+@@ -49,7 +71,7 @@
+ $mapPath = ".\workspace\qw38g_r6a_debug_binding_map.json"
+ Remove-Item $livePath,$receiptPath,$mapPath -ErrorAction SilentlyContinue
+ 
+-Write-Host "[16AI-QW-38G-R6A][run] dry_run=1 group=$Group slot=$Slot max_bytes=$MaxBytes max_new_tokens=$MaxNewTokens"
++Write-Host "[16AI-QW-38G-R6A-R1][run] dry_run=1 group=$Group slot=$Slot max_bytes=$MaxBytes max_new_tokens=$MaxNewTokens"
+ & ".\target\release\examples\infer_only.exe" `
+   --model-spec ".\specs\model_spec_v5_48259.toml" `
+   --tokenizer ".\artifacts\tokenizer_manifest_v5_final.json" `
+@@ -61,17 +83,17 @@
+   --json `
+   2>&1 | Tee-Object $livePath
+ $code = $LASTEXITCODE
+-Write-Host "[16AI-QW-38G-R6A][run_done] exit_code=$code live=$livePath"
++Write-Host "[16AI-QW-38G-R6A-R1][run_done] exit_code=$code live=$livePath"
+ 
+ if (-not (Test-Path $receiptPath)) {
+-  Write-Host "[16AI-QW-38G-R6A][error] receipt missing: $receiptPath"
++  Write-Host "[16AI-QW-38G-R6A-R1][error] receipt missing: $receiptPath"
+   exit 1
+ }
+ 
+-Write-Host "[16AI-QW-38G-R6A][receipt] $receiptPath"
++Write-Host "[16AI-QW-38G-R6A-R1][receipt] $receiptPath"
+ Get-Content $receiptPath -Encoding UTF8
+ if (Test-Path $mapPath) {
+-  Write-Host "[16AI-QW-38G-R6A][map] $mapPath"
++  Write-Host "[16AI-QW-38G-R6A-R1][map] $mapPath"
+   Get-Content $mapPath -Encoding UTF8
+ }
+ 

@@ -1,0 +1,42 @@
+PASS
+- [x] exists crates/lora_train/src/qwave_runtime_routing_hint_candidate.rs
+- [x] exists crates/lora_train/tests/qwave_runtime_routing_hint_candidate.rs
+- [x] exists crates/lora_train/src/lib.rs
+- [x] lib exports/contains pub mod qwave_runtime_routing_hint_candidate
+- [x] lib exports/contains QWaveRuntimeRoutingHintCandidateReceipt
+- [x] lib exports/contains QWaveRuntimeRoutingHintEntry
+- [x] lib exports/contains QWaveRuntimeRoutingHintReason
+- [x] lib exports/contains QWaveRuntimeRoutingHintTargetKind
+- [x] lib exports/contains QWaveRuntimeRoutingHintConfidenceReport
+- [x] lib exports/contains QWaveRuntimePromotionGateRef
+- [x] lib exports/contains QWaveRuntimeRoutingHintCandidateDecision
+- [x] lib exports/contains QWaveRuntimeRoutingHintCandidateError
+- [x] module contains QWaveRuntimeRoutingHintCandidateReceipt
+- [x] module contains QWaveRuntimeRoutingHintEntry
+- [x] module contains QWaveRuntimeRoutingHintReason
+- [x] module contains QWaveRuntimeRoutingHintTargetKind
+- [x] module contains QWaveRuntimeRoutingHintConfidenceReport
+- [x] module contains QWaveRuntimePromotionGateRef
+- [x] module contains AcceptedRuntimeRoutingHintCandidate
+- [x] module contains AcceptedHeldTelemetryOnly
+- [x] module contains AcceptedRequiresMoreEvidence
+- [x] module contains RejectedMissingQw19PromotionGateReceipt
+- [x] module contains RejectedNonGateOnlyPromotionSource
+- [x] module contains RejectedRuntimeContextNotReadOnly
+- [x] module contains RejectedInvalidApprovalScope
+- [x] module contains RejectedDirectSamplerMutation
+- [x] module contains RejectedTemperatureMutation
+- [x] module contains RejectedTopPMutation
+- [x] module contains RejectedTopKMutation
+- [x] module contains RejectedRepetitionPenaltyMutation
+- [x] module contains RejectedLogitBiasMutation
+- [x] module contains RejectedAdapterPointerMutation
+- [x] module contains RejectedBackendSwitch
+- [x] module contains RejectedRuntimeApply
+- [x] module contains RejectedCurrentPointerMutation
+- [x] module contains RejectedArtifactPointerMutation
+- [x] module brace balance
+- [x] test brace balance
+- [x] test function count >= 35
+- [x] acceptance report exists
+- [x] bake report exists

@@ -1,0 +1,27 @@
+SFT-GPU-OBS-01 static verification
+
+Performed:
+- delimiter balance: PASS
+  - crates/ash_core/src/sft_gpu_telemetry_dashboard.rs
+  - crates/ash_core/tests/sft_gpu_obs_01_telemetry_dashboard.rs
+  - crates/lora_train/src/gpu_train_telemetry_matrix.rs
+  - crates/lora_train/tests/gpu_train_telemetry_matrix.rs
+  - crates/burn_webgpu_backend/src/gpu_backend_telemetry.rs
+  - crates/burn_webgpu_backend/tests/gpu_backend_telemetry.rs
+- module export wiring: PASS
+  - crates/ash_core/src/lib.rs -> sft_gpu_telemetry_dashboard
+  - crates/lora_train/src/lib.rs -> gpu_train_telemetry_matrix
+  - crates/burn_webgpu_backend/src/lib.rs -> gpu_backend_telemetry
+
+Not performed:
+- cargo test: cargo is unavailable in this container
+- rustc check: rustc is unavailable in this container
+- rustfmt: rustfmt is unavailable in this container
+
+Required local commands:
+- cargo test -p ash_core sft_gpu_obs_01 -- --nocapture
+- cargo test -p lora_train gpu_train_telemetry_matrix -- --nocapture
+- cargo test -p burn_webgpu_backend gpu_backend_telemetry -- --nocapture
+- cargo test -p ash_core sft_gpu_safety_02 -- --nocapture
+- cargo test -p ash_core sft_gpu_safety_01 -- --nocapture
+- cargo test -p ash_core sft_gpu_run_13 -- --nocapture

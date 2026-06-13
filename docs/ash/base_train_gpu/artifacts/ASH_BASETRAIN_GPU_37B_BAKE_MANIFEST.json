@@ -1,0 +1,48 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-37B",
+  "title": "Selected Group Row-Block Streaming Read Smoke / Sequential Row-Block Plan To Bounded Multi-Block Read No GPU Upload Seal",
+  "baked_from": "ash_pass3_ASH-BASETRAIN-GPU-37A_selected_group_full_row_block_streaming_plan_baked.zip",
+  "added_files": [
+    "crates/base_train/src/ash_basetrain_gpu_37b_selected_group_row_block_streaming_read_smoke.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_37b_selected_group_row_block_streaming_read_smoke.rs",
+    "acceptance_reports/ASH-BASETRAIN-GPU-37B.md",
+    "patch_reports/ASH-BASETRAIN-GPU-37B_bake_report.md",
+    "artifacts/ASH_BASETRAIN_GPU_37B_SELECTED_GROUP_ROW_BLOCK_STREAMING_READ_SMOKE.json",
+    "artifacts/ASH_BASETRAIN_GPU_37B_STATIC_CHECKS.txt",
+    "artifacts/ASH_BASETRAIN_GPU_37B_BAKE_MANIFEST.json"
+  ],
+  "live_input_receipts_excluded": [
+    "artifacts/ASH_BASETRAIN_GPU_37A_SELECTED_GROUP_FULL_ROW_BLOCK_STREAMING_PLAN.json"
+  ],
+  "static_baked_status": "BLOCKED_37A_RECEIPT_NOT_FOUND",
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-37B",
+    "source_file": "crates/base_train/src/ash_basetrain_gpu_37b_selected_group_row_block_streaming_read_smoke.rs",
+    "bin_file": "crates/base_train/src/bin/ash_basetrain_gpu_37b_selected_group_row_block_streaming_read_smoke.rs",
+    "hex_crate_reference_present": false,
+    "source_safetensors_file_open_call_present": true,
+    "seek_call_present": true,
+    "read_exact_call_present": true,
+    "read_to_end_call_present": false,
+    "mmap_runtime_call_present": false,
+    "wgpu_guard_field_present": true,
+    "wgpu_runtime_call_present": false,
+    "f32_decode_marker_present": false,
+    "live_37a_receipt_same_path_included": false,
+    "rust_if_keyword_count": 0,
+    "rust_match_keyword_count": 3,
+    "selected_block_ids": [
+      "block_000000",
+      "block_000094",
+      "block_000188_tail"
+    ],
+    "max_bounded_row_block_read_bytes": 5267456,
+    "expected_read_bytes": {
+      "block_000000": 2097152,
+      "block_000094": 2097152,
+      "block_000188_tail": 1073152
+    },
+    "logic_boundary": "bounded representative row-block byte read only; no f32 decode; no gpu upload; no full selected group read"
+  },
+  "cargo_build_run_in_container": "not_available_no_cargo_or_rustc"
+}

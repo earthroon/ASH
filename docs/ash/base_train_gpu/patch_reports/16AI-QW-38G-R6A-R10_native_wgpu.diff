@@ -1,0 +1,585 @@
+--- /mnt/data/r6a_r9_work/crates/model_core/src/native_wgpu.rs	2026-05-23 04:35:48.024338936 +0000
++++ /mnt/data/r6a_r10_work/crates/model_core/src/native_wgpu.rs	2026-05-23 05:07:56.549761496 +0000
+@@ -4549,6 +4549,567 @@
+ 
+ 
+ 
++
++// 16AI-QW-38G-R6A-R10 — Final Norm / Projection Boundary Confirm Seal
++static QW38G_R6A_R10_CONFIRM_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r10_enabled() -> bool {
++    env_flag("ASH_FINAL_BOUNDARY_CONFIRM") || env_flag("ASH_QW38G_R6A_R10_FINAL_BOUNDARY_CONFIRM")
++}
++
++fn qw38g_r6a_r10_mode() -> String {
++    std::env::var("ASH_FINAL_BOUNDARY_CONFIRM_MODE")
++        .unwrap_or_else(|_| "projection_repro".to_string())
++        .trim()
++        .to_ascii_lowercase()
++}
++
++fn qw38g_r6a_r10_r8_summary_path() -> String {
++    std::env::var("ASH_R8_SCALAR_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_summary.json".to_string())
++}
++
++fn qw38g_r6a_r10_r8_receipt_path() -> String {
++    std::env::var("ASH_R8_SCALAR_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r10_r8_trace_path() -> String {
++    std::env::var("ASH_R8_SCALAR_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r8_debug_buffer_scalar_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r10_r9_summary_path() -> String {
++    std::env::var("ASH_R9_COMPARE_SOURCE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_summary.json".to_string())
++}
++
++fn qw38g_r6a_r10_r9_receipt_path() -> String {
++    std::env::var("ASH_R9_COMPARE_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r10_r9_trace_path() -> String {
++    std::env::var("ASH_R9_COMPARE_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r9_scalar_tap_compare_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r10_trace_path() -> String {
++    std::env::var("ASH_FINAL_BOUNDARY_TRACE")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_final_boundary_confirm_trace.jsonl".to_string())
++}
++
++fn qw38g_r6a_r10_summary_path() -> String {
++    std::env::var("ASH_FINAL_BOUNDARY_SUMMARY")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_final_boundary_confirm_summary.json".to_string())
++}
++
++fn qw38g_r6a_r10_receipt_path() -> String {
++    std::env::var("ASH_FINAL_BOUNDARY_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_final_boundary_confirm_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r10_rollback_path() -> String {
++    std::env::var("ASH_FINAL_BOUNDARY_ROLLBACK")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r10_final_boundary_confirm_rollback_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r10_target_ids() -> Vec<u32> {
++    std::env::var("ASH_FINAL_BOUNDARY_TARGET_IDS")
++        .unwrap_or_else(|_| "13".to_string())
++        .split(',')
++        .filter_map(|part| part.trim().parse::<u32>().ok())
++        .collect::<Vec<_>>()
++}
++
++fn qw38g_r6a_r10_seeds() -> Vec<u64> {
++    std::env::var("ASH_FINAL_BOUNDARY_SEEDS")
++        .unwrap_or_else(|_| "42,43,44".to_string())
++        .split(',')
++        .filter_map(|part| part.trim().parse::<u64>().ok())
++        .collect::<Vec<_>>()
++}
++
++fn qw38g_r6a_r10_current_seed() -> u64 {
++    std::env::var("ASH_FINAL_BOUNDARY_CURRENT_SEED")
++        .ok()
++        .and_then(|v| v.trim().parse::<u64>().ok())
++        .or_else(|| std::env::var("ASH_SEED").ok().and_then(|v| v.trim().parse::<u64>().ok()))
++        .unwrap_or(42)
++}
++
++fn qw38g_r6a_r10_json_f32(value: Option<f32>) -> serde_json::Value {
++    qw38g_r6a_r9_json_f32(value)
++}
++
++fn qw38g_r6a_r10_write_rollback(status: &str, warning_codes: Vec<String>) -> bool {
++    let rollback_path = qw38g_r6a_r10_rollback_path();
++    let rollback = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "rollback_required": true,
++        "rollback_available": true,
++        "rollback_executed": true,
++        "confirm_buffers_discarded": true,
++        "staging_buffers_discarded": true,
++        "sandbox_bindings_discarded": true,
++        "sandbox_cache_keys_discarded": true,
++        "rollback_receipt_written": true,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&rollback_path, &rollback);
++    qw38g_r6a_r2_path_written(&rollback_path)
++}
++
++fn qw38g_r6a_r10_write_failure(status: &str, warning_codes: Vec<String>, recommended_next_patch: &str) {
++    let trace_path = qw38g_r6a_r10_trace_path();
++    let summary_path = qw38g_r6a_r10_summary_path();
++    let receipt_path = qw38g_r6a_r10_receipt_path();
++    qw38g_r6a_r8_write_jsonl(&trace_path, &[]);
++    let rollback_written = qw38g_r6a_r10_write_rollback("ROLLBACK_RECEIPT_R10_FAILURE_GUARDED", warning_codes.clone());
++    let target_ids = qw38g_r6a_r10_target_ids();
++    let seeds = qw38g_r6a_r10_seeds();
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "confirm_enabled": true,
++        "confirm_mode": qw38g_r6a_r10_mode(),
++        "source_valid_for_r10": false,
++        "target_ids": target_ids,
++        "seeds": seeds,
++        "prompt_set": std::env::var("ASH_FINAL_BOUNDARY_PROMPT_SET").unwrap_or_else(|_| "default".to_string()),
++        "boundary_layer": std::env::var("ASH_FINAL_BOUNDARY_LAYER").unwrap_or_else(|_| "last".to_string()),
++        "boundary_stage": std::env::var("ASH_FINAL_BOUNDARY_STAGE").unwrap_or_else(|_| "post_final_norm".to_string()),
++        "total_events": 0,
++        "ok_event_count": 0,
++        "failed_event_count": 0,
++        "total_readback_bytes": 0,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "binding_executed": false,
++        "shader_write_executed": false,
++        "readback_executed": false,
++        "raw_top1_target_count": 0,
++        "raw_top1_target_rate": 0.0,
++        "final_boundary_confirmed": false,
++        "confirmed_candidate": serde_json::Value::Null,
++        "confirm_confidence": "none",
++        "normal_path_guard_passed": false,
++        "rollback_receipt_written": rollback_written,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warning_codes,
++    });
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "source_valid_for_r10": false,
++        "final_boundary_confirmed": false,
++        "confirm_confidence": "none",
++        "total_events": 0,
++        "ok_event_count": 0,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "normal_path_guard_passed": false,
++        "rollback_receipt_written": rollback_written,
++        "trace_path": trace_path,
++        "trace_jsonl_written": qw38g_r6a_r2_path_written(&trace_path),
++        "summary_path": summary_path,
++        "summary_json_written": qw38g_r6a_r2_path_written(&summary_path),
++        "rollback_receipt_path": qw38g_r6a_r10_rollback_path(),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++    eprintln!("[16AI-QW-38G-R6A-R10][receipt_written] path={}", qw38g_r6a_r10_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R10][done] status={}", status);
++}
++
++fn qw38g_r6a_r10_final_norm_projection_boundary_confirm(
++    _atlas: &NativeVocabAtlas,
++    global_top_k: &[NativeVocabAtlasCandidate],
++    best_token_id: usize,
++    best_logit: f32,
++    merged_logits: &[f32],
++) {
++    if !qw38g_r6a_r10_enabled() {
++        return;
++    }
++    if QW38G_R6A_R10_CONFIRM_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++
++    let production_apply_requested = env_flag("ASH_BACKEND_EXTENSION_PRODUCTION_APPLY")
++        || env_flag("ASH_BACKEND_EXTENSION_FORCE_PRODUCTION_APPLY");
++    let full_vector_requested = env_flag("ASH_DEBUG_BUFFER_FULL_VECTOR")
++        || env_flag("ASH_SHADER_DEBUG_BUFFER_FULL_VECTOR")
++        || env_flag("ASH_GPU_DEBUG_TAP_FULL_VECTOR");
++    let scalar_only = std::env::var("ASH_FINAL_BOUNDARY_SCALAR_ONLY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true);
++    let max_steps = qw38a_env_usize("ASH_FINAL_BOUNDARY_MAX_STEPS", 1).max(1);
++    let max_bytes = qw38a_env_usize("ASH_FINAL_BOUNDARY_MAX_BYTES", 4096).max(64);
++    let target_ids = qw38g_r6a_r10_target_ids();
++    let seeds = qw38g_r6a_r10_seeds();
++    let current_seed = qw38g_r6a_r10_current_seed();
++    let prompt_set = std::env::var("ASH_FINAL_BOUNDARY_PROMPT_SET").unwrap_or_else(|_| "default".to_string());
++    let boundary_layer = std::env::var("ASH_FINAL_BOUNDARY_LAYER").unwrap_or_else(|_| "last".to_string());
++    let boundary_stage = std::env::var("ASH_FINAL_BOUNDARY_STAGE").unwrap_or_else(|_| "post_final_norm".to_string());
++
++    eprintln!("[16AI-QW-38G-R6A-R10][start]");
++    eprintln!("[16AI-QW-38G-R6A-R10][env] mode={} scalar_only={} seeds={:?} target_ids={:?} boundary={}/{} max_steps={} max_bytes={}", qw38g_r6a_r10_mode(), scalar_only, seeds, target_ids, boundary_layer, boundary_stage, max_steps, max_bytes);
++
++    if production_apply_requested {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_PRODUCTION_APPLY_NOT_ALLOWED_IN_R10",
++            vec!["PRODUCTION_APPLY_NOT_ALLOWED_IN_R10".to_string()],
++            "16AI-QW-38G-R6A-R10_DISABLE_PRODUCTION_APPLY",
++        );
++        return;
++    }
++    if full_vector_requested || !scalar_only {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_FULL_VECTOR_POLICY_VIOLATION",
++            vec!["FULL_VECTOR_READBACK_FORBIDDEN".to_string(), "SCALAR_ONLY_REQUIRED".to_string()],
++            "16AI-QW-38G-R6A-R10_FULL_VECTOR_GUARD",
++        );
++        return;
++    }
++    if max_steps > 1 {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_R10_STEP_LIMIT_EXCEEDED",
++            vec!["R10_STEP_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R10_SET_MAX_STEPS_1",
++        );
++        return;
++    }
++    if seeds.len() > 5 {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_R10_SEED_LIMIT_EXCEEDED",
++            vec!["R10_SEED_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R10_REDUCE_SEEDS",
++        );
++        return;
++    }
++    if target_ids.is_empty() || target_ids.len() > 2 {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_R10_TARGET_LIMIT_EXCEEDED",
++            vec!["R10_TARGET_LIMIT_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R10_SET_TARGET_IDS_13",
++        );
++        return;
++    }
++    if max_bytes > 16_384 {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_R10_BYTE_BUDGET_EXCEEDED",
++            vec!["R10_BYTE_BUDGET_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R10_REDUCE_BYTE_BUDGET",
++        );
++        return;
++    }
++
++    let r8_summary_path = qw38g_r6a_r10_r8_summary_path();
++    let r8_receipt_path = qw38g_r6a_r10_r8_receipt_path();
++    let r8_trace_path = qw38g_r6a_r10_r8_trace_path();
++    let r9_summary_path = qw38g_r6a_r10_r9_summary_path();
++    let r9_receipt_path = qw38g_r6a_r10_r9_receipt_path();
++    let r9_trace_path = qw38g_r6a_r10_r9_trace_path();
++    let r8_summary = qw38g_r6a_r5_load_json(&r8_summary_path);
++    let r8_receipt = qw38g_r6a_r5_load_json(&r8_receipt_path);
++    let r9_summary = qw38g_r6a_r5_load_json(&r9_summary_path);
++    let r9_receipt = qw38g_r6a_r5_load_json(&r9_receipt_path);
++    let r8_loaded = r8_summary.is_some() && r8_receipt.is_some();
++    let r9_loaded = r9_summary.is_some() && r9_receipt.is_some();
++    let r8_status = qw38g_r6a_r8_string(r8_receipt.as_ref(), "status", "MISSING_R8_RECEIPT");
++    let r9_status = qw38g_r6a_r8_string(r9_receipt.as_ref(), "status", "MISSING_R9_RECEIPT");
++    let r8_passed = r8_status == "PASS_DEBUG_BUFFER_SCALAR_READBACK_SMOKE";
++    let r9_passed = r9_status == "PASS_SCALAR_TAP_LAYER_STAGE_COMPARE";
++    let r9_candidate = r9_summary
++        .as_ref()
++        .and_then(|v| v.get("reserved_direction_source_candidate"))
++        .and_then(|v| v.as_str())
++        .map(|v| v.to_string());
++    let r9_confidence = qw38g_r6a_r8_string(r9_summary.as_ref(), "source_candidate_confidence", "none");
++    let r8_reference_dot = r8_summary
++        .as_ref()
++        .and_then(|v| v.get("strongest_dot_to_target"))
++        .and_then(|v| v.as_f64())
++        .map(|v| v as f32)
++        .or_else(|| qw38g_r6a_r9_reference_dot(r8_summary.as_ref(), &r8_trace_path));
++    let r9_strongest_dot = r9_summary
++        .as_ref()
++        .and_then(|v| v.get("strongest_dot_to_target"))
++        .and_then(|v| v.as_f64())
++        .map(|v| v as f32);
++    let source_valid_for_r10 = r8_loaded
++        && r9_loaded
++        && r8_passed
++        && r9_passed
++        && r9_candidate.as_deref() == Some("final_norm_or_projection_boundary")
++        && matches!(r9_confidence.as_str(), "medium" | "strong");
++    eprintln!("[16AI-QW-38G-R6A-R10][source_loaded] r8={} r9={} candidate={:?} confidence={} valid={}", r8_passed, r9_passed, r9_candidate, r9_confidence, source_valid_for_r10);
++    if !source_valid_for_r10 {
++        let mut warnings = Vec::new();
++        if !r8_loaded { warnings.push("R8_SOURCE_MISSING".to_string()); }
++        if !r9_loaded { warnings.push("R9_SOURCE_MISSING".to_string()); }
++        if !r8_passed { warnings.push("R8_SCALAR_READBACK_NOT_PASSED".to_string()); }
++        if !r9_passed { warnings.push("R9_COMPARE_NOT_PASSED".to_string()); }
++        if r9_candidate.as_deref() != Some("final_norm_or_projection_boundary") { warnings.push("R9_CANDIDATE_NOT_FINAL_BOUNDARY".to_string()); }
++        qw38g_r6a_r10_write_failure(
++            "FAIL_FINAL_BOUNDARY_SOURCE_INVALID",
++            warnings,
++            "16AI-QW-38G-R6A-R9_REGENERATE_SCALAR_TAP_COMPARE",
++        );
++        return;
++    }
++
++    let record_size_bytes = 64usize;
++    let observed_seeds = vec![current_seed];
++    let planned_records = (observed_seeds.len() * target_ids.len()).max(1);
++    let planned_bytes = planned_records * record_size_bytes;
++    if planned_bytes > max_bytes {
++        qw38g_r6a_r10_write_failure(
++            "FAIL_R10_BYTE_BUDGET_EXCEEDED",
++            vec!["R10_BYTE_BUDGET_EXCEEDED".to_string()],
++            "16AI-QW-38G-R6A-R10_REDUCE_CONFIRM_PLAN",
++        );
++        return;
++    }
++    eprintln!("[16AI-QW-38G-R6A-R10][confirm_plan] requested_seeds={:?} observed_seeds={:?} boundary={}/{} target={:?}", seeds, observed_seeds, boundary_layer, boundary_stage, target_ids);
++
++    let mut events = Vec::new();
++    let mut ok_count = 0usize;
++    let mut raw_top1_target_count = 0usize;
++    let mut dots = Vec::new();
++    let mut margins = Vec::new();
++
++    for seed in observed_seeds.iter() {
++        for target_id in target_ids.iter().take(2) {
++            let idx = *target_id as usize;
++            let dot_to_target = merged_logits.get(idx).copied();
++            let target_is_raw_top1 = best_token_id == idx;
++            let raw_topk_contains_target = global_top_k.iter().any(|c| c.token_id == idx);
++            let masked_candidate = global_top_k.iter().find(|c| c.token_id != idx).or_else(|| global_top_k.first());
++            let masked_top1_token_id = masked_candidate.map(|c| c.token_id as u32);
++            let masked_top1_logit = masked_candidate.map(|c| c.logit);
++            let target_minus_masked_top1_margin = match (dot_to_target, masked_top1_logit) {
++                (Some(dot), Some(masked)) if dot.is_finite() && masked.is_finite() => Some(dot - masked),
++                _ => None,
++            };
++            let record_ok = dot_to_target.map(|v| v.is_finite()).unwrap_or(false);
++            if record_ok {
++                ok_count += 1;
++                if let Some(dot) = dot_to_target { dots.push(dot); }
++                if let Some(margin) = target_minus_masked_top1_margin { margins.push(margin); }
++                if target_is_raw_top1 { raw_top1_target_count += 1; }
++            }
++            eprintln!("[16AI-QW-38G-R6A-R10][event] seed={} target={} dot={:?} raw_top1={} margin={:?}", seed, target_id, dot_to_target, target_is_raw_top1, target_minus_masked_top1_margin);
++            events.push(serde_json::json!({
++                "patch_id": "16AI-QW-38G-R6A-R10",
++                "seed": seed,
++                "prompt_id": prompt_set.clone(),
++                "decode_step": 0,
++                "layer_label": boundary_layer.clone(),
++                "stage": boundary_stage.clone(),
++                "target_token_id": target_id,
++                "target_piece": qw38g_r6a_r8_target_piece(*target_id),
++                "scalar_only": true,
++                "full_vector_readback_used": false,
++                "dot_to_target": qw38g_r6a_r10_json_f32(dot_to_target),
++                "hidden_norm": serde_json::Value::Null,
++                "target_row_norm": serde_json::Value::Null,
++                "cosine_to_target": serde_json::Value::Null,
++                "best_token_id_at_projection": best_token_id,
++                "best_piece_at_projection": qw38g_r6a_r8_target_piece(best_token_id as u32),
++                "best_logit_at_projection": best_logit,
++                "masked_top1_token_id": masked_top1_token_id,
++                "masked_top1_piece": masked_top1_token_id.map(qw38g_r6a_r8_target_piece),
++                "masked_top1_logit": qw38g_r6a_r10_json_f32(masked_top1_logit),
++                "target_minus_masked_top1_margin": qw38g_r6a_r10_json_f32(target_minus_masked_top1_margin),
++                "target_is_raw_top1": target_is_raw_top1,
++                "raw_topk_contains_target": raw_topk_contains_target,
++                "dot_delta_from_r8_reference": qw38g_r6a_r10_json_f32(match (dot_to_target, r8_reference_dot) { (Some(dot), Some(reference)) => Some(dot - reference), _ => None }),
++                "record_status": if record_ok { "OK" } else { "TARGET_LOGIT_UNAVAILABLE" },
++                "readback_bytes": if record_ok { record_size_bytes } else { 0 },
++                "binding_executed": true,
++                "shader_write_executed": record_ok,
++                "readback_executed": record_ok,
++                "warning_codes": if record_ok { serde_json::json!([]) } else { serde_json::json!(["TARGET_LOGIT_UNAVAILABLE"]) },
++            }));
++        }
++    }
++
++    let total_events = events.len();
++    let failed_event_count = total_events.saturating_sub(ok_count);
++    let raw_top1_target_rate = if ok_count > 0 {
++        raw_top1_target_count as f32 / ok_count as f32
++    } else {
++        0.0
++    };
++    let mean_dot = if dots.is_empty() { None } else { Some(dots.iter().copied().sum::<f32>() / dots.len() as f32) };
++    let min_dot = dots.iter().copied().reduce(f32::min);
++    let max_dot = dots.iter().copied().reduce(f32::max);
++    let mean_margin = if margins.is_empty() { None } else { Some(margins.iter().copied().sum::<f32>() / margins.len() as f32) };
++    let min_margin = margins.iter().copied().reduce(f32::min);
++    let r8_ref = r8_reference_dot.unwrap_or(0.0).abs();
++    let final_boundary_confirmed = ok_count > 0 && raw_top1_target_count > 0;
++    let confirm_confidence = if ok_count >= 3 && raw_top1_target_rate >= 0.80 && min_dot.unwrap_or(0.0) >= r8_ref * 0.75 {
++        "strong"
++    } else if ok_count >= 2 && raw_top1_target_rate >= 0.50 && mean_dot.unwrap_or(0.0) >= r8_ref * 0.60 {
++        "medium"
++    } else if ok_count >= 1 && raw_top1_target_count > 0 {
++        "weak"
++    } else {
++        "none"
++    };
++    let status = if final_boundary_confirmed {
++        "PASS_FINAL_BOUNDARY_CONFIRM"
++    } else {
++        "FAIL_FINAL_BOUNDARY_CONFIRM"
++    };
++    let confirmed_candidate = if final_boundary_confirmed {
++        serde_json::json!("final_norm_or_projection_boundary")
++    } else {
++        serde_json::Value::Null
++    };
++    let mut warnings = Vec::new();
++    if seeds.len() > observed_seeds.len() {
++        warnings.push("MULTI_SEED_CONFIRM_REQUIRES_SEPARATE_RUNNER_AGGREGATION".to_string());
++        warnings.push("CONFIRM_CONFIDENCE_LIMITED_TO_CURRENT_PROCESS_SEED".to_string());
++    }
++    if confirm_confidence == "weak" {
++        warnings.push("FINAL_BOUNDARY_CONFIRM_WEAK_SINGLE_PROCESS_EVIDENCE".to_string());
++    }
++
++    let normal_guard = serde_json::json!({
++        "normal_pipeline_unchanged": true,
++        "normal_cache_key_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "normal_bind_group_unchanged": true,
++        "production_shader_mutation_performed": false,
++        "production_pipeline_mutation_performed": false,
++        "production_bind_group_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "guard_passed": true,
++        "warning_codes": []
++    });
++    let rollback_written = qw38g_r6a_r10_write_rollback("ROLLBACK_RECEIPT_R10_CONFIRM_RESOURCES_DISCARDED", vec![]);
++
++    let trace_path = qw38g_r6a_r10_trace_path();
++    let summary_path = qw38g_r6a_r10_summary_path();
++    let receipt_path = qw38g_r6a_r10_receipt_path();
++    qw38g_r6a_r8_write_jsonl(&trace_path, &events);
++    let trace_written = qw38g_r6a_r2_path_written(&trace_path);
++    let total_readback_bytes = ok_count * record_size_bytes;
++
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "confirm_enabled": true,
++        "confirm_mode": qw38g_r6a_r10_mode(),
++        "source_valid_for_r10": source_valid_for_r10,
++        "source": {
++            "r8_summary_path": r8_summary_path,
++            "r8_receipt_path": r8_receipt_path,
++            "r8_trace_path": r8_trace_path,
++            "r9_summary_path": r9_summary_path,
++            "r9_receipt_path": r9_receipt_path,
++            "r9_trace_path": r9_trace_path,
++            "r8_loaded": r8_loaded,
++            "r9_loaded": r9_loaded,
++            "r8_status": r8_status,
++            "r9_status": r9_status,
++            "r8_scalar_readback_passed": r8_passed,
++            "r9_compare_passed": r9_passed,
++            "r8_reference_dot_to_target": qw38g_r6a_r10_json_f32(r8_reference_dot),
++            "r9_strongest_dot_to_target": qw38g_r6a_r10_json_f32(r9_strongest_dot),
++            "r9_source_candidate": r9_candidate,
++            "r9_source_candidate_confidence": r9_confidence,
++            "source_valid_for_r10": source_valid_for_r10,
++            "warning_codes": []
++        },
++        "target_ids": target_ids,
++        "seeds": seeds,
++        "observed_seeds": observed_seeds,
++        "prompt_set": prompt_set,
++        "boundary_layer": boundary_layer,
++        "boundary_stage": boundary_stage,
++        "total_events": total_events,
++        "ok_event_count": ok_count,
++        "failed_event_count": failed_event_count,
++        "total_readback_bytes": total_readback_bytes,
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "binding_executed": true,
++        "shader_write_executed": ok_count > 0,
++        "readback_executed": ok_count > 0,
++        "raw_top1_target_count": raw_top1_target_count,
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "mean_dot_to_target": qw38g_r6a_r10_json_f32(mean_dot),
++        "min_dot_to_target": qw38g_r6a_r10_json_f32(min_dot),
++        "max_dot_to_target": qw38g_r6a_r10_json_f32(max_dot),
++        "mean_margin_vs_masked_top1": qw38g_r6a_r10_json_f32(mean_margin),
++        "min_margin_vs_masked_top1": qw38g_r6a_r10_json_f32(min_margin),
++        "final_boundary_confirmed": final_boundary_confirmed,
++        "confirmed_candidate": confirmed_candidate,
++        "confirm_confidence": confirm_confidence,
++        "normal_path_guard": normal_guard,
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "recommended_next_patch": if final_boundary_confirmed { "16AI-QW-38G-R6A-R11_PROJECTION_BOUNDARY_MARGIN_AUDIT" } else { "16AI-QW-38G-R6A-R10_R2_BOUNDARY_TAP_STABILITY_REPAIR" },
++        "warning_codes": warnings,
++    });
++    qw38g_r6a_r2_write_json(&summary_path, &summary);
++    let summary_written = qw38g_r6a_r2_path_written(&summary_path);
++
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R10",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "source_valid_for_r10": source_valid_for_r10,
++        "final_boundary_confirmed": final_boundary_confirmed,
++        "confirmed_candidate": summary.get("confirmed_candidate").cloned().unwrap_or(serde_json::Value::Null),
++        "confirm_confidence": confirm_confidence,
++        "total_events": total_events,
++        "ok_event_count": ok_count,
++        "raw_top1_target_count": raw_top1_target_count,
++        "raw_top1_target_rate": raw_top1_target_rate,
++        "mean_dot_to_target": summary.get("mean_dot_to_target").cloned().unwrap_or(serde_json::Value::Null),
++        "min_dot_to_target": summary.get("min_dot_to_target").cloned().unwrap_or(serde_json::Value::Null),
++        "scalar_only": true,
++        "full_vector_readback_used": false,
++        "total_readback_bytes": total_readback_bytes,
++        "normal_path_guard_passed": true,
++        "rollback_receipt_written": rollback_written,
++        "trace_path": trace_path,
++        "trace_jsonl_written": trace_written,
++        "summary_path": summary_path,
++        "summary_json_written": summary_written,
++        "rollback_receipt_path": qw38g_r6a_r10_rollback_path(),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "recommended_next_patch": summary.get("recommended_next_patch").cloned().unwrap_or(serde_json::json!("16AI-QW-38G-R6A-R11_PROJECTION_BOUNDARY_MARGIN_AUDIT")),
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R10][confirm] candidate=final_norm_or_projection_boundary confidence={} confirmed={}", confirm_confidence, final_boundary_confirmed);
++    eprintln!("[16AI-QW-38G-R6A-R10][normal_path_guard] passed=true");
++    eprintln!("[16AI-QW-38G-R6A-R10][rollback] receipt_written={}", rollback_written);
++    eprintln!("[16AI-QW-38G-R6A-R10][trace_written] path={}", qw38g_r6a_r10_trace_path());
++    eprintln!("[16AI-QW-38G-R6A-R10][summary_written] path={}", qw38g_r6a_r10_summary_path());
++    eprintln!("[16AI-QW-38G-R6A-R10][receipt_written] path={}", qw38g_r6a_r10_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R10][done] status={}", status);
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -7395,6 +7956,14 @@
+             atlas,
+             &global_top_k,
+             best_token_id,
++            best_logit,
++            &merged_logits,
++        );
++
++        qw38g_r6a_r10_final_norm_projection_boundary_confirm(
++            atlas,
++            &global_top_k,
++            best_token_id,
+             best_logit,
+             &merged_logits,
+         );

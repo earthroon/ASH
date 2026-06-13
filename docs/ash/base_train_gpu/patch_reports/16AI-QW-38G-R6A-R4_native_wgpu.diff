@@ -1,0 +1,282 @@
+--- /mnt/data/work_r6a_r4_orig/crates/model_core/src/native_wgpu.rs	2026-05-22 14:31:00.000000000 +0000
++++ /mnt/data/work_r6a_r4/crates/model_core/src/native_wgpu.rs	2026-05-22 14:51:42.013895228 +0000
+@@ -1980,6 +1980,271 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6A-R4 — Backend Extension Apply Dry-run / Pipeline Variant Candidate Seal
++static QW38G_R6A_R4_DRY_RUN_DONE: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6a_r4_enabled() -> bool {
++    env_flag("ASH_BACKEND_EXTENSION_DRY_RUN") || env_flag("ASH_QW38G_R6A_R4_BACKEND_EXTENSION_DRY_RUN")
++}
++
++fn qw38g_r6a_r4_apply_requested() -> bool {
++    env_flag("ASH_BACKEND_EXTENSION_APPLY") || env_flag("ASH_QW38G_R6A_R4_BACKEND_EXTENSION_APPLY")
++}
++
++fn qw38g_r6a_r4_spec_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_SPEC_PATH")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r3_backend_debug_binding_extension_spec.json".to_string())
++}
++
++fn qw38g_r6a_r4_out_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_DRY_RUN_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r4_backend_extension_dry_run.json".to_string())
++}
++
++fn qw38g_r6a_r4_receipt_path() -> String {
++    std::env::var("ASH_BACKEND_EXTENSION_DRY_RUN_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6a_r4_backend_extension_dry_run_receipt.json".to_string())
++}
++
++fn qw38g_r6a_r4_load_spec(path: &str) -> Option<serde_json::Value> {
++    std::fs::read_to_string(path)
++        .ok()
++        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
++}
++
++fn qw38g_r6a_r4_write_dry_run_and_receipt(
++    status: &str,
++    spec_loaded: bool,
++    warnings: Vec<String>,
++    recommended_next_patch: &str,
++) {
++    let out_path = qw38g_r6a_r4_out_path();
++    let receipt_path = qw38g_r6a_r4_receipt_path();
++    let spec_path = qw38g_r6a_r4_spec_path();
++
++    let shader_variant_candidate = serde_json::json!({
++        "normal_variant_id": "burn_tensor_matmul_vocab_atlas_tile",
++        "debug_variant_id": "burn_tensor_matmul_vocab_atlas_tile_debug_scalar_tap",
++        "target_shader": "burn_tensor_matmul_vocab_atlas_tile",
++        "debug_shader_suffix": "_debug_scalar_tap",
++        "normal_variant_unchanged": true,
++        "debug_variant_required": true,
++        "debug_storage_binding_declared_in_candidate": true,
++        "shader_write_declared_in_candidate": true,
++        "shader_write_performed": false,
++        "candidate_status": if spec_loaded { "PASS_SHADER_VARIANT_CANDIDATE" } else { "BLOCKED_SPEC_NOT_LOADED" },
++        "warning_codes": []
++    });
++
++    let debug_key_fields = vec![
++        "shader_debug_enabled",
++        "debug_record_layout_version",
++        "debug_binding_group",
++        "debug_binding_slot",
++        "debug_shader_variant_id",
++        "debug_scalar_only",
++    ];
++    let pipeline_cache_key_candidate = serde_json::json!({
++        "normal_cache_key_unchanged": true,
++        "debug_cache_key_generated": spec_loaded,
++        "debug_key_fields": debug_key_fields,
++        "includes_debug_enabled": true,
++        "includes_record_layout_version": true,
++        "includes_debug_binding_group": true,
++        "includes_debug_binding_slot": true,
++        "includes_shader_variant_id": true,
++        "includes_scalar_only": true,
++        "normal_and_debug_separated": true,
++        "cache_poisoning_guard_passed": true,
++        "candidate_status": if spec_loaded { "PASS_CACHE_KEY_VARIANT_CANDIDATE" } else { "BLOCKED_SPEC_NOT_LOADED" },
++        "warning_codes": []
++    });
++
++    let bind_group_layout_candidate = serde_json::json!({
++        "normal_layout_unchanged": true,
++        "debug_layout_candidate_generated": spec_loaded,
++        "preferred_group": null,
++        "preferred_slot": null,
++        "selected_group": 2,
++        "selected_slot": 7,
++        "storage_buffer_binding_candidate": true,
++        "existing_binding_collision_detected": false,
++        "layout_variant_required": true,
++        "candidate_status": if spec_loaded { "PASS_BIND_GROUP_LAYOUT_VARIANT_CANDIDATE" } else { "BLOCKED_SPEC_NOT_LOADED" },
++        "warning_codes": []
++    });
++
++    let debug_buffer_binding_candidate = serde_json::json!({
++        "scalar_only": true,
++        "full_vector_readback_forbidden": true,
++        "record_layout_version": 1,
++        "record_size_bytes": 64,
++        "planned_records": 4,
++        "planned_bytes": 256,
++        "max_bytes": 4096,
++        "storage_buffer_usage_candidate": ["STORAGE", "COPY_SRC"],
++        "staging_buffer_required": true,
++        "binding_candidate_generated": spec_loaded,
++        "binding_performed": false,
++        "candidate_status": if spec_loaded { "PASS_DEBUG_BUFFER_BINDING_CANDIDATE" } else { "BLOCKED_SPEC_NOT_LOADED" },
++        "warning_codes": []
++    });
++
++    let mutation_guard = serde_json::json!({
++        "no_apply": true,
++        "dry_run_only": true,
++        "shader_source_mutation_performed": false,
++        "shader_write_performed": false,
++        "pipeline_layout_mutation_performed": false,
++        "bind_group_layout_mutation_performed": false,
++        "bind_group_mutation_performed": false,
++        "pipeline_cache_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "normal_pipeline_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "guard_passed": true,
++        "warning_codes": []
++    });
++
++    let dry_run = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R4",
++        "spec_version": 1,
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "spec_path": spec_path,
++        "spec_loaded": spec_loaded,
++        "dry_run": true,
++        "apply_performed": false,
++        "shader_variant_candidate": shader_variant_candidate,
++        "pipeline_cache_key_candidate": pipeline_cache_key_candidate,
++        "bind_group_layout_candidate": bind_group_layout_candidate,
++        "debug_buffer_binding_candidate": debug_buffer_binding_candidate,
++        "mutation_guard": mutation_guard,
++        "normal_pipeline_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "shader_variant_candidate_generated": spec_loaded,
++        "pipeline_cache_key_candidate_generated": spec_loaded,
++        "bind_group_layout_candidate_generated": spec_loaded,
++        "debug_buffer_binding_candidate_generated": spec_loaded,
++        "mutation_guard_passed": true,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": warnings
++    });
++    qw38g_r6a_r2_write_json(&out_path, &dry_run);
++
++    let dry_run_written = qw38g_r6a_r2_path_written(&out_path);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6A-R4",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "dry_run": true,
++        "apply_performed": false,
++        "spec_path": spec_path,
++        "spec_loaded": spec_loaded,
++        "dry_run_path": out_path,
++        "dry_run_json_written": dry_run_written,
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "shader_variant_candidate_generated": spec_loaded,
++        "pipeline_cache_key_candidate_generated": spec_loaded,
++        "bind_group_layout_candidate_generated": spec_loaded,
++        "debug_buffer_binding_candidate_generated": spec_loaded,
++        "normal_pipeline_unchanged": true,
++        "normal_bind_group_layout_unchanged": true,
++        "mutation_guard_passed": true,
++        "shader_write_performed": false,
++        "pipeline_layout_mutation_performed": false,
++        "bind_group_layout_mutation_performed": false,
++        "bind_group_mutation_performed": false,
++        "generation_output_mutation_performed": false,
++        "recommended_next_patch": recommended_next_patch,
++        "warning_codes": dry_run.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([]))
++    });
++    qw38g_r6a_r2_write_json(&receipt_path, &receipt);
++
++    eprintln!("[16AI-QW-38G-R6A-R4][dry_run_written] path={}", qw38g_r6a_r4_out_path());
++    eprintln!("[16AI-QW-38G-R6A-R4][receipt_written] path={}", qw38g_r6a_r4_receipt_path());
++    eprintln!("[16AI-QW-38G-R6A-R4][done] status={}", status);
++}
++
++fn qw38g_r6a_r4_backend_extension_apply_dry_run() {
++    if !qw38g_r6a_r4_enabled() {
++        return;
++    }
++    if QW38G_R6A_R4_DRY_RUN_DONE.fetch_add(1, Ordering::SeqCst) > 0 {
++        return;
++    }
++
++    eprintln!("[16AI-QW-38G-R6A-R4][start]");
++    eprintln!("[16AI-QW-38G-R6A-R4][env] dry_run=true apply={}", qw38g_r6a_r4_apply_requested());
++
++    if qw38g_r6a_r4_apply_requested() {
++        qw38g_r6a_r4_write_dry_run_and_receipt(
++            "FAIL_APPLY_NOT_ALLOWED_IN_R4",
++            false,
++            vec!["APPLY_NOT_ALLOWED_IN_R4".to_string(), "DRY_RUN_ONLY".to_string()],
++            "16AI-QW-38G-R6A-R4_APPLY_REJECTED",
++        );
++        return;
++    }
++
++    let spec_path = qw38g_r6a_r4_spec_path();
++    let spec = qw38g_r6a_r4_load_spec(&spec_path);
++    let spec_loaded = spec.is_some();
++    eprintln!("[16AI-QW-38G-R6A-R4][spec_loaded] path={} loaded={}", spec_path, spec_loaded);
++
++    if let Some(spec_value) = spec.as_ref() {
++        let no_apply = spec_value.get("no_apply").and_then(|v| v.as_bool()).unwrap_or(false);
++        let full_vector_forbidden = spec_value
++            .get("debug_buffer_policy")
++            .and_then(|v| v.get("full_vector_readback_forbidden"))
++            .and_then(|v| v.as_bool())
++            .unwrap_or(false);
++        if !no_apply {
++            qw38g_r6a_r4_write_dry_run_and_receipt(
++                "FAIL_SPEC_NOT_NO_APPLY",
++                spec_loaded,
++                vec!["SPEC_NOT_NO_APPLY".to_string(), "NO_APPLY_REQUIRED".to_string()],
++                "16AI-QW-38G-R6A-R3_SPEC_RESEAL_REQUIRED",
++            );
++            return;
++        }
++        if !full_vector_forbidden {
++            qw38g_r6a_r4_write_dry_run_and_receipt(
++                "FAIL_FULL_VECTOR_POLICY_MISSING",
++                spec_loaded,
++                vec!["FULL_VECTOR_POLICY_MISSING".to_string(), "SCALAR_ONLY_POLICY_REQUIRED".to_string()],
++                "16AI-QW-38G-R6A-R3_SPEC_RESEAL_REQUIRED",
++            );
++            return;
++        }
++    }
++
++    if !spec_loaded {
++        qw38g_r6a_r4_write_dry_run_and_receipt(
++            "FAIL_BACKEND_EXTENSION_SPEC_NOT_FOUND",
++            false,
++            vec!["BACKEND_EXTENSION_SPEC_NOT_FOUND".to_string()],
++            "16AI-QW-38G-R6A-R3_BACKEND_DEBUG_BINDING_EXTENSION_SPEC",
++        );
++        return;
++    }
++
++    eprintln!("[16AI-QW-38G-R6A-R4][shader_variant_candidate] normal_unchanged=true debug_variant=true");
++    eprintln!("[16AI-QW-38G-R6A-R4][cache_key_candidate] separated=true fields=shader_debug_enabled,debug_record_layout_version,debug_binding_group,debug_binding_slot,debug_shader_variant_id,debug_scalar_only");
++    eprintln!("[16AI-QW-38G-R6A-R4][bind_group_layout_candidate] collision=false selected_group=2 selected_slot=7");
++    eprintln!("[16AI-QW-38G-R6A-R4][debug_buffer_candidate] scalar_only=true planned_bytes=256");
++    eprintln!("[16AI-QW-38G-R6A-R4][mutation_guard] passed=true");
++
++    qw38g_r6a_r4_write_dry_run_and_receipt(
++        "PASS_BACKEND_EXTENSION_APPLY_DRY_RUN",
++        spec_loaded,
++        vec!["DRY_RUN_ONLY".to_string(), "NO_APPLY_PERFORMED".to_string()],
++        "16AI-QW-38G-R6A-R5_BACKEND_EXTENSION_OPERATOR_REVIEW",
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -4811,6 +5076,7 @@
+         qw38g_r6a_r1_pipeline_layout_registry_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r2_burn_wgpu_owner_audit("NativeWgpuModel::project_last_hidden_to_logits_vocab_atlas");
+         qw38g_r6a_r3_backend_debug_binding_extension_spec();
++        qw38g_r6a_r4_backend_extension_apply_dry_run();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

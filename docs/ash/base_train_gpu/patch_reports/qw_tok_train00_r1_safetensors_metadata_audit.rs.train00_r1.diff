@@ -1,0 +1,29 @@
+--- a/crates/model_core/src/bin/qw_tok_train00_r1_safetensors_metadata_audit.rs
++++ b/crates/model_core/src/bin/qw_tok_train00_r1_safetensors_metadata_audit.rs
+@@ -0,0 +1,26 @@
++use model_core::{
++    qw_tok_train00_r1_config_from_args, run_qw_tok_train00_r1_safetensors_metadata_audit,
++    write_qw_tok_train00_r1_artifacts,
++};
++use std::{env, path::Path};
++
++fn main() {
++    let args: Vec<String> = env::args().skip(1).collect();
++    let cfg = qw_tok_train00_r1_config_from_args(&args);
++    match run_qw_tok_train00_r1_safetensors_metadata_audit(cfg) {
++        Ok(report) => {
++            if let Err(err) = write_qw_tok_train00_r1_artifacts(Path::new("."), &report) {
++                eprintln!("failed to write QW-TOK-TRAIN-00-R1 artifacts: {}", err);
++                std::process::exit(2);
++            }
++            println!("{}", report.status);
++            if report.status.starts_with("FAIL_") {
++                std::process::exit(1);
++            }
++        }
++        Err(err) => {
++            eprintln!("QW-TOK-TRAIN-00-R1 safetensors metadata audit failed: {}", err);
++            std::process::exit(2);
++        }
++    }
++}

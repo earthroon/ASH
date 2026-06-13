@@ -1,0 +1,306 @@
+--- ash38g_r1/crates/runtime/src/infer.rs	2026-05-22 07:23:17.000000000 +0000
++++ qw38g_r2/crates/runtime/src/infer.rs	2026-05-22 10:04:56.259583689 +0000
+@@ -110,6 +110,109 @@
+         .unwrap_or(0)
+ }
+ 
++
++// 16AI-QW-38G-R2 — Runtime Trace Entry Heartbeat / Fail-Closed Receipt Seal
++fn q38g_r2_enabled() -> bool {
++    q35e_env_truthy("ASH_LAYERWISE_RESERVED_TRACE")
++        || q35e_env_truthy("ASH_QW38G_R2_HEARTBEAT")
++        || q35e_env_truthy("ASH_38G_R2_HEARTBEAT")
++}
++
++fn q38g_r2_env(name: &str, default: &str) -> String {
++    std::env::var(name).unwrap_or_else(|_| default.to_string())
++}
++
++fn q38g_r2_path_written(path: &str) -> bool {
++    std::fs::metadata(path)
++        .map(|m| m.is_file() && m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn q38g_r2_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn q38g_r2_receipt_paths() -> (String, String, String, String, String) {
++    (
++        q38g_r2_env(
++            "ASH_LAYERWISE_RESERVED_TRACE_JSONL",
++            "workspace/qw38g_layerwise_reserved_direction_trace.jsonl",
++        ),
++        q38g_r2_env(
++            "ASH_LAYERWISE_RESERVED_SUMMARY_JSON",
++            "workspace/qw38g_layerwise_reserved_direction_summary.json",
++        ),
++        q38g_r2_env(
++            "ASH_LAYERWISE_RESERVED_RECEIPT_JSON",
++            "workspace/qw38g_runtime_receipt.json",
++        ),
++        q38g_r2_env(
++            "ASH_RAW_TOPK_TRACE_JSONL",
++            "workspace/qw38a_raw_topk_trace.jsonl",
++        ),
++        q38g_r2_env(
++            "ASH_HIDDEN_PROJECTION_TRACE_JSONL",
++            "workspace/qw38d_hidden_projection_trace.jsonl",
++        ),
++    )
++}
++
++fn q38g_r2_write_receipt(status: &str, last_stage: &str, extra: serde_json::Value) {
++    let (layer_trace_path, summary_path, receipt_path, raw_topk_path, hidden_proj_path) =
++        q38g_r2_receipt_paths();
++    let layerwise_trace_jsonl_written = q38g_r2_path_written(&layer_trace_path);
++    let summary_written = q38g_r2_path_written(&summary_path);
++    let raw_topk_trace_written = q38g_r2_path_written(&raw_topk_path);
++    let hidden_projection_trace_written = q38g_r2_path_written(&hidden_proj_path);
++
++    let mut warning_codes: Vec<&str> = Vec::new();
++    if !layerwise_trace_jsonl_written {
++        warning_codes.push("LAYERWISE_TRACE_HOOK_NOT_REACHED");
++    }
++    if !summary_written {
++        warning_codes.push("SUMMARY_NOT_WRITTEN");
++    }
++
++    let payload = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R2",
++        "status": status,
++        "last_stage": last_stage,
++        "timestamp_unix_ms": current_unix_ms(),
++        "infer_entered": true,
++        "layerwise_trace_jsonl_path": layer_trace_path,
++        "layerwise_trace_jsonl_written": layerwise_trace_jsonl_written,
++        "summary_path": summary_path.clone(),
++        "summary_written": summary_written,
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "raw_topk_trace_path": raw_topk_path,
++        "raw_topk_trace_written": raw_topk_trace_written,
++        "hidden_projection_trace_path": hidden_proj_path,
++        "hidden_projection_trace_written": hidden_projection_trace_written,
++        "python_postprocess_required": false,
++        "powershell_summary_required": false,
++        "warning_codes": warning_codes,
++        "extra": extra,
++    });
++
++    eprintln!(
++        "[16AI-QW-38G-R2][receipt] status={} last_stage={} path={}",
++        status, last_stage, receipt_path
++    );
++    q38g_r2_write_json(&receipt_path, &payload);
++}
++
++fn q38g_r2_heartbeat(stage: &str, extra: serde_json::Value) {
++    let text = serde_json::to_string(&extra).unwrap_or_else(|_| "{}".to_string());
++    eprintln!("[16AI-QW-38G-R2][{}] {}", stage, text);
++    q38g_r2_write_receipt("RUNNING", stage, extra);
++}
++
+ fn gpu_sampling_runtime_fingerprint() -> String {
+     "runtime_gpu_sampling_v1".to_string()
+ }
+@@ -2625,12 +2728,47 @@
+ ) -> Result<StandardInferResult> {
+     let subtitle_surface_request = req.clone();
+     let req = ResolvedStandardInferRequest::from_request(req)?;
++    let q38g_r2_trace_enabled = q38g_r2_enabled();
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "start",
++            serde_json::json!({
++                "request_id": req.request_id.clone(),
++                "model_spec_path": req.model_spec_path.clone(),
++                "tokenizer_manifest_path": req.tokenizer_manifest_path.clone(),
++                "checkpoint_paths": req.checkpoint_paths.clone(),
++            }),
++        );
++        q38g_r2_heartbeat(
++            "env",
++            serde_json::json!({
++                "ASH_LAYERWISE_RESERVED_TRACE": std::env::var("ASH_LAYERWISE_RESERVED_TRACE").unwrap_or_default(),
++                "ASH_LAYERWISE_RESERVED_TRACE_LAYERS": std::env::var("ASH_LAYERWISE_RESERVED_TRACE_LAYERS").unwrap_or_default(),
++                "ASH_LAYERWISE_RESERVED_TRACE_STAGES": std::env::var("ASH_LAYERWISE_RESERVED_TRACE_STAGES").unwrap_or_default(),
++                "ASH_LAYERWISE_RESERVED_TRACE_MAX_STEPS": std::env::var("ASH_LAYERWISE_RESERVED_TRACE_MAX_STEPS").unwrap_or_default(),
++                "ASH_FORCE_NO_LORA": std::env::var("ASH_FORCE_NO_LORA").unwrap_or_default(),
++                "ASH_PROMPT_TEMPLATE": std::env::var("ASH_PROMPT_TEMPLATE").unwrap_or_default(),
++            }),
++        );
++    }
+     if let Some(cue) = req.subtitle_cue.as_ref() {
+         validate_subtitle_cue_context(cue)?;
+     }
+     let spec = ModelSpec::load_toml(&req.model_spec_path)?;
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "model_spec_loaded",
++            serde_json::json!({"model_spec_id": spec.model_spec_id.clone(), "preferred_backend": spec.backend.preferred_backend.clone()}),
++        );
++    }
+     let manifest = TokenizerManifest::load_json(&req.tokenizer_manifest_path)?;
+     let tokenizer = NativeTokenizer::from_manifest(manifest.clone());
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "tokenizer_loaded",
++            serde_json::json!({"tokenizer_manifest_id": manifest.manifest_id.clone(), "vocab_size": manifest.vocab.len()}),
++        );
++    }
+     let native_aux_probe = build_native_aux_probe(&req);
+ 
+     let base_hot_status = tokenizer
+@@ -2750,6 +2888,19 @@
+         attach_resolution.missing_selected_count,
+     );
+ 
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "force_no_lora",
++            serde_json::json!({
++                "force_no_lora": force_no_lora,
++                "selected_lora_ids": decision.selected_lora_ids.clone(),
++                "loaded_loras": loaded_loras.len(),
++                "attached_loras": attached.len(),
++                "attach_resolution_reason": attach_resolution.attach_resolution_reason.clone(),
++            }),
++        );
++    }
++
+     let prompt = build_prompt(
+         &decision,
+         &req.input_text,
+@@ -2769,6 +2920,16 @@
+     );
+ 
+     let prompt_ids = tokenizer.encode(&prompt)?;
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "prompt_built",
++            serde_json::json!({
++                "prompt_template_id": prompt_template_id.as_str(),
++                "prompt_len": prompt_ids.len(),
++                "input_text_chars": req.input_text.chars().count(),
++            }),
++        );
++    }
+     let mut banned_token_ids: Vec<u32> = manifest
+         .vocab
+         .iter()
+@@ -2886,6 +3047,16 @@
+                 req.force_native_safe_attention,
+                 req.force_native_reference_prefill,
+             );
++            if q38g_r2_trace_enabled {
++                q38g_r2_heartbeat(
++                    "native_model_load_start",
++                    serde_json::json!({
++                        "use_vocab_atlas": native_use_vocab_atlas,
++                        "use_embedding_row_gather": native_use_embedding_row_gather,
++                        "vocab_tile_size": req.native_vocab_tile_size,
++                    }),
++                );
++            }
+             match NativeWgpuModel::load_toml_with_loras_and_vocab_atlas(
+                 &req.model_spec_path,
+                 &req.checkpoint_paths,
+@@ -2900,6 +3071,12 @@
+             ) {
+                 Ok(mut native_model) => {
+                     eprintln!("[debug] native_wgpu_enabled = true");
++                    if q38g_r2_trace_enabled {
++                        q38g_r2_heartbeat(
++                            "native_model_load_done",
++                            serde_json::json!({"native_wgpu_enabled": true}),
++                        );
++                    }
+                     let mut gpu_penalty_telemetry: Option<GpuPenaltyTelemetry> = None;
+                     if req.disable_native_structure_routing {
+                         native_model.clear_structure_routing_prior();
+@@ -3184,14 +3361,39 @@
+     let mut generation_telemetry: Option<GenerationTelemetry> = None;
+     let mut native_embedding_row_gather_bytes: Option<usize>;
+ 
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "generation_start",
++            serde_json::json!({
++                "effective_max_new_tokens": effective_max_new_tokens,
++                "banned_token_ids": banned_token_ids.len(),
++                "requested_sampled_decode": requested_sampled_decode,
++            }),
++        );
++    }
+     let (generated_ids, first_backend, first_telemetry, first_embedding_row_gather_bytes) =
+         generate_ids(&banned_token_ids)?;
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "generation_done",
++            serde_json::json!({
++                "generated_ids_len": generated_ids.len(),
++                "backend": first_backend.clone(),
++            }),
++        );
++    }
+     check_cancel(cancel_flag)?;
+     generation_telemetry = first_telemetry;
+     native_embedding_row_gather_bytes = first_embedding_row_gather_bytes;
+     resolved_backend =
+         annotate_backend_with_text_density(first_backend, req.text_routing_prior.as_ref());
+     eprintln!("[debug] resolved_backend = {}", resolved_backend);
++    if q38g_r2_trace_enabled {
++        q38g_r2_heartbeat(
++            "backend_resolved",
++            serde_json::json!({"resolved_backend": resolved_backend.clone()}),
++        );
++    }
+     eprintln!("[debug] generated_ids_len = {}", generated_ids.len());
+     eprintln!(
+         "[debug] generated_ids_head = {:?}",
+@@ -3609,6 +3811,38 @@
+         .map(|b| b.overall_subtitle_score);
+     let subtitle_score_compact = subtitle_score_breakdown.as_ref().map(|b| b.compact());
+ 
++    if q38g_r2_trace_enabled {
++        let (layer_trace_path, summary_path, _receipt_path, raw_topk_path, hidden_proj_path) = q38g_r2_receipt_paths();
++        let layer_trace_written = q38g_r2_path_written(&layer_trace_path);
++        let summary_written = q38g_r2_path_written(&summary_path);
++        let status = if layer_trace_written && summary_written {
++            "PASS_RUNTIME_TRACE"
++        } else if layer_trace_written {
++            "FAIL_SUMMARY_NOT_WRITTEN"
++        } else {
++            "FAIL_LAYERWISE_HOOK_NOT_REACHED"
++        };
++        q38g_r2_write_receipt(
++            status,
++            "emit_response",
++            serde_json::json!({
++                "resolved_backend": resolved_backend.clone(),
++                "prompt_len": prompt_len,
++                "generated_tail_len": final_tail_ids.len(),
++                "output_text_preview": output_text.chars().take(120).collect::<String>(),
++                "layer_trace_path": layer_trace_path.clone(),
++                "layer_trace_written": layer_trace_written,
++                "summary_path": summary_path.clone(),
++                "summary_written": summary_written,
++                "raw_topk_path": raw_topk_path.clone(),
++                "raw_topk_written": q38g_r2_path_written(&raw_topk_path),
++                "hidden_projection_path": hidden_proj_path.clone(),
++                "hidden_projection_written": q38g_r2_path_written(&hidden_proj_path),
++            }),
++        );
++        eprintln!("[16AI-QW-38G-R2][done] status={}", status);
++    }
++
+     Ok(StandardInferResult {
+         output_text,
+         prompt_ids,

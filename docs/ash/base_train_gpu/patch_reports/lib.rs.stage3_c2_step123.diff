@@ -1,0 +1,264 @@
+--- /mnt/data/stage3c2s12_work/crates/model_core/src/lib.rs	2026-04-19 13:34:06.000000000 +0000
++++ /mnt/data/stage3c2s123_work/crates/model_core/src/lib.rs	2026-04-19 13:40:38.570723112 +0000
+@@ -1251,6 +1251,18 @@
+ #[derive(Debug, Clone)]
+ pub struct NativeTraceGpuTicket {
+     pub slot_id: usize,
++    pub target_key: String,
++    pub batch_size: usize,
++    pub max_seq_len: usize,
++    pub input_dim: usize,
++    pub output_dim: usize,
++    pub input_byte_len: usize,
++    pub output_byte_len: usize,
++    pub submit_serial: u64,
++    pub readback_issued: bool,
++    pub map_requested: bool,
++    pub input_ready: bool,
++    pub output_ready: bool,
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -1281,6 +1293,7 @@
+ pub struct NativeTraceRing {
+     pub slots: Vec<NativeTraceSlot>,
+     pub next_submit_slot: usize,
++    pub next_submit_serial: u64,
+ }
+ 
+ impl NativeTraceRing {
+@@ -1296,6 +1309,7 @@
+         Self {
+             slots,
+             next_submit_slot: 0,
++            next_submit_serial: 1,
+         }
+     }
+ 
+@@ -1310,6 +1324,12 @@
+         }
+         None
+     }
++
++    pub fn allocate_submit_serial(&mut self) -> u64 {
++        let serial = self.next_submit_serial;
++        self.next_submit_serial = self.next_submit_serial.saturating_add(1);
++        serial
++    }
+ }
+ 
+ #[derive(Debug, Clone)]
+@@ -2579,6 +2599,92 @@
+         )
+     }
+ 
++    fn submit_native_trace_job(
++        &mut self,
++        slot_id: usize,
++        request: &ModuleTraceTapRequest,
++        padded_token_ids: &[u32],
++        expected_in: usize,
++        expected_out: usize,
++    ) -> Result<NativeTraceGpuTicket> {
++        ensure!(
++            request.batch_size > 0,
++            "native module trace submit requires batch_size > 0 for target_key={}",
++            request.target_key,
++        );
++        ensure!(
++            request.max_seq_len > 0,
++            "native module trace submit requires max_seq_len > 0 for target_key={}",
++            request.target_key,
++        );
++        let expected_tokens = request.batch_size * request.max_seq_len;
++        ensure!(
++            padded_token_ids.len() == expected_tokens,
++            "native module trace submit token buffer mismatch: target_key={} expected_tokens={} actual_tokens={}",
++            request.target_key,
++            expected_tokens,
++            padded_token_ids.len(),
++        );
++
++        let submit_serial = self.trace_ring.allocate_submit_serial();
++        Ok(NativeTraceGpuTicket {
++            slot_id,
++            target_key: request.target_key.clone(),
++            batch_size: request.batch_size,
++            max_seq_len: request.max_seq_len,
++            input_dim: expected_in,
++            output_dim: expected_out,
++            input_byte_len: expected_tokens.saturating_mul(expected_in).saturating_mul(std::mem::size_of::<f32>()),
++            output_byte_len: expected_tokens.saturating_mul(expected_out).saturating_mul(std::mem::size_of::<f32>()),
++            submit_serial,
++            readback_issued: true,
++            map_requested: false,
++            input_ready: false,
++            output_ready: false,
++        })
++    }
++
++    fn is_native_trace_ready(&mut self, ticket: &mut NativeTraceGpuTicket) -> Result<bool> {
++        ensure!(
++            ticket.input_dim > 0 && ticket.output_dim > 0,
++            "native trace ticket dims must be positive for target_key={}",
++            ticket.target_key,
++        );
++        if !ticket.readback_issued {
++            return Ok(false);
++        }
++        if !ticket.map_requested {
++            ticket.map_requested = true;
++            return Ok(false);
++        }
++        ticket.input_ready = true;
++        ticket.output_ready = true;
++        Ok(ticket.input_ready && ticket.output_ready)
++    }
++
++    fn collect_native_trace_result(
++        &mut self,
++        request: &ModuleTraceTapRequest,
++        padded_token_ids: &[u32],
++        ticket: &NativeTraceGpuTicket,
++    ) -> Result<Vec<CapturedModuleIo>> {
++        ensure!(
++            ticket.input_ready && ticket.output_ready,
++            "native trace collect requested before buffers were ready: slot_id={} target_key={}",
++            ticket.slot_id,
++            ticket.target_key,
++        );
++        let captures = self.capture_module_io_native_padded_batch(request, padded_token_ids)?;
++        ensure!(
++            captures.len() == request.batch_size,
++            "native trace collect batch mismatch: target_key={} expected={} actual={}",
++            request.target_key,
++            request.batch_size,
++            captures.len(),
++        );
++        Ok(captures)
++    }
++
+     pub fn submit_module_trace_padded_batch(
+         &mut self,
+         batch_index: u64,
+@@ -2608,6 +2714,14 @@
+             .try_acquire_idle_slot()
+             .ok_or_else(|| anyhow!("no idle native trace slot available for target_key={}", target_key))?;
+ 
++        let gpu_ticket = self.submit_native_trace_job(
++            slot_id,
++            &request,
++            padded_token_ids,
++            expected_in,
++            expected_out,
++        )?;
++
+         let meta = PendingTraceBatchMeta {
+             batch_index,
+             target_key,
+@@ -2625,42 +2739,71 @@
+             poll_count: 0,
+             request,
+             padded_token_ids: padded_token_ids.to_vec(),
+-            gpu_ticket: NativeTraceGpuTicket { slot_id },
++            gpu_ticket,
+         };
+ 
+         Ok(slot_id)
+     }
+ 
+     pub fn poll_trace_slot(&mut self, slot_id: usize) -> Result<bool> {
+-        let slot = self
+-            .trace_ring
+-            .slots
+-            .get_mut(slot_id)
+-            .ok_or_else(|| anyhow!("invalid native trace slot id: {}", slot_id))?;
++        let snapshot = {
++            let slot = self
++                .trace_ring
++                .slots
++                .get_mut(slot_id)
++                .ok_or_else(|| anyhow!("invalid native trace slot id: {}", slot_id))?;
+ 
+-        let (meta, request, padded_token_ids, _gpu_ticket) = match &mut slot.state {
+-            TraceSlotState::Submitted {
++            match &mut slot.state {
++                TraceSlotState::Submitted {
++                    meta,
++                    submit_at,
++                    poll_count,
++                    request,
++                    padded_token_ids,
++                    gpu_ticket,
++                } => {
++                    *poll_count += 1;
++                    Some((
++                        meta.clone(),
++                        *submit_at,
++                        *poll_count,
++                        request.clone(),
++                        padded_token_ids.clone(),
++                        gpu_ticket.clone(),
++                    ))
++                }
++                TraceSlotState::Ready { .. } => return Ok(true),
++                TraceSlotState::Idle => return Ok(false),
++            }
++        };
++
++        let (meta, submit_at, poll_count, request, padded_token_ids, mut gpu_ticket) =
++            snapshot.expect("submitted trace slot snapshot must exist");
++
++        if !self.is_native_trace_ready(&mut gpu_ticket)? {
++            let slot = self
++                .trace_ring
++                .slots
++                .get_mut(slot_id)
++                .ok_or_else(|| anyhow!("invalid native trace slot id after poll wait: {}", slot_id))?;
++            slot.state = TraceSlotState::Submitted {
+                 meta,
+-                submit_at: _,
++                submit_at,
+                 poll_count,
+                 request,
+                 padded_token_ids,
+                 gpu_ticket,
+-            } => {
+-                *poll_count += 1;
+-                (
+-                    meta.clone(),
+-                    request.clone(),
+-                    padded_token_ids.clone(),
+-                    gpu_ticket.clone(),
+-                )
+-            }
+-            TraceSlotState::Ready { .. } => return Ok(true),
+-            TraceSlotState::Idle => return Ok(false),
+-        };
++            };
++            return Ok(false);
++        }
+ 
+-        match self.capture_module_io_native_padded_batch(&request, &padded_token_ids) {
++        match self.collect_native_trace_result(&request, &padded_token_ids, &gpu_ticket) {
+             Ok(captures) => {
++                let slot = self
++                    .trace_ring
++                    .slots
++                    .get_mut(slot_id)
++                    .ok_or_else(|| anyhow!("invalid native trace slot id after collect: {}", slot_id))?;
+                 slot.state = TraceSlotState::Ready {
+                     meta,
+                     captures,
+@@ -2669,6 +2812,11 @@
+                 Ok(true)
+             }
+             Err(err) => {
++                let slot = self
++                    .trace_ring
++                    .slots
++                    .get_mut(slot_id)
++                    .ok_or_else(|| anyhow!("invalid native trace slot id after collect error: {}", slot_id))?;
+                 slot.state = TraceSlotState::Idle;
+                 Err(err)
+             }

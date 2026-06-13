@@ -1,0 +1,234 @@
+--- ash38g_orig/crates/model_core/src/native_wgpu.rs	2026-05-22 09:26:46.000000000 +0000
++++ ash38g_r1/crates/model_core/src/native_wgpu.rs	2026-05-22 09:40:02.194927274 +0000
+@@ -4,7 +4,7 @@
+ use std::fs::OpenOptions;
+ use std::io::Write;
+ use std::sync::atomic::{AtomicUsize, Ordering};
+-use std::sync::OnceLock;
++use std::sync::{Mutex, OnceLock};
+ use crate::reference_math::{
+     add_batched,
+     apply_loras_to_batched_hidden,
+@@ -833,6 +833,206 @@
+ 
+ // 16AI-QW-38G — Reserved Direction Hidden Activation Source Trace / Layerwise Residual Seal
+ static QW38G_LAYERWISE_FORWARD_STEP: AtomicUsize = AtomicUsize::new(0);
++// 16AI-QW-38G-R1 — Rust-native Layerwise Trace Closure / No PowerShell Postprocess Seal
++static QW38G_LAYERWISE_EVENTS: OnceLock<Mutex<Vec<serde_json::Value>>> = OnceLock::new();
++static QW38G_LAYERWISE_RECEIPT_COUNTER: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_events() -> &'static Mutex<Vec<serde_json::Value>> {
++    QW38G_LAYERWISE_EVENTS.get_or_init(|| Mutex::new(Vec::new()))
++}
++
++fn qw38g_jsonl_path() -> String {
++    std::env::var("ASH_LAYERWISE_RESERVED_TRACE_JSONL")
++        .unwrap_or_else(|_| "workspace/qw38g_layerwise_reserved_direction_trace.jsonl".to_string())
++}
++
++fn qw38g_summary_path() -> String {
++    std::env::var("ASH_LAYERWISE_RESERVED_SUMMARY_JSON")
++        .unwrap_or_else(|_| "workspace/qw38g_layerwise_reserved_direction_summary.json".to_string())
++}
++
++fn qw38g_receipt_path() -> String {
++    std::env::var("ASH_LAYERWISE_RESERVED_RECEIPT_JSON")
++        .unwrap_or_else(|_| "workspace/qw38g_runtime_receipt.json".to_string())
++}
++
++fn qw38g_string_field(record: &serde_json::Value, key: &str) -> Option<String> {
++    record.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
++}
++
++fn qw38g_f64_field(record: &serde_json::Value, key: &str) -> Option<f64> {
++    record.get(key).and_then(|v| v.as_f64()).filter(|v| v.is_finite())
++}
++
++fn qw38g_usize_field(record: &serde_json::Value, key: &str) -> Option<usize> {
++    record.get(key).and_then(|v| v.as_u64()).map(|v| v as usize)
++}
++
++fn qw38g_unique_strings(records: &[serde_json::Value], key: &str) -> Vec<String> {
++    let mut out = Vec::new();
++    for record in records {
++        if let Some(value) = qw38g_string_field(record, key) {
++            if !out.iter().any(|v| v == &value) {
++                out.push(value);
++            }
++        }
++    }
++    out
++}
++
++fn qw38g_mean(values: Vec<f64>) -> Option<f64> {
++    let vals = values.into_iter().filter(|v| v.is_finite()).collect::<Vec<_>>();
++    if vals.is_empty() { None } else { Some(vals.iter().sum::<f64>() / vals.len() as f64) }
++}
++
++fn qw38g_warning_codes(records: &[serde_json::Value]) -> Vec<String> {
++    let mut out = Vec::new();
++    for record in records {
++        if let Some(items) = record.get("warning_codes").and_then(|v| v.as_array()) {
++            for item in items {
++                if let Some(code) = item.as_str() {
++                    if !out.iter().any(|v| v == code) {
++                        out.push(code.to_string());
++                    }
++                }
++            }
++        }
++    }
++    out
++}
++
++fn qw38g_stage_rank(stage: &str) -> i64 {
++    match stage {
++        "embed" => 0,
++        "post_attn" => 1,
++        "post_mlp" => 2,
++        "pre_final_norm" => 3,
++        "post_final_norm" => 4,
++        _ => 99,
++    }
++}
++
++fn qw38g_sort_key(record: &serde_json::Value) -> (usize, i64, i64) {
++    let step = qw38g_usize_field(record, "decode_step").unwrap_or(usize::MAX / 4);
++    let stage = qw38g_string_field(record, "stage").unwrap_or_default();
++    let layer_key = if let Some(layer) = qw38g_usize_field(record, "layer_id") {
++        layer as i64
++    } else if stage == "embed" {
++        -1
++    } else if stage == "pre_final_norm" || stage == "post_final_norm" {
++        100_000_000
++    } else {
++        10_000_000
++    };
++    (step, layer_key, qw38g_stage_rank(&stage))
++}
++
++fn qw38g_build_summary(records: &[serde_json::Value]) -> serde_json::Value {
++    let mut steps = Vec::<usize>::new();
++    for record in records {
++        if let Some(step) = qw38g_usize_field(record, "decode_step") {
++            if !steps.contains(&step) {
++                steps.push(step);
++            }
++        }
++    }
++
++    let strongest = records.iter().filter_map(|r| qw38g_f64_field(r, "dot_to_target").map(|d| (d, r))).max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)).map(|(_, r)| r);
++    let mut spikes = records.iter().filter(|r| r.get("reserved_direction_spike").and_then(|v| v.as_bool()) == Some(true)).collect::<Vec<_>>();
++    spikes.sort_by_key(|r| qw38g_sort_key(r));
++    let first_spike = spikes.first().copied();
++
++    let has_stage_spike = |stage: &str| -> bool {
++        records.iter().any(|r| r.get("reserved_direction_spike").and_then(|v| v.as_bool()) == Some(true) && qw38g_string_field(r, "stage").as_deref() == Some(stage))
++    };
++
++    let hidden_direction_source = if let Some(first) = first_spike {
++        match qw38g_string_field(first, "stage").as_deref() {
++            Some("embed") => "embedding_or_prompt_control_token_contamination",
++            Some("post_attn") => "attention_branch_reserved_direction_spike",
++            Some("post_mlp") => "mlp_residual_reserved_direction_spike",
++            Some("pre_final_norm") | Some("post_final_norm") => "final_norm_or_late_residual_reserved_direction_spike",
++            _ => "reserved_direction_spike_unknown_stage",
++        }.to_string()
++    } else if let Some(strongest) = strongest {
++        format!("no_spike_detected_strongest_stage_{}", qw38g_string_field(strongest, "stage").unwrap_or_else(|| "unknown".to_string()))
++    } else {
++        "trace_unavailable".to_string()
++    };
++
++    serde_json::json!({
++        "patch_id": "16AI-QW-38G-R1",
++        "status": if records.is_empty() { "TRACE_UNAVAILABLE" } else { "PASS_RUST_NATIVE_SUMMARY" },
++        "total_events": records.len(),
++        "steps_observed": steps.len(),
++        "layers_observed": qw38g_unique_strings(records, "layer_label"),
++        "stages_observed": qw38g_unique_strings(records, "stage"),
++        "strongest_stage": strongest.and_then(|r| qw38g_string_field(r, "stage")),
++        "strongest_layer": strongest.and_then(|r| qw38g_string_field(r, "layer_label")),
++        "strongest_target_dot": strongest.and_then(|r| qw38g_f64_field(r, "dot_to_target")),
++        "strongest_target_cosine": strongest.and_then(|r| qw38g_f64_field(r, "cosine_to_target")),
++        "strongest_gain_stage": null,
++        "strongest_gain_value": null,
++        "first_spike_step": first_spike.and_then(|r| qw38g_usize_field(r, "decode_step")),
++        "first_spike_layer": first_spike.and_then(|r| qw38g_string_field(r, "layer_label")),
++        "first_spike_stage": first_spike.and_then(|r| qw38g_string_field(r, "stage")),
++        "embed_direction_high": has_stage_spike("embed"),
++        "attention_direction_spike_detected": has_stage_spike("post_attn"),
++        "mlp_direction_spike_detected": has_stage_spike("post_mlp"),
++        "final_norm_direction_spike_detected": has_stage_spike("pre_final_norm") || has_stage_spike("post_final_norm"),
++        "hidden_direction_source": hidden_direction_source,
++        "mean_dot_to_target": qw38g_mean(records.iter().filter_map(|r| qw38g_f64_field(r, "dot_to_target")).collect()),
++        "mean_cosine_to_target": qw38g_mean(records.iter().filter_map(|r| qw38g_f64_field(r, "cosine_to_target")).collect()),
++        "mean_target_minus_compare_margin": qw38g_mean(records.iter().filter_map(|r| qw38g_f64_field(r, "target_minus_compare_margin")).collect()),
++        "spike_count": spikes.len(),
++        "spike_rate": if records.is_empty() { 0.0 } else { spikes.len() as f64 / records.len() as f64 },
++        "warning_codes": qw38g_warning_codes(records),
++        "python_postprocess_required": false,
++        "powershell_summary_required": false,
++    })
++}
++
++fn qw38g_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_append_jsonl(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
++        let _ = writeln!(file, "{}", value);
++    }
++}
++
++fn qw38g_record_event(record: serde_json::Value) {
++    if let Ok(mut records) = qw38g_events().lock() {
++        records.push(record.clone());
++        qw38g_append_jsonl(&qw38g_jsonl_path(), &record);
++        let summary = qw38g_build_summary(&records);
++        qw38g_write_json(&qw38g_summary_path(), &summary);
++        let receipt = serde_json::json!({
++            "patch_id": "16AI-QW-38G-R1",
++            "status": "PASS_RUNTIME_TRACE_IN_PROGRESS",
++            "trace_events": records.len(),
++            "trace_jsonl_written": true,
++            "summary_written": true,
++            "runtime_receipt_written": true,
++            "summary_path": qw38g_summary_path(),
++            "trace_jsonl_path": qw38g_jsonl_path(),
++            "python_postprocess_required": false,
++            "powershell_summary_required": false,
++            "receipt_counter": QW38G_LAYERWISE_RECEIPT_COUNTER.fetch_add(1, Ordering::SeqCst) + 1,
++        });
++        qw38g_write_json(&qw38g_receipt_path(), &receipt);
++    }
++}
++
+ 
+ fn qw38g_env_string(name: &str, default: &str) -> String {
+     std::env::var(name).unwrap_or_else(|_| default.to_string())
+@@ -1034,14 +1234,7 @@
+         "warning_codes": warning_codes,
+     });
+ 
+-    let jsonl_path = std::env::var("ASH_LAYERWISE_RESERVED_TRACE_JSONL")
+-        .unwrap_or_else(|_| "workspace/qw38g_layerwise_reserved_direction_trace.jsonl".to_string());
+-    if let Some(parent) = std::path::Path::new(&jsonl_path).parent() {
+-        let _ = std::fs::create_dir_all(parent);
+-    }
+-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
+-        let _ = writeln!(file, "{}", record);
+-    }
++    qw38g_record_event(record);
+ }
+ 
+ fn build_native_vocab_atlas(

@@ -1,0 +1,302 @@
+--- /dev/fd/63	2026-05-22 12:47:22.794572669 +0000
++++ crates/model_core/src/native_wgpu.rs	2026-05-22 12:46:28.734818656 +0000
+@@ -481,6 +481,291 @@
+ }
+ 
+ 
++// 16AI-QW-38G-R6 — Shader Debug Buffer Design / Explicit Intermediate Export Candidate Seal
++static QW38G_R6_TAP_STEP: AtomicUsize = AtomicUsize::new(0);
++
++fn qw38g_r6_enabled() -> bool {
++    env_flag("ASH_SHADER_DEBUG_BUFFER") || env_flag("ASH_QW38G_R6_SHADER_DEBUG_BUFFER")
++}
++
++fn qw38g_r6_scalar_only() -> bool {
++    std::env::var("ASH_SHADER_DEBUG_BUFFER_SCALAR_ONLY")
++        .ok()
++        .map(|v| !matches!(v.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
++        .unwrap_or(true)
++}
++
++fn qw38g_r6_full_vector_requested() -> bool {
++    env_flag("ASH_SHADER_DEBUG_BUFFER_FULL_VECTOR")
++}
++
++fn qw38g_r6_trace_path() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BUFFER_OUT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6_shader_debug_buffer_trace.jsonl".to_string())
++}
++
++fn qw38g_r6_summary_path() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BUFFER_SUMMARY")
++        .unwrap_or_else(|_| "workspace/qw38g_r6_shader_debug_buffer_summary.json".to_string())
++}
++
++fn qw38g_r6_receipt_path() -> String {
++    std::env::var("ASH_SHADER_DEBUG_BUFFER_RECEIPT")
++        .unwrap_or_else(|_| "workspace/qw38g_r6_shader_debug_buffer_receipt.json".to_string())
++}
++
++fn qw38g_r6_max_bytes() -> usize {
++    qw38a_env_usize("ASH_SHADER_DEBUG_BUFFER_MAX_BYTES", 4096).max(64)
++}
++
++fn qw38g_r6_split_env(name: &str, default: &str) -> Vec<String> {
++    std::env::var(name)
++        .unwrap_or_else(|_| default.to_string())
++        .split(',')
++        .map(|s| s.trim().to_string())
++        .filter(|s| !s.is_empty())
++        .collect()
++}
++
++fn qw38g_r6_target_ids() -> Vec<usize> {
++    qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_TARGET_IDS", "13")
++        .into_iter()
++        .filter_map(|s| s.parse::<usize>().ok())
++        .collect::<Vec<_>>()
++}
++
++fn qw38g_r6_write_json(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(text) = serde_json::to_string_pretty(value) {
++        let _ = std::fs::write(path, text);
++    }
++}
++
++fn qw38g_r6_append_jsonl(path: &str, value: &serde_json::Value) {
++    if let Some(parent) = std::path::Path::new(path).parent() {
++        let _ = std::fs::create_dir_all(parent);
++    }
++    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
++        let _ = writeln!(file, "{}", value);
++    }
++}
++
++fn qw38g_r6_path_written(path: &str) -> bool {
++    std::path::Path::new(path)
++        .metadata()
++        .map(|m| m.len() > 0)
++        .unwrap_or(false)
++}
++
++fn qw38g_r6_record_size_bytes() -> usize {
++    // Planned ShaderDebugScalarRecord: sixteen 32-bit lanes.
++    16 * std::mem::size_of::<u32>()
++}
++
++fn qw38g_r6_write_summary_and_receipt(
++    status: &str,
++    total_events: usize,
++    tap_reached: bool,
++    trace_written: bool,
++    total_readback_bytes: usize,
++    warnings: Vec<String>,
++    extra: serde_json::Value,
++) {
++    let trace_path = qw38g_r6_trace_path();
++    let summary_path = qw38g_r6_summary_path();
++    let receipt_path = qw38g_r6_receipt_path();
++    let stages = qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_STAGES", "post_mlp,post_block");
++    let layers = qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_LAYERS", "mid,last");
++    let targets = qw38g_r6_target_ids();
++    let full_vector_readback_used = false;
++    let summary = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "enabled": qw38g_r6_enabled(),
++        "scalar_only": qw38g_r6_scalar_only(),
++        "full_vector_readback_used": full_vector_readback_used,
++        "requested_steps": qw38a_env_usize("ASH_SHADER_DEBUG_BUFFER_MAX_STEPS", 1).max(1),
++        "requested_layers": layers,
++        "requested_stages": stages,
++        "requested_target_ids": targets,
++        "total_records_allocated": extra.get("planned_records").and_then(|v| v.as_u64()).unwrap_or(0),
++        "total_events_decoded": total_events,
++        "total_readback_bytes": total_readback_bytes,
++        "tap_reached": tap_reached,
++        "post_mlp_tap_reached": false,
++        "post_block_tap_reached": false,
++        "post_final_norm_tap_reached": false,
++        "strongest_layer": null,
++        "strongest_stage": null,
++        "strongest_dot_to_target": null,
++        "strongest_cosine_to_target": null,
++        "reserved_direction_source_candidate": null,
++        "warning_codes": warnings,
++        "extra": extra,
++    });
++    qw38g_r6_write_json(&summary_path, &summary);
++    let receipt = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6",
++        "status": status,
++        "timestamp_unix_ms": qw38g_r3_now_ms(),
++        "debug_buffer_enabled": qw38g_r6_enabled(),
++        "scalar_only": qw38g_r6_scalar_only(),
++        "full_vector_readback_used": full_vector_readback_used,
++        "trace_path": trace_path,
++        "trace_written": trace_written && qw38g_r6_path_written(&trace_path),
++        "summary_path": summary_path,
++        "summary_written": qw38g_r6_path_written(&summary_path),
++        "receipt_path": receipt_path,
++        "receipt_written": true,
++        "total_readback_bytes": total_readback_bytes,
++        "tap_reached": tap_reached,
++        "recommended_next_patch": if tap_reached {
++            "16AI-QW-38G-R7_SHADER_SCALAR_TAP_SOURCE_COMPARE"
++        } else {
++            "16AI-QW-38G-R6A_SHADER_DISPATCH_HOOK_EXPOSURE"
++        },
++        "warning_codes": summary.get("warning_codes").cloned().unwrap_or_else(|| serde_json::json!([])),
++    });
++    qw38g_r6_write_json(&receipt_path, &receipt);
++    eprintln!("[16AI-QW-38G-R6][summary_written] path={}", summary_path);
++    eprintln!("[16AI-QW-38G-R6][receipt_written] path={}", receipt_path);
++    eprintln!("[16AI-QW-38G-R6][done] status={}", status);
++}
++
++fn qw38g_r6_shader_debug_buffer_candidate() {
++    if !qw38g_r6_enabled() {
++        return;
++    }
++    let step = QW38G_R6_TAP_STEP.fetch_add(1, Ordering::SeqCst);
++    let max_steps = qw38a_env_usize("ASH_SHADER_DEBUG_BUFFER_MAX_STEPS", 1).max(1);
++    if step >= max_steps {
++        return;
++    }
++    let layers = qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_LAYERS", "mid,last");
++    let stages = qw38g_r6_split_env("ASH_SHADER_DEBUG_BUFFER_STAGES", "post_mlp,post_block");
++    let targets = qw38g_r6_target_ids();
++    let scalar_only = qw38g_r6_scalar_only();
++    let max_bytes = qw38g_r6_max_bytes();
++    let planned_records = max_steps
++        .saturating_mul(layers.len().max(1))
++        .saturating_mul(stages.len().max(1))
++        .saturating_mul(targets.len().max(1));
++    let planned_bytes = planned_records.saturating_mul(qw38g_r6_record_size_bytes());
++    eprintln!(
++        "[16AI-QW-38G-R6][start] step={} scalar_only={} max_steps={} targets={:?}",
++        step, scalar_only, max_steps, targets
++    );
++    eprintln!(
++        "[16AI-QW-38G-R6][env] enabled=true layers={} stages={} scalar_only={} max_bytes={}",
++        layers.join(","), stages.join(","), scalar_only, max_bytes
++    );
++    eprintln!(
++        "[16AI-QW-38G-R6][buffer_plan] records={} bytes={} record_size={} max_bytes={}",
++        planned_records,
++        planned_bytes,
++        qw38g_r6_record_size_bytes(),
++        max_bytes
++    );
++
++    if qw38g_r6_full_vector_requested() || !scalar_only {
++        qw38g_r6_write_summary_and_receipt(
++            "FAIL_FULL_VECTOR_REJECTED",
++            0,
++            false,
++            false,
++            0,
++            vec!["GPU_DEBUG_TAP_FULL_VECTOR_REJECTED".to_string()],
++            serde_json::json!({
++                "planned_records": planned_records,
++                "planned_bytes": planned_bytes,
++                "requested_layers": layers,
++                "requested_stages": stages,
++                "requested_target_ids": targets,
++                "note": "full vector readback is rejected by 16AI-QW-38G-R6",
++            }),
++        );
++        return;
++    }
++    if planned_bytes > max_bytes {
++        qw38g_r6_write_summary_and_receipt(
++            "FAIL_DEBUG_BUFFER_BUDGET_EXCEEDED",
++            0,
++            false,
++            false,
++            0,
++            vec!["GPU_DEBUG_TAP_READBACK_BUDGET_EXCEEDED".to_string()],
++            serde_json::json!({
++                "planned_records": planned_records,
++                "planned_bytes": planned_bytes,
++                "max_bytes": max_bytes,
++                "requested_layers": layers,
++                "requested_stages": stages,
++                "requested_target_ids": targets,
++            }),
++        );
++        return;
++    }
++
++    for layer in &layers {
++        for stage in &stages {
++            for target in &targets {
++                eprintln!(
++                    "[16AI-QW-38G-R6][shader_tap_attempt] step={} layer={} stage={} target={} result=unavailable",
++                    step, layer, stage, target
++                );
++            }
++        }
++    }
++
++    let event = serde_json::json!({
++        "patch_id": "16AI-QW-38G-R6",
++        "decode_step": step,
++        "layer_id": null,
++        "layer_label": null,
++        "stage": null,
++        "target_token_id": targets.first().copied().unwrap_or(13),
++        "target_piece": qw38a_piece(qw38a_token_meta(), targets.first().copied().unwrap_or(13)),
++        "dot_to_target": null,
++        "hidden_norm": null,
++        "target_row_norm": null,
++        "cosine_to_target": null,
++        "readback_kind": "projection_scalar_unavailable",
++        "readback_bytes": 0,
++        "status_code": "GPU_DEBUG_BUFFER_INSERTION_POINT_UNAVAILABLE",
++        "tap_reached": false,
++        "warning_codes": ["GPU_DEBUG_BUFFER_INSERTION_POINT_UNAVAILABLE", "RESERVED_DIRECTION_SOURCE_STILL_UNKNOWN"],
++    });
++    // The trace is intentionally not written as a successful tap trace. The receipt/summary carries the fail-closed evidence.
++    let _ = event;
++    qw38g_r6_write_summary_and_receipt(
++        "FAIL_SHADER_DEBUG_TAP_UNAVAILABLE",
++        0,
++        false,
++        false,
++        0,
++        vec![
++            "GPU_DEBUG_BUFFER_INSERTION_POINT_UNAVAILABLE".to_string(),
++            "POST_MLP_TAP_UNAVAILABLE".to_string(),
++            "POST_BLOCK_TAP_UNAVAILABLE".to_string(),
++            "RESERVED_DIRECTION_SOURCE_STILL_UNKNOWN".to_string(),
++        ],
++        serde_json::json!({
++            "planned_records": planned_records,
++            "planned_bytes": planned_bytes,
++            "max_bytes": max_bytes,
++            "requested_layers": layers,
++            "requested_stages": stages,
++            "requested_target_ids": targets,
++            "actual_traceable_boundary": "final_hidden_projection",
++            "note": "shader debug buffer design candidate is present, but no intermediate shader insertion point is exposed in the current native path",
++        }),
++    );
++}
++
++
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct NativeTextDensityState {
+     pub configured: bool,
+@@ -3307,6 +3592,7 @@
+         qw38d_log_hidden_projection_trace(&global_top_k, best_token_id, best_logit, atlas, &last_hidden);
+         qw38g_r3_stage_enter("hidden_projection_trace_hook", format!("best_token_id={} best_logit={}", best_token_id, best_logit));
+         qw38g_r4_gpu_debug_tap_candidate(&global_top_k, atlas, &last_hidden);
++        qw38g_r6_shader_debug_buffer_candidate();
+ 
+         eprintln!(
+             "[native-vocab-atlas] tile_argmax token_id={} logit={} tile_count={} vocab={} full_vocab_bytes={} cache_action={} sampling_mode=full_logits_compat_top_k_merge top_k_candidates={}",

@@ -1,0 +1,103 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-35-R3A",
+  "title": "Atlas Group Plan Receipt Schema Narrowing And Explicit Source Path Rebind / Candidate Flood To Canonical Atlas Plan Receipt No Manifest Invent Seal",
+  "patch_kind": "read_only_canonical_source_binding_schema_narrowing",
+  "source_ssot": "explicit_canonical_atlas_group_plan_receipt_path_only",
+  "status": "BLOCKED_NO_EXPLICIT_ATLAS_PLAN_RECEIPT_SOURCE",
+  "verdict": "BLOCKED",
+  "pass": false,
+  "blocked_reason": "Baked static run did not provide CLI, ENV, or pointer receipt canonical atlas group plan receipt path. This is the expected sealed result for the bundled static artifact.",
+  "source_binding": {
+    "explicit_source_path_required": true,
+    "explicit_source_path_used": false,
+    "source_binding_origin": "none_static_bake",
+    "canonical_atlas_plan_receipt_path": null,
+    "canonical_atlas_plan_receipt_exists": false,
+    "canonical_atlas_plan_receipt_digest_hex": null,
+    "candidate_flood_selection_used": false,
+    "wildcard_scan_used_for_selection": false
+  },
+  "schema_narrowing": {
+    "schema_kind": "unsupported_or_unparsed",
+    "schema_match": false,
+    "parsed_group_count": 0,
+    "selected_group_match_count": 0
+  },
+  "selected_group_request": {
+    "selected_group_id_requested": "SELECTED_ATLAS_GROUP_SLOT_0_CONTRACT_ONLY",
+    "selected_group_index_requested": 0
+  },
+  "selected_group_manifest_candidate_count": 0,
+  "selected_group_manifest_candidate": null,
+  "guards": {
+    "invented_shape": false,
+    "invented_dtype": false,
+    "invented_byte_range": false,
+    "invented_tensor_name": false,
+    "invented_source_shard_path": false,
+    "selected_group_weights_loaded": false,
+    "runtime_gpu_buffer_created": false,
+    "selected_group_gradient_buffer_allocated": false,
+    "selected_group_backward_executed": false,
+    "optimizer_step_executed": false,
+    "safetensors_mutation_present": false,
+    "runtime_1p1b_training_claimed": false
+  },
+  "no_invent_guard": {
+    "no_invent_guard_created": true,
+    "shape_default_allowed": false,
+    "dtype_default_allowed": false,
+    "byte_range_default_allowed": false,
+    "tensor_name_default_allowed": false,
+    "source_shard_path_default_allowed": false,
+    "missing_field_policy": "block_do_not_fill"
+  },
+  "no_weight_load_guard": {
+    "no_weight_load_guard_created": true,
+    "safetensors_header_read_allowed": false,
+    "selected_group_weight_bytes_read": false,
+    "full_tensor_load_executed": false,
+    "mmap_materialization_executed": false,
+    "weight_loaded": false
+  },
+  "no_gpu_runtime_guard": {
+    "no_gpu_runtime_guard_created": true,
+    "wgpu_device_requested": false,
+    "runtime_gpu_buffer_created": false,
+    "gpu_upload_executed": false,
+    "forward_executed": false
+  },
+  "no_backward_no_optimizer_guard": {
+    "no_backward_no_optimizer_guard_created": true,
+    "selected_group_backward_executed": false,
+    "gradient_write_executed": false,
+    "optimizer_created": false,
+    "optimizer_step_executed": false,
+    "delta_candidate_materialized": false,
+    "checkpoint_write_executed": false,
+    "safetensors_mutation_present": false
+  },
+  "acceptance_criteria": {
+    "pass_status_expected": "PASS_ASH_BASETRAIN_GPU_35_R3A_ATLAS_GROUP_PLAN_RECEIPT_SCHEMA_NARROWING_AND_EXPLICIT_SOURCE_PATH_REBIND_CANDIDATE_FLOOD_TO_CANONICAL_ATLAS_PLAN_RECEIPT_NO_MANIFEST_INVENT",
+    "actual_status": "BLOCKED_NO_EXPLICIT_ATLAS_PLAN_RECEIPT_SOURCE",
+    "blocked_is_valid_sealed_result": true,
+    "same_input_same_digest_required": true,
+    "canonical_source_path_required": true,
+    "source_receipt_digest_required": true,
+    "selected_manifest_digest_required_on_pass": true,
+    "candidate_flood_selection_must_be_false": true,
+    "next_patch_if_pass": "ASH-BASETRAIN-GPU-36",
+    "next_patch_if_blocked_no_source": "ASH-BASETRAIN-GPU-35-R3A-R1",
+    "next_patch_if_blocked_schema": "ASH-BASETRAIN-GPU-35-R3B",
+    "next_patch_if_blocked_selected_group": "ASH-BASETRAIN-GPU-35-R3C"
+  },
+  "bake_static_evidence": {
+    "cargo_available_in_bake_container": false,
+    "cargo_build_executed": false,
+    "cargo_run_executed": false,
+    "static_checks_path": "artifacts/ASH_BASETRAIN_GPU_35_R3A_STATIC_CHECKS.txt",
+    "static_checks_sha256": "69ea7f8e826dfe021d6097b57dd2c724c1592b08b3b688dedc1fef9570aedfa0",
+    "source_file_sha256": "bcf8855d0a220b88140985de6640a8b346951546662c589d98cadd9fd84df367",
+    "bin_file_sha256": "51392dbeda1356b423dc1adf1e4462eba71f33c07e4b072810f1809a6214cf79"
+  }
+}

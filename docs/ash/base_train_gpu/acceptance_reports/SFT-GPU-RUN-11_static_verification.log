@@ -1,0 +1,31 @@
+# SFT-GPU-RUN-11 Static Verification Log
+2026-05-19T05:21:57Z
+
+cargo: NOT_AVAILABLE
+rustc: NOT_AVAILABLE
+
+## New files
+OK crates/ash_core/src/sft_gpu_slot_arbitration.rs
+OK crates/ash_core/tests/sft_gpu_run_11_slot_arbitration.rs
+OK crates/lora_train/src/gpu_trained_slot_arbitration.rs
+OK crates/lora_train/tests/gpu_trained_slot_arbitration.rs
+OK crates/burn_webgpu_backend/src/gpu_trained_slot_arbitration.rs
+OK crates/burn_webgpu_backend/tests/gpu_trained_slot_arbitration.rs
+OK acceptance_reports/SFT-GPU-RUN-11_slot_arbitration.md
+OK docs/roadmap/SFT-GPU-RUN-11_to_RUN-13_after_bake.md
+
+## Export wiring
+crates/ash_core/src/lib.rs:436:pub mod sft_gpu_slot_arbitration;
+crates/ash_core/src/lib.rs:437:pub use sft_gpu_slot_arbitration::*;
+crates/lora_train/src/lib.rs:309:pub mod gpu_trained_slot_arbitration;
+crates/lora_train/src/lib.rs:310:pub use gpu_trained_slot_arbitration::*;
+crates/burn_webgpu_backend/src/lib.rs:269:pub mod gpu_trained_slot_arbitration;
+crates/burn_webgpu_backend/src/lib.rs:270:pub use gpu_trained_slot_arbitration::*;
+
+## Balanced delimiter scan
+OK crates/ash_core/src/sft_gpu_slot_arbitration.rs
+OK crates/ash_core/tests/sft_gpu_run_11_slot_arbitration.rs
+OK crates/lora_train/src/gpu_trained_slot_arbitration.rs
+OK crates/lora_train/tests/gpu_trained_slot_arbitration.rs
+OK crates/burn_webgpu_backend/src/gpu_trained_slot_arbitration.rs
+OK crates/burn_webgpu_backend/tests/gpu_trained_slot_arbitration.rs

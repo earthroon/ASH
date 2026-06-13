@@ -1,0 +1,207 @@
+--- /mnt/data/work_38g_r3/scripts/run_16AI_QW_38G_layerwise_reserved_direction.ps1	2026-05-22 11:43:45.682728003 +0000
++++ scripts/run_16AI_QW_38G_R4_gpu_debug_tap.ps1	2026-05-22 12:26:24.171498691 +0000
+@@ -1,81 +1,72 @@
+ param(
+   [string]$Text = "1+1은?",
+   [string]$Task = "freeform",
+-  [int]$MaxNewTokens = 4,
++  [int]$MaxNewTokens = 1,
+   [int]$Seed = 42,
+   [string]$ModelSpec = ".\specs\model_spec_v5_48259.toml",
+   [string]$Tokenizer = ".\artifacts\tokenizer_manifest_v5_final.json",
+   [string]$Checkpoint = ".\tokenizer_v5\artifacts\full_model_vocab_v5_resized.safetensors",
+   [string]$Banlist = ".\artifacts\tokenizer_generation_banlist_v5.json",
++  [string]$Layers = "mid,last",
++  [string]$Stages = "post_mlp,post_block",
+   [int]$TopN = 8,
+-  [int]$MaxSteps = 4,
+-  [string]$Layers = "0,mid,last",
+-  [string]$Stages = "post_mlp,post_final_norm",
+   [string]$OutDir = ".\workspace",
++  [switch]$Build,
+   [switch]$Quiet
+ )
+ 
+ $ErrorActionPreference = "Continue"
+-
+-if (!(Test-Path $OutDir)) {
+-  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+-}
++if (!(Test-Path $OutDir)) { New-Item -ItemType Directory -Force -Path $OutDir | Out-Null }
+ 
+ chcp 65001 | Out-Null
+ [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+ 
+-$stdoutPath = Join-Path $OutDir "infer_qw38g_layerwise_reserved_direction_stdout.json"
+-$stderrPath = Join-Path $OutDir "infer_qw38g_layerwise_reserved_direction_stderr.log"
+-$livePath = Join-Path $OutDir "infer_qw38g_r3_stage_map_live.log"
++$livePath = Join-Path $OutDir "infer_qw38g_r4_gpu_debug_tap_live.log"
++$stdoutPath = Join-Path $OutDir "infer_qw38g_r4_gpu_debug_tap_stdout.json"
++$stderrPath = Join-Path $OutDir "infer_qw38g_r4_gpu_debug_tap_stderr.log"
++$tracePath = Join-Path $OutDir "qw38g_r4_gpu_debug_tap_trace.jsonl"
++$summaryPath = Join-Path $OutDir "qw38g_r4_gpu_debug_tap_summary.json"
++$receiptPath = Join-Path $OutDir "qw38g_r4_gpu_debug_tap_receipt.json"
++$stageMapPath = Join-Path $OutDir "qw38g_r4_forward_stage_map.json"
++$stageMapReceipt = Join-Path $OutDir "qw38g_r4_stage_map_receipt.json"
+ $rawJsonlPath = Join-Path $OutDir "qw38a_raw_topk_trace.jsonl"
+ $hiddenJsonlPath = Join-Path $OutDir "qw38d_hidden_projection_trace.jsonl"
+-$layerJsonlPath = Join-Path $OutDir "qw38g_layerwise_reserved_direction_trace.jsonl"
+-$summaryPath = Join-Path $OutDir "qw38g_layerwise_reserved_direction_summary.json"
+-$receiptPath = Join-Path $OutDir "qw38g_r3_runtime_receipt.json"
+-$stageMapPath = Join-Path $OutDir "qw38g_r3_forward_stage_map.json"
+-
+-Remove-Item $rawJsonlPath -ErrorAction SilentlyContinue
+-Remove-Item $hiddenJsonlPath -ErrorAction SilentlyContinue
+-Remove-Item $layerJsonlPath -ErrorAction SilentlyContinue
+-Remove-Item $summaryPath -ErrorAction SilentlyContinue
+-Remove-Item $receiptPath -ErrorAction SilentlyContinue
+-Remove-Item $stageMapPath -ErrorAction SilentlyContinue
+-Remove-Item $livePath -ErrorAction SilentlyContinue
+-Remove-Item $stdoutPath -ErrorAction SilentlyContinue
+-Remove-Item $stderrPath -ErrorAction SilentlyContinue
++
++Remove-Item $livePath,$stdoutPath,$stderrPath,$tracePath,$summaryPath,$receiptPath,$stageMapPath,$stageMapReceipt,$rawJsonlPath,$hiddenJsonlPath -ErrorAction SilentlyContinue
+ 
+ $env:ASH_PROMPT_TEMPLATE = "ash_dialogue_ko"
+ $env:ASH_FORCE_NO_LORA = "1"
++$env:ASH_GPU_DEBUG_TAP = "1"
++$env:ASH_GPU_DEBUG_TAP_MAX_STEPS = "1"
++$env:ASH_GPU_DEBUG_TAP_LAYERS = $Layers
++$env:ASH_GPU_DEBUG_TAP_STAGES = $Stages
++$env:ASH_GPU_DEBUG_TAP_TARGET_IDS = "13"
++$env:ASH_GPU_DEBUG_TAP_SCALAR_ONLY = "1"
++$env:ASH_GPU_DEBUG_TAP_OUT = $tracePath
++$env:ASH_GPU_DEBUG_TAP_SUMMARY = $summaryPath
++$env:ASH_GPU_DEBUG_TAP_RECEIPT = $receiptPath
++$env:ASH_FORWARD_STAGE_MAP = "1"
++$env:ASH_FORWARD_STAGE_MAP_OUT = $stageMapPath
++$env:ASH_FORWARD_STAGE_MAP_RECEIPT = $stageMapReceipt
+ $env:ASH_RAW_TOPK_TRACE = "1"
+ $env:ASH_RAW_TOPK_TRACE_TOP_N = "$TopN"
+-$env:ASH_RAW_TOPK_TRACE_MAX_STEPS = "$MaxSteps"
++$env:ASH_RAW_TOPK_TRACE_MAX_STEPS = "1"
+ $env:ASH_RAW_TOPK_TRACE_JSONL = $rawJsonlPath
+ $env:ASH_HIDDEN_PROJECTION_TRACE = "1"
+-$env:ASH_HIDDEN_PROJECTION_TRACE_MAX_STEPS = "$MaxSteps"
++$env:ASH_HIDDEN_PROJECTION_TRACE_MAX_STEPS = "1"
+ $env:ASH_HIDDEN_PROJECTION_TOP_N = "$TopN"
+ $env:ASH_HIDDEN_PROJECTION_TRACE_JSONL = $hiddenJsonlPath
+-$env:ASH_LAYERWISE_RESERVED_TRACE = "1"
+-$env:ASH_LAYERWISE_RESERVED_TRACE_MAX_STEPS = "$MaxSteps"
+-$env:ASH_LAYERWISE_RESERVED_TRACE_LAYERS = $Layers
+-$env:ASH_LAYERWISE_RESERVED_TRACE_STAGES = $Stages
+-$env:ASH_LAYERWISE_RESERVED_TRACE_JSONL = $layerJsonlPath
+-$env:ASH_LAYERWISE_RESERVED_SUMMARY_JSON = $summaryPath
+-$env:ASH_LAYERWISE_RESERVED_RECEIPT_JSON = $receiptPath
+-$env:ASH_LAYERWISE_RESERVED_TARGET_ID = "13"
+-$env:ASH_QW38G_R2_HEARTBEAT = "1"
+-$env:ASH_FORWARD_STAGE_MAP = "1"
+-$env:ASH_FORWARD_STAGE_MAP_VERBOSE = "1"
+-$env:ASH_FORWARD_STAGE_MAP_OUT = $stageMapPath
+-$env:ASH_FORWARD_STAGE_MAP_RECEIPT = $receiptPath
+ $env:ASH_TOKENIZER_MANIFEST_PATH = $Tokenizer
+ $env:ASH_GENERATION_BANLIST_PATH = $Banlist
+ 
+-$buildArgsList = @(
+-  "build", "--release", "--manifest-path", ".\crates\runtime\Cargo.toml", "--example", "infer_only"
+-)
+-
+ $exePath = ".\target\release\examples\infer_only.exe"
++if ($Build -or !(Test-Path $exePath)) {
++  Write-Host "[16AI-QW-38G-R4][build] cargo build --release example infer_only"
++  & cargo build --release --manifest-path ".\crates\runtime\Cargo.toml" --example infer_only 2>&1 | Tee-Object (Join-Path $OutDir "build_qw38g_r4.log")
++  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
++}
++
+ $runArgsList = @(
+   "--model-spec", $ModelSpec,
+   "--tokenizer", $Tokenizer,
+@@ -87,75 +78,29 @@
+   "--json"
+ )
+ 
+-Write-Host "[16AI-QW-38G-R3][start] force_no_lora=true prompt_template=ash_dialogue_ko top_n=$TopN max_steps=$MaxSteps layers=$Layers stages=$Stages"
+-Write-Host "[16AI-QW-38G-R3][paths] live=$livePath receipt=$receiptPath stage_map=$stageMapPath summary=$summaryPath trace=$layerJsonlPath"
+-Write-Host "[16AI-QW-38G-R3][build] cargo build --release example infer_only"
+-
+-$buildProcess = Start-Process `
+-  -FilePath "cargo.exe" `
+-  -ArgumentList $buildArgsList `
+-  -RedirectStandardOutput (Join-Path $OutDir "build_qw38g_r2_stdout.log") `
+-  -RedirectStandardError (Join-Path $OutDir "build_qw38g_r2_stderr.log") `
+-  -NoNewWindow `
+-  -Wait `
+-  -PassThru
+-
+-if ($buildProcess.ExitCode -ne 0) {
+-  Write-Host "[16AI-QW-38G-R3][error] cargo build failed exit_code=$($buildProcess.ExitCode)"
+-  Get-Content (Join-Path $OutDir "build_qw38g_r2_stderr.log") -Tail 120 -Encoding UTF8
+-  exit $buildProcess.ExitCode
+-}
+-
+-Write-Host "[16AI-QW-38G-R3][run_live] exe=$exePath"
++Write-Host "[16AI-QW-38G-R4][run] layers=$Layers stages=$Stages max_new_tokens=$MaxNewTokens scalar_only=1"
+ if ($Quiet) {
+-  $process = Start-Process `
+-    -FilePath $exePath `
+-    -ArgumentList $runArgsList `
+-    -RedirectStandardOutput $stdoutPath `
+-    -RedirectStandardError $stderrPath `
+-    -NoNewWindow `
+-    -Wait `
+-    -PassThru
++  $process = Start-Process -FilePath $exePath -ArgumentList $runArgsList -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -NoNewWindow -Wait -PassThru
+   $code = $process.ExitCode
+ } else {
+   & $exePath @runArgsList 2>&1 | Tee-Object -FilePath $livePath
+   $code = $LASTEXITCODE
+ }
+-
+-Write-Host "[16AI-QW-38G-R3][run_done] exit_code=$code live=$livePath"
+-
+-if ($code -ne 0) {
+-  Write-Host "[16AI-QW-38G-R3][error] infer_only failed with exit code $code"
+-  exit $code
+-}
++Write-Host "[16AI-QW-38G-R4][run_done] exit_code=$code live=$livePath"
++if ($code -ne 0) { exit $code }
+ 
+ if (!(Test-Path $receiptPath)) {
+-  Write-Host "[16AI-QW-38G-R3][error] runtime receipt missing: $receiptPath"
++  Write-Host "[16AI-QW-38G-R4][error] receipt missing: $receiptPath"
+   if (Test-Path $livePath) { Get-Content $livePath -Tail 120 -Encoding UTF8 }
+   exit 1
+ }
+-
+-Write-Host "[16AI-QW-38G-R3][receipt] $receiptPath"
++Write-Host "[16AI-QW-38G-R4][receipt] $receiptPath"
+ Get-Content $receiptPath -Encoding UTF8
+-
+-if (!(Test-Path $stageMapPath)) {
+-  Write-Host "[16AI-QW-38G-R3][error] stage map missing: $stageMapPath"
+-  if (Test-Path $livePath) { Get-Content $livePath -Tail 160 -Encoding UTF8 }
+-  exit 1
+-}
+-
+-Write-Host "[16AI-QW-38G-R3][stage_map] $stageMapPath"
+-Get-Content $stageMapPath -Encoding UTF8
+-
+-if (!(Test-Path $layerJsonlPath)) {
+-  Write-Host "[16AI-QW-38G-R3][warn] layerwise trace missing: $layerJsonlPath"
+-} else {
+-  Write-Host "[16AI-QW-38G-R3][layer_trace] $layerJsonlPath"
+-}
+-
+-if (!(Test-Path $summaryPath)) {
+-  Write-Host "[16AI-QW-38G-R3][warn] layerwise summary missing: $summaryPath"
+-} else {
+-  Write-Host "[16AI-QW-38G-R3][summary] $summaryPath"
++if (Test-Path $summaryPath) {
++  Write-Host "[16AI-QW-38G-R4][summary] $summaryPath"
+   Get-Content $summaryPath -Encoding UTF8
+ }
++if (Test-Path $tracePath) {
++  Write-Host "[16AI-QW-38G-R4][trace] $tracePath"
++  Get-Content $tracePath -Encoding UTF8 | Select-Object -First 20
++}
