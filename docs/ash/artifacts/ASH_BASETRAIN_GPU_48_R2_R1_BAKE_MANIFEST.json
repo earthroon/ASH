@@ -1,9 +1,9 @@
 {
   "patch_id": "ASH-BASETRAIN-GPU-48-R2-R1",
-  "status": "BAKED_CODE_AND_SPECS_PAYLOAD_DIGEST_CONTRACT_REBIND_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "status": "BAKED_E0277_OPTION_ITERATION_COMPILEFIX_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
   "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
-  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2_gpu40_exact_segment_output_payload_recovery_e0609fix_baked.zip",
-  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2-R1_payload_digest_contract_rebind_baked.zip",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2-R1_payload_digest_contract_rebind_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-48-R2-R1_payload_digest_contract_rebind_e0277fix_baked.zip",
   "body_zip_excludes_artifacts": true,
   "body_zip_includes_specs": true,
   "body_zip_excluded_patterns": [
@@ -13,11 +13,13 @@
     "*.sha256"
   ],
   "sha256_files_included": false,
+  "compile_fix": {
+    "error_code": "E0277",
+    "error_summary": "candidates.iter().flatten() attempted to flatten &&Option<LoadedJson>",
+    "fixed_by": "replace flatten iteration with explicit for candidate in candidates and match candidate.as_ref()"
+  },
   "changed_files": [
     "crates/base_train/src/ash_basetrain_gpu_48_r2_r1_payload_digest_contract_rebind.rs",
-    "crates/base_train/src/bin/ash_basetrain_gpu_48_r2_r1_payload_digest_contract_rebind.rs",
-    "crates/base_train/src/lib.rs",
-    "crates/base_train/Cargo.toml",
     "specs/ASH_BASETRAIN_GPU_48_R2_R1_SPEC.md"
   ],
   "package_check": {
