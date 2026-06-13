@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-48",
+  "status": "PASS_ASH_BASETRAIN_GPU_48_STATIC_GUARD_NO_FORBIDDEN_CALLS_WITH_RECEIPT_FIELD_ALLOWLIST",
+  "verdict": "PASS",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_48_forward_boundary_gpu_buffer_upload_execution.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_48_forward_boundary_gpu_buffer_upload_execution.rs",
+    "crates/base_train/src/lib.rs"
+  ],
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "allowlist_note": "Receipt field strings such as loss_used/backward_used/optimizer_used/full_tensor_load_used are allowed only as false-valued guard fields; direct calls are not present.",
+  "forbidden_bind_group_calls_found": [],
+  "forbidden_pipeline_calls_found": [],
+  "forbidden_dispatch_calls_found": [],
+  "forbidden_readback_calls_found": [],
+  "forbidden_loss_backward_optimizer_calls_found": [],
+  "full_tensor_load_patterns_found": [],
+  "pass": true
+}
