@@ -1,0 +1,38 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-49",
+  "status": "PASS_STATIC_GUARD_BIND_GROUP_PIPELINE_MATERIALIZATION_NO_DISPATCH_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_49_forward_boundary_bind_group_pipeline_materialization.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_49_forward_boundary_bind_group_pipeline_materialization.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_49_SPEC.md"
+  ],
+  "module_export_present": true,
+  "cargo_bin_registered": true,
+  "direct_forbidden_gpu_call_occurrences": {
+    "dispatch_workgroups_call": false,
+    "map_async_call": false,
+    "copy_buffer_to_buffer_call": false
+  },
+  "permitted_materialization_calls_present": {
+    "queue_write_buffer_call": true,
+    "create_bind_group_layout_call": true,
+    "create_bind_group_call": true,
+    "create_shader_module_call": true,
+    "create_pipeline_layout_call": true,
+    "create_compute_pipeline_call": true
+  },
+  "body_zip_policy": {
+    "artifacts_excluded": true,
+    "docs_excluded": true,
+    "target_excluded": true,
+    "sha256_files_included": false,
+    "specs_included": true
+  },
+  "pass": true
+}
