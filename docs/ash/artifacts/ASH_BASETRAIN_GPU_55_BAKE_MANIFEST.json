@@ -1,0 +1,44 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-55",
+  "status": "BAKED_CODE_AND_SPECS_FORWARD_CANDIDATE_RAW_PAYLOAD_MATERIALIZATION_GATE_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-54_forward_output_candidate_review_gate_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-55_forward_candidate_raw_payload_materialization_gate_baked.zip",
+  "body_zip_excludes_artifacts": true,
+  "body_zip_includes_specs": true,
+  "body_zip_excluded_patterns": [
+    "**/artifacts/**",
+    "target/**",
+    "docs/**",
+    "*.sha256"
+  ],
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_55_forward_candidate_raw_payload_materialization_gate.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_55_forward_candidate_raw_payload_materialization_gate.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_55_SPEC.md"
+  ],
+  "package_check": {
+    "files": 3051,
+    "specs": 214,
+    "artifacts": 0,
+    "docs": 0,
+    "target": 0,
+    "sha256": 0,
+    "has_spec": true,
+    "has_module": true,
+    "has_bin": true,
+    "has_lib_export": true,
+    "has_cargo_bin": true
+  },
+  "runtime_receipt_not_generated_in_container_reason": "cargo executable is not available in this container; local operator must run cargo to produce runtime PASS/BLOCKED receipt",
+  "local_artifacts_expected_on_pass": [
+    "artifacts/ASH_BASETRAIN_GPU_55_FORWARD_CANDIDATE_RAW_PAYLOAD.bin",
+    "artifacts/ASH_BASETRAIN_GPU_55_FORWARD_CANDIDATE_RAW_PAYLOAD_MANIFEST.json",
+    "artifacts/ASH_BASETRAIN_GPU_55_FORWARD_CANDIDATE_RAW_PAYLOAD_MATERIALIZATION_GATE.json"
+  ],
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-56",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-55-R1"
+}
