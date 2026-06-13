@@ -1,0 +1,18 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-41",
+  "title": "Projection Segment Stitch Candidate / Multi Row-Block Output Assembly Review Gate / No Logits Adoption No Optimizer",
+  "source_zip": "ash_pass3_ASH-BASETRAIN-GPU-40_segmented_matvec_dispatch_matrix_baked.zip",
+  "runtime_receipt_path": "artifacts/ASH_BASETRAIN_GPU_41_PROJECTION_SEGMENT_STITCH_REVIEW_GATE.json",
+  "code_files": [
+    "crates/base_train/src/ash_basetrain_gpu_41_projection_segment_stitch_review_gate.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_41_projection_segment_stitch_review_gate.rs"
+  ],
+  "spec_file": "specs/ASH_BASETRAIN_GPU_41_SPEC.md",
+  "zip_policy": "LIGHTWEIGHT_CODE_PACKAGE_ONLY",
+  "github_docs_policy": "reports_manifests_static_checks_uploaded_to_earthroon_ASH",
+  "no_sha256_files_included": true,
+  "cargo_verification": "NOT_RUN_CARGO_UNAVAILABLE_IN_CONTAINER",
+  "runtime_gpu_verification": "NOT_RUN_LOCAL_GPU_REQUIRED",
+  "rustfmt_verification": "NOT_RUN_RUSTFMT_UNAVAILABLE_IN_CONTAINER",
+  "static_checks_status": "PASS"
+}
