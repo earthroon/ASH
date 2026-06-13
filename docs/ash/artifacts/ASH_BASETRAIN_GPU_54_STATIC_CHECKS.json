@@ -1,0 +1,50 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-54",
+  "status": "PASS_STATIC_GUARD_FORWARD_OUTPUT_CANDIDATE_REVIEW_GATE_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "PASS_STATIC_ONLY",
+  "toolchain_cargo_available": false,
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container; compile/runtime PASS must be run in operator local environment",
+  "checked_files": [
+    "crates/base_train/src/ash_basetrain_gpu_54_forward_output_candidate_review_gate.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_54_forward_output_candidate_review_gate.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_54_SPEC.md"
+  ],
+  "module_export_present": true,
+  "cargo_bin_registered": true,
+  "forbidden_gpu_calls_absent": {
+    "dispatch_workgroups_call": true,
+    "map_async_call": true,
+    "copy_buffer_to_buffer_call": true,
+    "queue_submit_call": true
+  },
+  "forbidden_training_calls_absent": {
+    "loss_call": true,
+    "backward_call": true,
+    "optimizer_step_call": true,
+    "logits_adoption_call": true,
+    "weight_mutation_call": true
+  },
+  "candidate_contract": {
+    "candidate_state": "review_required",
+    "adopted": false,
+    "runtime_default_apply": false,
+    "operator_approval_required": true,
+    "runtime_adoption_allowed": false,
+    "metadata_only": true,
+    "raw_output_artifact_allowed": false,
+    "expected_output_sha256": "2c2cd128cde79af49eec8824e17d785eb40286968181fae096daf2b0029d6a33",
+    "expected_byte_len": 2048,
+    "expected_f32_count": 512
+  },
+  "body_zip_policy": {
+    "artifacts_excluded": true,
+    "docs_excluded": true,
+    "target_excluded": true,
+    "sha256_files_included": false,
+    "specs_included": true
+  },
+  "pass": true
+}
