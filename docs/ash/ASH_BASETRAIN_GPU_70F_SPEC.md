@@ -9,12 +9,15 @@ Readonly Block Probe Staging / Hidden FFN Provenance To Block Candidate Seal
 ## Seal
 No Logits / No Decode / No Sampling / No Generation / No Loss / No Backward / No Optimizer
 
+## Bake Status
+BAKED_CODE_AND_SPECS_RUNTIME_NOT_EXECUTED_IN_CONTAINER
+
+Output ZIP: `ash_pass3_ASH-BASETRAIN-GPU-70F_readonly_block_probe_staging_baked.zip`
+
 ## Purpose
 GPU-70F stages a readonly transformer block candidate envelope from the GPU-70E hidden and FFN provenance audit.
 
 This patch does not execute full block forward, attention, residual, norm, LM-head, logits, decode, sampling, generation, loss, backward, optimizer, weight mutation, runtime attach, production attach, or checkpoint mutation.
-
-GPU-70F proves that the 70E-proven hidden input and native atlas FFN output can be carried into a block-candidate staging envelope without silently claiming a full transformer block result.
 
 ## Input SSOT
 - artifacts/ASH_BASETRAIN_GPU_70E_HIDDEN_FFN_COMPATIBILITY_AUDIT.json
@@ -29,11 +32,6 @@ GPU-70F proves that the 70E-proven hidden input and native atlas FFN output can 
 ## Output SSOT
 - artifacts/ASH_BASETRAIN_GPU_70F_READONLY_BLOCK_CANDIDATE_ENVELOPE.json
 - artifacts/ASH_BASETRAIN_GPU_70F_READONLY_BLOCK_PROBE_STAGING_RECEIPT.json
-
-## State Ownership
-GPU-70F owns readonly block candidate staging envelope, block candidate shape metadata, inherited hidden and FFN provenance references, and no-execution forbidden-path confirmation.
-
-GPU-70F does not own attention execution, residual execution, norm execution, LM-head execution, logits, decode, sampling, generation, loss, backward, optimizer, weight mutation, runtime attach, production attach, checkpoint mutation, or full block output state.
 
 ## Required Checks
 - 70E pass is true.
@@ -51,7 +49,7 @@ GPU-70F does not own attention execution, residual execution, norm execution, LM
 - All forbidden runtime path flags remain false.
 
 ## Block Candidate Contract
-The readonly block candidate envelope records block_candidate_id, source digests, hidden input shape, FFN output shape, candidate hidden size, selected token position index, contract-only attention/residual/norm states, full_block_forward_claimed false, and logits_materialized false.
+The readonly block candidate envelope records block candidate ID, source digests, hidden input shape, FFN output shape, candidate hidden size, selected token position index, contract-only attention/residual/norm states, `full_block_forward_claimed=false`, and `logits_materialized=false`.
 
 ## Implementation Surface
 - crates/base_train/src/ash_basetrain_gpu_70f_readonly_block_probe_staging.rs
@@ -60,7 +58,14 @@ The readonly block candidate envelope records block_candidate_id, source digests
 - crates/base_train/Cargo.toml
 
 ## Rust / WGPU Rule
-GPU-70F is staging-only and introduces no tensor arithmetic kernel. The Rust implementation should be match-oriented and lookup-table-oriented. No WGSL file is required for 70F. Future patches that execute tensor computation should route compute through WGPU/WGSL shader paths.
+GPU-70F is staging-only and introduces no tensor arithmetic kernel. The Rust implementation should be match-oriented and lookup-table-oriented. No WGSL file is required for 70F. Future tensor computation must route through WGPU/WGSL shader paths.
+
+## Static Summary
+- New module `if` count: 0
+- New module `json!` count: 0
+- `.sha256` sidecars: 0
+- WGSL files added: none
+- Cargo check: deferred because cargo executable is unavailable in this container
 
 ## Next Stage
 ASH-BASETRAIN-GPU-70G — Attention Contract Audit / Readonly Block Candidate To Attention Requirement Seal / No Attention Dispatch No Logits No Loss No Backward No Optimizer
