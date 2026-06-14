@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-61-R1",
+  "status": "BAKED_CODE_AND_SPECS_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-61_forward_candidate_runtime_route_dryrun_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-61-R1_runtime_route_dryrun_bin_module_rebind_baked.zip",
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/bin/ash_basetrain_gpu_61_forward_candidate_runtime_route_dryrun.rs",
+    "specs/ASH_BASETRAIN_GPU_61_R1_SPEC.md",
+    "specs/ASH_BASETRAIN_GPU_61_R1_STATIC_CHECKS.json",
+    "specs/ASH_BASETRAIN_GPU_61_R1_BAKE_MANIFEST.json"
+  ],
+  "package_check": {
+    "files": 3076,
+    "specs": 227,
+    "artifacts": 0,
+    "docs": 0,
+    "target": 0,
+    "sha256": 0,
+    "has_r1_spec": true,
+    "has_bin": true,
+    "has_module": true
+  },
+  "runtime_receipt_not_generated_in_container_reason": "cargo executable is not available in this container",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-62",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-61-R2"
+}
