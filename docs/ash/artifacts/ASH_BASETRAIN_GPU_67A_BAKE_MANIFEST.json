@@ -1,0 +1,21 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-67A",
+  "status": "BAKED_CODE_AND_SPECS_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED_TO_OPERATOR_LOCAL_ARTIFACTS",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-66A-R1_atlas_grouped_input_packet_preflight_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-67A_tokenizer_encode_preflight_baked.zip",
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/ash_basetrain_gpu_67a_tokenizer_encode_preflight.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_67a_tokenizer_encode_preflight.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_67A_SPEC.md",
+    "specs/ASH_BASETRAIN_GPU_67A_STATIC_CHECKS.json",
+    "specs/ASH_BASETRAIN_GPU_67A_BAKE_MANIFEST.json"
+  ],
+  "cargo_check_executed": false,
+  "static_checks_path": "specs/ASH_BASETRAIN_GPU_67A_STATIC_CHECKS.json",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-68A",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-67A-R1"
+}
