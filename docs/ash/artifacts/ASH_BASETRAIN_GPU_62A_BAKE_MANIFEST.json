@@ -1,0 +1,33 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-62A",
+  "status": "BAKED_CODE_AND_SPECS_RUNTIME_NOT_EXECUTED_IN_CONTAINER",
+  "verdict": "BAKED_WITH_RUNTIME_CHECK_DEFERRED_TO_OPERATOR_LOCAL_ARTIFACTS",
+  "input_zip": "ash_pass3_ASH-BASETRAIN-GPU-61-R1_runtime_route_dryrun_bin_module_rebind_baked.zip",
+  "output_zip": "ash_pass3_ASH-BASETRAIN-GPU-62A_runtime_binding_registry_install_baked.zip",
+  "sha256_files_included": false,
+  "changed_files": [
+    "crates/base_train/src/runtime_binding_registry.rs",
+    "crates/base_train/src/ash_basetrain_gpu_62a_runtime_binding_registry_install.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_62a_runtime_binding_registry_install.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml",
+    "specs/ASH_BASETRAIN_GPU_62A_SPEC.md",
+    "specs/ASH_BASETRAIN_GPU_62A_STATIC_CHECKS.json",
+    "specs/ASH_BASETRAIN_GPU_62A_BAKE_MANIFEST.json"
+  ],
+  "local_artifact_inputs_expected": [
+    "artifacts/ASH_BASETRAIN_GPU_61_FORWARD_CANDIDATE_RUNTIME_ROUTE_DRYRUN.json",
+    "artifacts/ASH_BASETRAIN_GPU_61_RUNTIME_BINDING_DRYRUN_DESCRIPTOR.json",
+    "artifacts/ASH_BASETRAIN_GPU_60_RUNTIME_CANDIDATE_ROUTE_ENVELOPE.json",
+    "artifacts/ASH_BASETRAIN_GPU_59_OPERATOR_APPROVAL_ENVELOPE.json"
+  ],
+  "local_artifact_outputs_generated_when_run": [
+    "artifacts/ASH_BASETRAIN_GPU_62A_RUNTIME_BINDING_REGISTRY_ENTRY.json",
+    "artifacts/ASH_BASETRAIN_GPU_62A_RUNTIME_BINDING_INSTALL_RECEIPT.json"
+  ],
+  "cargo_check_executed": false,
+  "cargo_check_blocked_reason": "cargo executable is not available in this container",
+  "static_checks_path": "docs/ash/artifacts/ASH_BASETRAIN_GPU_62A_STATIC_CHECKS.json",
+  "next_patch_if_pass": "ASH-BASETRAIN-GPU-63A",
+  "next_patch_if_blocked": "ASH-BASETRAIN-GPU-62A-R1"
+}
