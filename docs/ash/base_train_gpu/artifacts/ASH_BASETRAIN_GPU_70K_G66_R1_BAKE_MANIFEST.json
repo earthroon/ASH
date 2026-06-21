@@ -1,0 +1,28 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G66-R1",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G66",
+  "title": "Explicit Submit Permission Grant Receipt / Packet Submit Allow Candidate To Operator-Granted Submit Permission Seal",
+  "seal": "No Packet Submit No Command Queue Submit No Gradient Write No Weight Commit",
+  "included_in_zip": [
+    "crates/base_train/src/ash_basetrain_gpu_70k_g66_r1_explicit_submit_permission_grant_receipt.rs",
+    "crates/base_train/src/bin/ash_basetrain_gpu_70k_g66_r1_explicit_submit_permission_grant_receipt.rs",
+    "crates/base_train/src/lib.rs",
+    "crates/base_train/Cargo.toml"
+  ],
+  "excluded_from_zip": [
+    "new G66-R1 generated receipt artifacts",
+    "new G66-R1 static checks",
+    "new G66-R1 bake manifest",
+    "new G66-R1 local bake validation",
+    "*.sha256",
+    "*.ps1"
+  ],
+  "github_artifacts": [
+    "docs/ash/base_train_gpu/artifacts/ASH_BASETRAIN_GPU_70K_G66_R1_STATIC_CHECKS.json",
+    "docs/ash/base_train_gpu/artifacts/ASH_BASETRAIN_GPU_70K_G66_R1_BAKE_MANIFEST.json",
+    "docs/ash/base_train_gpu/artifacts/ASH_BASETRAIN_GPU_70K_G66_R1_LOCAL_BAKE_VALIDATION.json",
+    "docs/ash/base_train_gpu/artifacts/ASH_BASETRAIN_GPU_70K_G66_R1_ARTIFACT_INDEX.json"
+  ],
+  "runtime_pass_claimed": false,
+  "compile_pass_claimed": false
+}
