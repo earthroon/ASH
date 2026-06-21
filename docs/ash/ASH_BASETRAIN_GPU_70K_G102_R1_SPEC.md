@@ -14,7 +14,17 @@ RuntimePassTarget: PASS_ASH_BASETRAIN_GPU_70K_G102_R1_G101_ARTIFACT_CONTRACT_COM
 NextPatch: ASH-BASETRAIN-GPU-70K-G102-R2
 ```
 
-G102-R1 accepts the actual G101 artifact contract without committing live output. It rebinds the G101 receipt predecessor field, adjusted policy kind alias, and G100-based source lineage.
+## Purpose
+
+Accept the actual G101 artifact contract without mutating G101 artifacts or committing live output. This patch rebinds the compatibility surface for:
+
+```text
+g100_blocked_predecessor_status_verified == true
+policy_kind == quarantined_candidate_adjusted_probe_policy OR adjusted_probe_policy
+state_kind == adjusted_probe_policy
+policy.source_patch_id == ASH-BASETRAIN-GPU-70K-G100-BLOCKED
+plan.source_patch_id == ASH-BASETRAIN-GPU-70K-G100-BLOCKED
+```
 
 ## Input SSOT
 
@@ -40,24 +50,6 @@ ASH_BASETRAIN_GPU_70K_G102_R1_DIGEST_CROSSCHECK_AUDIT.json
 ASH_BASETRAIN_GPU_70K_G102_R1_NO_LIVE_OUTPUT_COMMIT_AUDIT.json
 ASH_BASETRAIN_GPU_70K_G102_R1_BOUNDARY_AUDIT.json
 ASH_BASETRAIN_GPU_70K_G102_R1_FORBIDDEN_CLAIM_AUDIT.json
-```
-
-## Accepted G101 Contract
-
-```text
-G101 receipt predecessor field:
-  g100_blocked_predecessor_status_verified == true
-
-G101 adjusted policy kind:
-  quarantined_candidate_adjusted_probe_policy
-  adjusted_probe_policy
-
-G101 adjusted policy state:
-  state_kind == adjusted_probe_policy
-
-G101 source lineage:
-  policy.source_patch_id == ASH-BASETRAIN-GPU-70K-G100-BLOCKED
-  plan.source_patch_id == ASH-BASETRAIN-GPU-70K-G100-BLOCKED
 ```
 
 ## Opened State
