@@ -1,0 +1,108 @@
+# ASH-BASETRAIN-GPU-70K-G165
+
+## Training.rs Per-Step Commit Integration Preflight / G135-G138-G145 Evidence Binding / No Runtime Mutation
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G165`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G164`  
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G165_TRAINING_RS_PER_STEP_COMMIT_INTEGRATION_PREFLIGHT_G135_G138_G145_EVIDENCE_BINDING_NO_RUNTIME_MUTATION`
+
+G165 consumes the G164 active learning path decision packet and creates a `training.rs` per-step integration preflight packet. It binds G135 backward execution evidence, G138 optimizer quarantine evidence, and G145 direct commit evidence as future slot shapes only. G165 does not execute training, backward, optimizer step, weight commit, checkpoint write, safetensors write, route pointer rewrite, or any runtime mutation.
+
+## CLI
+
+```powershell
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g165_training_rs_per_step_commit_integration_preflight -- `
+  --local-root . `
+  --out-dir artifacts `
+  --source-patch-id ASH-BASETRAIN-GPU-70K-G164 `
+  --preflight-mode training-rs-per-step-commit-integration `
+  --selected-path freshinit-burn-native-tiny-proof `
+  --deferred-path atlas-grouped-sequential-integration-candidate `
+  --evidence-binding g135-g138-g145 `
+  --runtime-mutation-mode forbid `
+  --training-completion-mode hold `
+  --deployment-ready-mode hold
+```
+
+## Expected PASS summary
+
+```text
+previous_g164_accepted=true
+route=AtlasGroupedSequentialBackwardCandidate
+g164_active_learning_path_decision_gate_receipt_found=true
+g164_freshinit_burn_native_candidate_descriptor_found=true
+g164_atlas_grouped_sequential_candidate_descriptor_found=true
+g164_candidate_comparison_audit_found=true
+g164_active_learning_path_decision_packet_found=true
+g164_no_weight_mutation_audit_found=true
+g164_completion_and_training_claim_boundary_audit_found=true
+selected_active_learning_path=FreshInitBurnNativeTinyProof
+deferred_learning_path=AtlasGroupedSequentialIntegrationCandidate
+preflight_mode=TrainingRsPerStepCommitIntegration
+selected_path=FreshInitBurnNativeTinyProof
+deferred_path=AtlasGroupedSequentialIntegrationCandidate
+evidence_binding=G135G138G145
+runtime_mutation_mode=Forbid
+training_completion_mode=Hold
+deployment_ready_mode=Hold
+training_rs_per_step_integration_preflight_attempted=true
+training_rs_per_step_integration_preflight_created=true
+selected_active_learning_path_loaded=true
+freshinit_burn_native_tiny_proof_path_bound=true
+atlas_grouped_sequential_integration_path_deferred=true
+g135_backward_execution_evidence_bound=true
+g138_optimizer_quarantine_evidence_bound=true
+g145_direct_commit_evidence_bound=true
+per_step_loss_slot_planned=true
+per_step_grad_norm_slot_planned=true
+per_step_delta_norm_slot_planned=true
+per_step_step_digest_slot_planned=true
+per_step_mutation_scope_slot_planned=true
+training_rs_preflight_packet_created=true
+per_step_commit_integration_plan_created=true
+future_backward_slot_declared=true
+future_optimizer_candidate_slot_declared=true
+future_scoped_commit_slot_declared=true
+ready_for_loss_grad_delta_ledger=true
+ready_for_tiny_training_smoke=false
+ready_for_runtime_training_execution=false
+training_completion_claimed=false
+deployment_ready_claimed=false
+production_completion_claim_reexecuted_in_g165=false
+freshinit_training_executed_in_g165=false
+atlas_grouped_training_executed_in_g165=false
+loss_computed_as_training_result_in_g165=false
+grad_norm_computed_as_training_result_in_g165=false
+delta_norm_computed_as_training_result_in_g165=false
+checkpoint_rewritten_in_g165=false
+safetensors_rewritten_in_g165=false
+base_weight_mutated_in_g165=false
+optimizer_step_executed_in_g165=false
+backward_executed_in_g165=false
+gradient_mutated_in_g165=false
+default_route_pointer_rewritten_in_g165=false
+production_route_pointer_rewritten_in_g165=false
+default_inference_route_reswitched_in_g165=false
+unrelated_weight_mutation_detected=false
+silent_path_adoption_detected=false
+training_rs_per_step_commit_integration_preflight_verdict=FreshInitTinyProofBoundToPerStepLedgerPreflightG135G138G145EvidenceBoundNoRuntimeMutation
+output_files_written=9
+```
+
+## Output artifacts
+
+```text
+ASH_BASETRAIN_GPU_70K_G165_TRAINING_RS_PER_STEP_COMMIT_INTEGRATION_PREFLIGHT_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G165_G164_ACTIVE_LEARNING_DECISION_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G165_G135_BACKWARD_EVIDENCE_BINDING_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G165_G138_OPTIMIZER_QUARANTINE_EVIDENCE_BINDING_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G165_G145_DIRECT_COMMIT_EVIDENCE_BINDING_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G165_PER_STEP_INTEGRATION_PLAN_PACKET.json
+ASH_BASETRAIN_GPU_70K_G165_LOSS_GRAD_DELTA_SLOT_PREFLIGHT_SCHEMA.json
+ASH_BASETRAIN_GPU_70K_G165_NO_RUNTIME_MUTATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G165_NEXT_PATCH_PACKET.json
+```
+
+## Next patch
+
+`ASH-BASETRAIN-GPU-70K-G166` should create the concrete loss/grad/delta ledger schema and per-step training receipt contract without executing training.
