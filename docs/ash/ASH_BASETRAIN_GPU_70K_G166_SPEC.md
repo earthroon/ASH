@@ -1,0 +1,118 @@
+# ASH-BASETRAIN-GPU-70K-G166
+
+## Loss Grad Delta Ledger Schema Gate / Per-Step Training Receipt Contract / No Training Execution
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G166`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G165`  
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G166_LOSS_GRAD_DELTA_LEDGER_SCHEMA_GATE_PER_STEP_TRAINING_RECEIPT_CONTRACT_NO_TRAINING_EXECUTION`
+
+G166 consumes the G165 per-step integration preflight packet and creates the concrete per-step loss/grad/delta ledger schema. It does not execute training, compute real loss, execute backward, compute real grad norm, run optimizer step, compute real delta norm, commit weights, write checkpoint, write safetensors, or rewrite route pointers.
+
+## CLI
+
+```powershell
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g166_loss_grad_delta_ledger_schema_gate -- `
+  --local-root . `
+  --out-dir artifacts `
+  --source-patch-id ASH-BASETRAIN-GPU-70K-G165 `
+  --schema-mode loss-grad-delta-ledger-contract `
+  --selected-path freshinit-burn-native-tiny-proof `
+  --deferred-path atlas-grouped-sequential-integration-candidate `
+  --training-execution-mode forbid `
+  --runtime-mutation-mode forbid `
+  --training-completion-mode hold `
+  --deployment-ready-mode hold
+```
+
+## Expected PASS summary
+
+```text
+previous_g165_accepted=true
+source_patch_id=ASH-BASETRAIN-GPU-70K-G165
+route=AtlasGroupedSequentialBackwardCandidate
+g165_training_rs_per_step_preflight_receipt_found=true
+g165_g164_active_learning_decision_source_audit_found=true
+g165_g135_backward_evidence_binding_audit_found=true
+g165_g138_optimizer_quarantine_evidence_binding_audit_found=true
+g165_g145_direct_commit_evidence_binding_audit_found=true
+g165_per_step_integration_plan_packet_found=true
+g165_loss_grad_delta_slot_preflight_schema_found=true
+g165_no_runtime_mutation_audit_found=true
+selected_active_learning_path=FreshInitBurnNativeTinyProof
+deferred_learning_path=AtlasGroupedSequentialIntegrationCandidate
+schema_mode=LossGradDeltaLedgerContract
+training_execution_mode=Forbid
+runtime_mutation_mode=Forbid
+training_completion_mode=Hold
+deployment_ready_mode=Hold
+loss_grad_delta_ledger_schema_attempted=true
+loss_grad_delta_ledger_schema_created=true
+per_step_training_receipt_contract_created=true
+per_step_required_fields_declared=true
+loss_field_contract_declared=true
+grad_norm_field_contract_declared=true
+delta_norm_field_contract_declared=true
+digest_field_contract_declared=true
+mutation_scope_field_contract_declared=true
+finite_value_flags_required=true
+before_after_digest_fields_required=true
+step_digest_field_required=true
+loss_value_written=false
+grad_norm_value_written=false
+delta_norm_value_written=false
+step_digest_value_written=false
+before_digest_value_written=false
+after_digest_value_written=false
+schema_bound_to_g165_preflight=true
+schema_bound_to_selected_freshinit_tiny_proof=true
+schema_bound_to_deferred_atlas_grouped_integration=true
+schema_bound_to_no_training_execution=true
+schema_bound_to_no_runtime_mutation=true
+mutation_scope=SchemaOnlyNoRuntimeMutation
+mutation_scope_is_declared=true
+mutation_scope_allows_runtime_training=false
+mutation_scope_allows_checkpoint_write=false
+mutation_scope_allows_safetensors_write=false
+mutation_scope_allows_route_pointer_write=false
+ready_for_tiny_training_smoke=true
+ready_for_runtime_training_execution=false
+training_completion_claimed=false
+deployment_ready_claimed=false
+freshinit_training_executed_in_g166=false
+atlas_grouped_training_executed_in_g166=false
+loss_computed_as_training_result_in_g166=false
+grad_norm_computed_as_training_result_in_g166=false
+delta_norm_computed_as_training_result_in_g166=false
+checkpoint_rewritten_in_g166=false
+safetensors_rewritten_in_g166=false
+base_weight_mutated_in_g166=false
+optimizer_step_executed_in_g166=false
+backward_executed_in_g166=false
+gradient_mutated_in_g166=false
+default_route_pointer_rewritten_in_g166=false
+production_route_pointer_rewritten_in_g166=false
+default_inference_route_reswitched_in_g166=false
+runtime_training_execution_allowed_in_g166=false
+runtime_training_execution_detected=false
+unrelated_weight_mutation_detected=false
+loss_grad_delta_ledger_schema_verdict=PerStepReceiptContractCreatedNoTrainingExecution
+output_files_written=9
+```
+
+## Output artifacts
+
+```text
+ASH_BASETRAIN_GPU_70K_G166_LOSS_GRAD_DELTA_LEDGER_SCHEMA_GATE_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G166_G165_PREFLIGHT_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G166_PER_STEP_TRAINING_RECEIPT_CONTRACT.json
+ASH_BASETRAIN_GPU_70K_G166_LOSS_FIELD_CONTRACT.json
+ASH_BASETRAIN_GPU_70K_G166_GRAD_NORM_FIELD_CONTRACT.json
+ASH_BASETRAIN_GPU_70K_G166_DELTA_NORM_FIELD_CONTRACT.json
+ASH_BASETRAIN_GPU_70K_G166_DIGEST_AND_MUTATION_SCOPE_CONTRACT.json
+ASH_BASETRAIN_GPU_70K_G166_NO_TRAINING_EXECUTION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G166_NEXT_PATCH_PACKET.json
+```
+
+## Next patch
+
+`ASH-BASETRAIN-GPU-70K-G167` should execute the first FreshInit tiny multi-step training smoke and emit finite loss, grad norm, delta norm, before digest, after digest, and step digest under scoped runtime mutation. G167 must still avoid training completion claim.
