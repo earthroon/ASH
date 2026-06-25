@@ -1,0 +1,106 @@
+# ASH-BASETRAIN-GPU-70K-G164
+
+## Active Learning Path Decision Gate / FreshInit Burn Native vs AtlasGroupedSequential Candidate / No Weight Mutation
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G164`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G162`  
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G164_ACTIVE_LEARNING_PATH_DECISION_GATE_FRESHINIT_BURN_NATIVE_VS_ATLASGROUPEDSEQUENTIAL_CANDIDATE_NO_WEIGHT_MUTATION`
+
+G164 consumes the G162 production completion claim receipt and creates an active learning path decision packet. It selects `FreshInitBurnNativeTinyProof` as the primary tiny proof route and defers `AtlasGroupedSequentialIntegrationCandidate` as the later production-route integration path. G164 does not execute training, backward, optimizer step, weight mutation, checkpoint write, safetensors write, or route pointer rewrite.
+
+## CLI
+
+```powershell
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g164_active_learning_path_decision_gate -- `
+  --local-root . `
+  --out-dir artifacts `
+  --source-patch-id ASH-BASETRAIN-GPU-70K-G162 `
+  --decision-mode explicit-learning-path-decision `
+  --candidate-set freshinit-vs-atlas-grouped `
+  --weight-mutation-mode forbid `
+  --training-completion-mode hold `
+  --deployment-ready-mode hold
+```
+
+## Expected PASS summary
+
+```text
+previous_g162_accepted=true
+route=AtlasGroupedSequentialBackwardCandidate
+g162_completion_claim_execution_seal_receipt_found=true
+g162_operator_approval_source_audit_found=true
+g162_production_completion_claim_authorization_audit_found=true
+g162_production_completion_claim_receipt_found=true
+g162_production_completion_claim_binding_audit_found=true
+g162_training_completion_claim_block_audit_found=true
+g162_deployment_ready_claim_block_audit_found=true
+g162_forbidden_mutation_audit_found=true
+production_completion_claimed=true
+production_completion_claim_source_bound=true
+production_completion_claim_bound_to_g161_operator_approval=true
+production_completion_claim_bound_to_g160_readiness_candidate=true
+production_completion_claim_bound_to_repeated_forward_stability=true
+training_completion_claimed=false
+deployment_ready_claimed=false
+decision_mode=ExplicitLearningPathDecision
+candidate_set=FreshInitVsAtlasGrouped
+weight_mutation_mode=Forbid
+training_completion_mode=Hold
+deployment_ready_mode=Hold
+active_learning_path_decision_attempted=true
+active_learning_path_decision_created=true
+freshinit_burn_native_candidate_created=true
+atlas_grouped_sequential_candidate_created=true
+freshinit_burn_native_candidate_evaluated=true
+atlas_grouped_sequential_candidate_evaluated=true
+freshinit_burn_native_no_full_tensor_load_required=true
+freshinit_burn_native_tiny_training_surface_available=true
+freshinit_burn_native_loss_ledger_preflight_ready=true
+atlas_grouped_sequential_route_evidence_available=true
+atlas_grouped_sequential_requires_per_step_integration=true
+atlas_grouped_sequential_requires_optimizer_candidate_bridge=true
+atlas_grouped_sequential_requires_scoped_commit_bridge=true
+selected_active_learning_path=FreshInitBurnNativeTinyProof
+deferred_learning_path=AtlasGroupedSequentialIntegrationCandidate
+selected_path_reason_recorded=true
+deferred_path_reason_recorded=true
+decision_source_bound_to_g162_completion_claim=true
+decision_source_bound_to_no_training_completion_claim=true
+decision_source_bound_to_no_weight_mutation_policy=true
+ready_for_per_step_integration_preflight=true
+ready_for_loss_grad_delta_ledger=false
+ready_for_tiny_training_smoke=false
+production_completion_claim_reexecuted_in_g164=false
+checkpoint_rewritten_in_g164=false
+safetensors_rewritten_in_g164=false
+base_weight_mutated_in_g164=false
+optimizer_step_executed_in_g164=false
+backward_executed_in_g164=false
+gradient_mutated_in_g164=false
+default_route_pointer_rewritten_in_g164=false
+production_route_pointer_rewritten_in_g164=false
+default_inference_route_reswitched_in_g164=false
+freshinit_training_executed_in_g164=false
+atlas_grouped_training_executed_in_g164=false
+unrelated_weight_mutation_detected=false
+active_learning_path_decision_verdict=FreshInitBurnNativeSelectedAtlasGroupedSequentialDeferredNoWeightMutation
+output_files_written=9
+```
+
+## Output artifacts
+
+```text
+ASH_BASETRAIN_GPU_70K_G164_ACTIVE_LEARNING_PATH_DECISION_GATE_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G164_G162_COMPLETION_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G164_FRESHINIT_BURN_NATIVE_CANDIDATE_DESCRIPTOR.json
+ASH_BASETRAIN_GPU_70K_G164_ATLAS_GROUPED_SEQUENTIAL_CANDIDATE_DESCRIPTOR.json
+ASH_BASETRAIN_GPU_70K_G164_CANDIDATE_COMPARISON_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G164_ACTIVE_LEARNING_PATH_DECISION_PACKET.json
+ASH_BASETRAIN_GPU_70K_G164_NO_WEIGHT_MUTATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G164_COMPLETION_AND_TRAINING_CLAIM_BOUNDARY_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G164_NEXT_PATCH_PACKET.json
+```
+
+## Next patch
+
+`ASH-BASETRAIN-GPU-70K-G165` should bind the selected FreshInit tiny proof route to a per-step integration preflight and prepare the receipt schema for loss, grad norm, delta norm, step digest, and mutation scope without executing training yet.
