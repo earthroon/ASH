@@ -1,0 +1,68 @@
+# ASH-BASETRAIN-GPU-70K-G187A
+
+## Post-Apply Active Route Health Gate / Updated Active Learning Route Pointer To Health Observation Packet / No Production Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G187A`
+
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G186A`
+
+UpstreamRouteCandidateSourcePatchId: `ASH-BASETRAIN-GPU-70K-G185A-R2`
+
+UpstreamApprovedReviewSourcePatchId: `ASH-BASETRAIN-GPU-70K-G184A`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G187A_POST_APPLY_ACTIVE_ROUTE_HEALTH_GATE_UPDATED_ACTIVE_LEARNING_ROUTE_POINTER_TO_HEALTH_OBSERVATION_PACKET_NO_PRODUCTION_CLAIM`
+
+G187A consumes the G186A active learning route pointer update and observes the post-apply health surface without writing route pointers.
+
+Allowed observations:
+
+```text
+active_learning_route_pointer_current=AtlasGroupedSequentialIntegrationCandidate
+active_learning_route_pointer_matches_expected_target=true
+rollback_metadata_validated=true
+active_route_health_observation_packet_created=true
+ready_for_operator_post_apply_route_acceptance_review=true
+```
+
+Forbidden operations:
+
+```text
+active_learning_route_pointer_rewritten_in_g187a=true
+default_route_pointer_rewritten_in_g187a=true
+production_route_pointer_rewritten_in_g187a=true
+route_switch_apply_performed_in_g187a=true
+route_switch_rollback_executed_in_g187a=true
+production_claimed=true
+production_ready_claimed=true
+training_quality_claimed=true
+optimizer_quality_claimed=true
+model_improvement_claimed=true
+base_weight_mutated_in_g187a=true
+```
+
+Expected binary:
+
+`ash_basetrain_gpu_70k_g187a_post_apply_active_route_health_gate`
+
+Expected local spec in baked ZIP:
+
+`specs/ASH_BASETRAIN_GPU_70K_G187A_SPEC.md`
+
+Expected outputs:
+
+```text
+ASH_BASETRAIN_GPU_70K_G187A_POST_APPLY_ACTIVE_ROUTE_HEALTH_GATE_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G187A_G186A_ROUTE_SWITCH_APPLY_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_ACTIVE_LEARNING_ROUTE_POINTER_OBSERVATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_ROLLBACK_METADATA_OBSERVATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_ACTIVE_ROUTE_HEALTH_OBSERVATION_PACKET.json
+ASH_BASETRAIN_GPU_70K_G187A_NO_ROUTE_POINTER_REWRITE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_NO_PRODUCTION_CLAIM_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_NO_TRAINING_OR_WEIGHT_MUTATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G187A_OPERATOR_REVIEW_READY_PACKET.json
+ASH_BASETRAIN_GPU_70K_G187A_NEXT_PATCH_PACKET.json
+```
+
+Expected next patch:
+
+`ASH-BASETRAIN-GPU-70K-G188A` operator post-apply route acceptance review gate.
