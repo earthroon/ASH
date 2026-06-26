@@ -1,0 +1,64 @@
+# ASH-BASETRAIN-GPU-70K-G186A
+
+## Route Switch Apply Gate / Route Switch Candidate To Active Learning Route Pointer Update / No Production Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G186A`
+
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G185A-R2`
+
+UpstreamApprovedReviewSourcePatchId: `ASH-BASETRAIN-GPU-70K-G184A`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G186A_ROUTE_SWITCH_APPLY_GATE_ROUTE_SWITCH_CANDIDATE_TO_ACTIVE_LEARNING_ROUTE_POINTER_UPDATE_NO_PRODUCTION_CLAIM`
+
+G186A consumes the G185A-R2 route switch candidate and applies it only to the active learning route pointer.
+
+Allowed update:
+
+```text
+active_learning_route_pointer_previous=FreshInitBurnNativeTinyProof
+active_learning_route_pointer_next=AtlasGroupedSequentialIntegrationCandidate
+active_learning_route_pointer_update_applied=true
+active_learning_route_pointer_rewritten_in_g186a=true
+route_switch_apply_performed=true
+ready_for_post_apply_route_health_gate=true
+```
+
+Forbidden updates and claims:
+
+```text
+default_route_pointer_rewritten_in_g186a=true
+production_route_pointer_rewritten_in_g186a=true
+production_claimed=true
+production_ready_claimed=true
+deployment_ready_claimed=true
+runtime_training_execution_allowed_in_g186a=true
+optimizer_step_executed_in_g186a=true
+base_weight_mutated_in_g186a=true
+```
+
+Expected binary:
+
+`ash_basetrain_gpu_70k_g186a_route_switch_apply_gate`
+
+Expected local spec in baked ZIP:
+
+`specs/ASH_BASETRAIN_GPU_70K_G186A_SPEC.md`
+
+Expected outputs:
+
+```text
+ASH_BASETRAIN_GPU_70K_G186A_ROUTE_SWITCH_APPLY_GATE_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G186A_G185A_R2_ROUTE_SWITCH_CANDIDATE_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_ACTIVE_LEARNING_ROUTE_POINTER_PRE_APPLY_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_ACTIVE_LEARNING_ROUTE_POINTER_UPDATE_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G186A_ACTIVE_LEARNING_ROUTE_POINTER_POST_APPLY_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_ROUTE_SWITCH_ROLLBACK_METADATA.json
+ASH_BASETRAIN_GPU_70K_G186A_NO_DEFAULT_OR_PRODUCTION_ROUTE_REWRITE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_NO_PRODUCTION_CLAIM_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_NO_TRAINING_OR_WEIGHT_MUTATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G186A_NEXT_PATCH_PACKET.json
+```
+
+Expected next patch:
+
+`ASH-BASETRAIN-GPU-70K-G187A` post-apply active route health gate.
