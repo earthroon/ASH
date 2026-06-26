@@ -1,0 +1,85 @@
+# ASH-BASETRAIN-GPU-70K-G189D
+
+## Active Route Rollback Preflight / Denied Active Route Acceptance To Rollback Candidate / No Rollback Execution No Production Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G189D`
+
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G188A`
+
+UpstreamPostApplyHealthSourcePatchId: `ASH-BASETRAIN-GPU-70K-G187A`
+
+UpstreamRouteApplySourcePatchId: `ASH-BASETRAIN-GPU-70K-G186A`
+
+UpstreamRouteCandidateSourcePatchId: `ASH-BASETRAIN-GPU-70K-G185A-R2`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G189D_ACTIVE_ROUTE_ROLLBACK_PREFLIGHT_DENIED_ACTIVE_ROUTE_ACCEPTANCE_TO_ROLLBACK_CANDIDATE_NO_ROLLBACK_EXECUTION_NO_PRODUCTION_CLAIM`
+
+G189D consumes a G188A denied active route acceptance decision and creates a rollback candidate for the active learning route pointer. It must not execute rollback and must not rewrite any route pointer.
+
+Required denied-path facts:
+
+```text
+operator_active_route_acceptance_decision=Denied
+operator_active_route_acceptance_decision_is_explicit=true
+operator_active_route_acceptance_decision_bound=true
+operator_active_route_acceptance_denied=true
+active_route_acceptance_result=DeniedRollbackReviewRequired
+ready_for_active_route_rollback_preflight=true
+```
+
+Allowed outputs:
+
+```text
+active_route_rollback_preflight_created=true
+rollback_candidate_created=true
+rollback_candidate_scope=ActiveLearningRoutePointerOnly
+rollback_candidate_current_path=AtlasGroupedSequentialIntegrationCandidate
+rollback_candidate_target_restore_path=FreshInitBurnNativeTinyProof
+rollback_candidate_is_preflight_only=true
+rollback_candidate_has_no_execution_authority=true
+rollback_candidate_has_no_route_pointer_write_authority=true
+ready_for_explicit_rollback_execution_approval_gate=true
+```
+
+Forbidden operations:
+
+```text
+active_learning_route_pointer_rewritten_in_g189d=true
+default_route_pointer_rewritten_in_g189d=true
+production_route_pointer_rewritten_in_g189d=true
+route_switch_rollback_executed_in_g189d=true
+rollback_execution_performed=true
+rollback_pointer_update_applied=true
+production_claimed=true
+production_ready_claimed=true
+training_quality_claimed=true
+model_improvement_claimed=true
+base_weight_mutated_in_g189d=true
+```
+
+Expected binary:
+
+`ash_basetrain_gpu_70k_g189d_active_route_rollback_preflight`
+
+Expected local spec in baked ZIP:
+
+`specs/ASH_BASETRAIN_GPU_70K_G189D_SPEC.md`
+
+Expected outputs:
+
+```text
+ASH_BASETRAIN_GPU_70K_G189D_ACTIVE_ROUTE_ROLLBACK_PREFLIGHT_RECEIPT.json
+ASH_BASETRAIN_GPU_70K_G189D_G188A_DENIED_ACCEPTANCE_SOURCE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_CURRENT_ACTIVE_ROUTE_OBSERVATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_ROLLBACK_METADATA_BINDING_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_ACTIVE_ROUTE_ROLLBACK_CANDIDATE_PACKET.json
+ASH_BASETRAIN_GPU_70K_G189D_ROLLBACK_CANDIDATE_PREFLIGHT_RESULT_PACKET.json
+ASH_BASETRAIN_GPU_70K_G189D_NO_ROUTE_POINTER_REWRITE_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_NO_PRODUCTION_CLAIM_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_NO_TRAINING_OR_WEIGHT_MUTATION_AUDIT.json
+ASH_BASETRAIN_GPU_70K_G189D_NEXT_PATCH_PACKET.json
+```
+
+Expected next patch:
+
+`ASH-BASETRAIN-GPU-70K-G190D` explicit rollback execution approval gate.
