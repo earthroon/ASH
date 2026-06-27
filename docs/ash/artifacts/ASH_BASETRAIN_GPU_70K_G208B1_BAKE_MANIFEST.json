@@ -1,0 +1,131 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G208B1",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G208B0",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G208B2",
+  "phase": "PhaseB",
+  "title": "RC-1 Eval Matrix Expansion And Baseline Reference Compare / Compare Observation Outputs Without Improvement Claim / No Deployment Claim",
+  "bake_kind": "rc1_eval_matrix_baseline_compare_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g208b1_rc1_eval_matrix_baseline_compare",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G208B0_R1_lifetime_hotfix_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G208B1_rc1_eval_matrix_baseline_compare_baked_no_artifacts_no_ps1_no_py.zip",
+  "docs_committed_to_github": true,
+  "github_doc_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G208B1_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G208B1_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g208b1_rc1_eval_matrix_baseline_compare.rs",
+      "size_bytes": 24277,
+      "sha256": "57ce2bd878504a8ab209e55b352a2d8231ee82386efe832d3ed0485b347e6c7f"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G208B1_SPEC.md",
+      "size_bytes": 14574,
+      "sha256": "2e840217483f05f20c6fb211e889a6c3865abb7300153efab06f6d7fcb7d6c48"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G208B1_BAKE_MANIFEST.json",
+      "size_bytes": 5845,
+      "sha256": "omitted_self_referential"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G208B1_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 473,
+      "sha256": "e9eb6d2a5086166dc63b4ca4776bed6e05b68484f3de27d90bf408006c73b55f"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G208B1_STATIC_CHECKS.json",
+      "size_bytes": 748,
+      "sha256": "893306e81220e53741df8d18aa55b1d8ffac1344d1914771335e2ac8c27e8364"
+    }
+  ],
+  "cli_policy": {
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "release_candidate_id": "RC-1",
+    "eval_matrix_id": "rc1-ko-short-matrix-v1",
+    "baseline_reference_id": "ko-short-reference-v1"
+  },
+  "json_writer_policy": {
+    "serde_json_large_macro_allowed": false,
+    "recursion_limit_patch_allowed": false,
+    "serde_json_map_writer_required": true,
+    "json_atlas_writer_required": true,
+    "guard_macro": "anyhow::ensure"
+  },
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G208B1",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_ensure_macro_count": 2,
+    "common_receipt_static_artifact_lifetime_count": 0,
+    "common_receipt_str_artifact_signature": true,
+    "artifact_payload_filename_str_signature": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs": [
+    "ASH_BASETRAIN_GPU_70K_G208B1_RC1_EVAL_MATRIX_COMPARE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_G208B0_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_RC1_REGISTRY_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_FIRST_OBSERVATION_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_EVAL_MATRIX_EXPANSION_PLAN.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_EXPANDED_EVAL_MATRIX.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_EVAL_MATRIX_COVERAGE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_BASELINE_REFERENCE_BINDING.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_REFERENCE_PAIRING_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_RC1_REFERENCE_COMPARISON_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_REFERENCE_DELTA_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_COMPARISON_RESULT_SUMMARY.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_QUALITATIVE_REVIEW_QUEUE.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_SAMPLE_PRESERVATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_HUMAN_REVIEW_PACKET_APPEND.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_MODEL_IMPROVEMENT_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_PRODUCTION_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_BENCHMARK_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_DEPLOYMENT_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_BASE_WEIGHT_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_OPTIMIZER_STATE_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NO_TRAINING_WEIGHT_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_ATLAS_DEFERRED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_TENSORCUBE_DISABLED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G208B1_NEXT_G208B2_ENTRY_PACKET.json"
+  ],
+  "non_goals": [
+    "deployment claim",
+    "deployment ready claim",
+    "model improvement claim",
+    "production quality claim",
+    "benchmark claim",
+    "convergence claim",
+    "production pointer switch",
+    "actual rollback execution",
+    "checkpoint rewrite",
+    "safetensors rewrite",
+    "production base weight mutation",
+    "optimizer state mutation",
+    "training weight mutation",
+    "atlas route execution",
+    "tensorcube enable"
+  ],
+  "self_manifest_path": "specs/ASH_BASETRAIN_GPU_70K_G208B1_BAKE_MANIFEST.json",
+  "self_manifest_hash_recorded": false,
+  "self_manifest_hash_policy": "omitted_to_avoid_self_referential_digest",
+  "zip_hash_recorded": false,
+  "zip_hash_policy": "omitted_to_avoid_zip_self_reference_after_manifest_write"
+}
