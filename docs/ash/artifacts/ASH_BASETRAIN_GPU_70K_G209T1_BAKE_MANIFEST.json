@@ -1,0 +1,134 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T1",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T0",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T2",
+  "phase": "PhaseT",
+  "title": "TensorCube Shadow Parity Smoke And TensorCore Probe Receipt / Capture Normal Vs Shadow Outputs / No Replacement No Hardware Claim",
+  "bake_kind": "tensorcube_shadow_parity_smoke_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t1_tensorcube_shadow_parity_smoke",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T0_tensorcube_tensorcore_shadow_preflight_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T1_tensorcube_shadow_parity_smoke_baked_no_artifacts_no_ps1_no_py.zip",
+  "docs_committed_to_github": true,
+  "github_doc_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G209T1_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G209T1_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t1_tensorcube_shadow_parity_smoke.rs",
+      "size_bytes": 25358,
+      "sha256": "fc8ffa825d657b5664519fa5e5df6b8267712d0fa223d0fb97cb701d43a90bb7"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T1_SPEC.md",
+      "size_bytes": 11246,
+      "sha256": "74d6992f119a7439e01e27dd78e1d013cdd06a86e398412358a09b2a0b359428"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T1_BAKE_MANIFEST.json",
+      "size_bytes": 6118,
+      "sha256": "omitted_self_referential"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T1_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 467,
+      "sha256": "43b8fdebe34cf7cea3cecdbdc35509ca0855bea2bedb7a31a94521ee1b3af61e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T1_STATIC_CHECKS.json",
+      "size_bytes": 747,
+      "sha256": "7961575d4436bad0235d49bd7e0894a5af42b1334a76000d83e24c642dca0d48"
+    }
+  ],
+  "cli_policy": {
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "phase": "PhaseT",
+    "release_candidate_id": "RC-1",
+    "parity_tolerance_id": "rc1-tensor-shadow-v1"
+  },
+  "json_writer_policy": {
+    "serde_json_large_macro_allowed": false,
+    "recursion_limit_patch_allowed": false,
+    "serde_json_map_writer_required": true,
+    "json_atlas_writer_required": true,
+    "guard_macro": "anyhow::ensure"
+  },
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T1",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "common_receipt_static_artifact_lifetime_count": 0,
+    "common_receipt_str_artifact_signature": true,
+    "artifact_payload_filename_str_signature": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs": [
+    "ASH_BASETRAIN_GPU_70K_G209T1_TENSORCUBE_SHADOW_PARITY_SMOKE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_G209T0_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_RC1_PARITY_BASELINE_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_TENSORCUBE_SHADOW_ROUTE_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_TENSORCORE_PROBE_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_PARITY_TOLERANCE_LOAD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NORMAL_ROUTE_CAPTURE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_TENSORCUBE_SHADOW_CAPTURE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_TENSORCORE_PROBE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NORMAL_OUTPUT_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_SHADOW_OUTPUT_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_PARITY_COMPARE_LEDGER.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_PARITY_DIFF_SUMMARY.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_PARITY_VALUES_FINITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_FALLBACK_ROUTE_AVAILABILITY_PROOF.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_MATMUL_REPLACEMENT_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_TENSORCORE_ROUTE_ENABLE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_TENSORCORE_HARDWARE_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_CUDA_DEPENDENCY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_TORCH_DEPENDENCY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_BASE_WEIGHT_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_OPTIMIZER_STATE_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_TRAINING_WEIGHT_MUTATION_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_BENCHMARK_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NO_DEPLOYMENT_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G209T1_NEXT_G209T2_ENTRY_PACKET.json"
+  ],
+  "non_goals": [
+    "matmul replacement",
+    "TensorCore route enablement",
+    "TensorCore hardware acceleration claim",
+    "CUDA dependency",
+    "torch dependency",
+    "benchmark claim",
+    "model improvement claim",
+    "deployment claim",
+    "deployment ready claim",
+    "production pointer switch",
+    "rollback execution",
+    "checkpoint rewrite",
+    "safetensors rewrite",
+    "base weight mutation",
+    "optimizer state mutation",
+    "training weight mutation"
+  ],
+  "self_manifest_path": "specs/ASH_BASETRAIN_GPU_70K_G209T1_BAKE_MANIFEST.json",
+  "self_manifest_hash_recorded": false,
+  "self_manifest_hash_policy": "omitted_to_avoid_self_referential_digest",
+  "zip_hash_recorded": false,
+  "zip_hash_policy": "omitted_to_avoid_zip_self_reference_after_manifest_write"
+}
