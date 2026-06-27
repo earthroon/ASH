@@ -1,0 +1,86 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G207A2",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G207A1",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G207A3",
+  "title": "Training.rs Active FreshInit Backward Optimizer Smoke / Scoped Weight Delta / No Production Commit",
+  "bake_kind": "rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g207a2_active_freshinit_backward_optimizer_smoke",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_committed": false,
+  "docs_committed_to_github": true,
+  "github_doc_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G207A2_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G207A2_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g207a2_active_freshinit_backward_optimizer_smoke.rs",
+      "size_bytes": 19559,
+      "sha256": "dce7eb55a83b41a5459b38c007405ff9b2419ac030de6e19ca61d172fc5d99f7"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A2_SPEC.md",
+      "size_bytes": 6543,
+      "sha256": "ea0c252318bfceaf59187125bd06f75e167a3a3fbfed88b0293da771aafa9167"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A2_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 437,
+      "sha256": "dfc03b54cada075eddda161d29922654403a141465082432a01ee2d3acd883e7"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A2_STATIC_CHECKS.json",
+      "size_bytes": 311,
+      "sha256": "c5152a2fd89344d262e323d501a7e716097337f1ec0d9f6eef6cb45999d78d52"
+    }
+  ],
+  "local_runtime_outputs": [
+    "ASH_BASETRAIN_GPU_70K_G207A2_ACTIVE_BACKWARD_OPTIMIZER_SMOKE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_G207A1_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TRAINING_RS_ACTIVE_ROUTE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TINY_BATCH_DIGEST_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_FRESHINIT_FORWARD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_LOSS_COMPUTE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_LOSS_BACKWARD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_OPTIMIZER_STEP_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_SCOPED_WEIGHT_DELTA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_PRODUCTION_COMMIT_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_ATLAS_DEFERRED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TENSORCUBE_DISABLED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_TRAINING_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NEXT_G207A3_ENTRY_PACKET.json"
+  ],
+  "forbidden_prebaked_outputs_in_zip": [
+    "ASH_BASETRAIN_GPU_70K_G207A2_ACTIVE_BACKWARD_OPTIMIZER_SMOKE_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_G207A1_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TRAINING_RS_ACTIVE_ROUTE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TINY_BATCH_DIGEST_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_FRESHINIT_FORWARD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_LOSS_COMPUTE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_LOSS_BACKWARD_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_OPTIMIZER_STEP_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_SCOPED_WEIGHT_DELTA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_PRODUCTION_COMMIT_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_ATLAS_DEFERRED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_TENSORCUBE_DISABLED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NO_TRAINING_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A2_NEXT_G207A3_ENTRY_PACKET.json"
+  ],
+  "non_goals": [
+    "production base weight mutation",
+    "checkpoint rewrite",
+    "safetensors rewrite",
+    "route pointer rewrite",
+    "atlas route execution",
+    "tensorcube enable",
+    "training quality claim",
+    "deployment ready claim"
+  ],
+  "self_manifest_path": "specs/ASH_BASETRAIN_GPU_70K_G207A2_BAKE_MANIFEST.json",
+  "self_manifest_hash_recorded": false,
+  "self_manifest_hash_policy": "omitted_to_avoid_self_referential_digest"
+}
