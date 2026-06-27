@@ -1,0 +1,100 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G207A4",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G207A3",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G207A5",
+  "title": "Training.rs FreshInit Multi-Step Loss Direction Run / Loss First Greater Than Last / No Quality Claim",
+  "bake_kind": "rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g207a4_loss_direction_run",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_committed": false,
+  "docs_committed_to_github": true,
+  "github_doc_paths": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G207A4_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G207A4_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g207a4_loss_direction_run.rs",
+      "size_bytes": 27500,
+      "sha256": "1670ecbaad7cd172de0e7433e04bfbb3b8c2d40e988f8b34c4b26fdf6446e396"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A4_SPEC.md",
+      "size_bytes": 7469,
+      "sha256": "1a20f232599fcdc8f07cfd2d0fe5b6947b049c760d012efd1eb4a00eb67ac031"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A4_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 503,
+      "sha256": "8cb09f928113663b4566f353f0e76c7ce604549f9a6c4061b4df8efe107ee9ee"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G207A4_STATIC_CHECKS.json",
+      "size_bytes": 339,
+      "sha256": "9490c5132b07d39cadd96dbe66144541935964ff2cc01b4772b9d9ad68f9cdb4"
+    }
+  ],
+  "json_writer_policy": {
+    "serde_json_json_macro_allowed": false,
+    "recursion_limit_patch_allowed": false,
+    "serde_json_map_writer_required": true,
+    "json_atlas_writer_required": true,
+    "jsonl_ledger_writer_required": true
+  },
+  "local_runtime_outputs": [
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_DIRECTION_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_G207A3_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_SOURCE_LEDGER_SCHEMA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_MULTI_STEP_RUN_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_PER_STEP_LOSS_GRAD_DELTA_LEDGER.jsonl",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LEDGER_SCHEMA_VALIDATION.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_FINITE_VALUE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_FIRST_LAST_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_DIRECTION_OBSERVATION.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_DIGEST_CONTINUITY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_OPTIMIZER_CONTINUITY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_SCOPED_WEIGHT_DELTA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_PRODUCTION_COMMIT_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_ATLAS_DEFERRED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_TENSORCUBE_DISABLED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NEXT_G207A5_ENTRY_PACKET.json"
+  ],
+  "forbidden_prebaked_outputs_in_zip": [
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_DIRECTION_RECEIPT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_G207A3_SOURCE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_SOURCE_LEDGER_SCHEMA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_MULTI_STEP_RUN_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_PER_STEP_LOSS_GRAD_DELTA_LEDGER.jsonl",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LEDGER_SCHEMA_VALIDATION.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_FINITE_VALUE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_FIRST_LAST_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_LOSS_DIRECTION_OBSERVATION.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_DIGEST_CONTINUITY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_OPTIMIZER_CONTINUITY_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_SCOPED_WEIGHT_DELTA_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_QUALITY_CLAIM_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_PRODUCTION_COMMIT_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_CHECKPOINT_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NO_SAFETENSORS_REWRITE_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_ATLAS_DEFERRED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_TENSORCUBE_DISABLED_AUDIT.json",
+    "ASH_BASETRAIN_GPU_70K_G207A4_NEXT_G207A5_ENTRY_PACKET.json"
+  ],
+  "non_goals": [
+    "training quality claim",
+    "model improvement claim",
+    "production base weight mutation",
+    "checkpoint rewrite",
+    "safetensors rewrite",
+    "route pointer rewrite",
+    "atlas route execution",
+    "tensorcube enable",
+    "deployment ready claim"
+  ],
+  "self_manifest_path": "specs/ASH_BASETRAIN_GPU_70K_G207A4_BAKE_MANIFEST.json",
+  "self_manifest_hash_recorded": false,
+  "self_manifest_hash_policy": "omitted_to_avoid_self_referential_digest"
+}
