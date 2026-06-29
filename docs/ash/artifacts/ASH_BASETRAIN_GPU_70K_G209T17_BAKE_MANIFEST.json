@@ -1,0 +1,69 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T17",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T16",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T18",
+  "phase": "PhaseT",
+  "title": "TensorCube Canary Matmul Dispatch And Rollback Latch Smoke / Execute Single NonProduction Candidate Override Dispatch / No Production Pointer Switch No TensorCore Claim",
+  "bake_kind": "tensorcube_canary_dispatch_smoke_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t17_tensorcube_canary_dispatch_smoke",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T16_tensorcube_parity_override_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T17_tensorcube_canary_dispatch_smoke_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t17_tensorcube_canary_dispatch_smoke.rs",
+      "size_bytes": 19032,
+      "sha256": "634c31802e595a42dda7405476c0a99c8add4050c244ff7ba7339be93304da6c"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T17_SPEC.md",
+      "size_bytes": 11309,
+      "sha256": "02008c0b4d6deb30b4207f363a54a04a8542941ffa170b2ce48111d437d471d6"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T17_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 468,
+      "sha256": "b0889fcbc4887e1f79e3738af7296f735e005f8b7d88413f7edf7da886fcc09c"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T17_STATIC_CHECKS.json",
+      "size_bytes": 977,
+      "sha256": "e97bbc0f20fd22f79e23ba35700bd40a074c575954196e72ae5e214df0675e81"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T17_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T17",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_canary_dispatch_status_present": true,
+    "target_writer_match_rollback_latch_status_present": true,
+    "target_writer_match_output_apply_status_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 13,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
