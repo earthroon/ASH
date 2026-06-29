@@ -1,0 +1,126 @@
+# ASH-BASETRAIN-GPU-70K-G210U15
+
+## TensorCube Cold Storage Expiry Or Purge Decision Audit
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U15`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U14`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U16`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U15_TENSORCUBE_COLD_STORAGE_EXPIRY_OR_PURGE_DECISION_AUDIT_RECORD_EXPLICIT_EXPIRY_OR_PURGE_DECISION_BOUNDARY_WITHOUT_RUNTIME_RELEASE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U15 consumes the sealed G210U14 cold storage integrity audit, runtime release deny seal, cold-storage-integrity handoff, and G210U15 entry packet.
+
+It creates an expiry or purge decision boundary audit. The candidate route remains cold-stored, unreleased, unapplied, unpromoted, not live-bound, not dispatchable, runtime-disabled, and not production-visible. Expiry and purge decisions are recorded as boundaries only. No purge execution, candidate deletion, evidence deletion, runtime release, production route change, rollback execution, or TensorCore hardware acceleration claim is created.
+
+## Hard Boundary
+
+```text
+expiry_or_purge_decision_observed=true is not purge execution
+purge_boundary_recorded=true is not candidate deletion
+expiry_boundary_recorded=true is not runtime release
+candidate_stored=true remains non-authority
+candidate_released=false remains invariant
+runtime_release_denied=true remains non-runtime-authority
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U15_TENSORCUBE_COLD_STORAGE_EXPIRY_OR_PURGE_DECISION_AUDIT_RECORD_EXPLICIT_EXPIRY_OR_PURGE_DECISION_BOUNDARY_WITHOUT_RUNTIME_RELEASE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U14
+patch_id=ASH-BASETRAIN-GPU-70K-G210U15
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U16
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_cold_storage_integrity_audit_status=Audited
+source_tensorcube_runtime_release_deny_seal_status=Sealed
+source_tensorcube_cold_storage_integrity_handoff_status=Created
+tensorcube_expiry_or_purge_decision_audit_status=Audited
+tensorcube_expiry_or_purge_decision_audit_mode=ExpiryOrPurgeBoundaryRecordedNoExecution
+tensorcube_expiry_or_purge_decision_audit_candidate_route_state=ColdStoredNonProductionCandidateOnly
+tensorcube_expiry_or_purge_decision_audit_candidate_stored=true
+tensorcube_expiry_or_purge_decision_audit_candidate_released=false
+tensorcube_expiry_or_purge_decision_audit_candidate_applied=false
+tensorcube_expiry_or_purge_decision_audit_candidate_promoted=false
+tensorcube_expiry_or_purge_decision_audit_expiry_decision_recorded=true
+tensorcube_expiry_or_purge_decision_audit_purge_decision_recorded=true
+tensorcube_expiry_or_purge_decision_audit_expiry_executed=false
+tensorcube_expiry_or_purge_decision_audit_purge_executed=false
+tensorcube_expiry_or_purge_decision_audit_candidate_deleted=false
+tensorcube_expiry_or_purge_decision_audit_candidate_evidence_deleted=false
+tensorcube_expiry_or_purge_decision_audit_runtime_release_executed=false
+tensorcube_expiry_or_purge_decision_audit_runtime_enable_authority=false
+tensorcube_expiry_or_purge_decision_audit_tensorcore_claim_authority=false
+tensorcube_expiry_or_purge_boundary_seal_status=Sealed
+tensorcube_expiry_or_purge_boundary_seal_mode=ExpiryOrPurgeBoundaryNoCandidateReleaseNoPurgeExecution
+tensorcube_expiry_or_purge_boundary_seal_candidate_stored=true
+tensorcube_expiry_or_purge_boundary_seal_candidate_released=false
+tensorcube_expiry_or_purge_boundary_seal_expiry_decision_recorded=true
+tensorcube_expiry_or_purge_boundary_seal_purge_decision_recorded=true
+tensorcube_expiry_or_purge_boundary_seal_expiry_executed=false
+tensorcube_expiry_or_purge_boundary_seal_purge_executed=false
+tensorcube_expiry_or_purge_boundary_seal_candidate_deleted=false
+tensorcube_expiry_or_purge_boundary_seal_candidate_evidence_deleted=false
+tensorcube_expiry_or_purge_boundary_seal_runtime_release_executed=false
+tensorcube_expiry_purge_handoff_status=Created
+tensorcube_expiry_purge_handoff_mode=ExpiryOrPurgeBoundaryAwaitEvidenceRetentionAudit
+tensorcube_g210u16_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+candidate_route_bound_live=false
+candidate_route_dispatchable=false
+candidate_route_released=false
+candidate_route_cold_stored=true
+candidate_promoted=false
+candidate_deleted=false
+candidate_evidence_deleted=false
+candidate_archive_deleted=false
+expiry_decision_recorded=true
+purge_decision_recorded=true
+expiry_executed=false
+purge_executed=false
+production_route_changed=false
+production_route_pointer_switch_executed=false
+replacement_permission_granted=false
+runtime_release_requested=false
+runtime_release_approved=false
+runtime_release_authorized=false
+runtime_release_executed=false
+rollback_executed=false
+rollback_authorized=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u16=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u15_expiry_purge_decision.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u15_expiry_purge_decision
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U16`
+
+```text
+TensorCube Evidence Retention And Candidate Archive Deny / Retain Candidate Evidence While Denying Archive Deletion Or Runtime Release / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
