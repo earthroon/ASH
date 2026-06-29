@@ -1,0 +1,145 @@
+# ASH-BASETRAIN-GPU-70K-G210U13
+
+## TensorCube Promotion Decision Deny Audit And Candidate Cold Storage / Record Promotion Decision Denial While Keeping Candidate Route In Cold Storage / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U13`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U12`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U14`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U13_TENSORCUBE_PROMOTION_DECISION_DENY_AUDIT_AND_CANDIDATE_COLD_STORAGE_RECORD_PROMOTION_DECISION_DENIAL_WHILE_KEEPING_CANDIDATE_ROUTE_IN_COLD_STORAGE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U13 consumes the sealed G210U12 non-production route isolation receipt, rollback anchor receipt, rollback-anchor-no-execution seal receipt, isolation rollback handoff packet, G210U13 entry packet, post-route-isolation feature state, and no-candidate-apply/no-production-route-switch/no-rollback-execution/no-live-bind/no-command-submit/no-runtime-enable/no-TensorCore guards.
+
+It creates a promotion decision deny audit receipt. The denial is audit-only, not a promotion execution. It also creates a candidate cold storage receipt, keeps the candidate stored, unreleased, unapplied, unpromoted, non-production, non-live-bound, non-dispatchable, and runtime-disabled. It creates a promotion-deny-cold-storage seal and prepares the G210U14 cold storage integrity entry packet.
+
+## Core Boundary
+
+```text
+promotion decision deny audit != promotion execution
+candidate cold storage != live route bind
+deny audit receipt != production route switch
+cold storage state != candidate apply
+promotion denial recorded != rollback execution
+TensorCube cold storage != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U13_TENSORCUBE_PROMOTION_DECISION_DENY_AUDIT_AND_CANDIDATE_COLD_STORAGE_RECORD_PROMOTION_DECISION_DENIAL_WHILE_KEEPING_CANDIDATE_ROUTE_IN_COLD_STORAGE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U12
+patch_id=ASH-BASETRAIN-GPU-70K-G210U13
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U14
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_non_production_route_isolation_status=Isolated
+source_tensorcube_non_production_route_isolation_mode=CandidateRouteIsolatedFromProductionRuntime
+source_tensorcube_rollback_anchor_status=Anchored
+source_tensorcube_rollback_anchor_mode=RollbackAnchorNoExecution
+source_tensorcube_rollback_anchor_no_execution_seal_status=Sealed
+source_tensorcube_isolation_rollback_handoff_status=Created
+source_tensorcube_isolation_rollback_handoff_mode=IsolationAnchoredAwaitPromotionDecisionDenyAudit
+tensorcube_promotion_decision_deny_audit_status=Audited
+tensorcube_promotion_decision_deny_audit_mode=PromotionDeniedNoCandidatePromotion
+tensorcube_promotion_decision_deny_audit_candidate_route_observed=true
+tensorcube_promotion_decision_deny_audit_candidate_route_state=IsolatedNonProductionCandidateOnly
+tensorcube_promotion_decision_deny_audit_candidate_cold_storage_required=true
+tensorcube_promotion_decision_deny_audit_promotion_decision_observed=true
+tensorcube_promotion_decision_deny_audit_promotion_denied=true
+tensorcube_promotion_decision_deny_audit_promotion_approved=false
+tensorcube_promotion_decision_deny_audit_promotion_authorized=false
+tensorcube_promotion_decision_deny_audit_promotion_executed=false
+tensorcube_promotion_decision_deny_audit_candidate_promoted=false
+tensorcube_promotion_decision_deny_audit_candidate_applied=false
+tensorcube_promotion_decision_deny_audit_candidate_route_bound_live=false
+tensorcube_promotion_decision_deny_audit_candidate_route_dispatchable=false
+tensorcube_promotion_decision_deny_audit_production_route_pointer_unchanged=true
+tensorcube_promotion_decision_deny_audit_rollback_executed=false
+tensorcube_promotion_decision_deny_audit_tensorcore_claim_authority=false
+tensorcube_candidate_cold_storage_status=Stored
+tensorcube_candidate_cold_storage_mode=ColdStoredNonProductionCandidate
+tensorcube_candidate_cold_storage_candidate_route_state=ColdStoredNonProductionCandidateOnly
+tensorcube_candidate_cold_storage_candidate_stored=true
+tensorcube_candidate_cold_storage_candidate_released=false
+tensorcube_candidate_cold_storage_candidate_applied=false
+tensorcube_candidate_cold_storage_candidate_promoted=false
+tensorcube_candidate_cold_storage_candidate_route_bound_live=false
+tensorcube_candidate_cold_storage_candidate_route_dispatchable=false
+tensorcube_candidate_cold_storage_candidate_route_runtime_enabled=false
+tensorcube_candidate_cold_storage_candidate_route_production_visible=false
+tensorcube_candidate_cold_storage_live_binding_authority=false
+tensorcube_candidate_cold_storage_command_submit_authority=false
+tensorcube_candidate_cold_storage_dispatch_authority=false
+tensorcube_candidate_cold_storage_runtime_enable_authority=false
+tensorcube_candidate_cold_storage_tensorcore_claim_authority=false
+tensorcube_promotion_deny_cold_storage_seal_status=Sealed
+tensorcube_promotion_deny_cold_storage_seal_mode=PromotionDeniedCandidateColdStored
+tensorcube_cold_storage_handoff_status=Created
+tensorcube_cold_storage_handoff_mode=ColdStorageAwaitReleaseDenyIntegrityAudit
+tensorcube_g210u14_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+candidate_route_bound_live=false
+candidate_route_dispatchable=false
+candidate_route_released=false
+candidate_route_cold_stored=true
+production_route_changed=false
+production_route_pointer_switch_executed=false
+replacement_permission_granted=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_promotion_decision_deny_audit_created=true
+same_device_candidate_cold_storage_created=true
+tensorcore_hardware_acceleration_claimed=false
+new_approval_input_received=true
+new_human_decision_input_received=true
+new_shadow_decision_input_received=false
+approval_reopened=false
+approval_reissued=false
+approval_reused=false
+approval_granted=false
+approval_effective=false
+promotion_decision_made=false
+promotion_decision_denied=true
+promotion_auto_decision_made=false
+promotion_authorized=false
+promotion_executed=false
+candidate_promoted=false
+rollback_executed=false
+rollback_auto_executed=false
+rollback_authorized=false
+ready_for_g210u14=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u13_promotion_deny_cold_storage.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u13_promotion_deny_cold_storage
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U14`
+
+```text
+TensorCube Cold Storage Integrity And Runtime Release Deny Seal / Verify Cold Stored Candidate Remains Unreleased From Runtime / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
