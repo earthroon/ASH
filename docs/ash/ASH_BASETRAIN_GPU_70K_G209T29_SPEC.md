@@ -1,0 +1,278 @@
+# ASH-BASETRAIN-GPU-70K-G209T29
+
+## TensorCube Human Decision Intake Gate And Explicit Deny-By-Default / Accept Or Reject Human Promotion Decision Input Through A Deny-By-Default Gate / No Silent Approval No Production Route No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G209T29`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G209T28`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G209T30`  
+Phase: `PhaseT`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G209T29_TENSORCUBE_HUMAN_DECISION_INTAKE_GATE_AND_EXPLICIT_DENY_BY_DEFAULT_ACCEPT_OR_REJECT_HUMAN_PROMOTION_DECISION_INPUT_THROUGH_A_DENY_BY_DEFAULT_GATE_NO_SILENT_APPROVAL_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G209T29 consumes the G209T28 human review packet export receipt, shadow promotion decision sandbox receipt, shadow scorecard receipt, real promotion decision deferral receipt, post-shadow feature gate state receipt, post-shadow fallback readiness receipt, post-shadow rollback latch receipt, and no-real-promotion/no-production/no-TensorCore guards.
+
+It creates a human decision intake gate, seals a strict input schema, evaluates a deny-by-default matrix, and records a human decision input only as intake state. Missing, malformed, unsigned, stale, scope-mismatched, unknown-operator, silent-approval, and production-scope inputs are denied. Approve without production authority is recorded only. Explicit reject is rejected. Explicit hold is held.
+
+This patch must not silently approve, create a real promotion decision, authorize candidate promotion, switch production route pointers, enable candidate route by default, grant replacement permission, mutate model/training state, claim deployment readiness, or claim TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+source_patch_id=ASH-BASETRAIN-GPU-70K-G209T28
+patch_id=ASH-BASETRAIN-GPU-70K-G209T29
+next_patch_id=ASH-BASETRAIN-GPU-70K-G209T30
+phase=PhaseT
+training_loop_owner=training.rs
+active_training_route=FreshInit
+selected_tensorcube_policy=InternalTensorCube8x8CandidateRoute
+tensorcube_candidate_route_scope=NonProductionCandidateOnly
+source_tensorcube_human_review_packet_export_receipt_loaded=true
+source_tensorcube_human_review_packet_export_status=Exported
+source_tensorcube_human_review_packet_export_read_only=true
+source_tensorcube_human_review_packet_export_contains_authorization=false
+source_tensorcube_shadow_promotion_decision_sandbox_receipt_loaded=true
+source_tensorcube_shadow_promotion_decision_sandbox_mode=SimulationOnly
+source_tensorcube_shadow_promotion_decision_sandbox_authority=None
+source_tensorcube_shadow_promotion_decision_sandbox_output_status=SimulatedHold
+source_tensorcube_shadow_promotion_decision_sandbox_output_applied=false
+source_tensorcube_shadow_promotion_decision_sandbox_output_authorized=false
+source_tensorcube_shadow_promotion_decision_sandbox_output_committed=false
+source_tensorcube_shadow_promotion_scorecard_loaded=true
+source_tensorcube_shadow_promotion_scorecard_status=Pass
+source_tensorcube_shadow_promotion_scorecard_recommendation=SimulatedHold
+source_tensorcube_real_promotion_decision_status_loaded=true
+source_tensorcube_real_promotion_decision_status=NotMade
+source_tensorcube_real_promotion_decision_authorized=false
+source_tensorcube_real_promotion_decision_deferred=true
+source_tensorcube_post_shadow_sandbox_feature_gate_state_loaded=true
+source_tensorcube_post_shadow_sandbox_feature_gate_state=Disabled
+source_tensorcube_post_shadow_sandbox_candidate_route_state_loaded=true
+source_tensorcube_post_shadow_sandbox_candidate_route_state=NonProductionCandidateOnly
+source_tensorcube_post_shadow_sandbox_fallback_ready_loaded=true
+source_tensorcube_post_shadow_sandbox_fallback_ready=true
+source_tensorcube_post_shadow_sandbox_rollback_latch_loaded=true
+source_tensorcube_post_shadow_sandbox_rollback_latch_verified=true
+source_tensorcube_post_shadow_sandbox_approval_state_loaded=true
+source_tensorcube_post_shadow_sandbox_approval_state=Consumed
+tensorcube_human_decision_intake_gate_created=true
+tensorcube_human_decision_intake_gate_scope=NonProductionCandidateOnly
+tensorcube_human_decision_intake_gate_status=Open
+tensorcube_human_decision_intake_gate_policy=DenyByDefault
+tensorcube_human_decision_intake_gate_decision_authority=HumanOperator
+tensorcube_human_decision_intake_gate_auto_approval_allowed=false
+tensorcube_human_decision_intake_gate_silent_approval_allowed=false
+tensorcube_human_decision_intake_gate_production_authority=false
+tensorcube_human_decision_input_schema_created=true
+tensorcube_human_decision_input_schema_status=Sealed
+tensorcube_human_decision_input_schema_requires_operator_id=true
+tensorcube_human_decision_input_schema_requires_decision_kind=true
+tensorcube_human_decision_input_schema_requires_scope=true
+tensorcube_human_decision_input_schema_requires_review_packet_ref=true
+tensorcube_human_decision_input_schema_requires_nonce=true
+tensorcube_human_decision_input_schema_requires_signature=true
+tensorcube_human_decision_input_schema_accepts_approve=true
+tensorcube_human_decision_input_schema_accepts_reject=true
+tensorcube_human_decision_input_schema_accepts_hold=true
+tensorcube_human_decision_input_received=true
+tensorcube_human_decision_input_kind=Hold
+tensorcube_human_decision_input_scope=NonProductionCandidateOnly
+tensorcube_human_decision_input_signature_status=Valid
+tensorcube_human_decision_input_review_packet_ref_status=Matched
+tensorcube_human_decision_input_nonce_status=Fresh
+tensorcube_human_decision_input_schema_verdict=Pass
+tensorcube_deny_by_default_matrix_created=true
+tensorcube_deny_by_default_matrix_status=Pass
+tensorcube_deny_by_default_missing_input_verdict=Denied
+tensorcube_deny_by_default_malformed_input_verdict=Denied
+tensorcube_deny_by_default_unsigned_input_verdict=Denied
+tensorcube_deny_by_default_stale_nonce_verdict=Denied
+tensorcube_deny_by_default_scope_mismatch_verdict=Denied
+tensorcube_deny_by_default_unknown_operator_verdict=Denied
+tensorcube_deny_by_default_silent_approval_verdict=Denied
+tensorcube_deny_by_default_production_scope_verdict=Denied
+tensorcube_deny_by_default_approve_without_production_authority_verdict=RecordedOnly
+tensorcube_deny_by_default_explicit_reject_verdict=Rejected
+tensorcube_deny_by_default_explicit_hold_verdict=Held
+tensorcube_human_decision_intake_receipt_created=true
+tensorcube_human_decision_intake_receipt_status=Held
+tensorcube_human_decision_intake_receipt_scope=NonProductionCandidateOnly
+tensorcube_human_decision_intake_receipt_effect=RecordOnly
+tensorcube_human_decision_intake_receipt_applied=false
+tensorcube_human_decision_intake_receipt_authorized=false
+tensorcube_human_decision_intake_receipt_committed=false
+tensorcube_human_decision_effect_limiter_created=true
+tensorcube_human_decision_effect_limiter_status=Pass
+tensorcube_human_decision_effect_limiter_allows_record_only=true
+tensorcube_human_decision_effect_limiter_allows_production_enable=false
+tensorcube_human_decision_effect_limiter_allows_route_switch=false
+tensorcube_human_decision_effect_limiter_allows_candidate_promotion=false
+tensorcube_human_decision_effect_limiter_allows_replacement_permission=false
+tensorcube_human_decision_effect_limiter_allows_deployment_ready_claim=false
+tensorcube_real_promotion_decision_created=false
+tensorcube_real_promotion_decision_status=NotMade
+tensorcube_real_promotion_decision_authorized=false
+tensorcube_real_promotion_decision_auto_generated=false
+tensorcube_real_promotion_decision_deferred=true
+tensorcube_post_intake_feature_gate_state=Disabled
+tensorcube_post_intake_candidate_route_state=NonProductionCandidateOnly
+tensorcube_post_intake_fallback_ready=true
+tensorcube_post_intake_rollback_latch_verified=true
+tensorcube_post_intake_approval_state=Consumed
+no_silent_approval_guard_created=true
+no_auto_promotion_intake_guard_created=true
+no_production_authority_intake_guard_created=true
+no_real_promotion_decision_intake_guard_created=true
+no_default_enable_intake_guard_created=true
+no_production_route_intake_guard_created=true
+no_production_pointer_switch_intake_guard_created=true
+no_candidate_promotion_intake_guard_created=true
+no_replacement_permission_intake_guard_created=true
+no_deployment_ready_intake_guard_created=true
+no_tensorcore_claim_intake_guard_created=true
+human_decision_input_accepted_for_record=true
+human_decision_input_applied=false
+human_decision_input_authorized=false
+human_decision_input_committed=false
+silent_approval_detected=false
+silent_approval_blocked=true
+auto_approval_detected=false
+auto_approval_blocked=true
+promotion_decision_made=false
+promotion_auto_decision_made=false
+promotion_authorized=false
+candidate_promoted=false
+replacement_permission_granted=false
+default_production_route_changed=false
+production_route_pointer_switch_executed=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g209t30=true
+```
+
+## Source SSOT
+
+```text
+G209T28 human review packet export receipt
+G209T28 shadow promotion decision sandbox receipt
+G209T28 shadow promotion decision output receipt
+G209T28 shadow promotion scorecard receipt
+G209T28 real promotion decision deferral receipt
+G209T28 post-shadow-sandbox feature gate state receipt
+G209T28 post-shadow-sandbox fallback readiness receipt
+G209T28 post-shadow-sandbox rollback latch receipt
+G209T28 post-shadow-sandbox approval state receipt
+G209T28 no real promotion decision guard
+G209T28 no shadow output apply guard
+G209T28 no auto promotion shadow guard
+G209T28 no default enable shadow guard
+G209T28 no production route shadow guard
+G209T28 no production pointer switch shadow guard
+G209T28 no candidate promotion shadow guard
+G209T28 no replacement permission shadow guard
+G209T28 no deployment ready shadow guard
+G209T28 no TensorCore claim shadow guard
+```
+
+## New G209T29 SSOT
+
+```text
+TensorCube human decision intake gate receipt
+TensorCube human decision input schema receipt
+TensorCube human decision input receipt
+TensorCube deny-by-default matrix receipt
+TensorCube human decision intake result receipt
+TensorCube human decision effect limiter receipt
+TensorCube real promotion decision deferral receipt
+TensorCube post-intake feature gate state receipt
+TensorCube post-intake fallback readiness receipt
+TensorCube post-intake rollback latch receipt
+TensorCube post-intake approval state receipt
+no silent approval guard
+no auto promotion intake guard
+no production authority intake guard
+no real promotion decision intake guard
+no default enable intake guard
+no production route intake guard
+no production pointer switch intake guard
+no candidate promotion intake guard
+no replacement permission intake guard
+no deployment ready intake guard
+no TensorCore claim intake guard
+G209T30 entry packet
+```
+
+## Acceptance Criteria
+
+PASS iff source G209T28 review/shadow/deferral/post-shadow guards load, intake gate policy is `DenyByDefault`, auto and silent approval are forbidden, production authority is false, input schema is sealed and requires operator id, decision kind, scope, review packet ref, nonce, and signature, missing/malformed/unsigned/stale/scope-mismatched/silent/production-scope inputs are denied, approve without production authority is `RecordedOnly`, explicit reject is `Rejected`, explicit hold is `Held`, intake effect is `RecordOnly`, real promotion decision remains `NotMade`, post-intake feature gate is `Disabled`, candidate route is `NonProductionCandidateOnly`, fallback remains ready, rollback latch remains verified, approval remains consumed, no production/candidate/replacement/deployment/TensorCore effect occurs, and G209T30 entry packet is created.
+
+## Suggested Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t29_tensorcube_human_decision_intake_gate.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g209t29_tensorcube_human_decision_intake_gate
+```
+
+## Static Surface Expectations
+
+```text
+runtime_outputs_prebaked=0
+target_writer_json_macro_count=0
+target_writer_recursion_limit_count=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+boolean_value_flags_allowed=false
+string_mode_args_required=true
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+review_packet_source_load_parse_check=true
+shadow_sandbox_source_load_parse_check=true
+decision_intake_gate_parse_check=true
+decision_input_schema_parse_check=true
+decision_input_validation_parse_check=true
+deny_by_default_matrix_parse_check=true
+missing_input_deny_parse_check=true
+malformed_input_deny_parse_check=true
+unsigned_input_deny_parse_check=true
+silent_approval_deny_parse_check=true
+production_scope_deny_parse_check=true
+approve_without_authority_record_only_parse_check=true
+intake_receipt_effect_parse_check=true
+effect_limiter_parse_check=true
+real_promotion_decision_parse_check=true
+post_intake_gate_state_parse_check=true
+post_intake_fallback_ready_parse_check=true
+candidate_promotion_parse_check=true
+replacement_permission_parse_check=true
+default_production_route_parse_check=true
+candidate_persistent_enable_parse_check=true
+tensorcore_claim_parse_check=true
+verdict=PASS_STATIC_SURFACE
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g209t29_tensorcube_human_decision_intake_gate
+```
+
+Expected local PASS marker:
+
+```text
+PASS_ASH_BASETRAIN_GPU_70K_G209T29_TENSORCUBE_HUMAN_DECISION_INTAKE_GATE_AND_EXPLICIT_DENY_BY_DEFAULT_ACCEPT_OR_REJECT_HUMAN_PROMOTION_DECISION_INPUT_THROUGH_A_DENY_BY_DEFAULT_GATE_NO_SILENT_APPROVAL_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G209T30`
+
+```text
+TensorCube Human Approval Record Replay And Promotion Still-Hold / Replay Recorded Human Decision Intake Without Promotion Side Effects / No Promotion Apply No Production Route No TensorCore Claim
+```
