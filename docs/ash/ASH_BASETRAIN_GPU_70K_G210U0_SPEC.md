@@ -1,0 +1,113 @@
+# ASH-BASETRAIN-GPU-70K-G210U0
+
+## TensorCube Structure Inventory And Disabled Runtime Wiring Map / Map MicroTile Compute Body To Runtime Route Boundaries Before Dispatch / No Dispatch No Runtime Enable No Promotion Apply No Production Route No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U0`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G209T31`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U1`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U0_TENSORCUBE_STRUCTURE_INVENTORY_AND_DISABLED_RUNTIME_WIRING_MAP_MAP_MICROTILE_COMPUTE_BODY_TO_RUNTIME_ROUTE_BOUNDARIES_BEFORE_DISPATCH_NO_DISPATCH_NO_RUNTIME_ENABLE_NO_PROMOTION_APPLY_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U0 consumes the sealed G209T31 candidate route quarantine and evidence freeze state. It creates a TensorCube structure inventory and a disabled runtime wiring map before any dispatch, route enable, candidate apply, production route mutation, or TensorCore claim.
+
+The patch maps the existing microtile compute body in `crates/burn_webgpu_backend`, records WGSL/native smoke/telemetry/timing surfaces, confirms direct runtime/training/model hot-path wiring is absent, and names future route boundary targets. This is a planning-only gate.
+
+## Core Boundary
+
+```text
+source_patch_id=ASH-BASETRAIN-GPU-70K-G209T31
+patch_id=ASH-BASETRAIN-GPU-70K-G210U0
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U1
+phase=PhaseU
+training_loop_owner=training.rs
+active_training_route=FreshInit
+selected_tensorcube_policy=InternalTensorCube8x8CandidateRoute
+tensorcube_candidate_route_scope=NonProductionCandidateOnly
+source_tensorcube_candidate_route_quarantine_status=Quarantined
+source_tensorcube_evidence_chain_freeze_status=Frozen
+source_tensorcube_evidence_chain_freeze_mode=ReadOnly
+tensorcube_structure_inventory_status=Complete
+tensorcube_microtile_compute_body_detected=true
+tensorcube_microtile_compute_owner=crates/burn_webgpu_backend
+tensorcube_microtile_physical_tile=8x8
+tensorcube_microtile_scalar_kind=F32
+tensorcube_microtile_packing_kind=Vec4F32
+tensorcube_microtile_logical_16x16_bridge_detected=true
+tensorcube_cpu_reference_detected=true
+tensorcube_wgsl_vec4_reference_detected=true
+tensorcube_wgsl_workgroup_reference_detected=true
+tensorcube_wgsl_subgroup_experimental_classification=ExperimentalSeamOnly
+tensorcube_native_wgpu_smoke_runner_detected=true
+tensorcube_dispatch_telemetry_detected=true
+tensorcube_timing_probe_classification=AdvisoryOnly
+tensorcube_runtime_direct_wiring_detected=false
+tensorcube_training_rs_direct_call_detected=false
+tensorcube_model_core_direct_import_detected=false
+tensorcube_live_dispatch_owner_detected=false
+tensorcube_hot_path_replacement_detected=false
+tensorcube_disabled_runtime_wiring_map_status=Mapped
+tensorcube_disabled_runtime_wiring_map_mode=Disabled
+tensorcube_disabled_runtime_wiring_map_dispatch_allowed=false
+tensorcube_disabled_runtime_wiring_map_runtime_enable_allowed=false
+tensorcube_route_boundary_map_status=Ready
+tensorcube_route_boundary_compute_owner=burn_webgpu_backend
+tensorcube_route_boundary_training_owner=training.rs
+tensorcube_route_boundary_runtime_owner=runtime_route_registry_candidate
+tensorcube_route_boundary_model_surface_adapter_required=true
+tensorcube_route_boundary_same_device_handle_probe_required=true
+tensorcube_candidate_route_registry_target_status=IdentifiedOnly
+tensorcube_candidate_route_registry_target_bound=false
+tensorcube_candidate_route_registry_target_enabled=false
+tensorcube_candidate_route_registry_target_dispatchable=false
+tensorcube_same_device_handle_probe_target_identified=true
+tensorcube_same_device_handle_probe_performed=false
+tensorcube_same_device_handle_bound=false
+tensorcube_model_surface_tile_adapter_target_identified=true
+tensorcube_model_surface_tile_adapter_required=true
+tensorcube_model_surface_tile_adapter_created=false
+tensorcube_model_surface_tile_adapter_bound=false
+tensorcube_model_surface_tile_adapter_dispatchable=false
+tensorcube_phase_u_entry_gate_status=OpenForPlanningOnly
+tensorcube_phase_u_entry_gate_dispatch_allowed=false
+tensorcube_phase_u_entry_gate_runtime_enable_allowed=false
+tensorcube_phase_u_entry_gate_production_authority=false
+runtime_dispatch_performed=false
+runtime_route_enabled=false
+candidate_route_applied=false
+production_route_changed=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u1=true
+```
+
+## Acceptance Criteria
+
+PASS iff G209T31 quarantine/freeze is loaded, the microtile compute body and related WGSL/native smoke/telemetry/timing surfaces are inventoried, direct runtime/training/model hot-path wiring absence is recorded, a disabled wiring map is created, candidate registry/handle probe/model adapter targets are identified only, no dispatch or runtime enable occurs, no evidence mutation or approval reopen occurs, no route/candidate/replacement/deployment/TensorCore effect occurs, and G210U1 entry packet is created.
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u0_tensorcube_structure_inventory_wiring_map.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u0_tensorcube_structure_inventory_wiring_map
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u0_tensorcube_structure_inventory_wiring_map
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U1`
+
+```text
+TensorCube Same-Device Handle Probe Target And Disabled Route Stub / Create Runtime Route Stub And Verify Device Ownership Without Dispatch / No Dispatch No Runtime Enable No Promotion Apply No Production Route No TensorCore Claim
+```
