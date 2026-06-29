@@ -1,0 +1,135 @@
+# ASH-BASETRAIN-GPU-70K-G210U11
+
+## TensorCube Closed Apply Gate Audit And Candidate Non-Apply Seal / Audit Closed Apply Gate State Without Applying Candidate Route / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U11`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U10`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U12`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U11_TENSORCUBE_CLOSED_APPLY_GATE_AUDIT_AND_CANDIDATE_NON_APPLY_SEAL_AUDIT_CLOSED_APPLY_GATE_STATE_WITHOUT_APPLYING_CANDIDATE_ROUTE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U11 consumes the sealed G210U10 apply gate review packet receipt, runtime authority deny seal receipt, apply review packet handoff packet, G210U11 entry packet, post-apply-review feature state, and no-apply-gate-open/no-candidate-apply/no-live-bind/no-command-submit/no-runtime-enable/no-TensorCore guards.
+
+It creates a closed apply gate audit receipt. The audit observes the review packet and runtime authority deny seal, confirms the apply gate remains closed, and records that the candidate route is observed but not applied, not live-bound, not dispatchable, not runtime-enabled, not promoted, and not production-bound. It creates a candidate non-apply seal bound to the closed apply gate audit and prepares the G210U12 non-production route isolation entry packet.
+
+## Core Boundary
+
+```text
+closed apply gate audit != apply gate open
+candidate non-apply seal != candidate apply
+review packet handoff != runtime enable
+closed gate observed != command submit
+non-apply audit != live bind
+TensorCube closed gate audit != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U11_TENSORCUBE_CLOSED_APPLY_GATE_AUDIT_AND_CANDIDATE_NON_APPLY_SEAL_AUDIT_CLOSED_APPLY_GATE_STATE_WITHOUT_APPLYING_CANDIDATE_ROUTE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U10
+patch_id=ASH-BASETRAIN-GPU-70K-G210U11
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U12
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_apply_gate_review_packet_status=Created
+source_tensorcube_apply_gate_review_packet_mode=ReviewPacketNoRuntimeApply
+source_tensorcube_runtime_authority_deny_seal_status=Sealed
+source_tensorcube_runtime_authority_deny_seal_mode=ApplyReviewPacketRuntimeAuthorityDenied
+source_tensorcube_apply_review_packet_handoff_status=Created
+source_tensorcube_apply_review_packet_handoff_mode=ReviewPacketAwaitClosedGateAudit
+tensorcube_closed_apply_gate_audit_status=Audited
+tensorcube_closed_apply_gate_audit_mode=ClosedGateNoCandidateApply
+tensorcube_closed_apply_gate_audit_review_packet_observed=true
+tensorcube_closed_apply_gate_audit_runtime_deny_seal_observed=true
+tensorcube_closed_apply_gate_audit_apply_gate_closed=true
+tensorcube_closed_apply_gate_audit_apply_gate_open=false
+tensorcube_closed_apply_gate_audit_candidate_route_observed=true
+tensorcube_closed_apply_gate_audit_candidate_apply_observed=false
+tensorcube_closed_apply_gate_audit_candidate_apply_allowed=false
+tensorcube_closed_apply_gate_audit_candidate_applied=false
+tensorcube_closed_apply_gate_audit_candidate_route_state=NonProductionCandidateOnly
+tensorcube_closed_apply_gate_audit_candidate_route_bound_live=false
+tensorcube_closed_apply_gate_audit_candidate_route_dispatchable=false
+tensorcube_closed_apply_gate_audit_runtime_enable_allowed=false
+tensorcube_closed_apply_gate_audit_tensorcore_claim_allowed=false
+tensorcube_closed_apply_gate_audit_approval_granted=false
+tensorcube_closed_apply_gate_audit_approval_effective=false
+tensorcube_closed_apply_gate_audit_runtime_authority=false
+tensorcube_candidate_non_apply_seal_status=Sealed
+tensorcube_candidate_non_apply_seal_mode=ClosedGateCandidateNotApplied
+tensorcube_candidate_non_apply_seal_source_audit_status=Audited
+tensorcube_candidate_non_apply_seal_apply_gate_closed=true
+tensorcube_candidate_non_apply_seal_apply_gate_open=false
+tensorcube_candidate_non_apply_seal_candidate_apply_allowed=false
+tensorcube_candidate_non_apply_seal_candidate_applied=false
+tensorcube_candidate_non_apply_seal_candidate_route_state=NonProductionCandidateOnly
+tensorcube_candidate_non_apply_seal_candidate_route_bound_live=false
+tensorcube_candidate_non_apply_seal_candidate_route_dispatchable=false
+tensorcube_candidate_non_apply_seal_live_binding_authority=false
+tensorcube_candidate_non_apply_seal_command_submit_authority=false
+tensorcube_candidate_non_apply_seal_dispatch_authority=false
+tensorcube_candidate_non_apply_seal_runtime_enable_authority=false
+tensorcube_candidate_non_apply_seal_tensorcore_claim_authority=false
+tensorcube_closed_gate_audit_handoff_status=Created
+tensorcube_closed_gate_audit_handoff_mode=ClosedGateAuditAwaitNonProductionRouteIsolation
+tensorcube_g210u12_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+candidate_route_bound_live=false
+candidate_route_dispatchable=false
+production_route_changed=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_closed_apply_gate_audit_created=true
+same_device_candidate_non_apply_seal_created=true
+tensorcore_hardware_acceleration_claimed=false
+new_approval_input_received=true
+new_human_decision_input_received=true
+new_shadow_decision_input_received=false
+approval_reopened=false
+approval_reissued=false
+approval_reused=false
+approval_granted=false
+approval_effective=false
+ready_for_g210u12=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u11_closed_gate_audit.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u11_closed_gate_audit
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u11_closed_gate_audit
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U12`
+
+```text
+TensorCube Non-Production Route Isolation And Rollback Anchor / Isolate Candidate Route From Production Runtime And Anchor Rollback State / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
