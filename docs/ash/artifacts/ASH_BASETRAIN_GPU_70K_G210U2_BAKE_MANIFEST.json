@@ -1,0 +1,87 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G210U2",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G210U1",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G210U3",
+  "phase": "PhaseU",
+  "title": "TensorCube Same-Device Metadata Comparison And Cold Stub Seal / Compare Adapter Device Queue Identity Without Compute Dispatch / No Command Submit No Runtime Enable No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_same_device_metadata_comparison_cold_stub_seal_rust_default_args_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g210u2_same_device_cold_stub_seal",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U1_tensorcube_disabled_route_stub_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U2_same_device_cold_stub_seal_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u2_same_device_cold_stub_seal.rs",
+      "size_bytes": 25031,
+      "sha256": "5b7fe6bfd780f79436f302881e6630d05cb9fc32de90ff65e36f33274692977b"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U2_SPEC.md",
+      "size_bytes": 5096,
+      "sha256": "e7cc2283d756e43e2f766f0b7f68f0c87a00ec6fe397fb74865e13fca5d2825f"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U2_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 437,
+      "sha256": "5fa5a047ffcc06cc9c6b6a0212e892795ac5def08ae4bc72827c94306d12c941"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U2_STATIC_CHECKS.json",
+      "size_bytes": 1885,
+      "sha256": "ec411f279e23ba06dcfe9d5f6d94cd33d48af8aa69e7f0d0960d9d7baf25babe"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U2_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G210U2",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "source_patch_parse_check": true,
+    "g210u1_disabled_route_stub_source_load_parse_check": true,
+    "g210u1_route_stub_registry_source_load_parse_check": true,
+    "g210u1_same_device_probe_source_load_parse_check": true,
+    "g210u1_handle_provider_boundary_source_load_parse_check": true,
+    "g210u1_comparison_fields_source_load_parse_check": true,
+    "same_device_metadata_comparison_parse_check": true,
+    "adapter_fingerprint_comparison_parse_check": true,
+    "device_fingerprint_comparison_parse_check": true,
+    "queue_fingerprint_comparison_parse_check": true,
+    "backend_version_comparison_parse_check": true,
+    "wgpu_epoch_comparison_parse_check": true,
+    "lifetime_token_comparison_parse_check": true,
+    "same_device_metadata_verdict_parse_check": true,
+    "cold_stub_seal_parse_check": true,
+    "g210u3_entry_packet_parse_check": true,
+    "no_dispatch_guard_parse_check": true,
+    "no_runtime_enable_guard_parse_check": true,
+    "no_compute_submit_guard_parse_check": true,
+    "no_command_encoder_submit_guard_parse_check": true,
+    "no_compute_buffer_alloc_guard_parse_check": true,
+    "no_live_device_bind_guard_parse_check": true,
+    "no_candidate_apply_guard_parse_check": true,
+    "no_production_route_guard_parse_check": true,
+    "no_tensorcore_claim_guard_parse_check": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 2,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
