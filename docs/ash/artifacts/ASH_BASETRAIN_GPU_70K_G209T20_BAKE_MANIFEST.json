@@ -1,0 +1,74 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T20",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T19",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T21",
+  "phase": "PhaseT",
+  "title": "TensorCube Shape Sweep Boundary Parity Matrix / Run NonProduction TensorCube Candidate Shape Sweep Across Bounded Matmul Cases / No Production Replacement No TensorCore Claim",
+  "bake_kind": "tensorcube_shape_sweep_boundary_parity_matrix_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t20_tensorcube_shape_sweep_boundary_parity",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T19_tensorcube_repeatability_hash_chain_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T20_tensorcube_shape_sweep_boundary_parity_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t20_tensorcube_shape_sweep_boundary_parity.rs",
+      "size_bytes": 22650,
+      "sha256": "21ed60a45887528b7bd6ab4bade13cf250fcc331eb070a1943df968c2b7d4ed1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T20_SPEC.md",
+      "size_bytes": 10813,
+      "sha256": "698f23e3d6eb98a5001a62c54a129b18deeae5808d433fac4e09dbb9326f7c2a"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T20_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 562,
+      "sha256": "6ea8b80cb23ec3907e9e115646758f7481f057b798a9112c25ac7e001ea9c751"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T20_STATIC_CHECKS.json",
+      "size_bytes": 1265,
+      "sha256": "9d904eb1cbdada405077e4b969121a231da8b3f7933e87ff3c8cbad903d5bfa8"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T20_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T20",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_shape_case_count_present": true,
+    "target_writer_match_shape_case_status_present": true,
+    "target_writer_match_parity_matrix_status_present": true,
+    "target_writer_match_boundary_status_present": true,
+    "target_writer_match_fallback_availability_status_present": true,
+    "target_writer_match_aggregate_verdict_present": true,
+    "target_writer_match_shape_output_apply_status_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 18,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
