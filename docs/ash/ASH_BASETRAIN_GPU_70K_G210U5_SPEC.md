@@ -1,0 +1,131 @@
+# ASH-BASETRAIN-GPU-70K-G210U5
+
+## TensorCube Binding Ledger Replay And Integrity Check / Replay Disabled Binding Ledger Without Live Bind Or Adapter Lease Acquire / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U5`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U4`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U6`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U5_TENSORCUBE_BINDING_LEDGER_REPLAY_AND_INTEGRITY_CHECK_REPLAY_DISABLED_BINDING_LEDGER_WITHOUT_LIVE_BIND_OR_ADAPTER_LEASE_ACQUIRE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U5 consumes the sealed G210U4 disabled binding ledger, ledger route entry, ledger target entry, ledger adapter lease entry, ledger model adapter entry, no-live-bind seal, binding replay plan, G210U5 entry packet, and no-live-bind/no-adapter-lease-acquire/no-command-submit/no-runtime-enable/no-TensorCore guards.
+
+It replays the disabled binding ledger and checks route, target, adapter lease, and model adapter entry integrity. It creates a binding replay integrity verdict and replay no-live-bind seal without acquiring adapter lease, binding live route, binding live device, allocating buffers, submitting commands, enabling runtime route, mutating production route, or claiming TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+ledger replay != live route bind
+integrity check != adapter lease acquire
+disabled ledger replay != command submit
+ledger match != runtime enable
+binding replay != production route authority
+TensorCube binding replay != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U5_TENSORCUBE_BINDING_LEDGER_REPLAY_AND_INTEGRITY_CHECK_REPLAY_DISABLED_BINDING_LEDGER_WITHOUT_LIVE_BIND_OR_ADAPTER_LEASE_ACQUIRE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U4
+patch_id=ASH-BASETRAIN-GPU-70K-G210U5
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U6
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_disabled_binding_ledger_status=Materialized
+source_tensorcube_disabled_binding_ledger_mode=DryNoLiveBind
+source_tensorcube_no_live_bind_seal_status=Sealed
+source_tensorcube_no_live_bind_seal_mode=DryLedgerNoLiveBind
+tensorcube_binding_ledger_replay_status=Replayed
+tensorcube_binding_ledger_replay_mode=LedgerReplayNoLiveBind
+tensorcube_binding_ledger_replay_source_ledger_status=Materialized
+tensorcube_binding_ledger_replay_source_ledger_mode=DryNoLiveBind
+tensorcube_binding_ledger_replay_route_key=internal_tensorcube_8x8_candidate_disabled_stub
+tensorcube_binding_ledger_replay_target_surface=TensorCube8x8MicroTileCandidateRoute
+tensorcube_binding_ledger_replay_adapter_lease_required=true
+tensorcube_binding_ledger_replay_adapter_lease_acquired=false
+tensorcube_binding_ledger_replay_live_route_bound=false
+tensorcube_binding_ledger_replay_live_device_bound=false
+tensorcube_binding_ledger_replay_live_handle_bound=false
+tensorcube_binding_ledger_replay_command_submit_allowed=false
+tensorcube_binding_ledger_replay_compute_buffer_alloc_allowed=false
+tensorcube_binding_ledger_replay_dispatch_allowed=false
+tensorcube_binding_ledger_replay_runtime_enable_allowed=false
+tensorcube_binding_ledger_replay_tensorcore_claim_allowed=false
+tensorcube_binding_replay_route_entry_status=Replayed
+tensorcube_binding_replay_route_entry_matches_source=true
+tensorcube_binding_replay_target_entry_status=Replayed
+tensorcube_binding_replay_target_entry_matches_source=true
+tensorcube_binding_replay_adapter_lease_entry_status=Replayed
+tensorcube_binding_replay_adapter_lease_entry_matches_source=true
+tensorcube_binding_replay_model_adapter_entry_status=Replayed
+tensorcube_binding_replay_model_adapter_entry_matches_source=true
+tensorcube_ledger_integrity_check_status=Passed
+tensorcube_ledger_integrity_check_mode=ReplayFieldMatch
+tensorcube_ledger_integrity_check_no_missing_required_fields=true
+tensorcube_ledger_integrity_check_no_extra_authority_fields=true
+tensorcube_ledger_integrity_check_no_live_bind_leak=true
+tensorcube_ledger_integrity_check_no_adapter_lease_acquire_leak=true
+tensorcube_ledger_integrity_check_no_command_submit_leak=true
+tensorcube_ledger_integrity_check_no_runtime_enable_leak=true
+tensorcube_ledger_integrity_check_no_tensorcore_claim_leak=true
+tensorcube_binding_replay_verdict=ReplayIntegrityPassed
+tensorcube_binding_replay_verdict_scope=NoLiveBind
+tensorcube_binding_replay_verdict_live_bind_authorized=false
+tensorcube_binding_replay_verdict_adapter_lease_acquire_authorized=false
+tensorcube_binding_replay_verdict_command_submit_authorized=false
+tensorcube_binding_replay_verdict_runtime_enable_authorized=false
+tensorcube_binding_replay_verdict_production_authority=false
+tensorcube_binding_replay_verdict_tensorcore_claim_authorized=false
+tensorcube_replay_no_live_bind_seal_status=Sealed
+tensorcube_replay_no_live_bind_seal_mode=ReplayLedgerNoLiveBind
+tensorcube_replay_no_live_bind_seal_integrity_verdict=ReplayIntegrityPassed
+tensorcube_g210u6_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+production_route_changed=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_binding_replay_created=true
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u6=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u5_binding_ledger_replay.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u5_binding_ledger_replay
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u5_binding_ledger_replay
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U6`
+
+```text
+TensorCube Binding Replay Receipt And Operator Review Gate / Create Replay Evidence Receipt Before Any Live Binding Authority / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
