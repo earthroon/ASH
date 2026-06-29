@@ -1,0 +1,123 @@
+# ASH-BASETRAIN-GPU-70K-G210U3
+
+## TensorCube Cold Route Binding Plan And No-Submit Adapter Lease / Create NonDispatch Route Binding Plan From Metadata-Compatible Cold Stub / No Command Submit No Runtime Enable No Production Route No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U3`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U2`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U4`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U3_TENSORCUBE_COLD_ROUTE_BINDING_PLAN_AND_NO_SUBMIT_ADAPTER_LEASE_CREATE_NONDISPATCH_ROUTE_BINDING_PLAN_FROM_METADATA_COMPATIBLE_COLD_STUB_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U3 consumes the sealed G210U2 same-device metadata comparison receipt, metadata-compatible verdict receipt, cold stub seal receipt, post-cold-stub route state receipt, G210U3 entry packet, and no-command-submit/no-runtime-enable/no-production/no-TensorCore guards.
+
+It creates a cold route binding plan and a no-submit adapter lease plan. It maps the future binding target, ownership boundaries, and preconditions for later dry binding work without acquiring an adapter lease, binding a live route, binding a live device, allocating buffers, submitting commands, enabling runtime route, applying candidate route, mutating production route, or claiming TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+route binding plan != live route bind
+adapter lease plan != adapter lease acquired
+metadata-compatible != command submit
+cold route plan != runtime enable
+disabled candidate route != production route
+TensorCube route != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U3_TENSORCUBE_COLD_ROUTE_BINDING_PLAN_AND_NO_SUBMIT_ADAPTER_LEASE_CREATE_NONDISPATCH_ROUTE_BINDING_PLAN_FROM_METADATA_COMPATIBLE_COLD_STUB_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U2
+patch_id=ASH-BASETRAIN-GPU-70K-G210U3
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U4
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_same_device_metadata_comparison_status=ExecutedMetadataOnly
+source_tensorcube_same_device_metadata_comparison_mode=ColdStubNoDispatch
+source_tensorcube_same_device_metadata_verdict=MetadataCompatible
+source_tensorcube_same_device_metadata_verdict_scope=ColdStubOnly
+source_tensorcube_same_device_metadata_verdict_live_claim=false
+source_tensorcube_cold_stub_seal_status=Sealed
+source_tensorcube_cold_stub_seal_mode=MetadataCompatibleNoDispatch
+tensorcube_cold_route_binding_plan_status=Planned
+tensorcube_cold_route_binding_plan_mode=NonDispatchPlan
+tensorcube_cold_route_binding_plan_source_verdict=MetadataCompatible
+tensorcube_cold_route_binding_plan_source_scope=ColdStubOnly
+tensorcube_cold_route_binding_plan_adapter_lease_required=true
+tensorcube_cold_route_binding_plan_adapter_lease_acquired=false
+tensorcube_cold_route_binding_plan_live_route_bound=false
+tensorcube_cold_route_binding_plan_live_device_bound=false
+tensorcube_cold_route_binding_plan_dispatchable=false
+tensorcube_cold_route_binding_plan_command_submit_allowed=false
+tensorcube_cold_route_binding_plan_runtime_enable_allowed=false
+tensorcube_cold_route_binding_plan_tensorcore_claim_allowed=false
+tensorcube_no_submit_adapter_lease_plan_status=Planned
+tensorcube_no_submit_adapter_lease_plan_mode=NoSubmitLeasePlan
+tensorcube_no_submit_adapter_lease_plan_scope=ColdStubOnly
+tensorcube_no_submit_adapter_lease_acquired=false
+tensorcube_no_submit_adapter_lease_live_handle_bound=false
+tensorcube_no_submit_adapter_lease_command_submit_allowed=false
+tensorcube_no_submit_adapter_lease_compute_buffer_alloc_allowed=false
+tensorcube_no_submit_adapter_lease_dispatch_allowed=false
+tensorcube_no_submit_adapter_lease_runtime_enable_allowed=false
+tensorcube_route_binding_target_map_status=Mapped
+tensorcube_route_binding_target_map_mode=ColdPlanOnly
+tensorcube_route_binding_target_map_model_surface_adapter_required=true
+tensorcube_route_binding_target_map_model_surface_adapter_created=false
+tensorcube_route_binding_target_map_model_surface_adapter_bound=false
+tensorcube_route_binding_target_map_live_compute_body_bound=false
+tensorcube_route_binding_target_map_live_runtime_route_bound=false
+tensorcube_route_binding_target_map_dispatchable=false
+tensorcube_route_binding_owner_boundary_status=Ready
+tensorcube_adapter_lease_owner_boundary_status=Ready
+tensorcube_binding_precondition_ledger_status=ReadyForG210U4
+tensorcube_model_surface_adapter_binding_plan_status=PlannedOnly
+tensorcube_g210u4_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+production_route_changed=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_metadata_claim_made=true
+same_device_metadata_claim_scope=ColdStubOnly
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u4=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u3_cold_route_binding_plan.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u3_cold_route_binding_plan
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u3_cold_route_binding_plan
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U4`
+
+```text
+TensorCube Dry Route Binding Ledger And No-Live-Bind Seal / Materialize Disabled Binding Ledger From Cold Route Plan Without Acquiring Adapter Lease / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
