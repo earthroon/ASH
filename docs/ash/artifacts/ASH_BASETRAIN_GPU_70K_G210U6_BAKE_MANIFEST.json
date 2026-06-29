@@ -1,0 +1,84 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G210U6",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G210U5",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G210U7",
+  "phase": "PhaseU",
+  "title": "TensorCube Binding Replay Receipt And Operator Review Gate / Create Replay Evidence Receipt Before Any Live Binding Authority / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim",
+  "bake_kind": "tensorcube_replay_evidence_receipt_operator_review_gate_rust_default_args_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g210u6_replay_review_gate",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U5_binding_ledger_replay_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U6_replay_review_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u6_replay_review_gate.rs",
+      "size_bytes": 10535,
+      "sha256": "15303e51e1d25374fd96b18dead853c78e712913e068f6fe3bcc80a6669c2771"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U6_SPEC.md",
+      "size_bytes": 6111,
+      "sha256": "a6619df5b078bcb4520d577a01daf5c0ec74f95d1a245233f35870f15d678c2d"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U6_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 262,
+      "sha256": "17e31e20827f8694f41cc41db6754ab7135f7c4f672837c044caf7fce2cb6c0e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U6_STATIC_CHECKS.json",
+      "size_bytes": 1735,
+      "sha256": "b57dd0196e79c1361e372d4bbd9d93a4c8cfe9e5748f6abbce39311583ece804"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U6_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "boolean_value_flags_allowed": false,
+    "cargo_available_in_container": false,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "g210u5_binding_ledger_replay_source_load_parse_check": true,
+    "g210u5_binding_replay_verdict_source_load_parse_check": true,
+    "g210u5_ledger_integrity_check_source_load_parse_check": true,
+    "g210u5_replay_no_live_bind_seal_source_load_parse_check": true,
+    "g210u7_entry_packet_parse_check": true,
+    "no_adapter_lease_acquire_guard_parse_check": true,
+    "no_approval_reuse_guard_parse_check": true,
+    "no_candidate_apply_guard_parse_check": true,
+    "no_command_encoder_submit_guard_parse_check": true,
+    "no_compute_buffer_alloc_guard_parse_check": true,
+    "no_dispatch_guard_parse_check": true,
+    "no_live_device_bind_guard_parse_check": true,
+    "no_live_handle_bind_guard_parse_check": true,
+    "no_live_route_bind_guard_parse_check": true,
+    "no_production_route_guard_parse_check": true,
+    "no_runtime_enable_guard_parse_check": true,
+    "no_tensorcore_claim_guard_parse_check": true,
+    "operator_review_gate_parse_check": true,
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G210U6",
+    "replay_evidence_handoff_packet_parse_check": true,
+    "replay_evidence_receipt_parse_check": true,
+    "review_gate_no_authority_seal_parse_check": true,
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "rustfmt_available_in_container": false,
+    "source_patch_parse_check": true,
+    "string_mode_args_required": true,
+    "target_writer_ensure_macro_count": 1,
+    "target_writer_json_atlas_present": true,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "verdict": "PASS_STATIC_SURFACE"
+  },
+  "local_runtime_outputs_count": 2,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
