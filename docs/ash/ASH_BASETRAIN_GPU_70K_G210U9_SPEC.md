@@ -1,0 +1,136 @@
+# ASH-BASETRAIN-GPU-70K-G210U9
+
+## TensorCube Decision Authority Split And Apply Gate Precheck / Split Captured Operator Decision From Runtime Authority Before Apply Gate / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U9`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U8`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U10`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U9_TENSORCUBE_DECISION_AUTHORITY_SPLIT_AND_APPLY_GATE_PRECHECK_SPLIT_CAPTURED_OPERATOR_DECISION_FROM_RUNTIME_AUTHORITY_BEFORE_APPLY_GATE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U9 consumes the sealed G210U8 fresh operator decision packet receipt, no-runtime-authority seal receipt, fresh decision capture handoff packet, G210U9 entry packet, post-decision-capture feature state, and no-live-bind/no-adapter-lease-acquire/no-command-submit/no-runtime-enable/no-TensorCore guards.
+
+It creates a decision authority split receipt, separates captured operator decision observation from runtime authority, creates an apply gate precheck receipt, keeps apply gate closed, and grants no live binding authority, adapter lease acquire authority, command submit authority, runtime enable authority, production authority, or TensorCore claim authority.
+
+## Core Boundary
+
+```text
+captured decision != runtime authority
+authority split != live bind
+apply gate precheck != command submit
+operator decision observed != candidate apply
+approval input exists != production route change
+TensorCube authority split != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U9_TENSORCUBE_DECISION_AUTHORITY_SPLIT_AND_APPLY_GATE_PRECHECK_SPLIT_CAPTURED_OPERATOR_DECISION_FROM_RUNTIME_AUTHORITY_BEFORE_APPLY_GATE_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U8
+patch_id=ASH-BASETRAIN-GPU-70K-G210U9
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U10
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_fresh_operator_decision_packet_status=Captured
+source_tensorcube_fresh_operator_decision_packet_mode=FreshDecisionPacketNoRuntimeAuthority
+source_tensorcube_no_runtime_authority_seal_status=Sealed
+source_tensorcube_no_runtime_authority_seal_mode=FreshDecisionCapturedNoRuntimeAuthority
+source_tensorcube_fresh_decision_capture_handoff_status=Created
+source_tensorcube_fresh_decision_capture_handoff_mode=CapturedDecisionAwaitAuthoritySplit
+tensorcube_decision_authority_split_status=Created
+tensorcube_decision_authority_split_mode=CapturedDecisionSeparatedFromRuntimeAuthority
+tensorcube_decision_authority_split_source_decision_status=Captured
+tensorcube_decision_authority_split_source_decision_fresh=true
+tensorcube_decision_authority_split_source_decision_reused=false
+tensorcube_decision_authority_split_source_decision_reopened=false
+tensorcube_decision_authority_split_source_shadow_reused=false
+tensorcube_decision_authority_split_observation_authority=true
+tensorcube_decision_authority_split_review_input_observed=true
+tensorcube_decision_authority_split_human_decision_observed=true
+tensorcube_decision_authority_split_shadow_decision_observed=false
+tensorcube_decision_authority_split_approval_granted=false
+tensorcube_decision_authority_split_approval_effective=false
+tensorcube_decision_authority_split_runtime_authority=false
+tensorcube_decision_authority_split_live_binding_authority=false
+tensorcube_decision_authority_split_adapter_lease_acquire_authority=false
+tensorcube_decision_authority_split_command_submit_authority=false
+tensorcube_decision_authority_split_runtime_enable_authority=false
+tensorcube_decision_authority_split_tensorcore_claim_authority=false
+tensorcube_apply_gate_precheck_status=Prechecked
+tensorcube_apply_gate_precheck_mode=AuthoritySplitBeforeApplyGate
+tensorcube_apply_gate_precheck_decision_observed=true
+tensorcube_apply_gate_precheck_approval_granted=false
+tensorcube_apply_gate_precheck_approval_effective=false
+tensorcube_apply_gate_precheck_runtime_authority=false
+tensorcube_apply_gate_precheck_apply_gate_open=false
+tensorcube_apply_gate_precheck_candidate_apply_allowed=false
+tensorcube_apply_gate_precheck_live_bind_allowed=false
+tensorcube_apply_gate_precheck_adapter_lease_acquire_allowed=false
+tensorcube_apply_gate_precheck_command_submit_allowed=false
+tensorcube_apply_gate_precheck_compute_buffer_alloc_allowed=false
+tensorcube_apply_gate_precheck_dispatch_allowed=false
+tensorcube_apply_gate_precheck_runtime_enable_allowed=false
+tensorcube_apply_gate_precheck_tensorcore_claim_allowed=false
+tensorcube_no_runtime_authority_after_split_seal_status=Sealed
+tensorcube_no_runtime_authority_after_split_seal_mode=AuthoritySplitNoRuntimeAuthority
+tensorcube_split_apply_precheck_handoff_status=Created
+tensorcube_split_apply_precheck_handoff_mode=AuthoritySplitAwaitApplyGateReview
+tensorcube_g210u10_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+production_route_changed=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_decision_authority_split_created=true
+same_device_apply_gate_precheck_created=true
+tensorcore_hardware_acceleration_claimed=false
+new_approval_input_received=true
+new_human_decision_input_received=true
+new_shadow_decision_input_received=false
+approval_reopened=false
+approval_reissued=false
+approval_reused=false
+approval_granted=false
+approval_effective=false
+ready_for_g210u10=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u9_authority_split_precheck.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u9_authority_split_precheck
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u9_authority_split_precheck
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U10`
+
+```text
+TensorCube Apply Gate Review Packet And Runtime Authority Deny Seal / Create Apply Gate Review Packet Without Opening Runtime Apply Gate / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
