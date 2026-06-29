@@ -1,0 +1,75 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T21",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T20",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T22",
+  "phase": "PhaseT",
+  "title": "TensorCube Capability Probe And Dispatch Feature Gate / Probe NonProduction TensorCube Dispatch Capability And Bind Feature-Gated Candidate Route / No Default Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_capability_probe_feature_gate_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t21_tensorcube_capability_feature_gate",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T20_tensorcube_shape_sweep_boundary_parity_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T21_tensorcube_capability_feature_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t21_tensorcube_capability_feature_gate.rs",
+      "size_bytes": 21599,
+      "sha256": "46407a5c6a1fdd2aefb30f0274f349d95b03db52f9a5bed25dd6e0fe42f96014"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T21_SPEC.md",
+      "size_bytes": 10911,
+      "sha256": "cc7e239b802d413aa67af37b89606d1734d01faf64ce757d15fc0221fdcaa8ca"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T21_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 454,
+      "sha256": "a4d264d2ebefd9b431f0fc9db4358bf2deed748709ddeaff76e35d78c84dbfb6"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T21_STATIC_CHECKS.json",
+      "size_bytes": 1357,
+      "sha256": "9912df8f9fa39ff782766dba0d042e1f7635f3b4790366438af53f561f2860d7"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T21_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T21",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_capability_probe_status_present": true,
+    "target_writer_match_capability_probe_verdict_present": true,
+    "target_writer_match_feature_gate_default_state_present": true,
+    "target_writer_match_feature_gate_current_state_present": true,
+    "target_writer_match_feature_gate_binding_status_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_candidate_default_enable_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 18,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
