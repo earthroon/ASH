@@ -1,0 +1,131 @@
+# ASH-BASETRAIN-GPU-70K-G209T14
+
+## TensorCube Candidate Policy Jump Gate And Route Contract / Select Internal 8x8 TensorCube Candidate Policy From Human Review Surface / No Production Replacement No TensorCore Hardware Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G209T14`
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G209T13`
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G209T15`
+Phase: `PhaseT`
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G209T14_TENSORCUBE_CANDIDATE_POLICY_JUMP_GATE_AND_ROUTE_CONTRACT_SELECT_INTERNAL_8X8_TENSORCUBE_CANDIDATE_POLICY_FROM_HUMAN_REVIEW_SURFACE_NO_PRODUCTION_REPLACEMENT_NO_TENSORCORE_HARDWARE_CLAIM`
+
+## Purpose
+
+G209T14 consumes the G209T13 human review decision surface and jumps into the TensorCube policy layer. It selects `InternalTensorCube8x8CandidateRoute`, creates the TensorCube candidate route contract, and enables the route only in `NonProductionCandidateOnly` scope.
+
+## Core Boundary
+
+```text
+tensorcube_policy_selected=true
+selected_tensorcube_policy=InternalTensorCube8x8CandidateRoute
+tensorcube_candidate_route_allowed=true
+tensorcube_candidate_route_enabled=true
+tensorcube_candidate_route_scope=NonProductionCandidateOnly
+production_route_pointer_switch_executed=false
+tensorcube_matmul_replacement_enabled=false
+tensorcube_production_replacement_enabled=false
+tensorcore_route_enabled=false
+tensorcore_hardware_acceleration_claimed=false
+```
+
+## Required New Receipts
+
+```text
+tensorcube_policy_jump_gate_created=true
+tensorcube_policy_registry_created=true
+selected_tensorcube_policy_receipt_created=true
+internal_8x8_tensorcube_candidate_policy_created=true
+tensorcube_candidate_route_contract_created=true
+tensorcube_candidate_route_scope_receipt_created=true
+tensorcube_candidate_route_feature_gate_created=true
+tensorcube_candidate_matmul_surface_created=true
+tensorcube_shadow_to_candidate_transition_policy_created=true
+tensorcube_candidate_route_activation_receipt_created=true
+tensorcube_candidate_route_non_production_boundary_created=true
+tensorcube_fallback_preservation_contract_created=true
+tensorcube_candidate_route_rollback_anchor_created=true
+tensorcube_candidate_route_smoke_entry_packet_created=true
+no_production_replacement_policy_guard_created=true
+no_tensorcore_hardware_claim_policy_guard_created=true
+```
+
+## Policy Rules
+
+```text
+if tensorcube_candidate_route_enabled == true:
+  tensorcube_candidate_route_scope=NonProductionCandidateOnly
+  production_route_pointer_switch_executed=false
+  tensorcube_production_replacement_enabled=false
+  tensorcube_matmul_replacement_enabled=false
+  replacement_permission_granted=false
+
+if selected_tensorcube_policy == InternalTensorCube8x8CandidateRoute:
+  tensorcore_route_enabled=false
+  tensorcore_hardware_acceleration_claimed=false
+```
+
+## Expected PASS Summary
+
+```text
+previous_g209t13_accepted=true
+source_patch_id=ASH-BASETRAIN-GPU-70K-G209T13
+phase=PhaseT
+training_loop_owner=training.rs
+active_training_route=FreshInit
+tensorcube_policy_jump_gate_created=true
+tensorcube_policy_registry_created=true
+tensorcube_policy_selected=true
+selected_tensorcube_policy=InternalTensorCube8x8CandidateRoute
+selected_tensorcube_policy_receipt_created=true
+internal_8x8_tensorcube_candidate_policy_created=true
+tensorcube_policy_selection_reason=HumanReviewAcceptPreviewAvailable
+tensorcube_candidate_route_contract_created=true
+tensorcube_candidate_route_allowed=true
+tensorcube_candidate_route_enabled=true
+tensorcube_candidate_route_scope=NonProductionCandidateOnly
+tensorcube_candidate_route_scope_receipt_created=true
+tensorcube_candidate_route_feature_gate_created=true
+tensorcube_candidate_route_activation_receipt_created=true
+tensorcube_candidate_route_activation_status=NonProductionRouteActive
+tensorcube_candidate_matmul_surface_created=true
+tensorcube_candidate_matmul_surface_status=StagedCandidateRoute
+tensorcube_shadow_to_candidate_transition_policy_created=true
+tensorcube_fallback_preservation_contract_created=true
+fallback_route_target=normal-freshinit-route
+fallback_required_before_production_replacement=true
+tensorcube_candidate_route_rollback_anchor_created=true
+tensorcube_candidate_route_smoke_entry_packet_created=true
+no_production_replacement_policy_guard_created=true
+no_tensorcore_hardware_claim_policy_guard_created=true
+production_route_pointer_switch_executed=false
+tensorcube_matmul_replacement_enabled=false
+tensorcube_production_replacement_enabled=false
+tensorcore_route_enabled=false
+tensorcore_hardware_acceleration_claimed=false
+candidate_promoted=false
+replacement_permission_granted=false
+checkpoint_rewritten=false
+safetensors_rewritten=false
+production_base_weight_mutated=false
+optimizer_state_mutated=false
+training_weight_mutated=false
+benchmark_claimed=false
+model_improvement_claimed=false
+deployment_ready_claimed=false
+deployment_claimed=false
+ready_for_g209t15=true
+```
+
+## Suggested Files
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t14_tensorcube_policy_jump_gate.rs
+specs/ASH_BASETRAIN_GPU_70K_G209T14_SPEC.md
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G209T15`
+
+```text
+TensorCube Candidate Route Smoke Entry And Fallback Probe / Run Internal 8x8 Candidate Route In NonProduction Scope / No Production Pointer Switch No TensorCore Claim
+```
