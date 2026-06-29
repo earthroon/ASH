@@ -1,0 +1,128 @@
+# ASH-BASETRAIN-GPU-70K-G210U6
+
+## TensorCube Binding Replay Receipt And Operator Review Gate / Create Replay Evidence Receipt Before Any Live Binding Authority / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U6`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U5`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U7`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U6_TENSORCUBE_BINDING_REPLAY_RECEIPT_AND_OPERATOR_REVIEW_GATE_CREATE_REPLAY_EVIDENCE_RECEIPT_BEFORE_ANY_LIVE_BINDING_AUTHORITY_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U6 consumes the sealed G210U5 binding ledger replay receipt, ledger integrity check receipt, binding replay verdict receipt, replay no-live-bind seal receipt, G210U6 entry packet, and no-live-bind/no-adapter-lease-acquire/no-command-submit/no-runtime-enable/no-TensorCore guards.
+
+It creates a replay evidence receipt, an operator review gate, an evidence-to-review handoff packet, and a review gate no-authority seal. It records `ReplayIntegrityPassed` as evidence only, keeps the review gate pending, and grants no live binding authority, adapter lease acquire authority, command submit authority, runtime enable authority, production authority, or TensorCore claim authority.
+
+## Core Boundary
+
+```text
+replay evidence receipt != live binding authority
+operator review gate != approval granted
+review gate created != adapter lease acquire
+evidence receipt != command submit
+ReplayIntegrityPassed != runtime enable
+TensorCube replay evidence != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U6_TENSORCUBE_BINDING_REPLAY_RECEIPT_AND_OPERATOR_REVIEW_GATE_CREATE_REPLAY_EVIDENCE_RECEIPT_BEFORE_ANY_LIVE_BINDING_AUTHORITY_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U5
+patch_id=ASH-BASETRAIN-GPU-70K-G210U6
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U7
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_binding_ledger_replay_status=Replayed
+source_tensorcube_binding_ledger_replay_mode=LedgerReplayNoLiveBind
+source_tensorcube_ledger_integrity_check_status=Passed
+source_tensorcube_ledger_integrity_check_mode=ReplayFieldMatch
+source_tensorcube_binding_replay_verdict=ReplayIntegrityPassed
+source_tensorcube_binding_replay_verdict_scope=NoLiveBind
+source_tensorcube_replay_no_live_bind_seal_status=Sealed
+source_tensorcube_replay_no_live_bind_seal_mode=ReplayLedgerNoLiveBind
+tensorcube_replay_evidence_receipt_status=Created
+tensorcube_replay_evidence_receipt_mode=ReplayIntegrityEvidenceNoAuthority
+tensorcube_replay_evidence_receipt_source_replay_status=Replayed
+tensorcube_replay_evidence_receipt_source_integrity_status=Passed
+tensorcube_replay_evidence_receipt_source_verdict=ReplayIntegrityPassed
+tensorcube_replay_evidence_receipt_source_verdict_scope=NoLiveBind
+tensorcube_replay_evidence_receipt_route_entry_match=true
+tensorcube_replay_evidence_receipt_target_entry_match=true
+tensorcube_replay_evidence_receipt_adapter_lease_entry_match=true
+tensorcube_replay_evidence_receipt_model_adapter_entry_match=true
+tensorcube_replay_evidence_receipt_no_live_bind_leak=true
+tensorcube_replay_evidence_receipt_no_adapter_lease_acquire_leak=true
+tensorcube_replay_evidence_receipt_no_command_submit_leak=true
+tensorcube_replay_evidence_receipt_no_runtime_enable_leak=true
+tensorcube_replay_evidence_receipt_no_tensorcore_claim_leak=true
+tensorcube_replay_evidence_receipt_live_binding_authority=false
+tensorcube_replay_evidence_receipt_adapter_lease_acquire_authority=false
+tensorcube_replay_evidence_receipt_command_submit_authority=false
+tensorcube_replay_evidence_receipt_runtime_enable_authority=false
+tensorcube_replay_evidence_receipt_production_authority=false
+tensorcube_replay_evidence_receipt_tensorcore_claim_authority=false
+tensorcube_operator_review_gate_status=PendingReview
+tensorcube_operator_review_gate_mode=EvidenceReceiptOnly
+tensorcube_operator_review_gate_review_required=true
+tensorcube_operator_review_gate_review_completed=false
+tensorcube_operator_review_gate_approval_granted=false
+tensorcube_operator_review_gate_approval_reused=false
+tensorcube_operator_review_gate_approval_reopened=false
+tensorcube_operator_review_gate_live_binding_authority_granted=false
+tensorcube_operator_review_gate_adapter_lease_acquire_authority_granted=false
+tensorcube_operator_review_gate_command_submit_authority_granted=false
+tensorcube_operator_review_gate_runtime_enable_authority_granted=false
+tensorcube_operator_review_gate_tensorcore_claim_authority_granted=false
+tensorcube_replay_evidence_handoff_packet_status=Created
+tensorcube_review_gate_no_authority_seal_status=Sealed
+tensorcube_review_gate_no_authority_seal_mode=PendingReviewNoLiveAuthority
+tensorcube_g210u7_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+production_route_changed=false
+same_device_handle_bound=false
+same_device_live_claim_made=false
+same_device_replay_evidence_receipt_created=true
+same_device_operator_review_gate_created=true
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u7=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u6_replay_review_gate.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g210u6_replay_review_gate
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u6_replay_review_gate
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U7`
+
+```text
+TensorCube Operator Review Decision Boundary And No-Authority-Reuse Seal / Register Pending Review Decision Boundary Without Granting Live Binding Authority / No Approval Reuse No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
