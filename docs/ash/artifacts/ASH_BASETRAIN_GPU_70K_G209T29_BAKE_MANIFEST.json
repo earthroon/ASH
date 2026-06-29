@@ -1,0 +1,89 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T29",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T28",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T30",
+  "phase": "PhaseT",
+  "title": "TensorCube Human Decision Intake Gate And Explicit Deny-By-Default / Accept Or Reject Human Promotion Decision Input Through A Deny-By-Default Gate / No Silent Approval No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_human_decision_intake_gate_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t29_tensorcube_human_decision_intake_gate",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T28_tensorcube_human_review_shadow_promotion_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T29_tensorcube_human_decision_intake_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t29_tensorcube_human_decision_intake_gate.rs",
+      "size_bytes": 38483,
+      "sha256": "af492c64ae59393de3d722b01e312cfec67f080c0b86d23c6d915ab905861631"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T29_SPEC.md",
+      "size_bytes": 13740,
+      "sha256": "ae1c7f240bd1f8f4e6370f6c7453adfe95cccad95b6e58686c35b077afcb6da0"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T29_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 2728,
+      "sha256": "6940f1b0893bcfa74c713518153f480437d8a55b72cdd2b338162063cafca120"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T29_STATIC_CHECKS.json",
+      "size_bytes": 2215,
+      "sha256": "1f485f4d022a767a10a7ef51c0c1f6630aebd6d5ebc55938704d01782a15f2fc"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T29_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T29",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_review_packet_source_load_present": true,
+    "target_writer_match_shadow_sandbox_source_load_present": true,
+    "target_writer_match_decision_intake_gate_present": true,
+    "target_writer_match_decision_input_schema_present": true,
+    "target_writer_match_decision_input_validation_present": true,
+    "target_writer_match_deny_by_default_matrix_present": true,
+    "target_writer_match_missing_input_deny_present": true,
+    "target_writer_match_malformed_input_deny_present": true,
+    "target_writer_match_unsigned_input_deny_present": true,
+    "target_writer_match_silent_approval_deny_present": true,
+    "target_writer_match_production_scope_deny_present": true,
+    "target_writer_match_approve_without_authority_record_only_present": true,
+    "target_writer_match_intake_receipt_effect_present": true,
+    "target_writer_match_effect_limiter_present": true,
+    "target_writer_match_real_promotion_decision_present": true,
+    "target_writer_match_post_intake_gate_state_present": true,
+    "target_writer_match_post_intake_fallback_ready_present": true,
+    "target_writer_match_candidate_promotion_present": true,
+    "target_writer_match_replacement_permission_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_candidate_persistent_enable_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 23,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
