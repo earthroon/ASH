@@ -1,0 +1,82 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T26",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T25",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T27",
+  "phase": "PhaseT",
+  "title": "TensorCube Approved Trial Delta And Post-Approval Revert / Compare Manual-Approved Trial Output Against Frozen Baseline And Revert Approval State / No Persistent Approval No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_approved_trial_delta_revert_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t26_tensorcube_approved_trial_delta_revert",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T25_tensorcube_manual_approval_dispatch_trial_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T26_tensorcube_approved_trial_delta_revert_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t26_tensorcube_approved_trial_delta_revert.rs",
+      "size_bytes": 29647,
+      "sha256": "d495bc25f10aed58ca0d9a399139d958b320f6d48d5f18aaa552cb892c3790d1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T26_SPEC.md",
+      "size_bytes": 12741,
+      "sha256": "0adf14950e7c29ab1710697ae6f7b0ffdd05a6dbdd3936937c6290b86fccf5d1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T26_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 453,
+      "sha256": "d5ef51a984bccdbfc16bf4a8b72bfe1f9e99b29f075e816ac59f3bdbb860ffb6"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T26_STATIC_CHECKS.json",
+      "size_bytes": 1839,
+      "sha256": "16944d802015d4e507738e38a9ae2db2f4a73faea2c6dc95acd7a60d904db310"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T26_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T26",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_frozen_baseline_load_present": true,
+    "target_writer_match_approved_trial_delta_status_present": true,
+    "target_writer_match_approved_trial_delta_severity_present": true,
+    "target_writer_match_approved_trial_tolerance_verdict_present": true,
+    "target_writer_match_approved_trial_output_apply_status_present": true,
+    "target_writer_match_post_approval_revert_status_present": true,
+    "target_writer_match_post_approval_revert_state_present": true,
+    "target_writer_match_approval_item_consumed_state_present": true,
+    "target_writer_match_manual_approval_consumed_state_present": true,
+    "target_writer_match_approval_reuse_reissue_present": true,
+    "target_writer_match_trial_feature_gate_state_present": true,
+    "target_writer_match_post_revert_fallback_ready_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_candidate_persistent_enable_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 23,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
