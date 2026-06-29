@@ -1,0 +1,82 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T31",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T30",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T32",
+  "phase": "PhaseT",
+  "title": "TensorCube Candidate Route Quarantine And Evidence Freeze / Freeze Promotion Evidence Chain After Negative Matrix Sweep / No New Approval Input No Promotion Apply No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_candidate_route_quarantine_freeze_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t31_tensorcube_candidate_quarantine_freeze",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T30_tensorcube_deny_matrix_negative_sweep_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T31_tensorcube_candidate_quarantine_freeze_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t31_tensorcube_candidate_quarantine_freeze.rs",
+      "size_bytes": 39340,
+      "sha256": "b93f142d23f3322b5d64e0c1f9d0e3452892f4c0ba57190500fbde578389dd4e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T31_SPEC.md",
+      "size_bytes": 10547,
+      "sha256": "5ebdcfdf3c6a693aaf062ac5836514ffe4d682d36d7de0859c7c4fddb2e76cc1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T31_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 615,
+      "sha256": "7840458581f758bb2e6f7952dd7f965861f41def3faa2bce1180edaa5d4fd2f1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T31_STATIC_CHECKS.json",
+      "size_bytes": 2252,
+      "sha256": "b23058c3d891899b1348ea4211c6576550511f7374ef5ffcb13d0a144b495db3"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T31_BAKE_MANIFEST.json",
+      "size_bytes": 3502,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T31",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "target_writer_match_negative_sweep_source_load_present": true,
+    "target_writer_match_negative_case_ledger_source_load_present": true,
+    "target_writer_match_auto_hold_source_load_present": true,
+    "target_writer_match_record_only_source_load_present": true,
+    "target_writer_match_candidate_route_quarantine_present": true,
+    "target_writer_match_evidence_chain_freeze_present": true,
+    "target_writer_match_new_approval_input_lock_present": true,
+    "target_writer_match_new_decision_input_lock_present": true,
+    "target_writer_match_quarantine_audit_view_present": true,
+    "target_writer_match_quarantine_replay_probe_present": true,
+    "target_writer_match_new_input_block_present": true,
+    "target_writer_match_freeze_mutation_guard_present": true,
+    "target_writer_match_real_promotion_decision_present": true,
+    "target_writer_match_post_quarantine_gate_state_present": true,
+    "target_writer_match_post_quarantine_fallback_ready_present": true,
+    "target_writer_match_candidate_promotion_present": true,
+    "target_writer_match_replacement_permission_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_candidate_persistent_enable_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 27,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
