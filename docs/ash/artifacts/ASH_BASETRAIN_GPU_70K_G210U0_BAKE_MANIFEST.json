@@ -1,0 +1,85 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G210U0",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T31",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G210U1",
+  "phase": "PhaseU",
+  "title": "TensorCube Structure Inventory And Disabled Runtime Wiring Map / Map MicroTile Compute Body To Runtime Route Boundaries Before Dispatch / No Dispatch No Runtime Enable No Promotion Apply No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_structure_inventory_disabled_wiring_map_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g210u0_tensorcube_structure_inventory_wiring_map",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T31_tensorcube_candidate_quarantine_freeze_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U0_tensorcube_structure_inventory_wiring_map_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u0_tensorcube_structure_inventory_wiring_map.rs",
+      "size_bytes": 31737,
+      "sha256": "a12a37bc5d3222d89bf52f33bded4137f6c1a3f114b29dd468484d001f1f8c3b"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U0_SPEC.md",
+      "size_bytes": 5570,
+      "sha256": "a891bbff0e494832ca53e6acf9f6e7ae8a60c3bca05883269093bde98004b259"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U0_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 386,
+      "sha256": "884d4c19a74cbc2ad756a9fc32d146a01113f7be9be80f5546f2e1535df6bf47"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U0_STATIC_CHECKS.json",
+      "size_bytes": 2128,
+      "sha256": "5a7ac9aa326e30dd73b4a98ad7eac4f28b675472b38ebfe49200a4c8d7f7a9c8"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G210U0_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G210U0",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "target_writer_match_g209t31_quarantine_source_load_present": true,
+    "target_writer_match_g209t31_evidence_freeze_source_load_present": true,
+    "target_writer_match_structure_inventory_present": true,
+    "target_writer_match_microtile_compute_body_inventory_present": true,
+    "target_writer_match_wgsl_kernel_inventory_present": true,
+    "target_writer_match_cpu_reference_inventory_present": true,
+    "target_writer_match_native_smoke_runner_inventory_present": true,
+    "target_writer_match_dispatch_telemetry_inventory_present": true,
+    "target_writer_match_timing_probe_advisory_present": true,
+    "target_writer_match_runtime_direct_wiring_absence_present": true,
+    "target_writer_match_training_rs_direct_call_absence_present": true,
+    "target_writer_match_model_core_direct_import_absence_present": true,
+    "target_writer_match_disabled_runtime_wiring_map_present": true,
+    "target_writer_match_route_boundary_map_present": true,
+    "target_writer_match_candidate_route_registry_target_present": true,
+    "target_writer_match_same_device_handle_probe_target_present": true,
+    "target_writer_match_model_surface_tile_adapter_target_present": true,
+    "target_writer_match_phase_u_entry_gate_present": true,
+    "target_writer_match_no_dispatch_guard_present": true,
+    "target_writer_match_no_runtime_enable_guard_present": true,
+    "target_writer_match_no_candidate_apply_guard_present": true,
+    "target_writer_match_no_production_route_guard_present": true,
+    "target_writer_match_no_tensorcore_claim_guard_present": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 28,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
