@@ -1,0 +1,210 @@
+# ASH-BASETRAIN-GPU-70K-G209T23
+
+## TensorCube Opt-In Dry Run Delta Receipt And Fallback Replay / Compare Explicit Opt-In Dry Run Output Against Frozen Baseline And Replay Fallback / No Persistent Enable No Production Route No TensorCore Claim
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G209T23`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G209T22`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G209T24`  
+Phase: `PhaseT`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G209T23_TENSORCUBE_OPT_IN_DRY_RUN_DELTA_RECEIPT_AND_FALLBACK_REPLAY_COMPARE_EXPLICIT_OPT_IN_DRY_RUN_OUTPUT_AGAINST_FROZEN_BASELINE_AND_REPLAY_FALLBACK_NO_PERSISTENT_ENABLE_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G209T23 consumes the G209T22 explicit opt-in dry run output capsule, dry run telemetry, feature gate relock receipt, and post-dry-run fallback readiness state.
+
+It loads a frozen baseline capsule, compares the explicit opt-in dry run output against the frozen baseline, creates a dry run delta envelope, seals the delta receipt, verifies the delta remains within tolerance, then performs one fallback replay after the comparison.
+
+This patch verifies that the feature gate remains `Disabled`, no persistent enable occurred, the dry run output remains non-applied, fallback replay parity is `Pass`, the default production route remains unchanged, and TensorCore hardware acceleration is not claimed.
+
+## Core Boundary
+
+```text
+source_patch_id=ASH-BASETRAIN-GPU-70K-G209T22
+patch_id=ASH-BASETRAIN-GPU-70K-G209T23
+next_patch_id=ASH-BASETRAIN-GPU-70K-G209T24
+phase=PhaseT
+training_loop_owner=training.rs
+active_training_route=FreshInit
+selected_tensorcube_policy=InternalTensorCube8x8CandidateRoute
+tensorcube_candidate_route_scope=NonProductionCandidateOnly
+source_tensorcube_explicit_operator_opt_in_receipt_loaded=true
+source_tensorcube_feature_gate_pre_dry_run_state_loaded=true
+source_tensorcube_feature_gate_dry_run_state_loaded=true
+source_tensorcube_feature_gate_post_dry_run_state_loaded=true
+source_tensorcube_feature_gated_candidate_dry_run_session_loaded=true
+source_tensorcube_feature_gated_candidate_dry_run_execution_loaded=true
+source_tensorcube_feature_gated_candidate_dry_run_output_capsule_loaded=true
+source_tensorcube_feature_gated_candidate_dry_run_telemetry_loaded=true
+source_tensorcube_feature_gate_relock_receipt_loaded=true
+source_tensorcube_post_opt_in_dry_run_rollback_latch_loaded=true
+source_tensorcube_post_opt_in_dry_run_fallback_ready_loaded=true
+tensorcube_frozen_baseline_capsule_loaded=true
+tensorcube_frozen_baseline_scope=NonProductionCandidateOnly
+tensorcube_frozen_baseline_status=Loaded
+tensorcube_opt_in_dry_run_delta_envelope_created=true
+tensorcube_opt_in_dry_run_delta_receipt_created=true
+tensorcube_opt_in_dry_run_delta_status=WithinTolerance
+tensorcube_opt_in_dry_run_delta_severity=Nominal
+tensorcube_opt_in_dry_run_tolerance_verdict_created=true
+tensorcube_opt_in_dry_run_tolerance_verdict=Pass
+tensorcube_opt_in_dry_run_output_non_apply_audit_created=true
+tensorcube_opt_in_dry_run_output_applied=false
+tensorcube_opt_in_dry_run_output_committed_to_training_route=false
+tensorcube_opt_in_dry_run_output_committed_to_production_route=false
+tensorcube_fallback_replay_after_dry_run_session_created=true
+tensorcube_fallback_replay_after_dry_run_started=true
+tensorcube_fallback_replay_after_dry_run_completed=true
+tensorcube_fallback_replay_after_dry_run_count=1
+tensorcube_fallback_replay_after_dry_run_status=Pass
+tensorcube_fallback_replay_after_dry_run_output_capsule_created=true
+tensorcube_fallback_replay_after_dry_run_output_sealed=true
+tensorcube_fallback_replay_after_dry_run_output_applied=false
+tensorcube_fallback_replay_after_dry_run_output_committed_to_training_route=false
+tensorcube_fallback_replay_after_dry_run_output_committed_to_production_route=false
+tensorcube_fallback_replay_after_dry_run_parity_receipt_created=true
+tensorcube_fallback_replay_after_dry_run_parity_status=Pass
+tensorcube_fallback_replay_after_dry_run_telemetry_created=true
+tensorcube_fallback_replay_after_dry_run_telemetry_status=Pass
+tensorcube_feature_gate_pre_delta_state=Disabled
+tensorcube_feature_gate_post_delta_state=Disabled
+tensorcube_feature_gate_post_fallback_replay_state=Disabled
+tensorcube_feature_gate_persistent_enable_detected=false
+tensorcube_feature_gate_relock_reverified=true
+tensorcube_post_delta_rollback_latch_verified=true
+tensorcube_post_fallback_replay_rollback_latch_verified=true
+tensorcube_post_fallback_replay_fallback_ready=true
+no_persistent_enable_delta_guard_created=true
+no_default_enable_delta_guard_created=true
+no_production_route_delta_guard_created=true
+no_production_pointer_switch_delta_guard_created=true
+no_candidate_promotion_delta_guard_created=true
+no_tensorcore_claim_delta_guard_created=true
+default_production_route_changed=false
+production_route_pointer_switch_executed=false
+tensorcube_matmul_replacement_enabled=false
+tensorcube_production_replacement_enabled=false
+candidate_default_enabled=false
+candidate_dispatch_enabled_by_default=false
+candidate_dispatch_enabled_after_dry_run=false
+candidate_dispatch_persistently_enabled=false
+candidate_promoted=false
+replacement_permission_granted=false
+tensorcore_route_enabled=false
+tensorcore_hardware_acceleration_claimed=false
+checkpoint_rewritten=false
+safetensors_rewritten=false
+production_base_weight_mutated=false
+optimizer_state_mutated=false
+training_weight_mutated=false
+benchmark_claimed=false
+model_improvement_claimed=false
+deployment_ready_claimed=false
+deployment_claimed=false
+ready_for_g209t24=true
+```
+
+## Delta Contract
+
+Allowed delta statuses: `ExactMatch`, `WithinTolerance`. Rejected statuses: `DriftDetected`, `OutOfTolerance`, `Unknown`, `MissingBaseline`, `MissingDryRunOutput`.
+
+```text
+tensorcube_frozen_baseline_capsule_loaded=true
+tensorcube_opt_in_dry_run_delta_status=WithinTolerance
+tensorcube_opt_in_dry_run_delta_severity=Nominal
+tensorcube_opt_in_dry_run_tolerance_verdict=Pass
+tensorcube_opt_in_dry_run_output_applied=false
+```
+
+## Fallback Replay Contract
+
+```text
+tensorcube_fallback_replay_after_dry_run_count=1
+tensorcube_fallback_replay_after_dry_run_status=Pass
+tensorcube_fallback_replay_after_dry_run_output_applied=false
+tensorcube_fallback_replay_after_dry_run_parity_status=Pass
+tensorcube_fallback_replay_after_dry_run_telemetry_status=Pass
+```
+
+Fallback replay is a recovery proof, not a production replacement.
+
+## Feature Gate Persistent-Enable Audit
+
+```text
+tensorcube_feature_gate_pre_delta_state=Disabled
+tensorcube_feature_gate_post_delta_state=Disabled
+tensorcube_feature_gate_post_fallback_replay_state=Disabled
+tensorcube_feature_gate_persistent_enable_detected=false
+tensorcube_feature_gate_relock_reverified=true
+candidate_dispatch_persistently_enabled=false
+```
+
+## Acceptance Criteria
+
+PASS iff G209T22 source state is consumed, dry run output capsule and telemetry are loaded, frozen baseline capsule is loaded, delta envelope is created, delta status is `ExactMatch` or `WithinTolerance`, delta severity is `Nominal`, tolerance verdict is `Pass`, dry run output remains unapplied, fallback replay count is exactly `1`, fallback replay status is `Pass`, fallback replay output remains unapplied, fallback replay parity status is `Pass`, fallback telemetry status is `Pass`, feature gate remains `Disabled` before delta, after delta, and after fallback replay, persistent enable is not detected, rollback latch remains verified, fallback remains ready, default production route remains unchanged, candidate is not default-enabled or persistently enabled, TensorCore is not enabled or claimed, no checkpoint/safetensors/base/optimizer/training mutation occurs, no benchmark/model/deployment claim occurs, and G209T24 entry packet is created.
+
+## Suggested Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t23_tensorcube_opt_in_delta_fallback.rs
+```
+
+Runtime binary:
+
+```text
+ash_basetrain_gpu_70k_g209t23_tensorcube_opt_in_delta_fallback
+```
+
+## Static Surface Expectations
+
+```text
+runtime_outputs_prebaked=0
+target_writer_json_macro_count=0
+target_writer_recursion_limit_count=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+boolean_value_flags_allowed=false
+string_mode_args_required=true
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+source_patch_parse_check=true
+selected_policy_parse_check=true
+route_scope_parse_check=true
+frozen_baseline_load_parse_check=true
+delta_status_parse_check=true
+delta_severity_parse_check=true
+tolerance_verdict_parse_check=true
+fallback_replay_count_parse_check=true
+fallback_replay_status_parse_check=true
+fallback_replay_parity_status_parse_check=true
+feature_gate_state_parse_check=true
+persistent_enable_parse_check=true
+dry_run_output_apply_status_parse_check=true
+fallback_output_apply_status_parse_check=true
+default_production_route_parse_check=true
+candidate_persistent_enable_parse_check=true
+tensorcore_claim_parse_check=true
+verdict=PASS_STATIC_SURFACE
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g209t23_tensorcube_opt_in_delta_fallback
+```
+
+Expected local PASS marker:
+
+```text
+PASS_ASH_BASETRAIN_GPU_70K_G209T23_TENSORCUBE_OPT_IN_DRY_RUN_DELTA_RECEIPT_AND_FALLBACK_REPLAY_COMPARE_EXPLICIT_OPT_IN_DRY_RUN_OUTPUT_AGAINST_FROZEN_BASELINE_AND_REPLAY_FALLBACK_NO_PERSISTENT_ENABLE_NO_PRODUCTION_ROUTE_NO_TENSORCORE_CLAIM
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G209T24`
+
+```text
+TensorCube Operator Approval Queue And Rollback Drill / Queue Explicit Operator Approval For Candidate Dispatch And Run Rollback Drill Under NonProduction Scope / No Auto Approval No Production Route No TensorCore Claim
+```
