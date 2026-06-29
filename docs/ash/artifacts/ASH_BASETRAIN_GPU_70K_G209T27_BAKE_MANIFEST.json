@@ -1,0 +1,85 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T27",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T26",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T28",
+  "phase": "PhaseT",
+  "title": "TensorCube Candidate Dispatch Promotion Readiness Ledger / Aggregate NonProduction Trial Evidence Into Promotion Readiness Ledger / No Promotion Decision No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_promotion_readiness_ledger_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t27_tensorcube_promotion_readiness_ledger",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T26_tensorcube_approved_trial_delta_revert_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T27_tensorcube_promotion_readiness_ledger_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t27_tensorcube_promotion_readiness_ledger.rs",
+      "size_bytes": 33325,
+      "sha256": "417d73a9da4266abb1505528a2d81b80ad3c10252cbaff214ce8e5f630e36147"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T27_SPEC.md",
+      "size_bytes": 12601,
+      "sha256": "fcc5a50e9b9f16b3e1577a5ff72d9ea1bc68c5d36dd75b19618e3b48e914aeb2"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T27_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 717,
+      "sha256": "fef6ec4a72d50f0e1dc7889305e809c7f6da9429f7638d4897bae156e7dc8c27"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T27_STATIC_CHECKS.json",
+      "size_bytes": 1960,
+      "sha256": "337c2b09197dacc4ce78c4e5d03dca76b0a7c0a6476aff34b908ddc2843814d4"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T27_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T27",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_evidence_chain_load_present": true,
+    "target_writer_match_promotion_readiness_ledger_present": true,
+    "target_writer_match_ledger_evidence_status_present": true,
+    "target_writer_match_ledger_decision_authority_present": true,
+    "target_writer_match_ledger_auto_decision_present": true,
+    "target_writer_match_evidence_chain_contiguous_present": true,
+    "target_writer_match_missing_receipts_present": true,
+    "target_writer_match_untrusted_receipts_present": true,
+    "target_writer_match_review_packet_present": true,
+    "target_writer_match_promotion_decision_status_present": true,
+    "target_writer_match_promotion_decision_forbidden_present": true,
+    "target_writer_match_post_ledger_gate_state_present": true,
+    "target_writer_match_post_ledger_fallback_ready_present": true,
+    "target_writer_match_candidate_promotion_present": true,
+    "target_writer_match_replacement_permission_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_candidate_persistent_enable_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 19,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
