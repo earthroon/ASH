@@ -1,0 +1,80 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G209T23",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G209T22",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G209T24",
+  "phase": "PhaseT",
+  "title": "TensorCube Opt-In Dry Run Delta Receipt And Fallback Replay / Compare Explicit Opt-In Dry Run Output Against Frozen Baseline And Replay Fallback / No Persistent Enable No Production Route No TensorCore Claim",
+  "bake_kind": "tensorcube_opt_in_dry_run_delta_fallback_replay_overlay_rust_local_artifact_writer_no_prebaked_runtime_artifacts",
+  "runtime_binary": "ash_basetrain_gpu_70k_g209t23_tensorcube_opt_in_delta_fallback",
+  "runtime_artifacts_generated_locally": true,
+  "runtime_artifacts_generated_by_rust": true,
+  "runtime_artifacts_committed": false,
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T22_tensorcube_explicit_opt_in_dry_run_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G209T23_tensorcube_opt_in_delta_fallback_baked_no_artifacts_no_ps1_no_py.zip",
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g209t23_tensorcube_opt_in_delta_fallback.rs",
+      "size_bytes": 25942,
+      "sha256": "bb36fcd82a6972739ef51a95372291736d55ac5a45702863b0740b82b05b8814"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T23_SPEC.md",
+      "size_bytes": 12390,
+      "sha256": "3825858631075733a0d2cb7854f4f9cf8584057235b7a7e48d3fa0739bd3a50f"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T23_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 635,
+      "sha256": "164a2f4cbf65149fed4702c1e48b0d4ba1a0f5a0d9fbe5b4df209bfd27beb998"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T23_STATIC_CHECKS.json",
+      "size_bytes": 1632,
+      "sha256": "bf13858e32eb6f8e3162458c835f77b25f4cfc46779bf128608923ba316b3094"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G209T23_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G209T23",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "prebaked_output_names": [],
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "target_writer_serde_json_map_present": true,
+    "target_writer_json_atlas_present": true,
+    "target_writer_match_source_patch_present": true,
+    "target_writer_match_selected_policy_present": true,
+    "target_writer_match_route_scope_present": true,
+    "target_writer_match_frozen_baseline_load_present": true,
+    "target_writer_match_delta_status_present": true,
+    "target_writer_match_delta_severity_present": true,
+    "target_writer_match_tolerance_verdict_present": true,
+    "target_writer_match_fallback_replay_count_present": true,
+    "target_writer_match_fallback_replay_status_present": true,
+    "target_writer_match_fallback_replay_parity_status_present": true,
+    "target_writer_match_feature_gate_state_present": true,
+    "target_writer_match_persistent_enable_present": true,
+    "target_writer_match_dry_run_output_apply_status_present": true,
+    "target_writer_match_fallback_output_apply_status_present": true,
+    "target_writer_match_default_production_route_present": true,
+    "target_writer_match_tensorcore_claim_present": true,
+    "target_writer_ensure_macro_count": 1,
+    "artifact_payload_filename_str_signature": true,
+    "runtime_artifact_writer_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "dot_ps1_count": 0,
+    "dot_py_count": 0,
+    "dot_sha256_count": 0,
+    "cargo_available_in_container": false,
+    "rustfmt_available_in_container": false
+  },
+  "local_runtime_outputs_count": 20,
+  "self_manifest_hash_recorded": false,
+  "zip_hash_recorded": false
+}
