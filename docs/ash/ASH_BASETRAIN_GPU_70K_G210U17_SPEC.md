@@ -1,0 +1,128 @@
+# ASH-BASETRAIN-GPU-70K-G210U17
+
+## TensorCube Candidate Disposal Hold And Release Deny Audit
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G210U17`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G210U16`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G210U18`  
+Phase: `PhaseU`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G210U17_TENSORCUBE_CANDIDATE_DISPOSAL_HOLD_AND_RELEASE_DENY_AUDIT_HOLD_CANDIDATE_DISPOSAL_WHILE_DENYING_RUNTIME_RELEASE_OR_ARCHIVE_DELETION_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G210U17 consumes the sealed G210U16 evidence retention audit, candidate archive deny seal, evidence retention handoff packet, and G210U17 entry packet.
+
+It creates a candidate disposal hold audit receipt. Disposal handling is held, not executed. Disposal hold is not candidate deletion, purge execution, archive deletion, runtime release, production route switching, rollback execution, or TensorCore hardware acceleration claim.
+
+## Core Boundary
+
+```text
+candidate disposal hold != candidate deletion
+disposal hold audit != purge execution
+release deny during hold != runtime enable
+archive deletion deny during hold != archive purge
+retained archive != production route switch
+TensorCube disposal hold != TensorCore claim
+```
+
+## Expected PASS Summary
+
+```text
+status=PASS_ASH_BASETRAIN_GPU_70K_G210U17_TENSORCUBE_CANDIDATE_DISPOSAL_HOLD_AND_RELEASE_DENY_AUDIT_HOLD_CANDIDATE_DISPOSAL_WHILE_DENYING_RUNTIME_RELEASE_OR_ARCHIVE_DELETION_NO_LIVE_BIND_NO_COMMAND_SUBMIT_NO_RUNTIME_ENABLE_NO_TENSORCORE_CLAIM
+verdict=Pass
+phase=PhaseU
+source_patch_id=ASH-BASETRAIN-GPU-70K-G210U16
+patch_id=ASH-BASETRAIN-GPU-70K-G210U17
+next_patch_id=ASH-BASETRAIN-GPU-70K-G210U18
+rust_default_arg_injection_enabled=true
+runtime_args_missing_filled_by_sealed_defaults=true
+source_tensorcube_evidence_retention_audit_status=Audited
+source_tensorcube_candidate_archive_deny_seal_status=Sealed
+source_tensorcube_evidence_retention_handoff_status=Created
+tensorcube_candidate_disposal_hold_audit_status=Audited
+tensorcube_candidate_disposal_hold_audit_mode=CandidateDisposalHeldNoDeletionNoRelease
+tensorcube_candidate_disposal_hold_audit_candidate_route_state=ColdStoredNonProductionCandidateOnly
+tensorcube_candidate_disposal_hold_audit_candidate_stored=true
+tensorcube_candidate_disposal_hold_audit_candidate_released=false
+tensorcube_candidate_disposal_hold_audit_candidate_applied=false
+tensorcube_candidate_disposal_hold_audit_candidate_promoted=false
+tensorcube_candidate_disposal_hold_audit_candidate_deleted=false
+tensorcube_candidate_disposal_hold_audit_candidate_evidence_retained=true
+tensorcube_candidate_disposal_hold_audit_candidate_evidence_deleted=false
+tensorcube_candidate_disposal_hold_audit_candidate_archive_retained=true
+tensorcube_candidate_disposal_hold_audit_candidate_archive_deleted=false
+tensorcube_candidate_disposal_hold_audit_candidate_archive_deletion_denied=true
+tensorcube_candidate_disposal_hold_audit_disposal_hold_recorded=true
+tensorcube_candidate_disposal_hold_audit_disposal_hold_active=true
+tensorcube_candidate_disposal_hold_audit_disposal_requested=false
+tensorcube_candidate_disposal_hold_audit_disposal_authorized=false
+tensorcube_candidate_disposal_hold_audit_disposal_executed=false
+tensorcube_candidate_disposal_hold_audit_purge_executed=false
+tensorcube_candidate_disposal_hold_audit_runtime_release_executed=false
+tensorcube_release_deny_during_hold_status=Sealed
+tensorcube_release_deny_during_hold_mode=RuntimeReleaseDeniedDuringDisposalHold
+tensorcube_release_deny_during_hold_runtime_release_requested=false
+tensorcube_release_deny_during_hold_runtime_release_authorized=false
+tensorcube_release_deny_during_hold_runtime_release_executed=false
+tensorcube_archive_deletion_deny_during_hold_status=Sealed
+tensorcube_archive_deletion_deny_during_hold_mode=ArchiveDeletionDeniedDuringDisposalHold
+tensorcube_archive_deletion_deny_during_hold_candidate_evidence_retained=true
+tensorcube_archive_deletion_deny_during_hold_candidate_evidence_deleted=false
+tensorcube_archive_deletion_deny_during_hold_candidate_archive_retained=true
+tensorcube_archive_deletion_deny_during_hold_candidate_archive_deleted=false
+tensorcube_archive_deletion_deny_during_hold_candidate_archive_deletion_denied=true
+tensorcube_archive_deletion_deny_during_hold_candidate_archive_deletion_executed=false
+tensorcube_candidate_disposal_hold_handoff_status=Created
+tensorcube_candidate_disposal_hold_handoff_mode=DisposalHeldAwaitHoldIntegrityAudit
+tensorcube_g210u18_entry_packet_status=Ready
+runtime_dispatch_performed=false
+compute_dispatch_performed=false
+command_encoder_submitted=false
+compute_buffer_allocated=false
+adapter_lease_acquired=false
+live_route_bound=false
+live_device_bound=false
+live_handle_bound=false
+runtime_route_enabled=false
+candidate_route_applied=false
+candidate_route_released=false
+candidate_route_cold_stored=true
+candidate_deleted=false
+candidate_evidence_retained=true
+candidate_evidence_deleted=false
+candidate_archive_retained=true
+candidate_archive_deleted=false
+candidate_archive_deletion_denied=true
+candidate_archive_deletion_executed=false
+disposal_hold_recorded=true
+disposal_hold_active=true
+disposal_requested=false
+disposal_authorized=false
+disposal_executed=false
+purge_executed=false
+runtime_release_executed=false
+rollback_executed=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g210u18=true
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g210u17_disposal_hold_release_deny.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g210u17_disposal_hold_release_deny
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G210U18`
+
+```text
+TensorCube Disposal Hold Integrity And Retention Continuity / Verify Held Candidate Remains Retained Without Deletion Or Runtime Release / No Live Bind No Command Submit No Runtime Enable No TensorCore Claim
+```
