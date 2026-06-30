@@ -1,0 +1,63 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211A2",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211A1",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211A3",
+  "phase": "PhaseApplyA",
+  "title": "TensorCube Runtime Route Bind",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A1_candidate_release_to_runtime_staging_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A2_runtime_route_bind_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211a2_runtime_route_bind",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211a2_runtime_route_bind",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211A2_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211A2_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211a2_runtime_route_bind.rs",
+      "size_bytes": 31903,
+      "sha256": "f3762e7c0cf421c68b3fcd655a5d91733e65c0062b95c19323c870e4b5252d4b"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A2_SPEC.md",
+      "size_bytes": 11404,
+      "sha256": "b59d12d0d76f94ecce0d299aa6b57009dcfe85968972c6d40d2e50e2b10cac0e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A2_STATIC_CHECKS.json",
+      "size_bytes": 2267,
+      "sha256": "4d2b7a2d191f210e69775413c6c0b88fbce0ca8f7c4cadf8d6016f24ae30c6b3"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A2_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 884,
+      "sha256": "769fbe7b70492e3cfb02057c75f25ff43ce99fb4088c422a8f45ef88083f0511"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A2_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "candidate_route_bind_allowed_in_g211a2": true,
+    "runtime_route_enable_allowed_in_g211a2": true,
+    "command_submit_allowed_in_g211a2": false,
+    "compute_dispatch_allowed_in_g211a2": false,
+    "runtime_execution_receipt_allowed_in_g211a2": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
