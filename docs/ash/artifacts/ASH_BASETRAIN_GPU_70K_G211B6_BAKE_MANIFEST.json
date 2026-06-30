@@ -1,0 +1,60 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B6",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B5",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B7",
+  "phase": "PhaseNextRouteAudit",
+  "title": "TensorCube GPU Audit Route Apply Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B5_controlled_dispatch_receipt_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B6_gpu_audit_route_apply_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b6_gpu_audit_route_apply_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b6_gpu_audit_route_apply_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B6_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B6_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b6_gpu_audit_route_apply_gate.rs",
+      "size_bytes": 25429,
+      "sha256": "5ce9d2cfb3ce0241770eb8982c9eefb388ba2555198fd82a7acc9862c51b3ce3"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B6_SPEC.md",
+      "size_bytes": 10026,
+      "sha256": "690476047caaf65f7525f1bfd16d06ee446cae273762fa1da2d3fce5dbdcddaa"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B6_STATIC_CHECKS.json",
+      "size_bytes": 1029,
+      "sha256": "06ff3037cb3ef7d385c5c401d99796434ce1559598f449c9391a24fa79c48621"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B6_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 432,
+      "sha256": "d97d054926af145ba17c5101ae4df8efdbbb1d4c61dc559b54ee07999f98e76c"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "gpu_audit_runtime_state_apply_allowed_in_g211b6": true,
+    "runtime_execution_receipt_binding_allowed_in_g211b6": true,
+    "gpu_audit_route_state_record_create_allowed_in_g211b6": true,
+    "cpu_reference_parity_prepare_allowed_in_g211b6": true,
+    "cpu_reference_parity_allowed_in_g211b6": false,
+    "final_apply_verdict_allowed_in_g211b6": false,
+    "rollback_anchor_allowed_in_g211b6": false,
+    "production_replacement_allowed_in_g211b6": false,
+    "benchmark_claim_allowed_in_g211b6": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b6": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
