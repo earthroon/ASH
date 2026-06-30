@@ -1,0 +1,67 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B2",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B1",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B3",
+  "phase": "PhaseNextRouteAudit",
+  "title": "TensorCube Next Route Audit Candidate Rebind Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B1_next_route_audit_entry_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B2_candidate_rebind_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b2_candidate_rebind_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b2_candidate_rebind_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B2_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B2_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b2_candidate_rebind_gate.rs",
+      "size_bytes": 28191,
+      "sha256": "8635bdf6e4f58d83c23f29558adc5efeb7bd257d4bc64981c073281f5272d6e9"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B2_SPEC.md",
+      "size_bytes": 12056,
+      "sha256": "6ab77d89e0977d261cc6ca7c67681ad503ed4e715e1e798b1ad701576953e92a"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B2_STATIC_CHECKS.json",
+      "size_bytes": 2684,
+      "sha256": "064c72ee5febe45424ccecd77fce98db9f7686814d1d99ef2565a42f6554dfde"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B2_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 552,
+      "sha256": "16223d7559ad262124e94dfa9cb2424dd67093baac3a57c96731930e84d4f60b"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B2_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "next_route_candidate_selection_allowed_in_g211b2": true,
+    "audit_surface_bind_allowed_in_g211b2": true,
+    "command_submit_allowed_in_g211b2": false,
+    "compute_dispatch_allowed_in_g211b2": false,
+    "cpu_reference_parity_allowed_in_g211b2": false,
+    "final_apply_verdict_allowed_in_g211b2": false,
+    "rollback_anchor_allowed_in_g211b2": false,
+    "production_replacement_allowed_in_g211b2": false,
+    "benchmark_claim_allowed_in_g211b2": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
