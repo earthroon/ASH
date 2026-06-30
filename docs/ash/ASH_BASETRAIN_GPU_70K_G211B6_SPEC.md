@@ -1,0 +1,158 @@
+# ASH-BASETRAIN-GPU-70K-G211B6
+
+## TensorCube GPU Audit Route Apply Gate
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G211B6`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G211B5`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G211B7`  
+Phase: `PhaseNextRouteAudit`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G211B6_TENSORCUBE_GPU_AUDIT_ROUTE_APPLY_GATE_APPLY_CONTROLLED_DISPATCH_EXECUTION_RECEIPT_TO_GPU_RUNTIME_AUDIT_STATE_BEFORE_CPU_REFERENCE_PARITY_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G211B6 consumes the passed G211B5 controlled dispatch receipt and runtime execution receipt.
+
+G211B6 applies the controlled dispatch execution receipt to the GPU runtime audit state.
+
+G211B6 creates an explicit GPU audit route apply receipt and binds the runtime execution receipt to a GPU audit route state record.
+
+G211B6 establishes the GPU-side audit SSOT before CPU reference parity.
+
+G211B6 does not perform CPU reference parity, create a final apply verdict, create a rollback anchor, mutate production weights, rewrite checkpoints, rewrite safetensors, execute rollback, replace production, claim benchmark improvement, claim model improvement, claim deployment, or claim TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+GPU audit route apply != production route apply
+GPU runtime audit state != production runtime state
+runtime execution receipt binding != CPU reference parity
+GPU audit state receipt != final apply verdict
+GPU audit apply receipt != rollback anchor
+audit route apply != production weight mutation
+audit state binding != checkpoint rewrite
+audit state binding != safetensors rewrite
+G211B6 != benchmark claim
+G211B6 != TensorCore hardware acceleration claim
+```
+
+## Source Load Contract
+
+G211B6 must load and validate the G211B5 controlled dispatch receipt state.
+
+Required G211B5 source artifacts:
+
+```text
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_TENSORCUBE_NEXT_ROUTE_AUDIT_CONTROLLED_DISPATCH_RECEIPT.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_COMPUTE_DISPATCH_RECEIPT.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_RUNTIME_EXECUTION_RECEIPT.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_CONTROLLED_DISPATCH_SOURCE_VALIDATION_RECEIPT.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_AUDIT_BOUNDARY_PRESERVATION_RECEIPT.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_CPU_PARITY_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_FINAL_VERDICT_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_ROLLBACK_ANCHOR_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b5/ASH_BASETRAIN_GPU_70K_G211B5_G211B6_ENTRY_PACKET.json
+artifacts/g211b5/PASS_ASH_BASETRAIN_GPU_70K_G211B5.txt
+```
+
+## Required Runtime States
+
+```text
+next_route_audit_gpu_apply_phase_entered=true
+next_route_audit_gpu_apply_phase=PhaseNextRouteAuditGpuRouteApplyGate
+g211b5_controlled_dispatch_receipt_loaded=true
+g211b5_compute_dispatch_receipt_loaded=true
+g211b5_runtime_execution_receipt_loaded=true
+g211b5_g211b6_entry_packet_loaded=true
+controlled_audit_dispatch_status=Dispatched
+compute_dispatch_status=PerformedInG211B5
+runtime_execution_receipt_status=Created
+gpu_audit_route_apply_phase_entered=true
+gpu_audit_runtime_state_apply_executed=true
+gpu_audit_runtime_state_apply_status=Applied
+gpu_audit_runtime_state_apply_scope=TensorCubeNextRouteAuditOnly
+gpu_audit_runtime_state_apply_source=G211B5ControlledDispatchExecutionReceipt
+gpu_audit_runtime_state_apply_mode=AuditStateApplyOnly
+gpu_audit_runtime_state_apply_receipt_status=Created
+runtime_execution_receipt_bound_to_gpu_audit_state=true
+runtime_execution_receipt_binding_status=Bound
+runtime_execution_receipt_binding_scope=GPUAuditRuntimeStateOnly
+runtime_execution_receipt_binding_receipt_status=Created
+gpu_audit_route_state_record_created=true
+gpu_audit_route_state_record_status=Created
+gpu_audit_route_state_source=G211B5ControlledAuditDispatch
+gpu_audit_route_state_scope=TensorCubeNextRouteAuditOnly
+gpu_audit_route_state_identity_hash_status=Created
+gpu_audit_route_state_receipt_status=Created
+gpu_audit_route_state_source_chain_validated=true
+gpu_audit_state_production_visible=false
+gpu_audit_state_production_route_replace_enabled=false
+gpu_audit_state_checkpoint_write_enabled=false
+gpu_audit_state_safetensors_write_enabled=false
+gpu_audit_state_optimizer_write_enabled=false
+gpu_audit_state_training_weight_write_enabled=false
+cpu_reference_parity_prepared=true
+cpu_reference_parity_entry_packet_status=Created
+cpu_reference_parity_entry_packet_target=ASH-BASETRAIN-GPU-70K-G211B7
+cpu_reference_parity_source=G211B6GPUAuditRuntimeState
+cpu_reference_parity_mode=PreparedOnlyNoParity
+cpu_reference_parity_execution_status=NotExecutedInG211B6
+cpu_reference_parity_checked=false
+cpu_reference_parity_status=NotCheckedInG211B6
+cpu_reference_parity_receipt_status=NotCreatedInG211B6
+final_apply_verdict_recorded=false
+rollback_anchor_created=false
+silent_fallback_allowed=false
+silent_fallback_detected=false
+production_weight_mutation_allowed=false
+production_replacement_executed=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g211b7=true
+```
+
+## Expected Runtime Artifacts
+
+Runtime artifacts are not prebaked into this ZIP. Rust must create them locally at run time.
+
+```text
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_TENSORCUBE_GPU_AUDIT_ROUTE_APPLY_RECEIPT.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_GPU_RUNTIME_AUDIT_STATE_APPLY_RECEIPT.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_RUNTIME_EXECUTION_RECEIPT_BINDING_RECEIPT.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_GPU_AUDIT_ROUTE_STATE_RECORD.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_GPU_AUDIT_ROUTE_STATE_RECEIPT.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_GPU_AUDIT_ROUTE_STATE_SOURCE_CHAIN_VALIDATION_RECEIPT.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_CPU_REFERENCE_PARITY_PREP_PACKET.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_CPU_PARITY_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_FINAL_VERDICT_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_ROLLBACK_ANCHOR_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b6/ASH_BASETRAIN_GPU_70K_G211B6_G211B7_ENTRY_PACKET.json
+artifacts/g211b6/PASS_ASH_BASETRAIN_GPU_70K_G211B6.txt
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b6_gpu_audit_route_apply_gate.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b6_gpu_audit_route_apply_gate
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G211B7`
+
+```text
+TensorCube Next Route Audit CPU Reference Parity /
+Compare GPU Audit Runtime State Against CPU Reference /
+No Silent Fallback No Production Weight Mutation No TensorCore Claim
+```
