@@ -1,0 +1,253 @@
+# ASH-BASETRAIN-GPU-70K-G211B8
+
+## TensorCube Active GPU Runtime Route CPU Reference Parity
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G211B8`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G211B7`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G211B9`  
+Phase: `PhaseNextRouteAudit`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G211B8_TENSORCUBE_ACTIVE_GPU_RUNTIME_ROUTE_CPU_REFERENCE_PARITY_COMPARE_ACTIVE_GPU_RUNTIME_ROUTE_AGAINST_CPU_REFERENCE_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G211B8 consumes the passed G211B7 active GPU runtime route commit state.
+
+G211B8 loads the active GPU runtime route bound in G211B7.
+
+G211B8 compares the active GPU runtime route against the CPU reference.
+
+G211B8 creates an explicit CPU reference parity receipt for the active GPU runtime route.
+
+G211B8 validates that the active runtime route remains bound to the G211B7 source chain.
+
+G211B8 does not create a final apply verdict, create a rollback anchor, mutate production weights, rewrite checkpoints, rewrite safetensors, mutate optimizer state, mutate training weights, execute a new runtime dispatch, replace production runtime route, claim benchmark improvement, claim model improvement, claim deployment, production replacement, or TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+CPU reference parity != final apply verdict
+CPU reference parity receipt != rollback anchor
+active GPU runtime route parity != production replacement
+active GPU runtime route parity != checkpoint rewrite
+active GPU runtime route parity != safetensors rewrite
+parity compare != new runtime dispatch
+parity compare != production weight mutation
+parity match != deployment claim
+parity match != benchmark claim
+G211B8 != TensorCore hardware acceleration claim
+```
+
+## Source Load Contract
+
+G211B8 must load and validate the G211B7 active GPU runtime route commit state.
+
+Required G211B7 source artifacts:
+
+```text
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_TENSORCUBE_ACTIVE_GPU_RUNTIME_ROUTE_COMMIT_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_GPU_AUDIT_STATE_PROMOTION_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_ACTIVE_GPU_RUNTIME_ROUTE_BINDING_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_RUNTIME_DISPATCH_SURFACE_REBIND_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_GPU_RUNTIME_ROUTE_ACTIVE_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_ACTIVE_GPU_RUNTIME_ROUTE_DISPATCH_READY_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_ACTIVE_GPU_RUNTIME_ROUTE_SOURCE_CHAIN_VALIDATION_RECEIPT.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_POST_COMMIT_CPU_REFERENCE_PARITY_PREP_PACKET.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_CPU_PARITY_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_FINAL_VERDICT_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_ROLLBACK_ANCHOR_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b7/ASH_BASETRAIN_GPU_70K_G211B7_G211B8_ENTRY_PACKET.json
+artifacts/g211b7/PASS_ASH_BASETRAIN_GPU_70K_G211B7.txt
+```
+
+## Required Runtime States
+
+```text
+next_route_audit_active_gpu_cpu_parity_phase_entered=true
+next_route_audit_active_gpu_cpu_parity_phase=PhaseNextRouteAuditActiveGpuRuntimeRouteCpuReferenceParity
+active_gpu_runtime_route_loaded=true
+active_gpu_runtime_route_load_status=Loaded
+active_gpu_runtime_route_load_source=G211B7ActiveGPURuntimeRoute
+active_gpu_runtime_route_commit_status=Committed
+active_gpu_runtime_route_binding_status=Bound
+runtime_dispatch_surface_status=Bound
+runtime_dispatch_surface_source=ActiveGPUAuditRuntimeRoute
+gpu_runtime_route_active=true
+gpu_runtime_route_active_status=Active
+active_gpu_runtime_route_dispatch_ready=true
+cpu_reference_route_loaded=true
+cpu_reference_route_status=Loaded
+cpu_reference_route_scope=ParityReferenceOnly
+cpu_reference_route_source=CpuReferenceBaseline
+cpu_reference_route_mutation_allowed=false
+cpu_reference_route_mutated=false
+active_gpu_runtime_route_source_chain_loaded=true
+active_gpu_runtime_route_source_chain_validated=true
+active_gpu_runtime_route_source_chain_validation_status=Valid
+active_gpu_runtime_route_source_chain_validation_receipt_status=Created
+active_gpu_runtime_route_cpu_parity_phase_entered=true
+active_gpu_runtime_route_cpu_parity_executed=true
+active_gpu_runtime_route_cpu_parity_status=Checked
+active_gpu_runtime_route_cpu_parity_source=G211B7ActiveGPURuntimeRoute
+active_gpu_runtime_route_cpu_parity_mode=ActiveRuntimeRouteVsCpuReference
+active_gpu_runtime_route_cpu_parity_receipt_status=Created
+cpu_reference_parity_checked=true
+cpu_reference_parity_status=Checked
+cpu_reference_parity_source=G211B7ActiveGPURuntimeRoute
+cpu_reference_parity_target=CpuReferenceBaseline
+cpu_reference_parity_mode=ActiveGpuRuntimeRouteVsCpuReference
+cpu_reference_parity_receipt_status=Created
+cpu_reference_parity_result_recorded=true
+cpu_reference_parity_result=ParityPassOrWarnOrFail
+new_command_encoder_created=false
+new_command_encoder_submitted=false
+new_compute_dispatch_prepared=false
+new_compute_dispatch_performed=false
+new_runtime_execution_receipt_created=false
+runtime_execution_replayed=false
+post_parity_verdict_prepared=true
+post_parity_verdict_entry_packet_status=Created
+post_parity_verdict_entry_packet_target=ASH-BASETRAIN-GPU-70K-G211B9
+post_parity_verdict_source=G211B8ActiveGpuRuntimeRouteCpuReferenceParity
+post_parity_verdict_execution_status=NotExecutedInG211B8
+final_apply_verdict_recorded=false
+final_apply_verdict_status=NotRecordedInG211B8
+final_apply_verdict_receipt_status=NotCreatedInG211B8
+rollback_anchor_created=false
+rollback_anchor_status=NotCreatedInG211B8
+silent_fallback_allowed=false
+silent_fallback_detected=false
+fallback_observed=false
+production_weight_mutation_allowed=false
+production_base_weight_mutated=false
+checkpoint_rewritten=false
+safetensors_rewritten=false
+optimizer_state_mutated=false
+training_weight_mutated=false
+production_replacement_executed=false
+production_route_replaced=false
+production_runtime_route_replaced=false
+active_gpu_runtime_route_production_visible=false
+active_gpu_runtime_route_persistent_storage_write_enabled=false
+active_gpu_runtime_route_checkpoint_write_enabled=false
+active_gpu_runtime_route_safetensors_write_enabled=false
+active_gpu_runtime_route_optimizer_write_enabled=false
+active_gpu_runtime_route_training_weight_write_enabled=false
+tensorcore_hardware_acceleration_claimed=false
+benchmark_claimed=false
+model_improvement_claimed=false
+deployment_claimed=false
+g211b9_entry_packet_status=Created
+g211b9_entry_packet_target=ASH-BASETRAIN-GPU-70K-G211B9
+ready_for_g211b9=true
+```
+
+## Expected Runtime Artifacts
+
+Runtime artifacts are not prebaked into this ZIP. Rust must create them locally at run time.
+
+```text
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_TENSORCUBE_ACTIVE_GPU_RUNTIME_ROUTE_CPU_REFERENCE_PARITY_RECEIPT.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_ACTIVE_GPU_RUNTIME_ROUTE_LOAD_RECEIPT.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_CPU_REFERENCE_ROUTE_LOAD_RECEIPT.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_ACTIVE_GPU_RUNTIME_ROUTE_SOURCE_CHAIN_VALIDATION_RECEIPT.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_CPU_REFERENCE_PARITY_RESULT_RECORD.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_POST_PARITY_VERDICT_PREP_PACKET.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_FINAL_VERDICT_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_ROLLBACK_ANCHOR_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b8/ASH_BASETRAIN_GPU_70K_G211B8_G211B9_ENTRY_PACKET.json
+artifacts/g211b8/PASS_ASH_BASETRAIN_GPU_70K_G211B8.txt
+```
+
+## Acceptance Criteria
+
+Pass if and only if:
+
+```text
+G211B7 PASS marker is loaded.
+G211B7 active GPU runtime route commit receipt is loaded.
+G211B7 active route binding, dispatch surface rebind, active route, dispatch ready, source chain, parity prep, and closed-boundary seals are loaded.
+active_gpu_runtime_route_loaded=true.
+cpu_reference_route_loaded=true.
+active_gpu_runtime_route_source_chain_validated=true.
+active_gpu_runtime_route_cpu_parity_executed=true.
+cpu_reference_parity_checked=true.
+cpu_reference_parity_result is one of ParityPass, ParityWarn, ParityFail.
+new_command_encoder_created=false.
+new_command_encoder_submitted=false.
+new_compute_dispatch_performed=false.
+new_runtime_execution_receipt_created=false.
+runtime_execution_replayed=false.
+final_apply_verdict_recorded=false.
+rollback_anchor_created=false.
+silent_fallback_detected=false.
+production_weight_mutation_allowed=false.
+checkpoint_rewritten=false.
+safetensors_rewritten=false.
+production_replacement_executed=false.
+tensorcore_hardware_acceleration_claimed=false.
+ready_for_g211b9=true.
+```
+
+## Static Surface Requirements
+
+```text
+runtime_outputs_prebaked=0
+target_writer_json_macro_count=0
+target_writer_recursion_limit_count=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+rust_default_arg_injection_present=true
+boolean_value_flags_allowed=false
+string_mode_args_required=true
+active_gpu_runtime_route_load_allowed_in_g211b8=true
+cpu_reference_route_load_allowed_in_g211b8=true
+cpu_reference_parity_allowed_in_g211b8=true
+cpu_reference_parity_receipt_allowed_in_g211b8=true
+active_gpu_runtime_route_source_chain_validation_allowed_in_g211b8=true
+post_parity_verdict_prepare_allowed_in_g211b8=true
+new_runtime_dispatch_allowed_in_g211b8=false
+final_apply_verdict_allowed_in_g211b8=false
+rollback_anchor_allowed_in_g211b8=false
+production_replacement_allowed_in_g211b8=false
+production_weight_mutation_allowed_in_g211b8=false
+persistent_storage_write_allowed_in_g211b8=false
+benchmark_claim_allowed_in_g211b8=false
+tensorcore_hardware_acceleration_claim_allowed_in_g211b8=false
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+verdict=PASS_STATIC_SURFACE
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b8_active_gpu_runtime_route_cpu_reference_parity.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b8_active_gpu_runtime_route_cpu_reference_parity
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G211B9`
+
+```text
+TensorCube Active GPU Runtime Route Parity Verdict Gate /
+Record CPU Reference Parity Verdict For Active GPU Runtime Route /
+No Silent Fallback No Production Weight Mutation No TensorCore Claim
+```
