@@ -1,0 +1,63 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211A1",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211A0",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211A2",
+  "phase": "PhaseApplyA",
+  "title": "TensorCube Candidate Release To Runtime Staging",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A0_runtime_apply_authority_reopen_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A1_candidate_release_to_runtime_staging_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211a1_candidate_release_to_runtime_staging",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211a1_candidate_release_to_runtime_staging",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211A1_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211A1_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211a1_candidate_release_to_runtime_staging.rs",
+      "size_bytes": 21852,
+      "sha256": "a0f42980b795229274116e4c08e44174c5205647b1b9644dad25ee5bf7aa610b"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A1_SPEC.md",
+      "size_bytes": 10107,
+      "sha256": "ea1ff8bc610330832038924b034520f674696fdbd044e624ddb3c2aeee942c14"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A1_STATIC_CHECKS.json",
+      "size_bytes": 2090,
+      "sha256": "6f758a001bc380140813217007470eea9a3b2cb3b893b46641c035f4ac7189a6"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A1_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 924,
+      "sha256": "246d478958fd7e1e0c249ccfe69dd5f74917132422520f39f8bf0f2c26763cb1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A1_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "candidate_release_execution_allowed_in_g211a1": true,
+    "live_route_bind_allowed_in_g211a1": false,
+    "command_submit_allowed_in_g211a1": false,
+    "runtime_enable_allowed_in_g211a1": false,
+    "compute_dispatch_allowed_in_g211a1": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
