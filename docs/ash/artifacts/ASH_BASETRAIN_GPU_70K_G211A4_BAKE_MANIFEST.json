@@ -1,0 +1,66 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211A4",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211A3",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211A5",
+  "phase": "PhaseApplyA",
+  "title": "TensorCube Applied Route CPU Reference Parity",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A3_command_submit_execution_receipt_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A4_applied_route_cpu_reference_parity_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211a4_applied_route_cpu_reference_parity",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211a4_applied_route_cpu_reference_parity",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211A4_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211A4_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211a4_applied_route_cpu_reference_parity.rs",
+      "size_bytes": 28956,
+      "sha256": "c416f01218f8c8943ae7f338561579ada83e041ad5aedede4fe8d7fbc9353399"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A4_SPEC.md",
+      "size_bytes": 7622,
+      "sha256": "bae7358043399c36372de1e06a0ed1428c4628f6324092659de0b75194b14e3d"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A4_STATIC_CHECKS.json",
+      "size_bytes": 2347,
+      "sha256": "20f4c63d551ae46a9d2afb3950840b02a2b43f755e160256f515cf9c1c0e4c11"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A4_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 903,
+      "sha256": "051c1c10a1d3f91f77faa57b983742da4030a22517a83e29d2ee5eaea0bc5383"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A4_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "cpu_reference_parity_allowed_in_g211a4": true,
+    "parity_verdict_allowed_in_g211a4": true,
+    "final_apply_verdict_allowed_in_g211a4": false,
+    "rollback_anchor_allowed_in_g211a4": false,
+    "production_replacement_allowed_in_g211a4": false,
+    "benchmark_claim_allowed_in_g211a4": false,
+    "new_command_submit_allowed_in_g211a4": false,
+    "new_compute_dispatch_allowed_in_g211a4": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
