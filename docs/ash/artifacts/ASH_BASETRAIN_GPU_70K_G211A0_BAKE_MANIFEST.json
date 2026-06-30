@@ -1,0 +1,99 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211A0",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G210U21",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211A1",
+  "phase": "PhaseApplyA",
+  "title": "TensorCube Runtime Apply Authority Reopen / Reopen Closed PhaseU Candidate Chain For Explicit Runtime Application / Create Runtime Authority And Candidate Release Path / No Silent Fallback No Production Weight Mutation No TensorCore Claim",
+  "bake_kind": "runtime_apply_authority_reopen_rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U21_post_quarantine_review_index_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211A0_runtime_apply_authority_reopen_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211a0_runtime_apply_authority_reopen",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211a0_runtime_apply_authority_reopen",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211A0_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211A0_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211a0_runtime_apply_authority_reopen.rs",
+      "size_bytes": 14358,
+      "sha256": "eb239108dc33caa75e79632713dc86fe8859f1995d4ade6b101dd31953713011"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A0_SPEC.md",
+      "size_bytes": 8184,
+      "sha256": "130208f2541f47ca33ab6ec4c02846e9d79472720bbf3c5fa027e705f4f7a4d3"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A0_STATIC_CHECKS.json",
+      "size_bytes": 1850,
+      "sha256": "ac7be144c6a8ad9c087eb74689847b3db3f6a776452e20a636f8a45edb00dda8"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A0_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 813,
+      "sha256": "a7864f8d827a3cbd34100c9277e316d28475f5b176f4039d732273e32d1d6f4f"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211A0_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G211A0",
+    "source_patch_id": "ASH-BASETRAIN-GPU-70K-G210U21",
+    "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211A1",
+    "phase": "PhaseApplyA",
+    "verdict": "PASS_STATIC_SURFACE",
+    "supersedes": "ASH-BASETRAIN-GPU-70K-G210U22 Archive Catalog Seal",
+    "source_patch_parse_check": true,
+    "g210u21_review_index_source_load_parse_check": true,
+    "g210u21_closed_chain_index_receipt_source_load_parse_check": true,
+    "g210u21_future_human_review_packet_source_load_parse_check": true,
+    "g210u21_no_runtime_authority_seal_source_load_parse_check": true,
+    "archive_catalog_supersede_parse_check": true,
+    "runtime_apply_authority_reopen_audit_parse_check": true,
+    "candidate_release_path_authorization_receipt_parse_check": true,
+    "apply_phase_entry_packet_parse_check": true,
+    "no_silent_fallback_seal_parse_check": true,
+    "no_production_weight_mutation_seal_parse_check": true,
+    "g211a1_entry_packet_parse_check": true,
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "serde_json_map_import": true,
+    "json_atlas_writer": true,
+    "target_writer_ensure_macro_count": 1,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "candidate_release_execution_allowed_in_g211a0": false,
+    "live_route_bind_allowed_in_g211a0": false,
+    "command_submit_allowed_in_g211a0": false,
+    "runtime_enable_allowed_in_g211a0": false,
+    "compute_dispatch_allowed_in_g211a0": false,
+    "silent_fallback_allowed": false,
+    "production_weight_mutation_allowed": false,
+    "tensorcore_hardware_acceleration_claim_allowed": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  },
+  "local_bake_validation": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G211A0",
+    "verdict": "BAKED_STATIC_ONLY_CARGO_NOT_RUN_IN_CONTAINER",
+    "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G210U21_post_quarantine_review_index_baked_no_artifacts_no_ps1_no_py.zip",
+    "runtime_artifacts_prebaked": 0,
+    "runtime_artifacts_are_rust_local_outputs": true,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false,
+    "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211a0_runtime_apply_authority_reopen",
+    "expected_pass_status": "PASS_ASH_BASETRAIN_GPU_70K_G211A0_TENSORCUBE_RUNTIME_APPLY_AUTHORITY_REOPEN_REOPEN_CLOSED_PHASEU_CANDIDATE_CHAIN_FOR_EXPLICIT_RUNTIME_APPLICATION_CREATE_RUNTIME_AUTHORITY_AND_CANDIDATE_RELEASE_PATH_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM"
+  }
+}
