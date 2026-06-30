@@ -1,0 +1,74 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B3",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B2",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B4",
+  "phase": "PhaseNextRouteAudit",
+  "title": "TensorCube Next Route Audit Bind Validation",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B2_candidate_rebind_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B3_bind_validation_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b3_bind_validation",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b3_bind_validation",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B3_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B3_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b3_bind_validation.rs",
+      "size_bytes": 31423,
+      "sha256": "2a3708ab828e45cddf40d2258b5ea9e8cfee5ef52c8aab61831f4e4da4f58419"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B3_SPEC.md",
+      "size_bytes": 9279,
+      "sha256": "76434011a06ffdbda88971fef66e3c76913b4d4dcc86795e255828257055b771"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B3_STATIC_CHECKS.json",
+      "size_bytes": 1072,
+      "sha256": "c842778c7ad9b31016811750b872f2e32cfcc5a80de3a077f31503aec50f978d"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B3_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 554,
+      "sha256": "82289ccd18591aad6f480a813aa9a72be7f4864cb1268c29d42badcced5c5112"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B3_BAKE_MANIFEST.json",
+      "size_bytes": 0,
+      "sha256": "omitted_self_referential"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "serde_json_map_import": true,
+    "json_atlas_writer": true,
+    "target_writer_ensure_macro_count": 5,
+    "bind_validation_allowed_in_g211b3": true,
+    "candidate_identity_validation_allowed_in_g211b3": true,
+    "audit_surface_descriptor_validation_allowed_in_g211b3": true,
+    "controlled_submit_prepare_allowed_in_g211b3": true,
+    "command_submit_allowed_in_g211b3": false,
+    "compute_dispatch_allowed_in_g211b3": false,
+    "cpu_reference_parity_allowed_in_g211b3": false,
+    "final_apply_verdict_allowed_in_g211b3": false,
+    "rollback_anchor_allowed_in_g211b3": false,
+    "production_replacement_allowed_in_g211b3": false,
+    "benchmark_claim_allowed_in_g211b3": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
