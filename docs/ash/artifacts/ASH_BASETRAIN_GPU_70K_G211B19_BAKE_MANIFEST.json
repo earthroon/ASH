@@ -1,0 +1,86 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B19",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B18",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B20",
+  "phase": "PhaseTensorCubeGpuControlledNextApplyVerdict",
+  "title": "TensorCube GPU Controlled Next Apply Verdict Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B18_tensorcube_gpu_controlled_dispatch_execution_receipt_review_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B19_tensorcube_gpu_controlled_next_apply_verdict_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b19_tensorcube_gpu_controlled_next_apply_verdict_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b19_tensorcube_gpu_controlled_next_apply_verdict_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "ssot_note": "G211B19 records the controlled TensorCube GPU next apply verdict from the reviewed G211B18 dispatch output, records a valid source chain, and opens commit readiness only. It does not execute commit, write weights, write persistent storage, replace production, rewrite checkpoint or safetensors, execute a new dispatch, or claim TensorCore hardware acceleration.",
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B19_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B19_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b19_tensorcube_gpu_controlled_next_apply_verdict_gate.rs",
+      "size_bytes": 30865,
+      "sha256": "140a59d2ddf1453b0d221f4e3a9f4f017fc18d1e1d392c7967cfd965318a6e68"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B19_SPEC.md",
+      "size_bytes": 14877,
+      "sha256": "c20f343f466f94367afce184bead317d7c09811793e1a6d3698c5defbf0bde63"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B19_STATIC_CHECKS.json",
+      "size_bytes": 2194,
+      "sha256": "55543072b2002061a14399a094f540039474d8674a8af149e335c3b05a1eb12e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B19_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 324,
+      "sha256": "e0e0ded5a938ca87eb0fa759c6b9dbce08b337acd95fcac97e5a2cc494683d63"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G211B19",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "serde_json_map_import": true,
+    "json_atlas_writer": true,
+    "target_writer_ensure_macro_count": 1,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "controlled_dispatch_execution_review_record_load_allowed_in_g211b19": true,
+    "controlled_dispatch_output_review_record_load_allowed_in_g211b19": true,
+    "controlled_dispatch_output_review_result_record_load_allowed_in_g211b19": true,
+    "controlled_runtime_execution_consistency_review_load_allowed_in_g211b19": true,
+    "controlled_verdict_gate_ready_receipt_load_allowed_in_g211b19": true,
+    "controlled_tensorcube_gpu_next_apply_verdict_record_allowed_in_g211b19": true,
+    "controlled_tensorcube_gpu_next_apply_verdict_source_chain_record_allowed_in_g211b19": true,
+    "controlled_tensorcube_gpu_next_apply_commit_ready_record_allowed_in_g211b19": true,
+    "g211b20_entry_packet_prepare_allowed_in_g211b19": true,
+    "new_runtime_dispatch_allowed_in_g211b19": false,
+    "actual_command_encoder_creation_allowed_in_g211b19": false,
+    "actual_command_buffer_submit_allowed_in_g211b19": false,
+    "actual_compute_dispatch_allowed_in_g211b19": false,
+    "runtime_execution_receipt_creation_allowed_in_g211b19": false,
+    "controlled_tensorcube_gpu_next_apply_commit_allowed_in_g211b19": false,
+    "production_replacement_allowed_in_g211b19": false,
+    "production_weight_mutation_allowed_in_g211b19": false,
+    "persistent_storage_write_allowed_in_g211b19": false,
+    "checkpoint_rewrite_allowed_in_g211b19": false,
+    "safetensors_rewrite_allowed_in_g211b19": false,
+    "optimizer_state_mutation_allowed_in_g211b19": false,
+    "training_weight_mutation_allowed_in_g211b19": false,
+    "rollback_anchor_allowed_in_g211b19": false,
+    "rollback_execution_allowed_in_g211b19": false,
+    "benchmark_claim_allowed_in_g211b19": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b19": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
