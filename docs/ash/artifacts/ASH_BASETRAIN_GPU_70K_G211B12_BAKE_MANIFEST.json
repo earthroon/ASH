@@ -1,0 +1,67 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B12",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B11",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B13",
+  "phase": "PhaseTensorCubeGpuNextApplyEntry",
+  "title": "TensorCube GPU Next Apply Entry Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B11_tensorcube_gpu_smoke_dispatch_receipt_review_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B12_tensorcube_gpu_next_apply_entry_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b12_tensorcube_gpu_next_apply_entry_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b12_tensorcube_gpu_next_apply_entry_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "ssot_note": "G211B12 opens the TensorCube GPU next apply phase entry from G211B11 smoke review/route continuity. It does not execute next apply, dispatch, rollback, or production mutation.",
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B12_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B12_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b12_tensorcube_gpu_next_apply_entry_gate.rs",
+      "size_bytes": 29730,
+      "sha256": "a028fd1ab437badb27f02e08d2dd1c63c69f6c40fa818b98bea8b67d4e3c333a"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B12_SPEC.md",
+      "size_bytes": 13174,
+      "sha256": "5635826900e443dcef15a49bf76b7ab5a10c6dd53fd2b33fd5f61641129b9ced"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B12_STATIC_CHECKS.json",
+      "size_bytes": 3146,
+      "sha256": "c1affc526a1ce6a5202fb66cd74a8a33cff9a78737fdc5848ddbe9c6f2fa12c9"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B12_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 434,
+      "sha256": "5f249a26f5a4a69784545bf089d0cec0763113d2ad1109741002f62e188ab654"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "tensorcube_gpu_smoke_dispatch_review_receipt_load_allowed_in_g211b12": true,
+    "tensorcube_gpu_smoke_dispatch_review_result_load_allowed_in_g211b12": true,
+    "tensorcube_gpu_route_continuity_result_load_allowed_in_g211b12": true,
+    "next_tensorcube_gpu_apply_entry_open_allowed_in_g211b12": true,
+    "next_tensorcube_gpu_apply_input_bind_allowed_in_g211b12": true,
+    "g211b13_entry_packet_prepare_allowed_in_g211b12": true,
+    "new_runtime_dispatch_allowed_in_g211b12": false,
+    "next_tensorcube_gpu_apply_execution_allowed_in_g211b12": false,
+    "next_tensorcube_gpu_apply_commit_allowed_in_g211b12": false,
+    "rollback_anchor_allowed_in_g211b12": false,
+    "rollback_execution_allowed_in_g211b12": false,
+    "production_replacement_allowed_in_g211b12": false,
+    "production_weight_mutation_allowed_in_g211b12": false,
+    "persistent_storage_write_allowed_in_g211b12": false,
+    "benchmark_claim_allowed_in_g211b12": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b12": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
