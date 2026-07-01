@@ -1,0 +1,289 @@
+# ASH-BASETRAIN-GPU-70K-G211B13
+
+## TensorCube GPU Next Apply Candidate Gate
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G211B13`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G211B12`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G211B14`  
+Phase: `PhaseTensorCubeGpuNextApplyCandidate`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G211B13_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_GATE_PREPARE_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_FROM_OPEN_APPLY_ENTRY_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G211B13 consumes the passed G211B12 TensorCube GPU next apply entry state.
+
+G211B13 loads the TensorCube GPU next apply entry open receipt, input bind receipt, and next apply phase state receipt.
+
+G211B13 validates that the opened next apply entry can be used to prepare a TensorCube GPU next apply candidate.
+
+G211B13 prepares a TensorCube GPU next apply candidate from the bound TensorCube GPU execution path.
+
+G211B13 records the candidate identity, source chain, input route, entry scope, and apply readiness.
+
+G211B13 creates an explicit TensorCube GPU next apply candidate receipt, a candidate source chain validation receipt, a candidate validation-ready receipt, boundary seals, and a G211B14 entry packet.
+
+G211B13 does not execute next apply, commit next apply, execute a new GPU dispatch, create a command encoder, submit a command buffer, create a rollback anchor, execute rollback, replace the production route, mutate production weights, rewrite checkpoints, rewrite safetensors, mutate optimizer state, mutate training weights, claim benchmark improvement, claim model improvement, claim deployment, production replacement, or TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+next apply candidate != next apply execution
+next apply candidate != next apply commit
+next apply candidate != production route replacement
+next apply candidate != checkpoint rewrite
+next apply candidate != safetensors rewrite
+next apply candidate != production weight mutation
+next apply candidate != benchmark claim
+next apply candidate != model improvement claim
+next apply candidate != deployment claim
+next apply candidate != TensorCore hardware acceleration claim
+G211B13 prepares the TensorCube GPU next apply candidate.
+G211B13 does not execute the candidate.
+G211B13 does not dispatch the candidate.
+G211B13 does not commit the candidate.
+G211B13 does not mutate production storage.
+G211B13 does not promote to production.
+```
+
+## Source Load Contract
+
+G211B13 must load and validate the G211B12 TensorCube GPU next apply entry state.
+
+Required G211B12 source artifacts:
+
+```text
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_TENSORCUBE_GPU_NEXT_APPLY_ENTRY_OPEN_RECEIPT.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_TENSORCUBE_GPU_NEXT_APPLY_INPUT_BIND_RECEIPT.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NEXT_APPLY_PHASE_STATE_RECEIPT.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_APPLY_EXECUTION_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_NO_TENSORCORE_CLAIM_SEAL.json
+artifacts/g211b12/ASH_BASETRAIN_GPU_70K_G211B12_G211B13_ENTRY_PACKET.json
+artifacts/g211b12/PASS_ASH_BASETRAIN_GPU_70K_G211B12.txt
+```
+
+Required source states:
+
+```text
+source_patch_id=ASH-BASETRAIN-GPU-70K-G211B12
+source_g211b12_pass_marker_status=Present
+source_next_tensorcube_gpu_apply_entry_open_status=Opened
+source_next_tensorcube_gpu_apply_phase_status=Open
+source_next_tensorcube_gpu_apply_input_bind_status=Bound
+source_next_tensorcube_gpu_apply_input_route=TensorCubeGpuExecutionPath
+source_next_tensorcube_gpu_apply_input_ready=true
+source_next_tensorcube_gpu_apply_executed=false
+source_next_tensorcube_gpu_apply_commit_executed=false
+source_new_compute_dispatch_performed=false
+source_tensorcube_gpu_next_apply_dispatch_executed=false
+source_silent_fallback_detected=false
+source_production_weight_mutation_allowed=false
+source_production_replacement_executed=false
+source_persistent_storage_write_allowed=false
+source_tensorcore_hardware_acceleration_claimed=false
+source_g211b13_entry_packet_status=Created
+source_ready_for_g211b13=true
+```
+
+Rejected source states:
+
+```text
+source_next_tensorcube_gpu_apply_input_route != TensorCubeGpuExecutionPath
+source_next_tensorcube_gpu_apply_input_ready != true
+source_next_tensorcube_gpu_apply_phase_status != Open
+source_next_tensorcube_gpu_apply_executed == true
+source_next_tensorcube_gpu_apply_commit_executed == true
+source_new_compute_dispatch_performed == true
+source_tensorcube_gpu_next_apply_dispatch_executed == true
+source_production_weight_mutation_allowed == true
+source_production_replacement_executed == true
+source_tensorcore_hardware_acceleration_claimed == true
+```
+
+## Candidate Preparation Contract
+
+```text
+tensorcube_gpu_next_apply_candidate_phase_entered=true
+tensorcube_gpu_next_apply_candidate_prepare_executed=true
+tensorcube_gpu_next_apply_candidate_prepared=true
+tensorcube_gpu_next_apply_candidate_status=Prepared
+tensorcube_gpu_next_apply_candidate_source=G211B12TensorCubeGpuNextApplyEntry
+tensorcube_gpu_next_apply_candidate_scope=TensorCubeGpuNextApplyCandidateOnly
+tensorcube_gpu_next_apply_candidate_mode=PrepareCandidateOnlyNoApplyExecution
+tensorcube_gpu_next_apply_candidate_receipt_status=Created
+
+tensorcube_gpu_next_apply_candidate_id=G211B13TensorCubeGpuNextApplyCandidate
+tensorcube_gpu_next_apply_candidate_route=TensorCubeGpuExecutionPath
+tensorcube_gpu_next_apply_candidate_route_source=G211B10TensorCubeGpuRuntimeWireAndSmokeDispatch
+tensorcube_gpu_next_apply_candidate_review_source=G211B11TensorCubeGpuSmokeDispatchReview
+tensorcube_gpu_next_apply_candidate_entry_source=G211B12TensorCubeGpuNextApplyEntry
+tensorcube_gpu_next_apply_candidate_input_bind_source=G211B12TensorCubeGpuNextApplyInputBind
+tensorcube_gpu_next_apply_candidate_ready=true
+tensorcube_gpu_next_apply_candidate_ready_status=Ready
+```
+
+## Candidate Source Chain Validation Contract
+
+Required source chain:
+
+```text
+G211B10TensorCubeGpuRuntimeWireAndSmokeDispatch
+G211B11TensorCubeGpuSmokeDispatchReview
+G211B12TensorCubeGpuNextApplyEntry
+G211B13TensorCubeGpuNextApplyCandidate
+```
+
+Required validation states:
+
+```text
+tensorcube_gpu_next_apply_candidate_source_chain_loaded=true
+tensorcube_gpu_next_apply_candidate_source_chain_validated=true
+tensorcube_gpu_next_apply_candidate_source_chain_validation_status=Valid
+tensorcube_gpu_next_apply_candidate_source_chain_validation_source=G211B12TensorCubeGpuNextApplyEntry
+tensorcube_gpu_next_apply_candidate_source_chain_validation_receipt_status=Created
+```
+
+## Candidate Apply Readiness Contract
+
+G211B13 records that the candidate is ready for validation, not execution.
+
+```text
+tensorcube_gpu_next_apply_candidate_validation_ready=true
+tensorcube_gpu_next_apply_candidate_validation_ready_status=Ready
+tensorcube_gpu_next_apply_candidate_validation_ready_source=G211B13TensorCubeGpuNextApplyCandidate
+tensorcube_gpu_next_apply_candidate_validation_ready_scope=CandidateValidationOnly
+tensorcube_gpu_next_apply_candidate_validation_ready_receipt_status=Created
+tensorcube_gpu_next_apply_candidate_execution_ready=false
+tensorcube_gpu_next_apply_candidate_execution_status=NotReadyInG211B13
+tensorcube_gpu_next_apply_candidate_commit_ready=false
+tensorcube_gpu_next_apply_candidate_commit_status=NotReadyInG211B13
+```
+
+## Boundary Contracts
+
+```text
+next_tensorcube_gpu_apply_executed=false
+next_tensorcube_gpu_apply_commit_executed=false
+next_tensorcube_gpu_apply_weight_write_executed=false
+next_tensorcube_gpu_apply_storage_write_executed=false
+next_tensorcube_gpu_apply_checkpoint_write_executed=false
+next_tensorcube_gpu_apply_safetensors_write_executed=false
+tensorcube_gpu_next_apply_candidate_executed=false
+tensorcube_gpu_next_apply_candidate_committed=false
+new_command_encoder_created=false
+new_command_encoder_submitted=false
+new_compute_dispatch_performed=false
+new_runtime_execution_receipt_created=false
+runtime_execution_replayed=false
+tensorcube_gpu_next_apply_candidate_dispatch_executed=false
+silent_fallback_allowed=false
+silent_fallback_detected=false
+fallback_observed=false
+fallback_route_selected=false
+production_weight_mutation_allowed=false
+production_base_weight_mutated=false
+checkpoint_rewritten=false
+safetensors_rewritten=false
+optimizer_state_mutated=false
+training_weight_mutated=false
+production_replacement_executed=false
+production_route_replaced=false
+production_runtime_route_replaced=false
+persistent_storage_write_allowed=false
+tensorcube_gpu_next_apply_candidate_persistent_storage_write_enabled=false
+tensorcube_gpu_next_apply_candidate_production_visible=false
+tensorcore_hardware_acceleration_claimed=false
+benchmark_claimed=false
+model_improvement_claimed=false
+deployment_claimed=false
+```
+
+## Expected Runtime Artifacts
+
+Runtime artifacts are not prebaked into this ZIP. Rust must create them locally at run time.
+
+```text
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_RECEIPT.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_SOURCE_CHAIN_VALIDATION_RECEIPT.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_VALIDATION_READY_RECEIPT.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_APPLY_EXECUTION_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_CANDIDATE_EXECUTION_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_NO_TENSORCORE_CLAIM_SEAL.json
+artifacts/g211b13/ASH_BASETRAIN_GPU_70K_G211B13_G211B14_ENTRY_PACKET.json
+artifacts/g211b13/PASS_ASH_BASETRAIN_GPU_70K_G211B13.txt
+```
+
+## Static Surface Requirements
+
+```text
+runtime_outputs_prebaked=0
+target_writer_json_macro_count=0
+target_writer_recursion_limit_count=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+rust_default_arg_injection_present=true
+boolean_value_flags_allowed=false
+string_mode_args_required=true
+next_tensorcube_gpu_apply_entry_open_receipt_load_allowed_in_g211b13=true
+next_tensorcube_gpu_apply_input_bind_receipt_load_allowed_in_g211b13=true
+next_apply_phase_state_receipt_load_allowed_in_g211b13=true
+tensorcube_gpu_next_apply_candidate_prepare_allowed_in_g211b13=true
+tensorcube_gpu_next_apply_candidate_source_chain_validation_allowed_in_g211b13=true
+tensorcube_gpu_next_apply_candidate_validation_ready_record_allowed_in_g211b13=true
+g211b14_entry_packet_prepare_allowed_in_g211b13=true
+new_runtime_dispatch_allowed_in_g211b13=false
+next_tensorcube_gpu_apply_execution_allowed_in_g211b13=false
+next_tensorcube_gpu_apply_commit_allowed_in_g211b13=false
+tensorcube_gpu_next_apply_candidate_execution_allowed_in_g211b13=false
+tensorcube_gpu_next_apply_candidate_commit_allowed_in_g211b13=false
+rollback_anchor_allowed_in_g211b13=false
+rollback_execution_allowed_in_g211b13=false
+production_replacement_allowed_in_g211b13=false
+production_weight_mutation_allowed_in_g211b13=false
+persistent_storage_write_allowed_in_g211b13=false
+benchmark_claim_allowed_in_g211b13=false
+tensorcore_hardware_acceleration_claim_allowed_in_g211b13=false
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+verdict=PASS_STATIC_SURFACE
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b13_tensorcube_gpu_next_apply_candidate_gate.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b13_tensorcube_gpu_next_apply_candidate_gate
+```
+
+## PASS Marker
+
+```text
+PASS_ASH_BASETRAIN_GPU_70K_G211B13_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_GATE_PREPARE_TENSORCUBE_GPU_NEXT_APPLY_CANDIDATE_FROM_OPEN_APPLY_ENTRY_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G211B14`
+
+```text
+TensorCube GPU Next Apply Candidate Validation Gate /
+Validate TensorCube GPU Next Apply Candidate Before Controlled Apply /
+No Silent Fallback No Production Weight Mutation No TensorCore Claim
+```
