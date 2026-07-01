@@ -1,0 +1,81 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B14",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B13",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B15",
+  "phase": "PhaseTensorCubeGpuNextApplyCandidateValidation",
+  "title": "TensorCube GPU Next Apply Candidate Validation Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B13_tensorcube_gpu_next_apply_candidate_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B14_tensorcube_gpu_next_apply_candidate_validation_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b14_tensorcube_gpu_next_apply_candidate_validation_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b14_tensorcube_gpu_next_apply_candidate_validation_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "ssot_note": "G211B14 validates the G211B13 TensorCube GPU next apply candidate and records controlled apply readiness. It does not execute controlled apply, dispatch, commit, rollback, or mutate production storage.",
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B14_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B14_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b14_tensorcube_gpu_next_apply_candidate_validation_gate.rs",
+      "size_bytes": 34405,
+      "sha256": "ce22920a22b4b874c7973503e2aeeac19b5b5818c44f3b4c1aa6c0dd777c740e"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B14_SPEC.md",
+      "size_bytes": 13056,
+      "sha256": "0d077ec2246251cb8c17a8da72c1837711d57985b935848091886f816091bb91"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B14_STATIC_CHECKS.json",
+      "size_bytes": 1972,
+      "sha256": "14655450d657da0f3adb01180c4e57c42242ac5e3996cd90729274a87c371cb3"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B14_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 418,
+      "sha256": "ddea04b6242381b95b9866c3ab4b45969c227842b33d66e1ccda43406f7cc063"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G211B14",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "serde_json_map_import": true,
+    "json_atlas_writer": true,
+    "target_writer_ensure_macro_count": 1,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "tensorcube_gpu_next_apply_candidate_receipt_load_allowed_in_g211b14": true,
+    "tensorcube_gpu_next_apply_candidate_source_chain_validation_receipt_load_allowed_in_g211b14": true,
+    "tensorcube_gpu_next_apply_candidate_validation_ready_receipt_load_allowed_in_g211b14": true,
+    "tensorcube_gpu_next_apply_candidate_validation_allowed_in_g211b14": true,
+    "tensorcube_gpu_next_apply_candidate_source_chain_reconfirmation_allowed_in_g211b14": true,
+    "controlled_tensorcube_gpu_next_apply_readiness_record_allowed_in_g211b14": true,
+    "g211b15_entry_packet_prepare_allowed_in_g211b14": true,
+    "new_runtime_dispatch_allowed_in_g211b14": false,
+    "next_tensorcube_gpu_apply_execution_allowed_in_g211b14": false,
+    "next_tensorcube_gpu_apply_commit_allowed_in_g211b14": false,
+    "controlled_tensorcube_gpu_next_apply_execution_allowed_in_g211b14": false,
+    "controlled_tensorcube_gpu_next_apply_commit_allowed_in_g211b14": false,
+    "tensorcube_gpu_next_apply_candidate_execution_allowed_in_g211b14": false,
+    "tensorcube_gpu_next_apply_candidate_commit_allowed_in_g211b14": false,
+    "rollback_anchor_allowed_in_g211b14": false,
+    "rollback_execution_allowed_in_g211b14": false,
+    "production_replacement_allowed_in_g211b14": false,
+    "production_weight_mutation_allowed_in_g211b14": false,
+    "persistent_storage_write_allowed_in_g211b14": false,
+    "benchmark_claim_allowed_in_g211b14": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b14": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
