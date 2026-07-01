@@ -1,0 +1,65 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B11",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B10",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B12",
+  "phase": "PhaseTensorCubeGpuRuntimeWireReview",
+  "title": "TensorCube GPU Smoke Dispatch Receipt Review Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B10_tensorcube_gpu_runtime_wire_and_smoke_dispatch_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B11_tensorcube_gpu_smoke_dispatch_receipt_review_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b11_tensorcube_gpu_smoke_dispatch_receipt_review_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b11_tensorcube_gpu_smoke_dispatch_receipt_review_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "ssot_note": "G211B11 reviews the G211B10 TensorCube GPU smoke dispatch receipts without executing a new dispatch or opening production/rollback paths.",
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B11_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B11_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b11_tensorcube_gpu_smoke_dispatch_receipt_review_gate.rs",
+      "size_bytes": 33298,
+      "sha256": "960224ea9cb0ec42f938ffeca815f11820c7818b7a0b3444dfcd0f8d331ca08a"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B11_SPEC.md",
+      "size_bytes": 14924,
+      "sha256": "9633bc389438936360a5e645740bc700df92dc3b1fd9e845f2a4c8bfe58de208"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B11_STATIC_CHECKS.json",
+      "size_bytes": 2590,
+      "sha256": "ed357c488a008027a4fe27ef99b8ad9df53a4b154eb4872c1adf790c5a4feabc"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B11_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 374,
+      "sha256": "16a289a31af1521553a74f2dc61487c58cc54fe04764b7d462bd16d6cc9a2e63"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "tensorcube_gpu_runtime_wire_receipt_load_allowed_in_g211b11": true,
+    "tensorcube_gpu_smoke_execution_receipt_load_allowed_in_g211b11": true,
+    "tensorcube_gpu_smoke_output_record_load_allowed_in_g211b11": true,
+    "tensorcube_gpu_smoke_dispatch_review_allowed_in_g211b11": true,
+    "tensorcube_gpu_route_continuity_check_allowed_in_g211b11": true,
+    "next_tensorcube_gpu_apply_entry_prepare_allowed_in_g211b11": true,
+    "new_runtime_dispatch_allowed_in_g211b11": false,
+    "rollback_anchor_allowed_in_g211b11": false,
+    "rollback_execution_allowed_in_g211b11": false,
+    "production_replacement_allowed_in_g211b11": false,
+    "production_weight_mutation_allowed_in_g211b11": false,
+    "persistent_storage_write_allowed_in_g211b11": false,
+    "benchmark_claim_allowed_in_g211b11": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b11": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
