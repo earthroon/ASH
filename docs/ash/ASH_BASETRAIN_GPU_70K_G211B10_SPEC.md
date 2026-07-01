@@ -1,0 +1,276 @@
+# ASH-BASETRAIN-GPU-70K-G211B10
+
+## TensorCube GPU Runtime Wire And Smoke Dispatch Gate
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G211B10`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G211B9`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G211B11`  
+Phase: `PhaseTensorCubeGpuRuntimeWire`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_RUNTIME_WIRE_AND_SMOKE_DISPATCH_GATE_CONNECT_ACTIVE_GPU_RUNTIME_ROUTE_TO_TENSORCUBE_GPU_EXECUTION_PATH_AND_EXECUTE_CONTROLLED_SMOKE_DISPATCH_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G211B10 consumes the passed G211B9 active GPU runtime route parity verdict state.
+
+G211B10 loads the active GPU runtime route final apply verdict.
+
+G211B10 connects the active GPU runtime route to the TensorCube GPU execution path.
+
+G211B10 binds the TensorCube GPU dispatch target to the active GPU runtime route.
+
+G211B10 enables the TensorCube GPU runtime execution surface for a controlled smoke dispatch.
+
+G211B10 executes one controlled smoke dispatch through the TensorCube GPU execution path.
+
+G211B10 creates explicit wire, dispatch target, smoke dispatch, and execution receipts.
+
+G211B10 does not create a rollback anchor, execute rollback, replace the production route, mutate production weights, rewrite checkpoints, rewrite safetensors, mutate optimizer state, mutate training weights, claim benchmark improvement, claim model improvement, claim deployment, production replacement, or TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+TensorCube GPU runtime wire != production route replacement
+TensorCube GPU execution path bind != checkpoint rewrite
+TensorCube GPU dispatch target bind != safetensors rewrite
+controlled smoke dispatch != benchmark claim
+controlled smoke dispatch != model improvement claim
+controlled smoke dispatch != deployment claim
+controlled smoke dispatch != production replacement
+controlled smoke dispatch != TensorCore hardware acceleration claim
+G211B10 opens TensorCube GPU execution path binding.
+G211B10 opens controlled smoke dispatch.
+G211B10 does not open production storage mutation.
+G211B10 does not open rollback anchor.
+```
+
+## Source Load Contract
+
+G211B10 must load and validate the G211B9 active GPU runtime route parity verdict state.
+
+Required G211B9 source artifacts:
+
+```text
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_TENSORCUBE_ACTIVE_GPU_RUNTIME_ROUTE_PARITY_VERDICT_RECEIPT.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_CPU_REFERENCE_PARITY_RESULT_LOAD_RECEIPT.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_ACTIVE_GPU_RUNTIME_ROUTE_SOURCE_CHAIN_VALIDATION_RECEIPT.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_ACTIVE_GPU_RUNTIME_ROUTE_PARITY_VERDICT_RESULT_RECORD.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_FINAL_APPLY_VERDICT_RECEIPT.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_POST_VERDICT_ROLLBACK_ANCHOR_PREP_PACKET.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_ROLLBACK_ANCHOR_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_ROLLBACK_EXECUTION_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b9/ASH_BASETRAIN_GPU_70K_G211B9_G211B10_ENTRY_PACKET.json
+artifacts/g211b9/PASS_ASH_BASETRAIN_GPU_70K_G211B9.txt
+```
+
+Required source states:
+
+```text
+source_patch_id=ASH-BASETRAIN-GPU-70K-G211B9
+source_g211b9_pass_marker_status=Present
+source_final_apply_verdict_recorded=true
+source_final_apply_verdict_status=Recorded
+source_final_apply_verdict_scope=ActiveGpuRuntimeRouteOnly
+source_final_apply_verdict_result=FinalApplyVerdictPassOrWarn
+source_g211b10_entry_packet_status=Created
+source_ready_for_g211b10=true
+```
+
+Allowed final apply verdict values for smoke dispatch:
+
+```text
+FinalApplyVerdictPass
+FinalApplyVerdictWarn
+```
+
+Rejected final apply verdict value:
+
+```text
+FinalApplyVerdictFail
+```
+
+## TensorCube GPU Runtime Wire Contract
+
+```text
+tensorcube_gpu_runtime_wire_phase_entered=true
+tensorcube_gpu_runtime_wire_executed=true
+tensorcube_gpu_runtime_wire_status=Wired
+tensorcube_gpu_runtime_wire_source=G211B9ActiveGpuRuntimeRouteFinalVerdict
+tensorcube_gpu_runtime_wire_scope=TensorCubeGpuExecutionPathOnly
+tensorcube_gpu_runtime_wire_mode=ActiveGpuRuntimeRouteToTensorCubeGpuExecutionPath
+tensorcube_gpu_runtime_wire_receipt_status=Created
+active_gpu_runtime_route_loaded=true
+active_gpu_runtime_route_load_status=Loaded
+active_gpu_runtime_route_final_verdict_loaded=true
+active_gpu_runtime_route_final_verdict_status=Recorded
+active_gpu_runtime_route_final_verdict_scope=ActiveGpuRuntimeRouteOnly
+tensorcube_gpu_execution_path_bind_executed=true
+tensorcube_gpu_execution_path_bind_status=Bound
+tensorcube_gpu_execution_path_bind_target=TensorCubeGpuExecutionPath
+active_gpu_runtime_route_connected_to_tensorcube_gpu=true
+active_gpu_runtime_route_connection_status=Connected
+```
+
+## TensorCube GPU Dispatch Target Bind Contract
+
+```text
+tensorcube_gpu_dispatch_target_bind_executed=true
+tensorcube_gpu_dispatch_target_bind_status=Bound
+tensorcube_gpu_dispatch_target_source=G211B9ActiveGpuRuntimeRouteFinalVerdict
+tensorcube_gpu_dispatch_target=TensorCubeGpuExecutionPath
+tensorcube_gpu_dispatch_target_scope=ControlledSmokeDispatchOnly
+tensorcube_gpu_runtime_surface_enabled=true
+tensorcube_gpu_runtime_surface_status=Enabled
+tensorcube_gpu_runtime_surface_scope=ControlledSmokeDispatchOnly
+tensorcube_gpu_smoke_dispatch_ready=true
+tensorcube_gpu_smoke_dispatch_ready_status=Ready
+```
+
+## Controlled Smoke Dispatch Contract
+
+```text
+tensorcube_gpu_controlled_smoke_dispatch_phase_entered=true
+tensorcube_gpu_controlled_smoke_dispatch_executed=true
+tensorcube_gpu_controlled_smoke_dispatch_status=Dispatched
+tensorcube_gpu_controlled_smoke_dispatch_source=TensorCubeGpuExecutionPath
+tensorcube_gpu_controlled_smoke_dispatch_scope=ControlledSmokeDispatchOnly
+tensorcube_gpu_controlled_smoke_dispatch_mode=SmokeOnlyNoProductionReplacement
+tensorcube_gpu_command_encoder_created=true
+tensorcube_gpu_command_encoder_submitted=true
+tensorcube_gpu_compute_dispatch_prepared=true
+tensorcube_gpu_compute_dispatch_performed=true
+tensorcube_gpu_compute_dispatch_status=PerformedInG211B10
+tensorcube_gpu_smoke_execution_receipt_created=true
+tensorcube_gpu_smoke_execution_receipt_status=Created
+tensorcube_gpu_smoke_output_recorded=true
+tensorcube_gpu_smoke_output_scope=SmokeOnly
+```
+
+## Production And Persistent Storage Boundary Contract
+
+```text
+silent_fallback_allowed=false
+silent_fallback_detected=false
+fallback_observed=false
+fallback_route_selected=false
+implicit_cpu_route_selected=false
+implicit_production_route_selected=false
+production_weight_mutation_allowed=false
+production_base_weight_mutated=false
+checkpoint_rewritten=false
+safetensors_rewritten=false
+optimizer_state_mutated=false
+training_weight_mutated=false
+production_replacement_executed=false
+production_route_replaced=false
+production_runtime_route_replaced=false
+persistent_storage_write_allowed=false
+tensorcube_gpu_runtime_wire_persistent_storage_write_enabled=false
+tensorcube_gpu_dispatch_target_persistent_storage_write_enabled=false
+tensorcube_gpu_smoke_output_persistent_storage_write_enabled=false
+tensorcube_gpu_smoke_output_production_visible=false
+```
+
+## TensorCore Claim Boundary
+
+```text
+tensorcube_gpu_execution_path_bound=true
+tensorcube_gpu_runtime_surface_enabled=true
+tensorcube_gpu_controlled_smoke_dispatch_executed=true
+tensorcore_hardware_acceleration_claimed=false
+tensorcore_hardware_path_required=false
+tensorcore_hardware_path_verified=false
+tensorcore_hardware_benchmark_claimed=false
+```
+
+## Expected Runtime Artifacts
+
+Runtime artifacts are not prebaked into this ZIP. Rust must create them locally at run time.
+
+```text
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_RUNTIME_WIRE_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_ACTIVE_GPU_RUNTIME_ROUTE_LOAD_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_EXECUTION_PATH_BIND_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_ACTIVE_GPU_ROUTE_TENSORCUBE_CONNECTION_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_DISPATCH_TARGET_BIND_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_RUNTIME_SURFACE_ENABLE_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_SMOKE_DISPATCH_READY_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_COMMAND_ENCODER_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_COMMAND_SUBMIT_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_COMPUTE_DISPATCH_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_CONTROLLED_SMOKE_DISPATCH_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_SMOKE_EXECUTION_RECEIPT.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_SMOKE_OUTPUT_RECORD.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_NO_TENSORCORE_CLAIM_SEAL.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_POST_SMOKE_ROUTE_RECEIPT_PREP_PACKET.json
+artifacts/g211b10/ASH_BASETRAIN_GPU_70K_G211B10_G211B11_ENTRY_PACKET.json
+artifacts/g211b10/PASS_ASH_BASETRAIN_GPU_70K_G211B10.txt
+```
+
+## Static Surface Requirements
+
+```text
+runtime_outputs_prebaked=0
+target_writer_json_macro_count=0
+target_writer_recursion_limit_count=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+rust_default_arg_injection_present=true
+boolean_value_flags_allowed=false
+string_mode_args_required=true
+tensorcube_gpu_runtime_wire_allowed_in_g211b10=true
+tensorcube_gpu_execution_path_bind_allowed_in_g211b10=true
+tensorcube_gpu_dispatch_target_bind_allowed_in_g211b10=true
+tensorcube_gpu_runtime_surface_enable_allowed_in_g211b10=true
+tensorcube_gpu_controlled_smoke_dispatch_allowed_in_g211b10=true
+tensorcube_gpu_smoke_execution_receipt_allowed_in_g211b10=true
+rollback_anchor_allowed_in_g211b10=false
+rollback_execution_allowed_in_g211b10=false
+production_replacement_allowed_in_g211b10=false
+production_weight_mutation_allowed_in_g211b10=false
+persistent_storage_write_allowed_in_g211b10=false
+benchmark_claim_allowed_in_g211b10=false
+tensorcore_hardware_acceleration_claim_allowed_in_g211b10=false
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+verdict=PASS_STATIC_SURFACE
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b10_tensorcube_gpu_runtime_wire_and_smoke_dispatch_gate.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b10_tensorcube_gpu_runtime_wire_and_smoke_dispatch_gate
+```
+
+## PASS Marker
+
+```text
+PASS_ASH_BASETRAIN_GPU_70K_G211B10_TENSORCUBE_GPU_RUNTIME_WIRE_AND_SMOKE_DISPATCH_GATE_CONNECT_ACTIVE_GPU_RUNTIME_ROUTE_TO_TENSORCUBE_GPU_EXECUTION_PATH_AND_EXECUTE_CONTROLLED_SMOKE_DISPATCH_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G211B11`
+
+```text
+TensorCube GPU Smoke Dispatch Receipt Review Gate /
+Review TensorCube GPU Runtime Wire Smoke Dispatch Receipt /
+No Silent Fallback No Production Weight Mutation No TensorCore Claim
+```
