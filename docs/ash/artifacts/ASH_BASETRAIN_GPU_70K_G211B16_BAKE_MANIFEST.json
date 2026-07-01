@@ -1,0 +1,87 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B16",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B15",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B17",
+  "phase": "PhaseTensorCubeGpuControlledNextApplyDispatchPrepare",
+  "title": "TensorCube GPU Controlled Next Apply Dispatch Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B15_tensorcube_gpu_controlled_next_apply_entry_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B16_tensorcube_gpu_controlled_next_apply_dispatch_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b16_tensorcube_gpu_controlled_next_apply_dispatch_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b16_tensorcube_gpu_controlled_next_apply_dispatch_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "ssot_note": "G211B16 prepares the controlled TensorCube GPU next apply dispatch plan, packet, command surface descriptor, and dispatch execution gate readiness from the open controlled entry. It does not create a real command encoder, submit a command buffer, perform compute dispatch, create a runtime execution receipt, execute apply, commit, rollback, or mutate production storage.",
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B16_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B16_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b16_tensorcube_gpu_controlled_next_apply_dispatch_gate.rs",
+      "size_bytes": 40393,
+      "sha256": "3d8ea973eef048f5c8cb9347da19b15cdd21e49dd366175a156d13dc3f1ea197"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B16_SPEC.md",
+      "size_bytes": 18891,
+      "sha256": "78b5730d9bdeeca7155defc4a2274669e2bbe160bf41ec37a9fdbd133c57c7f1"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B16_STATIC_CHECKS.json",
+      "size_bytes": 4515,
+      "sha256": "d9933e8dbc0ebb2312b6a930dc7cd2eb9ad18e1352cc90cf293cb164338c7289"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B16_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 411,
+      "sha256": "27ed8a13ef182c942a66cab34c8c8d7ba54205ecbb145d382f221e73b71a58ff"
+    }
+  ],
+  "static_checks": {
+    "patch_id": "ASH-BASETRAIN-GPU-70K-G211B16",
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "target_writer_json_macro_count": 0,
+    "target_writer_recursion_limit_count": 0,
+    "serde_json_map_import": true,
+    "json_atlas_writer": true,
+    "target_writer_ensure_macro_count": 1,
+    "rust_default_arg_injection_present": true,
+    "boolean_value_flags_allowed": false,
+    "string_mode_args_required": true,
+    "controlled_apply_entry_open_receipt_load_allowed_in_g211b16": true,
+    "controlled_apply_input_bind_receipt_load_allowed_in_g211b16": true,
+    "controlled_apply_state_receipt_load_allowed_in_g211b16": true,
+    "controlled_apply_dispatch_gate_ready_receipt_load_allowed_in_g211b16": true,
+    "controlled_tensorcube_gpu_next_apply_dispatch_prepare_allowed_in_g211b16": true,
+    "controlled_tensorcube_gpu_next_apply_dispatch_plan_prepare_allowed_in_g211b16": true,
+    "controlled_tensorcube_gpu_next_apply_dispatch_packet_prepare_allowed_in_g211b16": true,
+    "controlled_tensorcube_gpu_next_apply_command_surface_descriptor_prepare_allowed_in_g211b16": true,
+    "controlled_tensorcube_gpu_next_apply_dispatch_execution_gate_ready_record_allowed_in_g211b16": true,
+    "g211b17_entry_packet_prepare_allowed_in_g211b16": true,
+    "new_runtime_dispatch_allowed_in_g211b16": false,
+    "actual_command_encoder_creation_allowed_in_g211b16": false,
+    "actual_command_buffer_submit_allowed_in_g211b16": false,
+    "actual_compute_dispatch_allowed_in_g211b16": false,
+    "runtime_execution_receipt_creation_allowed_in_g211b16": false,
+    "controlled_tensorcube_gpu_next_apply_dispatch_execution_allowed_in_g211b16": false,
+    "controlled_tensorcube_gpu_next_apply_execution_allowed_in_g211b16": false,
+    "controlled_tensorcube_gpu_next_apply_commit_allowed_in_g211b16": false,
+    "next_tensorcube_gpu_apply_execution_allowed_in_g211b16": false,
+    "next_tensorcube_gpu_apply_commit_allowed_in_g211b16": false,
+    "rollback_anchor_allowed_in_g211b16": false,
+    "rollback_execution_allowed_in_g211b16": false,
+    "production_replacement_allowed_in_g211b16": false,
+    "production_weight_mutation_allowed_in_g211b16": false,
+    "persistent_storage_write_allowed_in_g211b16": false,
+    "benchmark_claim_allowed_in_g211b16": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b16": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
