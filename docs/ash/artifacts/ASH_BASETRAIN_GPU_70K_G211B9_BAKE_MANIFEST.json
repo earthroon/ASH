@@ -1,0 +1,64 @@
+{
+  "patch_id": "ASH-BASETRAIN-GPU-70K-G211B9",
+  "source_patch_id": "ASH-BASETRAIN-GPU-70K-G211B8",
+  "next_patch_id": "ASH-BASETRAIN-GPU-70K-G211B10",
+  "phase": "PhaseNextRouteAudit",
+  "title": "TensorCube Active GPU Runtime Route Parity Verdict Gate",
+  "bake_kind": "rust_local_artifacts_no_prebaked_runtime_outputs",
+  "base_zip": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B8_active_gpu_runtime_route_cpu_reference_parity_baked_no_artifacts_no_ps1_no_py.zip",
+  "zip_file": "ash_pass3_ASH-BASETRAIN-GPU-70K-G211B9_active_gpu_runtime_route_parity_verdict_gate_baked_no_artifacts_no_ps1_no_py.zip",
+  "runtime_binary": "ash_basetrain_gpu_70k_g211b9_active_gpu_runtime_route_parity_verdict_gate",
+  "cargo_run_command": "cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b9_active_gpu_runtime_route_parity_verdict_gate",
+  "runtime_artifacts_generated_locally_by_rust": true,
+  "runtime_artifacts_prebaked": 0,
+  "runtime_artifacts_committed": false,
+  "github_commit_scope": [
+    "docs/ash/ASH_BASETRAIN_GPU_70K_G211B9_SPEC.md",
+    "docs/ash/artifacts/ASH_BASETRAIN_GPU_70K_G211B9_BAKE_MANIFEST.json"
+  ],
+  "included_files": [
+    {
+      "path": "crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b9_active_gpu_runtime_route_parity_verdict_gate.rs",
+      "size_bytes": 23613,
+      "sha256": "bef7428dbb92bd0ad8e48a0ddc0481c25002a522d56b9c03744d0f391347d7bb"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B9_SPEC.md",
+      "size_bytes": 10301,
+      "sha256": "d48cc01035ce1e1c7e4aafbef428033535525d71bf70c1e255fb1f7114a863dc"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B9_STATIC_CHECKS.json",
+      "size_bytes": 1337,
+      "sha256": "837d974281299499fa092da3ef627d59e5f7a0f14e97e83ecb50fa33a558d5bc"
+    },
+    {
+      "path": "specs/ASH_BASETRAIN_GPU_70K_G211B9_LOCAL_BAKE_VALIDATION.json",
+      "size_bytes": 313,
+      "sha256": "73fef546bb08f4aadd37c4ab736f7a98719b334ead87cc0e82ce94da00483540"
+    }
+  ],
+  "static_checks": {
+    "verdict": "PASS_STATIC_SURFACE",
+    "runtime_outputs_prebaked": 0,
+    "cpu_reference_parity_receipt_load_allowed_in_g211b9": true,
+    "cpu_reference_parity_result_record_load_allowed_in_g211b9": true,
+    "active_gpu_runtime_route_parity_verdict_allowed_in_g211b9": true,
+    "final_apply_verdict_record_allowed_in_g211b9": true,
+    "active_gpu_runtime_route_source_chain_validation_allowed_in_g211b9": true,
+    "post_verdict_rollback_anchor_prepare_allowed_in_g211b9": true,
+    "rollback_anchor_allowed_in_g211b9": false,
+    "rollback_execution_allowed_in_g211b9": false,
+    "new_runtime_dispatch_allowed_in_g211b9": false,
+    "production_replacement_allowed_in_g211b9": false,
+    "production_weight_mutation_allowed_in_g211b9": false,
+    "persistent_storage_write_allowed_in_g211b9": false,
+    "benchmark_claim_allowed_in_g211b9": false,
+    "tensorcore_hardware_acceleration_claim_allowed_in_g211b9": false,
+    "ps1_files_included": 0,
+    "py_files_included": 0,
+    "sha256_files_included": 0,
+    "cargo_available_in_container": false,
+    "rustc_available_in_container": false
+  }
+}
