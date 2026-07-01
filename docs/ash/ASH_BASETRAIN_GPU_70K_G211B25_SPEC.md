@@ -1,0 +1,252 @@
+# ASH-BASETRAIN-GPU-70K-G211B25
+
+## TensorCube GPU Controlled Promotion Candidate Prepare Gate
+
+PatchId: `ASH-BASETRAIN-GPU-70K-G211B25`  
+SourcePatchId: `ASH-BASETRAIN-GPU-70K-G211B24`  
+NextPatchId: `ASH-BASETRAIN-GPU-70K-G211B26`  
+Phase: `PhaseTensorCubeGpuControlledPromotionCandidatePrepare`
+
+RuntimePassTarget: `PASS_ASH_BASETRAIN_GPU_70K_G211B25_TENSORCUBE_GPU_CONTROLLED_PROMOTION_CANDIDATE_PREPARE_GATE_PREPARE_CONTROLLED_PROMOTION_CANDIDATE_FROM_REVIEWED_ROLLBACK_ANCHOR_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM`
+
+## Purpose
+
+G211B25 consumes the passed G211B24 rollback anchor review state.
+
+G211B25 loads the rollback anchor prepare review record, rollback anchor descriptor review record, rollback anchor prepared state review receipt, rollback anchor source-chain review receipt, promotion candidate gate ready receipt, boundary seals, G211B25 entry packet, and PASS marker.
+
+G211B25 validates that rollback anchor prepare review passed or warned, rollback anchor descriptor review passed, rollback anchor prepared state review is descriptor-only, rollback anchor source-chain review is valid, and promotion candidate gate readiness is ready.
+
+G211B25 prepares a controlled promotion candidate descriptor/state only. It records promotion candidate prepare result, prepared state, source chain, prepare receipt, descriptor, promotion candidate review gate readiness, boundary seals, and a G211B26 entry packet.
+
+G211B25 does not review, approve, apply, or promote the promotion candidate. It does not promote controlled staging to production, replace the production route, mutate production weights, persist promotion candidate to production storage, persist rollback anchor, create snapshots, execute rollback, write persistent storage, rewrite checkpoints, rewrite safetensors, mutate optimizer/training weights, execute a new dispatch, create a new command encoder, submit a command buffer, create a runtime execution receipt, or claim TensorCore hardware acceleration.
+
+## Core Boundary
+
+```text
+controlled promotion candidate prepare != promotion candidate review
+controlled promotion candidate prepare != promotion candidate approval
+controlled promotion candidate prepare != promotion candidate apply
+controlled promotion candidate prepare != production promotion
+controlled promotion candidate prepare != production route replacement
+controlled promotion candidate prepare != production weight mutation
+controlled promotion candidate prepare != persistent storage write
+controlled promotion candidate prepare != rollback anchor persistence
+controlled promotion candidate prepare != rollback execution
+controlled promotion candidate prepare != checkpoint/safetensors snapshot creation
+controlled promotion candidate prepare != new dispatch
+controlled promotion candidate prepare != command encoder creation
+controlled promotion candidate prepare != command buffer submit
+controlled promotion candidate prepare != runtime execution receipt creation
+controlled promotion candidate prepare != TensorCore hardware acceleration claim
+```
+
+## Source Load Contract
+
+Required G211B24 source artifacts:
+
+```text
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_ROLLBACK_ANCHOR_PREPARE_REVIEW_RECORD.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_ROLLBACK_ANCHOR_DESCRIPTOR_REVIEW_RECORD.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_ROLLBACK_ANCHOR_PREPARED_STATE_REVIEW_RECEIPT.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_ROLLBACK_ANCHOR_SOURCE_CHAIN_REVIEW_RECEIPT.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_PROMOTION_CANDIDATE_GATE_READY_RECEIPT.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_PROMOTION_CANDIDATE_CREATION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_PRODUCTION_PROMOTION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_ROLLBACK_ANCHOR_PERSISTENT_WRITE_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_ROLLBACK_EXECUTION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_COMMAND_ENCODER_CREATION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_COMMAND_BUFFER_SUBMIT_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_RUNTIME_EXECUTION_RECEIPT_CREATION_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_NO_TENSORCORE_CLAIM_SEAL.json
+artifacts/g211b24/ASH_BASETRAIN_GPU_70K_G211B24_G211B25_ENTRY_PACKET.json
+artifacts/g211b24/PASS_ASH_BASETRAIN_GPU_70K_G211B24.txt
+```
+
+Required source states:
+
+```text
+source_rollback_anchor_prepare_review_result=ReviewPassOrReviewWarn
+source_rollback_anchor_descriptor_review_status=ReviewPass
+source_rollback_anchor_prepared_state_review_status=PreparedDescriptorOnly
+source_rollback_anchor_source_chain_review_status=Valid
+source_rollback_anchor_source_chain_review_route=TensorCubeGpuExecutionPath
+source_promotion_candidate_gate_ready=true
+source_promotion_candidate_gate_ready_status=Ready
+source_promotion_candidate_prepared=false
+source_promotion_candidate_created=false
+source_promotion_candidate_apply_allowed=false
+source_promotion_candidate_production_visible=false
+source_rollback_anchor_persisted=false
+source_rollback_execution_allowed=false
+source_new_compute_dispatch_performed=false
+source_new_runtime_execution_receipt_created=false
+source_production_weight_mutation_allowed=false
+source_production_replacement_executed=false
+source_persistent_storage_write_allowed=false
+source_tensorcore_hardware_acceleration_claimed=false
+source_ready_for_g211b25=true
+```
+
+## Runtime State Contract
+
+```text
+promotion_candidate_prepare_executed=true
+promotion_candidate_prepared=true
+promotion_candidate_prepare_status=Prepared
+promotion_candidate_prepare_scope=ControlledPromotionCandidatePrepareOnlyNoProductionMutationNoPersistentWrite
+promotion_candidate_prepare_mode=PreparePromotionCandidateDescriptorOnlyNoApplyNoProductionPromotion
+promotion_candidate_prepare_receipt_status=Created
+
+promotion_candidate_descriptor_created=true
+promotion_candidate_descriptor_status=Created
+promotion_candidate_descriptor_scope=DescriptorOnlyNoApplyNoProductionMutation
+promotion_candidate_descriptor_route=TensorCubeGpuExecutionPath
+promotion_candidate_descriptor_controlled_staging_state=Committed
+promotion_candidate_descriptor_anchor_prepared=true
+promotion_candidate_descriptor_anchor_persisted=false
+promotion_candidate_descriptor_production_visible=false
+promotion_candidate_descriptor_apply_enabled=false
+promotion_candidate_descriptor_production_write_enabled=false
+promotion_candidate_descriptor_persistent_storage_write_enabled=false
+promotion_candidate_descriptor_checkpoint_rewrite_enabled=false
+promotion_candidate_descriptor_safetensors_rewrite_enabled=false
+promotion_candidate_descriptor_weight_write_enabled=false
+
+promotion_candidate_prepare_result_recorded=true
+promotion_candidate_prepare_result_status=PromotionCandidatePrepared
+promotion_candidate_prepare_receipt_created=true
+promotion_candidate_prepare_receipt_status=Created
+promotion_candidate_prepared_state_recorded=true
+promotion_candidate_prepared_state=Prepared
+promotion_candidate_prepared_state_status=ReadyForPromotionCandidateReview
+promotion_candidate_source_chain_recorded=true
+promotion_candidate_source_chain_status=Valid
+promotion_candidate_source_route=TensorCubeGpuExecutionPath
+promotion_candidate_review_gate_ready=true
+promotion_candidate_review_gate_ready_status=Ready
+
+promotion_candidate_created=false
+promotion_candidate_recorded=false
+promotion_candidate_receipt_created=false
+promotion_candidate_approved=false
+promotion_candidate_applied=false
+promotion_candidate_promoted=false
+promotion_candidate_apply_allowed=false
+promotion_candidate_production_visible=false
+promotion_candidate_production_write_enabled=false
+promotion_candidate_persistent_storage_write_executed=false
+promotion_candidate_weight_write_allowed=false
+
+production_promotion_ready=false
+production_promotion_executed=false
+production_weight_mutation_allowed=false
+production_replacement_executed=false
+persistent_storage_write_allowed=false
+rollback_anchor_persisted=false
+rollback_execution_allowed=false
+new_command_encoder_created=false
+new_command_buffer_submitted=false
+new_compute_dispatch_performed=false
+new_runtime_execution_receipt_created=false
+silent_fallback_detected=false
+tensorcore_hardware_acceleration_claimed=false
+ready_for_g211b26=true
+```
+
+## Expected Runtime Artifacts
+
+Runtime artifacts are not prebaked into this ZIP. Rust must create them locally at run time.
+
+```text
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_PREPARE_RECEIPT.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_DESCRIPTOR.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_PREPARE_RESULT_RECORD.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_PREPARED_STATE_RECEIPT.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_SOURCE_CHAIN_RECEIPT.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_PROMOTION_CANDIDATE_REVIEW_GATE_READY_RECEIPT.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_PROMOTION_CANDIDATE_APPLY_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_PRODUCTION_PROMOTION_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_PRODUCTION_REPLACEMENT_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_PRODUCTION_WEIGHT_MUTATION_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_PERSISTENT_STORAGE_WRITE_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_ROLLBACK_ANCHOR_PERSISTENT_WRITE_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_ROLLBACK_EXECUTION_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_NEW_DISPATCH_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_COMMAND_ENCODER_CREATION_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_COMMAND_BUFFER_SUBMIT_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_RUNTIME_EXECUTION_RECEIPT_CREATION_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_SILENT_FALLBACK_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_NO_TENSORCORE_CLAIM_SEAL.json
+artifacts/g211b25/ASH_BASETRAIN_GPU_70K_G211B25_G211B26_ENTRY_PACKET.json
+artifacts/g211b25/PASS_ASH_BASETRAIN_GPU_70K_G211B25.txt
+```
+
+## Static Surface Requirements
+
+```text
+runtime_outputs_prebaked=0
+serde_json_map_import=true
+json_atlas_writer=true
+target_writer_ensure_macro_count=1
+rust_default_arg_injection_present=true
+promotion_candidate_prepare_allowed_in_g211b25=true
+promotion_candidate_descriptor_create_allowed_in_g211b25=true
+promotion_candidate_prepare_result_record_allowed_in_g211b25=true
+promotion_candidate_prepare_receipt_record_allowed_in_g211b25=true
+promotion_candidate_prepared_state_record_allowed_in_g211b25=true
+promotion_candidate_source_chain_record_allowed_in_g211b25=true
+promotion_candidate_review_gate_ready_record_allowed_in_g211b25=true
+g211b26_entry_packet_prepare_allowed_in_g211b25=true
+promotion_candidate_review_allowed_in_g211b25=false
+promotion_candidate_approval_allowed_in_g211b25=false
+promotion_candidate_apply_allowed_in_g211b25=false
+production_promotion_allowed_in_g211b25=false
+production_replacement_allowed_in_g211b25=false
+production_weight_mutation_allowed_in_g211b25=false
+persistent_storage_write_allowed_in_g211b25=false
+new_runtime_dispatch_allowed_in_g211b25=false
+actual_command_encoder_creation_allowed_in_g211b25=false
+actual_command_buffer_submit_allowed_in_g211b25=false
+actual_compute_dispatch_allowed_in_g211b25=false
+runtime_execution_receipt_creation_allowed_in_g211b25=false
+benchmark_claim_allowed_in_g211b25=false
+tensorcore_hardware_acceleration_claim_allowed_in_g211b25=false
+ps1_files_included=0
+py_files_included=0
+sha256_files_included=0
+verdict=PASS_STATIC_SURFACE
+```
+
+## Runtime
+
+```text
+crates/base_train/src/bin/ash_basetrain_gpu_70k_g211b25_tensorcube_gpu_controlled_promotion_candidate_prepare_gate.rs
+```
+
+## Cargo Run Command
+
+```bash
+cargo run -p base_train --bin ash_basetrain_gpu_70k_g211b25_tensorcube_gpu_controlled_promotion_candidate_prepare_gate
+```
+
+## PASS Marker
+
+```text
+PASS_ASH_BASETRAIN_GPU_70K_G211B25_TENSORCUBE_GPU_CONTROLLED_PROMOTION_CANDIDATE_PREPARE_GATE_PREPARE_CONTROLLED_PROMOTION_CANDIDATE_FROM_REVIEWED_ROLLBACK_ANCHOR_NO_SILENT_FALLBACK_NO_PRODUCTION_WEIGHT_MUTATION_NO_TENSORCORE_CLAIM
+```
+
+## Next Patch
+
+`ASH-BASETRAIN-GPU-70K-G211B26`
+
+```text
+TensorCube GPU Controlled Promotion Candidate Review Gate /
+Review Prepared Controlled Promotion Candidate Before Production Promotion Gate /
+No Silent Fallback No Production Weight Mutation No TensorCore Claim
+```
