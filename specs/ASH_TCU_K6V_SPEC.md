@@ -1,6 +1,6 @@
 # ASH TCU K6V
 
-Canary hold monitor with deterministic random f32 dynamic range replay after K6U.
+Canary random f32 monitor after K6U.
 
 Required K6U PASS with current-device canary hold and random f32 fixture policy valid.
 
