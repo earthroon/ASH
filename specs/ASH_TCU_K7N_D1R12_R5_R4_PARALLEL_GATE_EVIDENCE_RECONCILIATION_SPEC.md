@@ -1,0 +1,179 @@
+# ASH-TCU-K7N-D1R12-R5-R4 SPEC
+
+## Parallel Gate Evidence Reconciliation
+
+## 1. Patch Identity
+
+```text
+ASH-TCU-K7N-D1R12-R5-R4_PARALLEL_GATE_EVIDENCE_RECONCILIATION
+```
+
+PASS marker:
+
+```text
+PASS_ASH_TCU_K7N_D1R12_R5_R4_PARALLEL_GATE_EVIDENCE_RECONCILIATION_BRANCHES_BOUND_POLICY_RECOMMENDATION_SEALED
+```
+
+HOLD marker:
+
+```text
+HOLD_ASH_TCU_K7N_D1R12_R5_R4_PARALLEL_GATE_EVIDENCE_RECONCILIATION_REQUIRED_BRANCH_INCOMPLETE
+```
+
+Failure marker:
+
+```text
+FAIL_ASH_TCU_K7N_D1R12_R5_R4_PARALLEL_GATE_EVIDENCE_RECONCILIATION_PARENT_EVIDENCE_OR_PROTECTED_STATE_VIOLATION
+```
+
+GitHub path:
+
+```text
+specs/ASH_TCU_K7N_D1R12_R5_R4_PARALLEL_GATE_EVIDENCE_RECONCILIATION_SPEC.md
+```
+
+## 2. Purpose
+
+Reconcile the completed S13 persistence branch with a completed S05 affected-share audit and select exactly one non-committing repair recommendation. R5-R4 performs no replay and does not mutate route or bucket classifications.
+
+## 3. Required Parents
+
+R5-R2 semantic parent:
+
+```text
+execution_id=d1r12-r5-r2-c3396b7fd36a7f5b0a1e
+selected_outcome=semantic_repair_completed
+```
+
+R5-R3B S13 persistence parent:
+
+```text
+execution_id=d1r12-r5-r3b-e6d3724554de93dc66a0
+selected_outcome=cold_start_only_transient
+cold_start_authoritative_red=true
+warm_steady_authoritative_red=false
+isolated_queue_authoritative_red=false
+nominal_contention_authoritative_red=false
+control_authoritative_red_count=0
+order_effect_detected=false
+queue_causality=insufficient_evidence
+cross_shape_fallback_used=false
+```
+
+R5-R3A S05 branch is mandatory but is not yet bound. The R5-R4 binary must require an explicit R5-R3A execution ID and selected outcome. It must never infer the branch from latest files alone.
+
+## 4. S13 Reconciliation
+
+Required normalized state:
+
+```text
+s13_reconciliation_state=cold_start_only_transient
+s13_runtime_persistence_status=not_persistent_in_production_relevant_cohorts
+s13_current_route_authority_support=insufficient_for_persistent_route_hold
+s13_recommended_evidence_disposition=retain_as_cold_start_diagnostic
+s13_recommended_route_disposition=remove_single_red_persistent_hold_authority
+s13_control_causal_resolution=shape_local_proximal_not_single_axis
+```
+
+The proximal controls are same-route and same-shape, but have Hamming distance 2. They support broad shape-local spillover checks, not single-axis causal claims.
+
+## 5. S05 Required Normalized States
+
+Exactly one:
+
+```text
+persistent_independent_affected_share_regression
+persistent_non_independent_red_evidence
+affected_share_aggregation_overreach
+historical_s05_red_not_reproduced
+s05_control_spillover
+s05_measurement_indeterminate
+```
+
+## 6. Reconciliation Outcomes
+
+Exactly one:
+
+```text
+s13_policy_overauthority_only
+s05_and_s13_authority_qualification_required
+dual_policy_overauthority_confirmed
+both_route_holds_lack_persistent_support
+s05_measurement_surface_contaminated
+required_branch_indeterminate
+required_branch_incomplete
+parent_evidence_mismatch
+protected_state_violation
+```
+
+## 7. Recommended Next Patches
+
+R5-R4 may select one draft target only:
+
+```text
+ASH-TCU-K7N-D1R12-R5-R5A_S13_SINGLE_RED_PERSISTENCE_QUALIFICATION_POLICY_REPAIR
+ASH-TCU-K7N-D1R12-R5-R5B_S05_AFFECTED_SHARE_AND_S13_SINGLE_RED_AUTHORITY_QUALIFICATION_REPAIR
+ASH-TCU-K7N-D1R12-R5-R5C_AFFECTED_SHARE_AGGREGATION_AND_SINGLE_RED_AUTHORITY_REPAIR
+ASH-TCU-K7N-D1R12-R5-R5D_STALE_ROUTE_HOLD_RETIREMENT_AND_DIAGNOSTIC_RETENTION
+ASH-TCU-K7N-D1R12-R5-R5E_S05_MEASUREMENT_PROTOCOL_AND_CONTROL_SURFACE_REPAIR
+```
+
+No next patch may be selected while R5-R3A is incomplete or indeterminate.
+
+## 8. Preservation Contract
+
+Required:
+
+```text
+route_classification_change_count=0
+bucket_classification_change_count=0
+policy_mutation_count=0
+threshold_mutation_count=0
+replay_execution_count=0
+parent_artifact_rewrite_count=0
+output_authority=burn
+runtime_output_changed=false
+```
+
+## 9. Required Implementation Files
+
+```text
+crates/burn_webgpu_backend/src/tensorcube_k7n_d1r12_r5_r4_parallel_gate_evidence_reconciliation.rs
+crates/model_core/src/vocab_atlas_shadow_parallel_gate_evidence_reconciliation_contract.rs
+crates/orchestrator_local/src/ash_tcu_k7n_d1r12_r5_r4_parallel_gate_evidence_reconciliation_report.rs
+crates/orchestrator_local/src/bin/ash_tcu_k7n_d1r12_r5_r4_parallel_gate_evidence_reconciliation.rs
+crates/burn_webgpu_backend/src/lib.rs
+crates/model_core/src/lib.rs
+crates/orchestrator_local/Cargo.toml
+```
+
+Normal crate exports are required. Direct source inclusion through `#[path = "..."]` is forbidden.
+
+## 10. Required Artifacts
+
+```text
+parent_reconciliation
+branch_binding_receipt
+s05_branch_summary
+s13_branch_summary
+production_relevance_constitution
+control_quality_boundary
+parallel_gate_matrix
+route_authority_recommendations
+next_patch_selection
+classification_preservation_audit
+determinism_audit
+protected_state_guard
+report
+verdict
+final_seal
+local_manifest
+```
+
+All artifacts must be generated by the local Rust binary.
+
+## 11. PASS Meaning
+
+PASS means both branches were explicitly bound, their evidence was reconciled under one production-relevance constitution, and one non-committing next repair recommendation was selected while all parent classifications and policies remained unchanged.
+
+PASS does not mean either route classification has already changed, the cold-start issue is repaired, TensorCube is promoted, or production readiness is established.
