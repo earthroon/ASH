@@ -1,0 +1,10 @@
+# ASH-TCU-DECODE-04-R2 SPEC
+
+## FINAL_PROJECTION_INPUT_ORIGIN_DIAGNOSTIC
+
+```text
+patch_id=ASH-TCU-DECODE-04-R2_FINAL_PROJECTION_INPUT_ORIGIN_DIAGNOSTIC
+parent_patch=ASH-TCU-DECODE-04-R1_LIVE_PROJECTION_INPUT_AND_RUNTIME_RHS_NONDEGENERACY_DIAGNOSTIC
+parent_code_hotfix=ASH-TCU-DECODE-04-R1-R1_CRATE_ROOT_NATIVE_API_COMPILE_CLOSURE
+parent_package=ash_pass3_ASH-TCU-DECODE-04-R1-R1_crate_root_native_api_compile_closure_code_baked_no_spec_no_docs_no_runtime_artifacts_no_sha.zip
+parent_package_sha256
