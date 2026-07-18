@@ -1,0 +1,7 @@
+# ASH-TCU-DECODE-04-R4-R2-R2
+# Live DecodeState / KV Boundary Snapshot Parity and No-Production-Handle Truth Gate
+
+- Patch ID: `ASH-TCU-DECODE-04-R4-R2-R2_LIVE_DECODESTATE_KV_BOUNDARY_SNAPSHOT_PARITY_AND_NO_PRODUCTION_HANDLE_TRUTH_GATE`
+- Parent gate: `ASH-TCU-DECODE-04-R4-R2-R1_PARENT_ARTIFACT_LINEAGE_SURFACE_DIGEST_TOKENIZER_IDENTITY_TRUTH_REPAIR_GATE`
+- Runtime mode: `live_boundary_observe_only`
+- Production
