@@ -2,7 +2,7 @@
 
 ## RGBA Texture GQA4 Parallel Cluster Kernel / Shared KV Tile Population / Four Query-Head Concurrent Consumption / Kernel-Only Numerical and Structural Validation Seal
 
-## 0. State
+## 0. Document state
 
 ```text
 SPEC_ID=ASH-ATTN-HEADWISE-CAUSAL-01B-R12-R3-R3-R3-R2-R7-R2D
@@ -18,17 +18,32 @@ PERFORMANCE_PROMOTION=forbidden
 PREBAKED_RUNTIME_EVIDENCE=forbidden
 ```
 
-R7-R2D introduces a kernel-only shadow candidate in which one workgroup executes four query heads sharing one KV head. Immutable RGBA4 K/V texture tiles are loaded once into workgroup memory and consumed by all four query heads. This revision validates structure and numerical correctness only. It does not promote a production texture route or claim performance superiority.
+R7-R2D introduces a kernel-only shadow candidate in which one workgroup executes four query heads that share one KV head. Immutable RGBA4 K/V texture tiles are loaded once into workgroup memory and consumed by all four query heads. This revision validates structure and numerical correctness only. It does not promote a production texture route or claim performance superiority.
 
-## 1. Parent authority
+## 1. Parent requirements
 
-The promoted R7-R2C artifact and manifest must seal buffer-Q plus immutable texture-KV binding, query-head to KV-head mapping, logical-page to physical-page mapping, exact integer `textureLoad`, raw K/V parity, attention parity, page-generation lock, payload-readback zero, shadow isolation, and unchanged production path.
+R7-R2D requires the promoted R7-R2C artifact and manifest. The parent must seal:
 
-R7-R2D must not create another Device, Queue, dispatcher, route authority, output ABI authority, texture residency owner, page-table owner, or GQA mapping authority.
+```text
+buffer-Q and immutable texture-KV binding
+query-head to KV-head coordinate authority
+logical-page to physical-page mapping
+exact integer textureLoad
+raw K/V parity
+attention parity
+page-generation lock
+payload readback zero
+shadow isolation
+active path unchanged
+```
 
-## 2. GQA4 meaning
+R7-R2D must not create a second Device, Queue, dispatcher, route authority, output ABI authority, residency owner, page-table owner, or GQA mapping authority.
+
+## 2. GQA4 definition
 
 `GQA4` means four query heads per cluster sharing one KV head. It does not mean that the model has four KV heads.
+
+Canonical model:
 
 ```text
 q_heads=32
@@ -36,6 +51,7 @@ kv_heads=4
 query_heads_per_kv=8
 query_heads_per_cluster=4
 clusters_per_kv_head=2
+total_clusters=8 per query position
 ```
 
 Required:
@@ -46,7 +62,7 @@ query_heads_per_cluster=4
 clusters_per_kv_head=2
 ```
 
-## 3. Revisions
+## 3. Component revisions
 
 ```text
 backend_abi_revision=ASH-ATTN-HEADWISE-CAUSAL-01B-R12-R3-R3-R3-R2-R7
@@ -61,27 +77,31 @@ cli_contract_revision=ASH-ATTN-HEADWISE-CAUSAL-01B-R12-R3-R3-R3-R2-R7-R2D
 
 Cross-component revision equality is forbidden.
 
-## 4. Dispatch and subgroup topology
+## 4. Dispatch topology
+
+Canonical dispatch:
 
 ```text
 dispatch.x=seq_q
 dispatch.y=kv_head_count
 dispatch.z=clusters_per_kv_head
-workgroup_size=(32,4,1)
+workgroup_size=(128,1,1)
 workgroup_invocations=128
 ```
 
-Coordinate authority:
+Coordinates:
 
 ```text
 q_position=workgroup_id.x
 kv_head=workgroup_id.y
 cluster_index=workgroup_id.z
 query_head_base=kv_head*query_heads_per_kv+cluster_index*4
-query_head=query_head_base+local_invocation_id.y
+query_head_lane=local_invocation_index/32
+token_lane=local_invocation_index%32
+query_head=query_head_base+query_head_lane
 ```
 
-Canonical clusters:
+The eight canonical clusters are:
 
 ```text
 KV0: Q0..3, Q4..7
@@ -90,18 +110,24 @@ KV2: Q16..19, Q20..23
 KV3: Q24..27, Q28..31
 ```
 
-The adapter must expose subgroup size 32. Four subgroups map exactly to four query-head lanes:
+No query head may be missing, duplicated, or assigned across a KV-head boundary.
+
+## 5. Subgroup topology
+
+The canonical adapter must expose subgroup size 32. The workgroup must contain four subgroups, with each subgroup mapped to one query-head lane:
 
 ```text
 subgroup_size=32
 subgroup_count=4
-subgroup_id=local_invocation_id.y
-subgroup_invocation_id=local_invocation_id.x
+subgroup_id=local_invocation_index/32
+subgroup_invocation_id=local_invocation_index%32
 ```
 
-This mapping must be verified by an executed compact GPU topology probe. It must not be inferred from the workgroup declaration. Mismatch causes HOLD without scalar fallback.
+This mapping must be verified by an executed compact GPU topology probe. It must not be inferred solely from the declared workgroup size. Subgroup mismatch causes HOLD without scalar fallback.
 
-## 5. Tile and shared-memory layout
+wgpu 26 / Naga rejects `subgroup_id` and `subgroup_invocation_id` on multidimensional workgroups. Therefore the physical WGSL declaration must be `@workgroup_size(128,1,1)`. The logical 32-by-4 topology is preserved by `local_invocation_index / 32` and `local_invocation_index % 32`, and the runtime probe must verify that the actual subgroup partition matches this decomposition.
+
+## 6. Token and dimension tiles
 
 ```text
 token_tile_size=32
@@ -111,27 +137,40 @@ page_tokens=128
 tiles_per_page=4
 ```
 
-Canonical workgroup storage:
+A canonical tile must not cross a physical texture-page boundary.
+
+## 7. Workgroup memory
+
+Canonical shared allocations:
 
 ```text
-shared_q=4*16 vec4<f32>=1024 bytes
-shared_kv_tile=32*16 vec4<f32>=8192 bytes
-shared_tile_weight=4*32 f32=512 bytes
-shared reduction state=64 bytes
-shared physical-page table=48 bytes
-declared total=9840 bytes
-hard budget=12288 bytes
+shared_q: 4*16 vec4<f32> = 1024 bytes
+shared_kv_tile: 32*16 vec4<f32> = 8192 bytes
+shared_tile_weight: 4*32 f32 = 512 bytes
+shared running/tile scalar state = 64 bytes
+shared physical-page tile table = 48 bytes
+canonical declared total = 9840 bytes
+hard budget = 12288 bytes
 ```
 
-K and V must time-share one `shared_kv_tile`. Simultaneous full-size K and V arrays are forbidden. Runtime must verify that declared bytes fit both the fixed budget and the device limit. Silent reduced-tile fallback is forbidden.
+K and V use one phase-reused `shared_kv_tile` allocation. Simultaneous full-size K and V shared arrays are forbidden.
 
-## 6. Shared K/V population and accounting
-
-For one cluster tile:
+The runtime must verify:
 
 ```text
-physical K loads=active_tokens*dimension_groups
-physical V loads=active_tokens*dimension_groups
+declared_workgroup_storage_bytes <= 12288
+declared_workgroup_storage_bytes <= device max_compute_workgroup_storage_size
+```
+
+No silent reduced-tile fallback is allowed.
+
+## 8. Shared K/V population
+
+For each cluster tile:
+
+```text
+physical K texture loads=active_tokens*dimension_groups
+physical V texture loads=active_tokens*dimension_groups
 logical K reads=physical K loads*4
 logical V reads=physical V loads*4
 K reuse factor=4
@@ -141,9 +180,9 @@ V reuse factor=4
 For a full tile:
 
 ```text
-K textureLoad count=512 vec4
-V textureLoad count=512 vec4
-naive four-head count=2048 vec4
+K textureLoad count=32*16=512 vec4
+V textureLoad count=32*16=512 vec4
+naive per-query-head count=2048 vec4
 ```
 
 Required zero counters:
@@ -157,21 +196,55 @@ shared_entry_unowned_count
 shared_overwrite_before_consume_count
 ```
 
-One physical-page LUT lookup is allowed per cluster tile. Query heads must not perform independent page-table lookups.
+## 9. Page lookup authority
 
-K/V payload access remains exact integer `textureLoad` with mip zero. Samplers, normalized coordinates, filtering, nonzero mip levels, sRGB formats, and `textureSample` are forbidden.
+A cluster performs one physical-page LUT lookup per logical token tile and stores it in shared workgroup state. Query heads must not perform independent page-table lookups.
 
-## 7. Q, score, softmax, and V phases
+Canonical coordinate chain remains:
 
-Q remains a same-device storage buffer. One cluster loads exactly 64 Q vec4 values.
+```text
+kv_position -> logical_page -> physical_page -> array_layer -> integer texel
+```
 
-Each subgroup lane owns one token for one query head and computes the 64-dimensional score in ascending scalar FMA order. Q identity, shared K identity, per-token score, causal visibility, and tile maximum require bitwise identity with the R7-R2C reference.
+K/V payload access must remain exact integer `textureLoad` with mip zero. Samplers, normalized coordinates, filtering, nonzero mip levels, sRGB formats, and `textureSample` are forbidden.
 
-Causal visibility:
+## 10. Q population
+
+Q remains a same-device storage buffer. One cluster loads:
+
+```text
+4 query heads * 16 dimension groups = 64 vec4
+```
+
+Q texture conversion or per-token Q reload is forbidden.
+
+## 11. Score phase
+
+Each subgroup lane owns one token for one query head. It computes the 64-dimensional score in exact ascending scalar order, preserving the R7-R2C FMA order:
+
+```text
+dimension 0 -> 1 -> ... -> 63
+```
+
+Required exact surfaces:
+
+```text
+Q value identity
+shared K value identity
+per-token score bitwise identity
+causal visibility identity
+tile maximum bitwise identity
+```
+
+## 12. Causal visibility
 
 ```text
 visible_kv_count=seq_kv-seq_q+query_position+1
 ```
+
+Invisible lanes write the canonical negative maximum score and contribute zero probability. Partial visible tiles are allowed; partial texture pages are not.
+
+## 13. Subgroup and online tiled softmax
 
 Each subgroup independently performs:
 
@@ -180,7 +253,7 @@ tile_max=subgroupMax(score)
 tile_sum=subgroupAdd(exp(score-tile_max))
 ```
 
-Running denominator state:
+Per-query-head running state:
 
 ```text
 Mnew=max(M,Mt)
@@ -189,27 +262,55 @@ tile_scale=exp(Mt-Mnew)
 Lnew=L*previous_scale+Lt*tile_scale
 ```
 
-After K consumption, the same shared allocation is repopulated from V texture. One invocation owns one output vec4. Output multi-writer, unowned output, out-of-range write, and candidate-kernel global atomics are forbidden.
+No reduction may mix values from different query heads.
 
-## 8. Barrier contract
+## 14. V phase and output ownership
 
-All workgroup barriers must be in uniform control flow. Required synchronization covers initial Q/page publication, K population, K consumer completion, probability publication, V population, and V consumer completion.
+After score consumption, the same shared KV allocation is repopulated from V texture. Output owners are defined by the linear topology:
+
+```text
+token_lane=local_invocation_index%32
+token_lane<16
+one owner per output vec4
+```
+
+Each output component accumulates tokens in ascending KV-position order. Required zero counters:
+
+```text
+output_multi_writer_count
+output_unowned_count
+output_out_of_range_write_count
+global_atomic_count in candidate kernel
+```
+
+## 15. Barrier contract
+
+All workgroup barriers must be in uniform control flow. Canonical synchronization includes:
+
+```text
+initial Q/page-table publication barrier
+K population barrier per tile
+K consume/online-state completion barrier per tile
+probability publication barrier
+V population barrier per tile
+V consumer completion barrier per tile
+```
 
 Forbidden:
 
 ```text
 divergent barrier
-lane-local return before barrier
-causal branch around barrier
+lane-local return before a barrier
+causal branch around a barrier
 shared overwrite before all consumers finish
 ```
 
-## 9. Reference and numerical policy
+## 16. Reference and candidate
 
 Reference:
 
 ```text
-R7-R2C operation-order-preserving buffer K/V attention
+R7-R2C operation-order-preserving buffer K/V attention reference
 ```
 
 Candidate:
@@ -217,11 +318,15 @@ Candidate:
 ```text
 buffer Q
 immutable texture K/V
-phase-reused shared KV tile
+shared phase-reused KV tile
 four-query-head cluster execution
 subgroup tile reductions
 online tiled denominator
 ```
+
+Both use the same Device, Queue, Q values, K/V logical values, page generation, scale, causal policy, and output shape.
+
+## 17. Numerical policy
 
 Bitwise exact:
 
@@ -259,7 +364,7 @@ non-finite count=0
 
 Tolerance widening after observing results, vendor-specific silent tolerance, sample filtering, NaN removal, and outlier deletion are forbidden.
 
-## 10. Validation matrix
+## 18. Validation matrix
 
 ```text
 batch=1
@@ -274,9 +379,38 @@ seq_q/seq_kv:
 8/384
 ```
 
-All eight clusters and all query positions must execute. Boundary coverage includes tokens 0, 1, 30, 31, 32, 33, 126, 127, 128, 129, 254, 255, 256, 257, 382, and 383. For `seq_q=8, seq_kv=384`, visible counts 377 through 384 must all be validated.
+All eight clusters and all query positions must execute. Page and tile boundary coverage includes:
 
-## 11. Readback and isolation
+```text
+0,1,30,31,32,33,126,127,128,129,254,255,256,257,382,383
+```
+
+For `seq_q=8, seq_kv=384`, visible counts 377 through 384 must all be validated.
+
+## 19. Structural accounting
+
+Rust artifacts must distinguish logical and physical operations and record:
+
+```text
+workgroup and subgroup topology
+cluster width and cluster count
+token tile size
+workgroup storage bytes
+Q buffer vec4 loads
+K/V physical texture loads
+K/V logical reads
+K/V reuse factors
+page-table lookups
+barrier executions
+output vec4 writes
+query-head-specific load counts
+cross-KV cluster count
+candidate global atomic count
+```
+
+Constant-only or fabricated accounting digests are forbidden.
+
+## 20. GPU readback policy
 
 Allowed CPU readback:
 
@@ -300,9 +434,34 @@ output tensor
 shared-memory dump
 ```
 
-Allowed consumers are the GQA4 shadow kernel, topology probe, numerical comparator, and fault-injection validation path. Production attention, guard, O-projection, residual, decode output, route probes, and performance-route activation are forbidden. Candidate output commit and production consumer counts must be zero.
+## 21. Kernel-only isolation
 
-## 12. CLI extension
+Allowed consumers:
+
+```text
+GQA4 shadow cluster kernel
+GQA4 subgroup topology probe
+GQA4 numerical comparator
+fault-injection validation path
+```
+
+Forbidden consumers:
+
+```text
+production attention
+production guard
+O-projection
+residual
+decode output
+route probe
+performance route candidate
+```
+
+Candidate output commit count and production consumer count must be zero.
+
+## 22. CLI extension
+
+Policies:
 
 ```text
 --gqa4-cluster-policy four-query-heads-one-kv-head-v1
@@ -352,17 +511,36 @@ Required booleans:
 --require-gqa4-first-fault-capture true
 ```
 
-Unknown, duplicate, missing, token-adhered, silently defaulted, and last-write-wins keys remain forbidden.
+Unknown, duplicate, missing, token-adhered, silently defaulted, or last-write-wins CLI keys remain forbidden.
 
-## 13. Negative controls and Rust evidence
+## 23. Negative controls
 
-At least 120 executed controls are required, ten each for cluster ownership, subgroup topology, shared K tile, shared V tile, barrier safety, page/texture access, score/softmax, output, workgroup memory, readback/isolation, active path, and operation accounting.
+At least 120 executed controls are required, ten each for:
+
+```text
+CLU cluster ownership
+SUB subgroup topology
+SKT shared K tile
+SVT shared V tile
+BAR barrier safety
+PAG page and texture access
+NUM score and softmax
+OUT output ownership and envelope
+MEM workgroup memory
+ISO readback and isolation
+ACT active path
+ACC operation accounting
+```
+
+Expected count is derived from the registry.
+
+## 24. Runtime outputs
 
 Rust emits parent binding, cluster topology, subgroup topology, structural receipts, numerical receipts, workgroup-memory receipt, texture-fetch receipt, readback-zero receipt, shadow-isolation receipt, active-path snapshots, negative-control outcomes, CLI receipts, runtime artifact, local manifest, and verdict.
 
 The code ZIP must not contain specs, scripts, manifests, artifacts, receipts, verdicts, runtime JSON, PowerShell, batch files, or run-command files.
 
-## 14. PASS
+## 25. PASS requirements
 
 ```text
 R7-R2C parent binding pass
@@ -393,7 +571,9 @@ all negative controls pass
 Rust artifact and manifest emitted
 ```
 
-Success verdict:
+## 26. Verdicts
+
+Success:
 
 ```text
 PROMOTE_ASH_ATTN_HEADWISE_CAUSAL_01B_R12_R3_R3_R3_R2_R7_R2D_RGBA_TEXTURE_GQA4_PARALLEL_CLUSTER_KERNEL_NUMERICAL_AND_STRUCTURAL_VALIDATION_SEALED
@@ -411,13 +591,15 @@ HOLD_..._R7_R2D_TILED_SOFTMAX_OR_OUTPUT_NUMERICAL_ENVELOPE_EXCEEDED
 HOLD_..._R7_R2D_GQA4_CLUSTER_KERNEL_ESCAPED_INTO_PRODUCTION_PATH
 ```
 
-## 15. Fail-closed, rollback, next revision
+## 27. Fail-closed rules
 
-The gate must not silently fall back to scalar or single-head execution after subgroup or cluster failure, reload K/V per query head after shared-memory failure, widen numerical tolerances, remove NaN or outlier samples, perform CPU tensor parity, or commit candidate output to production.
+The gate must not silently fall back to a scalar or single-head kernel after subgroup or cluster failure, reload K/V per query head after shared-memory failure, widen numerical tolerances, remove NaN or outlier samples, perform CPU tensor parity, or commit the candidate output to production.
 
-Rollback removes the R7-R2D shader, topology probe, numerical comparator, shadow scratch, CLI extension, and R7-R2D evidence while preserving R7-R2B residency, R7-R2C hybrid binding and reference, and the active production buffer route.
+## 28. Rollback
 
-Next revision:
+Rollback removes the GQA4 shader, topology probe, numerical comparator, shadow scratch, CLI extension, and R7-R2D evidence while preserving R7-R2B residency, R7-R2C hybrid binding and parity reference, and the active production buffer route.
+
+## 29. Next revision
 
 ```text
 ASH-ATTN-HEADWISE-CAUSAL-01B-R12-R3-R3-R3-R2-R7-R2E
@@ -426,3 +608,7 @@ Shared Texture-Load Reuse Performance Receipt /
 Paired GPU Timestamp Atlas /
 Kernel-Only Non-Inferiority and Candidate Eligibility Seal
 ```
+
+## 30. Final seal statement
+
+A single linear 128-invocation workgroup executed four query heads sharing one KV head. Four subgroup-32 domains owned four independent query heads. Each immutable K and V RGBA tile was loaded exactly once per cluster tile into one phase-reused workgroup allocation and consumed by all four query heads. No query-head-specific K/V reload, cross-KV cluster, duplicate ownership, candidate global atomic, divergent barrier, tensor payload readback, production consumer, or output commit was observed. Scores and tile maxima remained bitwise identical to the R7-R2C reference, and tiled-softmax and output surfaces remained within the fixed R7-R2D numerical envelope. The candidate remained kernel-only and did not alter the active production route.
