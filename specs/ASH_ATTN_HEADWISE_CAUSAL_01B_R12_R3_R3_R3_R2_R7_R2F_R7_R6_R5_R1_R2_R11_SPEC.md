@@ -22,13 +22,13 @@ CHILD_FEATURE_MASK=0x000000000000003f
 PREPARED_GENERATION=35
 COMMITTED_GENERATION=36
 
-IMPLEMENTATION_REVISION=R2-R11-stage6-multi-k-panel-ordered-accumulation-v1
+IMPLEMENTATION_REVISION=R2-R11-R2-child-artifact-list-ssot-v1
 CLI_EXTENSION_KEYS=122
 CANONICAL_REGISTRY_KEYS=1744
 CANONICAL_RESPONSE_FILE_LINES=3488
 ATLAS_GROUPS=29
 NEGATIVE_CONTROLS=720
-CHILD_ARTIFACTS=32
+CHILD_ARTIFACTS=33
 DEFAULT_VERDICT=HOLD
 ```
 
@@ -63,6 +63,7 @@ PhysicalTileAddressState owner=R2-R10 mutable_by_R2_R11=false
 PanelScheduleState owner=R2-R11
 AccumulatorLifetimeState owner=R2-R11
 FinalWriteOwnershipState owner=R2-R11
+ChildArtifactListState owner=R2-R11 canonical ordered suffix list
 StagePointerState owner=TensorCube registry Stage5 -> Stage6 CAS
 KVOwnershipState owner=inherited registry, Stage6 write lease=none
 ScientificEvidenceState owner=R1-R2 mutable_by_R2_R11=false
@@ -103,11 +104,9 @@ for panel in 0..7:
     acc = acc + panel_acc
 ```
 
-The Stage5-layout-derived GPU oracle uses the same panel-local FMA grouping and the same ordered panel addition. No numerical tolerance is allowed.
+The Stage5-layout-derived GPU oracle uses the same panel-local FMA grouping and ordered panel addition. No numerical tolerance is allowed.
 
 ## 4. Subgroup32 quadrant topology
-
-A new 128-thread multi-subgroup assumption is forbidden. The sealed Stage3 topology is inherited:
 
 ```text
 logical tiles=128
@@ -120,7 +119,7 @@ subgroups per workgroup=1
 panel iterations=4096
 ```
 
-Each logical 16×16 tile is produced by four disjoint exact-subgroup32 quadrant workgroups. Quadrant output address ranges may not overlap.
+A new 128-thread multi-subgroup assumption is forbidden. Each logical 16×16 tile is produced by four disjoint exact-subgroup32 quadrant workgroups.
 
 ## 5. Private accumulator persistence
 
@@ -131,7 +130,7 @@ acc_low
 acc_high
 ```
 
-They are initialized exactly once before the panel loop, persist across all eight panels, and are consumed only by terminal packing after the loop. Storage-buffer and workgroup-memory accumulator paths are forbidden. This is a WGSL private-variable contract; physical ISA register residency is not claimed without backend disassembly evidence.
+They are initialized exactly once before the panel loop, persist across all eight panels, and are consumed only by terminal packing after the loop. Storage-buffer and workgroup-memory accumulator paths are forbidden. Physical ISA register residency is not claimed without backend disassembly evidence.
 
 R2-R8-R2 packing semantics remain mandatory:
 
@@ -141,7 +140,7 @@ packed_high = subgroupShuffle(acc_high, source_lane)
 packed      = select(packed_low, packed_high, destination_condition)
 ```
 
-Selecting low/high in the source lane before shuffle is forbidden. The historical `4096/8192` mismatch signature is a required negative control.
+Selecting low/high in the source lane before shuffle is forbidden. The historical `4096/8192` mismatch signature remains a required negative control.
 
 ## 6. Final-write-once authority
 
@@ -159,7 +158,7 @@ out-of-range writes=0
 cross-quadrant alias=0
 ```
 
-A per-slot atomic write-count surface and a complete-coverage audit prove exactly-once final publication.
+A per-slot atomic write-count surface and complete-coverage audit prove exactly-once final publication.
 
 ## 7. GPU execution and oracle
 
@@ -170,8 +169,6 @@ crates/burn_webgpu_backend/src/shaders/tensorcube_atlas_multi_k_panel_16x16_subg
 crates/burn_webgpu_backend/src/shaders/tensorcube_atlas_multi_k_panel_16x16_oracle.wgsl
 crates/burn_webgpu_backend/src/shaders/tensorcube_atlas_multi_k_panel_16x16_verify.wgsl
 ```
-
-The fast path uses exact subgroup32 lane exchange. The oracle writes the same Stage5-aligned row-major 16×16 physical layout using direct scalar workers and identical arithmetic grouping. It does not redispatch Stage3, Stage4, or Stage5 and does not materialize per-panel partial tiles.
 
 Execution receipt:
 
@@ -223,23 +220,13 @@ KV writes=0
 KV bit-exact=true
 ```
 
-GPU-generated fixture inputs are permitted. Tensor payload upload or readback is not.
-
 ## 9. Exact fallback
-
-Direct fallback:
-
-```text
-Stage6 -> Stage5
-```
-
-Inherited chain:
 
 ```text
 Stage6 -> Stage5 -> Stage4 -> Stage3 -> Stage2 -> Stage1 -> HeadwiseActive -> ReferenceActive
 ```
 
-Required drill:
+Required direct drill:
 
 ```text
 Stage5 fallback tiles=128/128
@@ -251,7 +238,7 @@ Fallback occurs before Stage6 publication and preserves the Stage5 pointer, mask
 
 ## 10. Pointer and generation seal
 
-The exact Stage5 pointer is the CAS compare value. Stage6 publication writes one v6 pointer record with:
+The exact Stage5 pointer is the CAS compare value. Stage6 publication writes one v6 pointer record containing:
 
 ```text
 parent and child stage IDs
@@ -281,10 +268,20 @@ canonical response-file lines=3488
 empty or whitespace-only lines=0
 Atlas groups=29/29
 negative controls=720/720
-child artifacts=32
+child artifacts=33
 ```
 
-The manifest binds parent runtime and manifest, parent and child pointers, Stage5 shader, three Stage6 shaders, binary identity, canonical CLI, all child artifacts, all group digests, Atlas digest, panel schedule, accumulator contract, and final-write contract.
+The 33 child artifacts are governed by one ordered canonical suffix array. `CHILD_ARTIFACT_EXPECTED` is derived from that array length. Runtime sealing compares both the emitted artifact count and the exact emitted suffix sequence against the canonical list. Count-only acceptance is forbidden.
+
+The final three entries are:
+
+```text
+runtime_artifact.json
+canonical_args.txt
+canonical_run.cmd
+```
+
+The manifest binds parent runtime and manifest, parent and child pointers, Stage5 shader, three Stage6 shaders, binary identity, canonical CLI, all 33 child artifacts, all group digests, Atlas digest, panel schedule, accumulator contract, and final-write contract.
 
 ## 12. PASS
 
@@ -317,6 +314,8 @@ direct lower fallbacks=0
 generations=34/35/36
 Atlas groups=29/29
 negative controls=720/720
+child artifacts=33/33
+child artifact ordered suffix list exact
 manifest closure exact
 parent scientific terminal preserved
 ```
@@ -324,7 +323,7 @@ parent scientific terminal preserved
 Expected summary:
 
 ```text
-[r2f-r7-r6-r5-r1-r2-r11][summary] parent_r2_r10=PASS headwise_parent=HeadwiseActive parent_stage=Stage5Active stage=Stage6Active parent_feature=tensorcube-contiguous-16x16-physical-allocation-v1 feature=tensorcube-multi-k-panel-ordered-register-accumulation-v1 mask=0x000000000000001f->0x000000000000003f added_bits=1/1 head_dim=64 panel_width=8 panel_count=8 k_coverage=64/64 remainder_k=0 logical_tiles=128/128 quadrant_workgroups=512/512 workgroup_size=32 subgroup_size=32 subgroups_per_workgroup=1 panel_iterations=4096/4096 scalar_fmas_per_lane_per_panel=16 scalar_fmas_per_lane=128 scalar_fmas_per_tile=16384 scalar_fmas_total=2097152 compute_shuffles_per_lane=192 final_pack_shuffles_per_lane=8 total_shuffles_per_lane=200 final_vec4_writes=8192/8192 final_scalar_writes=32768/32768 output_mismatch=0 non_finite=0 panel_order_mismatch=0 panel_skip=0 panel_duplicate=0 k_coverage_mismatch=0 accumulator_initialization_mismatch=0 accumulator_persistence_mismatch=0 intermediate_output_write=0 final_write_count_mismatch=0 quadrant_topology_mismatch=0 lane_packing_mismatch=0 bit_exact_parity=true same_device=true same_queue_lineage=true kv_writes=0 kv_bit_exact=true stage5_fallback_tiles=128/128 stage5_fallback_scalars=32768/32768 direct_stage4_fallbacks=0 direct_stage3_fallbacks=0 direct_stage2_fallbacks=0 direct_stage1_fallbacks=0 direct_headwise_fallbacks=0 host_materializations=0 host_uploads=0 payload_readbacks=0 payload_buffer_maps=0 compact_decision_readbacks=1 compact_decision_bytes=48 cross_device_copies=0 generations=34/35/36 atlas_groups=29/29 new_negative=720/720 pass=true
+[r2f-r7-r6-r5-r1-r2-r11][summary] parent_r2_r10=PASS headwise_parent=HeadwiseActive parent_stage=Stage5Active stage=Stage6Active parent_feature=tensorcube-contiguous-16x16-physical-allocation-v1 feature=tensorcube-multi-k-panel-ordered-register-accumulation-v1 mask=0x000000000000001f->0x000000000000003f added_bits=1/1 head_dim=64 panel_width=8 panel_count=8 k_coverage=64/64 remainder_k=0 logical_tiles=128/128 quadrant_workgroups=512/512 workgroup_size=32 subgroup_size=32 subgroups_per_workgroup=1 panel_iterations=4096/4096 scalar_fmas_per_lane_per_panel=16 scalar_fmas_per_lane=128 scalar_fmas_per_tile=16384 scalar_fmas_total=2097152 compute_shuffles_per_lane=192 final_pack_shuffles_per_lane=8 total_shuffles_per_lane=200 final_vec4_writes=8192/8192 final_scalar_writes=32768/32768 output_mismatch=0 non_finite=0 panel_order_mismatch=0 panel_skip=0 panel_duplicate=0 k_coverage_mismatch=0 accumulator_initialization_mismatch=0 accumulator_persistence_mismatch=0 intermediate_output_write=0 final_write_count_mismatch=0 quadrant_topology_mismatch=0 lane_packing_mismatch=0 bit_exact_parity=true same_device=true same_queue_lineage=true kv_writes=0 kv_bit_exact=true stage5_fallback_tiles=128/128 stage5_fallback_scalars=32768/32768 direct_stage4_fallbacks=0 direct_stage3_fallbacks=0 direct_stage2_fallbacks=0 direct_stage1_fallbacks=0 direct_headwise_fallbacks=0 host_materializations=0 host_uploads=0 payload_readbacks=0 payload_buffer_maps=0 compact_decision_readbacks=1 compact_decision_bytes=48 cross_device_copies=0 generations=34/35/36 atlas_groups=29/29 new_negative=720/720 child_artifacts=33/33 pass=true
 ```
 
 Success token:
@@ -335,7 +334,7 @@ PROMOTE_ASH_ATTN_HEADWISE_CAUSAL_01B_R12_R3_R3_R3_R2_R7_R2F_R7_R6_R5_R1_R2_R11_T
 
 ## 13. HOLD
 
-Any parent, feature, K geometry, panel order, arithmetic grouping, accumulator lifetime, subgroup topology, quadrant ownership, lane packing, final-write count, oracle parity, non-finite, device, queue, KV, payload movement, fallback, pointer, generation, Atlas, CLI, artifact, manifest, binary, shader, or negative-control mismatch is terminal HOLD.
+Any parent, feature, K geometry, panel order, arithmetic grouping, accumulator lifetime, subgroup topology, quadrant ownership, lane packing, final-write count, oracle parity, non-finite, device, queue, KV, payload movement, fallback, pointer, generation, Atlas, CLI, child-artifact count, child-artifact ordered suffix list, manifest, binary, shader, or negative-control mismatch is terminal HOLD.
 
 ```text
 HOLD_ASH_ATTN_HEADWISE_CAUSAL_01B_R12_R3_R3_R3_R2_R7_R2F_R7_R6_R5_R1_R2_R11_STAGE6_PARENT_PANEL_ORDER_ACCUMULATOR_WRITE_ONCE_PARITY_FALLBACK_OR_GENERATION_NOT_PROVEN
