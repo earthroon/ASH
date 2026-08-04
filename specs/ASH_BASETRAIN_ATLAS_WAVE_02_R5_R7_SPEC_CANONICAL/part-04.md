@@ -1,112 +1,3 @@
-
----
-
-# 15. Actual Q/K/V projection adoption
-
-The Q/K/V stage must consume exact selected-layer tensors:
-
-```text
-model.layers.L.self_attn.q_proj.weight
-model.layers.L.self_attn.k_proj.weight
-model.layers.L.self_attn.v_proj.weight
-```
-
-Required output widths:
-
-```text
-Q width = 2048
-K width = 256
-V width = 256
-```
-
-The gate must prove that K and V do not inherit the Q width through padding or aliasing.
-
-Required counterfactuals:
-
-```text
-K bound to V tensor
-V bound to K tensor
-K or V bound to Q tensor prefix
-KV output allocated at Q width
-Q output truncated to KV width
-projection row-major/column-major swap
-```
-
-The physical tensor layout is row-major `[output_dim, input_dim]` as represented by the canonical Safetensors shape and current WGSL indexing.
-
----
-
-# 16. External NeoX RoPE live consumption
-
-R5-R7 must consume the external convention authority physically proven by R5-R5.
-
-For head dimension 64:
-
-```text
-rotary_dim = 64
-pair_count_per_head = 32
-first half lanes    0..31
-second half lanes   32..63
-pair i              (i, i + 32)
-```
-
-For each pair:
-
-```text
-frequency_i = rope_theta ^ (-2i / head_dim)
-angle_i = position * frequency_i
-out_first  = first * cos(angle) - second * sin(angle)
-out_second = first * sin(angle) + second * cos(angle)
-```
-
-The live full-shape shader must publish:
-
-```text
-pairing layout ID
-shader source digest
-parameter digest
-position digest
-Q input/output digests
-K input/output digests
-Q pair invocation count
-K pair invocation count
-```
-
-Required invocation counts for batch 1 and sequence 4:
-
-```text
-Q pairs = 1 * 4 * 32 * 32 = 4096
-K pairs = 1 * 4 * 4  * 32 = 512
-```
-
-The adjacent-layout counterfactual must produce a nonzero mismatch and be rejected.
-
-The legacy adjacent full-shape shader must not remain an active alternative authority.
-
----
-
-# 17. Production-candidate GQA consumption
-
-The attention stage must use the R5-R4 mapping:
-
-```text
-q_heads_per_kv_head = num_attention_heads / num_key_value_heads = 8
-kv_head = q_head / 8
-```
-
-Canonical mapping:
-
-```text
-Q heads  0..7   -> KV head 0
-Q heads  8..15  -> KV head 1
-Q heads 16..23  -> KV head 2
-Q heads 24..31  -> KV head 3
-```
-
-The stage must consume compact K and V buffers with width 256. It must not expand K/V to 2048 before attention.
-
-Required proof:
-
 ```text
 Q head domain 32
 KV head domain 4
@@ -291,3 +182,75 @@ Headwise replacement
 TensorCube input authority
 production inference output
 ```
+
+Headwise adoption remains the responsibility of `ASH-BASETRAIN-ATLAS-WAVE-02-R6`.
+
+---
+
+# 22. No full-model admission
+
+The selected-layer forward stops at attention context.
+
+Required zero counters:
+
+```text
+o_projection_dispatch_count        0
+attention_residual_dispatch_count  0
+post_attention_norm_dispatch_count 0
+mlp_dispatch_count                 0
+layer_output_publish_count         0
+next_layer_dispatch_count          0
+final_norm_dispatch_count          0
+lm_head_dispatch_count             0
+logits_publish_count               0
+loss_dispatch_count                0
+backward_dispatch_count            0
+optimizer_step_count               0
+full_model_dispatch_count          0
+```
+
+Required state:
+
+```text
+executed_layer_count      1
+full_model_admission      BLOCKED
+production_admission      BLOCKED
+proof_ledger_admission    HOLD
+r6_admission              BLOCKED
+```
+
+---
+
+# 23. Physical gate artifacts
+
+The gate must write a versioned runtime directory such as:
+
+```text
+workspace/runtime/basetrain/atlas_wave/02/r5_r7/selected-layer-real-forward-v1/
+```
+
+Required artifacts:
+
+```text
+00_parent_r5_r6_authority_import.json
+01_parent_r5_r5_rope_authority_import.json
+02_selected_layer_tensor_selection_receipt.json
+03_bf16_f16_decode_authority_receipt.json
+04_resident_tensor_lease_set_receipt.json
+05_token_fixture_authority_receipt.json
+06_actual_embedding_forward_receipt.json
+07_actual_rmsnorm_forward_receipt.json
+08_actual_qkv_forward_receipt.json
+09_external_neox_rope_live_receipt.json
+10_production_gqa_attention_receipt.json
+11_cpu_f64_selected_surface_reference_receipt.json
+12_gpu_cpu_selected_surface_parity_receipt.json
+13_resident_lease_provenance_receipt.json
+14_no_headwise_output_authority_receipt.json
+15_no_full_model_admission_receipt.json
+16_negative_counterfactual_ledger.json
+17_selected_layer_forward_authority.json
+ash_basetrain_atlas_wave_02_r5_r7_local_manifest.json
+```
+
+Every artifact must contain:
