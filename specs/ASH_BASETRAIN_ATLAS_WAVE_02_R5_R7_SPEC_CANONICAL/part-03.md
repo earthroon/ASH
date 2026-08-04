@@ -253,3 +253,4 @@ Q heads 24..31  -> KV head 3
 The stage must consume compact K and V buffers with width 256. It must not expand K/V to 2048 before attention.
 
 Required proof:
+

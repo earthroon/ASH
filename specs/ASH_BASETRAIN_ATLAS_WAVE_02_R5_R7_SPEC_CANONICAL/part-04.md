@@ -254,3 +254,4 @@ ash_basetrain_atlas_wave_02_r5_r7_local_manifest.json
 ```
 
 Every artifact must contain:
+
