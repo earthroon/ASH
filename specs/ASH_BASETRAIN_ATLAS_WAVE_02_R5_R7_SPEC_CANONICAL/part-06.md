@@ -1,39 +1,3 @@
-workspace/runtime/basetrain/atlas_wave/02/r5_r7/selected-layer-real-forward-v1
-```
-
-The gate may receive the same checkpoint/config/CAS inputs used by R5-R6 only to deterministically reconstruct the authority. The reconstructed checkpointSetDigest and authorityDigest must exactly equal the parent R5-R6 local manifest. Tensor keys and shard paths still come only from that reconstructed authority; independent tensor or shard overrides are forbidden.
-
----
-
-# 27. Required implementation units
-
-## base_train crate
-
-```text
-base_train_atlas_wave_02_r5_r7_selected_layer_forward_authority.rs
-base_train_atlas_wave_02_r5_r7_cpu_f64_reference.rs
-```
-
-Required public APIs:
-
-```rust
-pub fn import_base_train_atlas_wave_02_r5_r6_checkpoint_authority(...)
-    -> Result<BaseTrainAtlasWave02R5CheckpointTensorSetAuthority>;
-
-pub fn select_base_train_atlas_wave_02_r5_r7_tensors(...)
-    -> Result<BaseTrainAtlasWave02R5R7SelectedTensorSet>;
-
-pub fn build_base_train_atlas_wave_02_r5_r7_cpu_f64_reference(...)
-    -> Result<BaseTrainAtlasWave02R5R7CpuF64Reference>;
-
-pub fn compare_base_train_atlas_wave_02_r5_r7_selected_surface(...)
-    -> Result<BaseTrainAtlasWave02R5R7ParityReceipt>;
-```
-
-## burn_webgpu_backend crate
-
-```text
-base_train_atlas_wave_02_r5_r7_checkpoint_residency.rs
 base_train_atlas_wave_02_r5_r7_selected_layer_forward.rs
 shaders/base_train_atlas_wave_02_r5_r7_rope_neox_half_split.wgsl
 ```
