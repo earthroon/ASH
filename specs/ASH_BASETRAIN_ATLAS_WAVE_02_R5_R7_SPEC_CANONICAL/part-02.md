@@ -1,185 +1,3 @@
-    pub pass: bool,
-    pub authority_digest: String,
-}
-```
-
-## 4.2 Tensor decode authority
-
-```rust
-pub struct BaseTrainAtlasWave02R5R7TensorDecodeAuthority {
-    pub checkpoint_set_digest: String,
-    pub source_dtype: String,
-    pub target_runtime_dtype: String,
-    pub decode_rule_id: String,
-    pub decode_chunk_bytes: u64,
-    pub tensor_receipts: Vec<BaseTrainAtlasWave02R5R7TensorDecodeReceipt>,
-    pub source_payload_bytes: u64,
-    pub decoded_runtime_bytes: u64,
-    pub host_full_tensor_materialization_count: u32,
-    pub source_range_reopen_count: u32,
-    pub pass: bool,
-    pub authority_digest: String,
-}
-```
-
-Each tensor receipt must bind:
-
-```text
-tensor key
-canonical role
-layer index
-R5-R6 tensorIdentityDigest
-shard ID
-shard SHA-256
-header SHA-256
-absolute source range
-source dtype
-source element count
-source payload byte count
-decode rule ID
-decoded f32 byte count
-decoded f32 stream digest
-chunk count
-```
-
-## 4.3 Resident tensor lease set
-
-```rust
-pub struct BaseTrainAtlasWave02R5R7ResidentTensorLeaseSet {
-    pub checkpoint_set_digest: String,
-    pub selected_layer: u32,
-    pub group_id: String,
-    pub runtime_holder_id: String,
-    pub device_epoch: u64,
-    pub queue_epoch: u64,
-    pub source_weight_generation: u64,
-    pub atlas_residency_generation: u64,
-    pub slot_index: u32,
-    pub leases: Vec<BaseTrainAtlasWave02R5R7ResidentTensorLease>,
-    pub lease_acquire_count: u32,
-    pub lease_release_count: u32,
-    pub mixed_generation_count: u32,
-    pub stale_lease_count: u32,
-    pub checkpoint_reopen_during_forward_count: u32,
-    pub weight_write_during_forward_count: u32,
-    pub pass: bool,
-    pub lease_set_digest: String,
-}
-```
-
-Each lease binds the physical tensor to one resident buffer range:
-
-```text
-tensorIdentityDigest
-source shard digest
-source range
-source dtype
-decode digest
-runtime buffer identity digest
-runtime byte offset
-runtime byte length
-runtime representation f32
-buffer usage
-lease generation
-```
-
-The lease set, not the checkpoint path, is the only weight source accepted by the GPU forward function.
-
----
-
-# 5. Parent authority import
-
-R5-R7 must consume the R5-R6 local manifest and the R5-R6 checkpoint tensor-set authority receipt.
-
-Required checks:
-
-```text
-R5-R6 pass              true
-R5-R6 pass token        exact
-productionAdmission     BLOCKED
-proofLedgerAdmission    HOLD
-r6Admission             BLOCKED
-syntheticTensorCount    0
-missingTensorCount      0
-unexpectedTensorCount   0
-shapeMismatchCount      0
-dtypeMismatchCount      0
-rangeGapCount           0
-rangeOverlapCount       0
-unmappedPayloadBytes    0
-```
-
-R5-R7 must also import the R5-R5 local manifest and require:
-
-```text
-R5-R5 pass              true
-pairingLayout           NeoXHalfSplit
-ropeThetaBits           exact match with R5-R6 config
-model type              exact match
-architecture            exact match
-```
-
-The gate must reject a parent manifest with a valid filename but mismatched content digest.
-
----
-
-# 6. Selected-layer tensor set
-
-For selected layer `L`, R5-R7 may consume exactly these five physical tensors:
-
-```text
-model.embed_tokens.weight
-model.layers.L.input_layernorm.weight
-model.layers.L.self_attn.q_proj.weight
-model.layers.L.self_attn.k_proj.weight
-model.layers.L.self_attn.v_proj.weight
-```
-
-Expected shapes derive only from R5-R6 config authority:
-
-```text
-embedding     [vocab_size, hidden_size]
-input norm    [hidden_size]
-Q             [num_attention_heads * head_dim, hidden_size]
-K             [num_key_value_heads * head_dim, hidden_size]
-V             [num_key_value_heads * head_dim, hidden_size]
-```
-
-For the current checkpoint:
-
-```text
-embedding     [48259, 2048]
-input norm    [2048]
-Q             [2048, 2048]
-K             [256, 2048]
-V             [256, 2048]
-```
-
-The gate must reject:
-
-```text
-shape-only tensor selection
-suffix matching
-case-fold matching
-layer index clamping
-layer index wraparound
-fallback to layer 0
-wrong checkpoint tensor with matching shape
-planned registry entries without payload authority
-```
-
----
-
-# 7. Selected layer policy
-
-The rev.1 physical admission fixture is pinned to:
-
-```text
-selected_layer = 0
-```
-
-This is a fixture policy, not a model limitation.
-
 Implementation rules:
 
 ```text
@@ -291,3 +109,149 @@ parallel decode workers   4
 wave readback policy      every wave
 resident representation   f32
 atlas allocation count    1
+```
+
+The vocabulary embedding tensor is uploaded as ordered parallel waves:
+
+```text
+R5-R6 embedding physical range
+  -> page plan
+  -> up to four concurrent exact-range readers
+  -> BF16/F16/F32 to f32 page decode
+  -> ordered atlas subrange writes
+  -> bounded per-wave GPU readback
+  -> wave digest equality
+  -> immutable embedding resident lease
+```
+
+The implementation must preserve page order at publication even when page decode completes out of order. Each wave seals the first page index, page count, source byte range, atlas byte range, source-page digests, decoded-page digests and readback digest.
+
+The layer RMSNorm and Q/K/V tensors use the same atlas streaming-wave engine. Their pages may form fewer waves because their payloads are smaller.
+
+`lm_head.weight` is not uploaded by R5-R7 because this patch has no logits authority. Its R5-R6 inventory authority remains valid, but `lm_head_upload_count` must equal zero.
+
+The requested wgpu device limits for the R5-R7 physical gate must explicitly adopt the adapter-supported `max_buffer_size` and `max_storage_buffer_binding_size`; silently accepting WebGPU default limits and then splitting authority across an unsealed parallel buffer is forbidden.
+
+The loader must decode bounded pages directly into resident atlas upload pages.
+
+Required counters:
+
+```text
+host_full_tensor_materialization_count = 0
+checkpoint_whole_file_materialization_count = 0
+atlas_page_count > 0
+parallel_decode_wave_count > 0
+bounded_wave_readback_count = atlas_wave_count
+source_range_reopen_count = 0 after lease publication
+```
+
+The embedding tensor may be fully resident on the GPU, but its expanded f32 representation must not first exist as one full host `Vec<f32>`.
+
+## 9.4 Decode witnesses
+
+For every tensor, the gate must verify:
+
+```text
+source element count
+source byte count
+decoded element count
+decoded f32 byte count
+page ordering
+wave ordering
+parallel completion reorder recovery
+source stream digest
+decoded stream digest
+wave readback digest
+first element witness
+middle element witness
+last element witness
+finite count
+NaN count = 0
+Inf count = 0
+```
+
+A counterfactual decoder must be rejected:
+
+```text
+BF16 bytes interpreted as F16
+F16 bytes interpreted as BF16
+byte-swapped half values
+truncated final page
+page reorder without canonical reassembly
+wave reorder
+silent zero fill
+```
+
+---
+
+# 10. Resident tensor upload and lease provenance
+
+## 10.1 Upload phase and forward phase are distinct
+
+R5-R7 has two explicit phases.
+
+```text
+Phase A: checkpoint range read, decode, buffer creation, upload, lease publication
+Phase B: selected-layer forward using only published resident views
+```
+
+After Phase A publishes the lease set, Phase B must observe:
+
+```text
+checkpoint_open_count                  0
+checkpoint_payload_read_bytes          0
+weight_buffer_create_count             0
+weight_queue_write_count               0
+weight_queue_write_bytes               0
+resident_to_replacement_copy_count     0
+```
+
+## 10.2 Same lineage requirement
+
+All five resident tensor leases must share:
+
+```text
+checkpointSetDigest
+runtimeHolderId
+deviceEpoch
+queueEpoch
+sourceWeightGeneration
+atlasResidencyGeneration
+slotIndex
+groupId
+```
+
+A mixed-generation set is invalid even when every individual tensor has a correct shape and digest.
+
+## 10.3 Atlas allocation and vocabulary wave authority
+
+All five selected tensors occupy one immutable, non-overlapping f32 atlas allocation. Each tensor receives a 256-byte aligned suballocation and its own binding range. The embedding range is populated exclusively through the parallel streaming-wave path.
+
+Required atlas counters:
+
+```text
+atlas_buffer_create_count             1
+atlas_tensor_suballocation_count      5
+atlas_page_count                      > 0
+atlas_wave_count                      > 0
+parallel_decode_wave_count            = atlas_wave_count
+bounded_wave_readback_count           = atlas_wave_count
+host_full_tensor_materialization_count 0
+lm_head_upload_count                  0
+```
+
+## 10.4 Buffer identity
+
+Each resident lease must seal:
+
+```text
+buffer label
+buffer usage
+allocation byte length
+binding byte offset
+binding byte length
+runtime buffer identity digest
+upload stream digest
+tensor identity digest
+```
+
