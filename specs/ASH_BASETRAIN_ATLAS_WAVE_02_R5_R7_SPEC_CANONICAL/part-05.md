@@ -1,76 +1,3 @@
-
-Headwise adoption remains the responsibility of `ASH-BASETRAIN-ATLAS-WAVE-02-R6`.
-
----
-
-# 22. No full-model admission
-
-The selected-layer forward stops at attention context.
-
-Required zero counters:
-
-```text
-o_projection_dispatch_count        0
-attention_residual_dispatch_count  0
-post_attention_norm_dispatch_count 0
-mlp_dispatch_count                 0
-layer_output_publish_count         0
-next_layer_dispatch_count          0
-final_norm_dispatch_count          0
-lm_head_dispatch_count             0
-logits_publish_count               0
-loss_dispatch_count                0
-backward_dispatch_count            0
-optimizer_step_count               0
-full_model_dispatch_count          0
-```
-
-Required state:
-
-```text
-executed_layer_count      1
-full_model_admission      BLOCKED
-production_admission      BLOCKED
-proof_ledger_admission    HOLD
-r6_admission              BLOCKED
-```
-
----
-
-# 23. Physical gate artifacts
-
-The gate must write a versioned runtime directory such as:
-
-```text
-workspace/runtime/basetrain/atlas_wave/02/r5_r7/selected-layer-real-forward-v1/
-```
-
-Required artifacts:
-
-```text
-00_parent_r5_r6_authority_import.json
-01_parent_r5_r5_rope_authority_import.json
-02_selected_layer_tensor_selection_receipt.json
-03_bf16_f16_decode_authority_receipt.json
-04_resident_tensor_lease_set_receipt.json
-05_token_fixture_authority_receipt.json
-06_actual_embedding_forward_receipt.json
-07_actual_rmsnorm_forward_receipt.json
-08_actual_qkv_forward_receipt.json
-09_external_neox_rope_live_receipt.json
-10_production_gqa_attention_receipt.json
-11_cpu_f64_selected_surface_reference_receipt.json
-12_gpu_cpu_selected_surface_parity_receipt.json
-13_resident_lease_provenance_receipt.json
-14_no_headwise_output_authority_receipt.json
-15_no_full_model_admission_receipt.json
-16_negative_counterfactual_ledger.json
-17_selected_layer_forward_authority.json
-ash_basetrain_atlas_wave_02_r5_r7_local_manifest.json
-```
-
-Every artifact must contain:
-
 ```text
 schemaVersion
 patchId
@@ -291,3 +218,39 @@ workspace/runtime/basetrain/atlas_wave/02/r5_r5/external-rope-convention-v1/ash_
 4
 
 --runtime-output-dir
+workspace/runtime/basetrain/atlas_wave/02/r5_r7/selected-layer-real-forward-v1
+```
+
+The gate may receive the same checkpoint/config/CAS inputs used by R5-R6 only to deterministically reconstruct the authority. The reconstructed checkpointSetDigest and authorityDigest must exactly equal the parent R5-R6 local manifest. Tensor keys and shard paths still come only from that reconstructed authority; independent tensor or shard overrides are forbidden.
+
+---
+
+# 27. Required implementation units
+
+## base_train crate
+
+```text
+base_train_atlas_wave_02_r5_r7_selected_layer_forward_authority.rs
+base_train_atlas_wave_02_r5_r7_cpu_f64_reference.rs
+```
+
+Required public APIs:
+
+```rust
+pub fn import_base_train_atlas_wave_02_r5_r6_checkpoint_authority(...)
+    -> Result<BaseTrainAtlasWave02R5CheckpointTensorSetAuthority>;
+
+pub fn select_base_train_atlas_wave_02_r5_r7_tensors(...)
+    -> Result<BaseTrainAtlasWave02R5R7SelectedTensorSet>;
+
+pub fn build_base_train_atlas_wave_02_r5_r7_cpu_f64_reference(...)
+    -> Result<BaseTrainAtlasWave02R5R7CpuF64Reference>;
+
+pub fn compare_base_train_atlas_wave_02_r5_r7_selected_surface(...)
+    -> Result<BaseTrainAtlasWave02R5R7ParityReceipt>;
+```
+
+## burn_webgpu_backend crate
+
+```text
+base_train_atlas_wave_02_r5_r7_checkpoint_residency.rs
