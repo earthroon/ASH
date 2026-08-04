@@ -1,149 +1,3 @@
-```
-
-The vocabulary embedding tensor is uploaded as ordered parallel waves:
-
-```text
-R5-R6 embedding physical range
-  -> page plan
-  -> up to four concurrent exact-range readers
-  -> BF16/F16/F32 to f32 page decode
-  -> ordered atlas subrange writes
-  -> bounded per-wave GPU readback
-  -> wave digest equality
-  -> immutable embedding resident lease
-```
-
-The implementation must preserve page order at publication even when page decode completes out of order. Each wave seals the first page index, page count, source byte range, atlas byte range, source-page digests, decoded-page digests and readback digest.
-
-The layer RMSNorm and Q/K/V tensors use the same atlas streaming-wave engine. Their pages may form fewer waves because their payloads are smaller.
-
-`lm_head.weight` is not uploaded by R5-R7 because this patch has no logits authority. Its R5-R6 inventory authority remains valid, but `lm_head_upload_count` must equal zero.
-
-The requested wgpu device limits for the R5-R7 physical gate must explicitly adopt the adapter-supported `max_buffer_size` and `max_storage_buffer_binding_size`; silently accepting WebGPU default limits and then splitting authority across an unsealed parallel buffer is forbidden.
-
-The loader must decode bounded pages directly into resident atlas upload pages.
-
-Required counters:
-
-```text
-host_full_tensor_materialization_count = 0
-checkpoint_whole_file_materialization_count = 0
-atlas_page_count > 0
-parallel_decode_wave_count > 0
-bounded_wave_readback_count = atlas_wave_count
-source_range_reopen_count = 0 after lease publication
-```
-
-The embedding tensor may be fully resident on the GPU, but its expanded f32 representation must not first exist as one full host `Vec<f32>`.
-
-## 9.4 Decode witnesses
-
-For every tensor, the gate must verify:
-
-```text
-source element count
-source byte count
-decoded element count
-decoded f32 byte count
-page ordering
-wave ordering
-parallel completion reorder recovery
-source stream digest
-decoded stream digest
-wave readback digest
-first element witness
-middle element witness
-last element witness
-finite count
-NaN count = 0
-Inf count = 0
-```
-
-A counterfactual decoder must be rejected:
-
-```text
-BF16 bytes interpreted as F16
-F16 bytes interpreted as BF16
-byte-swapped half values
-truncated final page
-page reorder without canonical reassembly
-wave reorder
-silent zero fill
-```
-
----
-
-# 10. Resident tensor upload and lease provenance
-
-## 10.1 Upload phase and forward phase are distinct
-
-R5-R7 has two explicit phases.
-
-```text
-Phase A: checkpoint range read, decode, buffer creation, upload, lease publication
-Phase B: selected-layer forward using only published resident views
-```
-
-After Phase A publishes the lease set, Phase B must observe:
-
-```text
-checkpoint_open_count                  0
-checkpoint_payload_read_bytes          0
-weight_buffer_create_count             0
-weight_queue_write_count               0
-weight_queue_write_bytes               0
-resident_to_replacement_copy_count     0
-```
-
-## 10.2 Same lineage requirement
-
-All five resident tensor leases must share:
-
-```text
-checkpointSetDigest
-runtimeHolderId
-deviceEpoch
-queueEpoch
-sourceWeightGeneration
-atlasResidencyGeneration
-slotIndex
-groupId
-```
-
-A mixed-generation set is invalid even when every individual tensor has a correct shape and digest.
-
-## 10.3 Atlas allocation and vocabulary wave authority
-
-All five selected tensors occupy one immutable, non-overlapping f32 atlas allocation. Each tensor receives a 256-byte aligned suballocation and its own binding range. The embedding range is populated exclusively through the parallel streaming-wave path.
-
-Required atlas counters:
-
-```text
-atlas_buffer_create_count             1
-atlas_tensor_suballocation_count      5
-atlas_page_count                      > 0
-atlas_wave_count                      > 0
-parallel_decode_wave_count            = atlas_wave_count
-bounded_wave_readback_count           = atlas_wave_count
-host_full_tensor_materialization_count 0
-lm_head_upload_count                  0
-```
-
-## 10.4 Buffer identity
-
-Each resident lease must seal:
-
-```text
-buffer label
-buffer usage
-allocation byte length
-binding byte offset
-binding byte length
-runtime buffer identity digest
-upload stream digest
-tensor identity digest
-```
-
 The binding range must contain exactly one decoded tensor and may not alias another selected tensor unless an explicit immutable atlas suballocation authority proves non-overlap.
 
 ## 10.5 Lease lifetime
@@ -291,3 +145,111 @@ masked rows exact zero
 CPU-f64 reference from same decoded source
 finite output count exact
 ```
+
+---
+
+# 15. Actual Q/K/V projection adoption
+
+The Q/K/V stage must consume exact selected-layer tensors:
+
+```text
+model.layers.L.self_attn.q_proj.weight
+model.layers.L.self_attn.k_proj.weight
+model.layers.L.self_attn.v_proj.weight
+```
+
+Required output widths:
+
+```text
+Q width = 2048
+K width = 256
+V width = 256
+```
+
+The gate must prove that K and V do not inherit the Q width through padding or aliasing.
+
+Required counterfactuals:
+
+```text
+K bound to V tensor
+V bound to K tensor
+K or V bound to Q tensor prefix
+KV output allocated at Q width
+Q output truncated to KV width
+projection row-major/column-major swap
+```
+
+The physical tensor layout is row-major `[output_dim, input_dim]` as represented by the canonical Safetensors shape and current WGSL indexing.
+
+---
+
+# 16. External NeoX RoPE live consumption
+
+R5-R7 must consume the external convention authority physically proven by R5-R5.
+
+For head dimension 64:
+
+```text
+rotary_dim = 64
+pair_count_per_head = 32
+first half lanes    0..31
+second half lanes   32..63
+pair i              (i, i + 32)
+```
+
+For each pair:
+
+```text
+frequency_i = rope_theta ^ (-2i / head_dim)
+angle_i = position * frequency_i
+out_first  = first * cos(angle) - second * sin(angle)
+out_second = first * sin(angle) + second * cos(angle)
+```
+
+The live full-shape shader must publish:
+
+```text
+pairing layout ID
+shader source digest
+parameter digest
+position digest
+Q input/output digests
+K input/output digests
+Q pair invocation count
+K pair invocation count
+```
+
+Required invocation counts for batch 1 and sequence 4:
+
+```text
+Q pairs = 1 * 4 * 32 * 32 = 4096
+K pairs = 1 * 4 * 4  * 32 = 512
+```
+
+The adjacent-layout counterfactual must produce a nonzero mismatch and be rejected.
+
+The legacy adjacent full-shape shader must not remain an active alternative authority.
+
+---
+
+# 17. Production-candidate GQA consumption
+
+The attention stage must use the R5-R4 mapping:
+
+```text
+q_heads_per_kv_head = num_attention_heads / num_key_value_heads = 8
+kv_head = q_head / 8
+```
+
+Canonical mapping:
+
+```text
+Q heads  0..7   -> KV head 0
+Q heads  8..15  -> KV head 1
+Q heads 16..23  -> KV head 2
+Q heads 24..31  -> KV head 3
+```
+
+The stage must consume compact K and V buffers with width 256. It must not expand K/V to 2048 before attention.
+
+Required proof:
