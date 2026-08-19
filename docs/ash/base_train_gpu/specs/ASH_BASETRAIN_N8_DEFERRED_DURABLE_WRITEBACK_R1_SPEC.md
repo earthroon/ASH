@@ -14,37 +14,64 @@ Single Durable Checkpoint Publication /
 Single Archive Publication Seal
 ```
 
-Build revision:
+Parent build revision:
 
 ```text
 n8-deferred-durable-writeback-r1
 ```
 
+Resident-checkpoint closure identity:
+
+```text
+ASH-BASETRAIN-N8-DEFERRED-DURABLE-WRITEBACK-R1-
+RESIDENT-CHECKPOINT-SOURCE-AUTHORITY-CLOSURE
+
+Resident Logical Checkpoint Authority /
+Physical File Existence Decoupling /
+Resident Range-Read Session Identity /
+Path·Digest·Byte-Length·Generation Parity Seal /
+Disk Legacy Preservation /
+Silent Disk Fallback Prohibition /
+Step2→Step8 Resident Continuation Seal
+```
+
+Closure revision:
+
+```text
+n8-deferred-resident-checkpoint-source-authority-r1
+```
+
 ## 2. Purpose
 
-N8 long-horizon training executes eight optimizer steps. Before this patch the
-RAM-resident Adam path already deferred Adam M/V pack materialization until final
-writeback, but `weights.r6pack` was still materialized on every optimizer step.
-The next step therefore remained coupled to large packed-state filesystem writes.
+N8 long-horizon training executes eight optimizer steps. The RAM-resident Adam route
+already supported final-only Adam M/V materialization, but the packed weight path was
+still able to force large filesystem payload materialization into the optimizer loop.
+R1 moves the durability boundary from each optimizer step to the end of the admitted
+8-step resident transaction.
 
-R1 introduces an explicit N8 deferred-durability route in which optimizer steps 1–7
-advance through resident weight and RAM Adam state without writing any large packed
-training payload. Step 8 materializes the complete final triple pack exactly once and
-then performs the existing durable checkpoint/archive publication.
+Optimizer steps 1–7 advance through resident weight and RAM Adam state without writing
+large packed training payloads. Step 8 materializes the final `weights.r6pack`,
+`adam_m.r6pack`, and `adam_v.r6pack`, then performs the existing durable
+checkpoint/archive publication.
 
-This patch changes persistence timing and resident continuation authority. It does not
-change forward, backward, gradient, AdamW, Muon, scheduler, TensorCube, subgroup, Atlas,
-or checkpoint serialization mathematics.
+The Resident Checkpoint Source Authority Closure completes that design. After step 1,
+the logical next checkpoint path intentionally exists only as metadata while its weight
+payload is resident in memory. Runtime checkpoint consumers must therefore recognize a
+verified resident range-read session as the physical backing authority for that logical
+checkpoint identity. They must not require or recreate an intermediate `weights.r6pack`.
+
+This patch changes persistence timing, checkpoint backing authority, and resident
+continuation only. It does not change training or optimizer mathematics.
 
 ## 3. Explicit admission
 
-New CLI admission:
+The route is explicit:
 
 ```text
 --admit-n8-deferred-durable-writeback
 ```
 
-The route is fail-closed and requires all of the following:
+It requires the existing parent admissions, including:
 
 ```text
 --admit-production-multistep-loop
@@ -55,10 +82,10 @@ The route is fail-closed and requires all of the following:
 --storage-publication-policy checkpoint
 ```
 
-The existing persistent weight route additionally retains its RAM36/exact-inventory
-parent requirements. R1 does not weaken those pre-existing admission gates.
+The persistent weight route retains its RAM36/exact-inventory parent requirements.
+No existing parent gate is weakened.
 
-Required failure tokens include:
+Admission failures remain fail-closed:
 
 ```text
 N8DeferredWritebackN8AdmissionMissing
@@ -68,38 +95,37 @@ N8DeferredWritebackResidentWeightAuthorityMissing
 N8DeferredWritebackCheckpointPublicationRequired
 ```
 
-When the deferred flag is absent, legacy per-step weight materialization behavior remains
-unchanged.
+When deferred admission is absent, the legacy durable route is preserved.
 
 ## 4. Eight-step resident transaction
 
-For a source generation `G`, the admitted transaction is:
+For source generation `G`:
 
 ```text
 G
- -> step 1 resident successor G+1
- -> step 2 resident successor G+2
+ -> resident successor G+1
+ -> resident successor G+2
  -> ...
- -> step 7 resident successor G+7
- -> step 8 resident successor G+8
+ -> resident successor G+7
+ -> resident successor G+8
  -> final triple-pack materialization
  -> durable checkpoint publication
  -> archive publication
 ```
 
-For the current N8 generation-5 reproducer this is:
+For the current generation-5 N8 reproducer:
 
 ```text
 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13
 ```
 
-Intermediate steps are resident commits. They are explicitly non-durable and must not be
-presented as restartable checkpoints.
+Intermediate steps are resident commits, not durable checkpoints. A crash before the
+final materialization restarts from the last durable generation rather than claiming the
+latest resident generation as recoverable state.
 
 ## 5. Intermediate packed payload write zero
 
-In deferred mode, optimizer steps 1–7 must not create/write any large packed training
-payload:
+In deferred mode, steps 1–7 must not create or write large packed training payloads:
 
 ```text
 weights.r6pack = 0 bytes written
@@ -108,78 +134,61 @@ adam_v.r6pack  = 0 bytes written
 runtime payload file count = 0
 ```
 
-The weight writer is gated by:
+The weight writer is gated by the final boundary:
 
 ```text
 write_weight_payload = !deferred_durable_writeback || final_writeback
 ```
 
-Adam M/V writers retain their existing final-writeback-only gating.
+Adam M/V writers retain final-writeback-only behavior.
 
-The implementation maintains a streaming SHA-256 over candidate weight bytes even when
-there is no disk weight writer, so the run-local manifest and resident successor keep a
-truthful weight digest/byte-length identity.
+The candidate weight stream still computes its SHA-256 and byte length even when no
+disk writer exists, so resident and manifest identities remain complete.
 
-The following hard failure is preserved for any intermediate packed payload write:
+Intermediate large-payload write detection is fail-closed:
 
 ```text
 N8DeferredWritebackIntermediatePackedPayloadWriteDetected
 ```
 
-### Control-write boundary
-
-R1 does **not** claim zero filesystem writes of every kind. Small run-local control and
-diagnostic files such as transaction markers, cursor/scheduler state, receipts, and
-training-state JSON may still be written per step. The performance seal is specifically:
-
-```text
-intermediate packed training payload bytes = 0
-```
-
-The active training-state control record also reports:
-
-```text
-runtimePayloadFilesPerGeneration = 0
-```
-
-for deferred intermediate generations, so control metadata cannot claim a payload file
-that does not physically exist.
+Small control/diagnostic files are not classified as packed training payload. Per-step
+cursor, scheduler, receipt, and transaction metadata may still be written. The active
+training-state control record reports zero runtime payload files for deferred
+intermediate generations.
 
 ## 6. Resident weight successor authority
 
-Without a physical intermediate `weights.r6pack`, the next optimizer step must consume
-the in-memory successor weight pack.
-
-Candidate weight bytes therefore flow simultaneously into the resident successor builder
-and, only on the final step, the disk writer:
+Updated weight bytes flow to the resident successor on every step and to the physical
+weight writer only at the final boundary:
 
 ```text
 GPU/optimizer candidate bytes
-        -> ResidentWeightPackBuilder     (steps 1–8)
-        -> weights.r6pack writer         (step 8 only)
+        -> ResidentWeightPackBuilder     steps 1–8
+        -> weights.r6pack writer         step 8 only
 ```
 
-The resulting resident successor preserves generation, optimizer-step, source-path,
-byte-length, and SHA-256 identity.
+The resident successor preserves:
 
-No intermediate disk weight file is allowed to become a hidden next-step authority.
+```text
+generation
+optimizer step
+logical source path
+byte length
+SHA-256
+```
+
+No intermediate disk weight file may become a hidden continuation authority.
 
 ## 7. Resident Atlas plan source
 
-The existing packed-runtime Atlas plan materializer requires a physical packed weight
-file. That requirement is correct for the legacy route but would make deferred step 2
-fail before execution because step 1 intentionally has no `weights.r6pack`.
-
-R1 therefore introduces:
+The legacy packed-runtime Atlas materializer remains physical-file-backed.
+Deferred continuation uses:
 
 ```text
 materialize_production_atlas_plan_for_resident_packed_runtime
 ```
 
-The legacy public materializer still requires a physical file.
-
-The resident materializer is selected only under deferred admission and is supplied only
-a previously verified `ResidentWeightPack`. Before use the scheduler verifies:
+Before resident plan materialization the scheduler verifies:
 
 ```text
 resident generation == SourceState generation
@@ -195,9 +204,8 @@ Failure token:
 N8DeferredWritebackResidentPlanSourceIdentityDrift
 ```
 
-The resident materializer removes only the physical-file-existence requirement. Tensor
-geometry, offsets, parameter digests, registry digest, Atlas grouping, and plan digest
-contracts remain unchanged.
+Only the source backing changes. Tensor geometry, parameter order, offsets, digests,
+registry digest, Atlas grouping, and plan digest contracts remain unchanged.
 
 ## 8. Source-generation SSOT compatibility
 
@@ -208,9 +216,8 @@ ASH-BASETRAIN-N8-SOURCE-WEIGHT-GENERATION-SSOT-R1
 ```
 
 `SourceState.generation` remains the semantic generation authority. Resident weight and
-RAM/VRAM residency are witnesses/carriers, not generation creators.
-
-The deferred route does not reintroduce any synthetic generation-zero fallback.
+RAM/VRAM objects are carriers and parity witnesses. No synthetic generation-zero
+fallback is reintroduced.
 
 ## 9. RAM Adam M/V continuity
 
@@ -230,14 +237,12 @@ Adam M final pack write = 1
 Adam V final pack write = 1
 ```
 
-The existing RAM Adam optimizer state, exact inventory, process-budget, generation, and
-final writeback checks remain authoritative.
+Existing RAM Adam process-budget, exact-inventory, generation, final-writeback, and
+resume contracts remain authoritative.
 
 ## 10. Final-step triple-pack materialization
 
-Only the final optimizer step is a packed-payload durability boundary.
-
-It must materialize all three payloads:
+Only step 8 is the packed-payload durability boundary. It must materialize:
 
 ```text
 weights.r6pack
@@ -245,7 +250,7 @@ adam_m.r6pack
 adam_v.r6pack
 ```
 
-Required physical conditions:
+Required final state:
 
 ```text
 weight payload bytes > 0
@@ -254,28 +259,18 @@ Adam V payload bytes > 0
 runtime payload file count = 3
 ```
 
-Failure token:
+Failure tokens include:
 
 ```text
 N8DeferredWritebackFinalTriplePackIncomplete
-```
-
-The final weight writer digest is cross-checked against the independently streamed weight
-digest:
-
-```text
 N8DeferredWritebackFinalWeightDigestDrift
 ```
 
-No checkpoint serialization format is changed.
+Checkpoint serialization format is unchanged.
 
 ## 11. Durable checkpoint and archive publication
 
-The existing N8 storage publication runs after the eight-step training loop.
-R1 verifies the resulting storage receipt rather than moving archive publication into the
-optimizer loop.
-
-Required counts:
+The existing N8 storage publication remains after the 8-step loop. Required counts:
 
 ```text
 durable checkpoint publication count = 1
@@ -289,7 +284,7 @@ N8DeferredWritebackMultipleDurablePublication
 N8DeferredWritebackMultipleArchivePublication
 ```
 
-Publication ordering remains:
+Ordering remains:
 
 ```text
 final resident successor
@@ -300,87 +295,231 @@ final resident successor
  -> archive publication
 ```
 
-## 12. Restart/crash semantics
+## 12. Resident Checkpoint Source Authority Closure
 
-Intermediate generations are intentionally non-durable. A process failure before final
-writeback must not claim recovery from the latest resident generation.
+### 12.1 Parent physical failure
 
-Restart authority remains the last durable source checkpoint.
+The physical reproducer proved the parent writeback behavior:
 
-The existing run-local publication state remains explicitly non-resumable. R1 does not
-silently synthesize missing weight or Adam payloads and does not introduce an automatic
-intermediate disk fallback.
+```text
+[N8-DEFERRED][STEP]
+step=1/8
+source_generation=5
+target_generation=6
+weight_source=resident
+adam_source=ram_resident
+weight_payload_write_bytes=0
+adam_m_payload_write_bytes=0
+adam_v_payload_write_bytes=0
+final_materialization=0
+```
+
+Immediately afterward step-2 admission failed with:
+
+```text
+BTR27R1JR6APackedSourceMissing:
+.../training_state/slot_b/weights.r6pack
+```
+
+This proved that step 1 had successfully created resident generation 6 while a legacy
+checkpoint preflight still treated the logical `weights.r6pack` path as an unconditional
+filesystem authority.
+
+### 12.2 Logical identity versus physical backing
+
+Within deferred intermediate generations:
+
+```text
+checkpoint logical identity
+    = path + generation + byte length + SHA-256
+
+checkpoint physical backing
+    = verified ResidentWeightPack / active resident range-read session
+```
+
+The logical checkpoint path remains stable even when no physical file exists.
+
+```text
+logical path present in metadata
+physical weights.r6pack absent
+resident source present and verified
+```
+
+is a valid deferred intermediate state.
+
+### 12.3 Active resident range-read authority
+
+`begin_checkpoint_resident_range_read_session` now binds the resident generation in
+addition to resident bytes and SHA-256.
+
+The active session exposes a verified resident source authority containing:
+
+```text
+logical path
+generation
+byte length
+SHA-256
+```
+
+Checkpoint preflight validates the resident authority before considering any legacy disk
+path.
+
+### 12.4 Path, digest, size, and generation parity
+
+Required parity:
+
+```text
+requested logical path == resident logical path
+expected SHA-256        == resident SHA-256
+expected byte length    == resident byte length
+SourceState generation  == resident session generation
+```
+
+Hard failures:
+
+```text
+N8DeferredResidentCheckpointPathDrift
+N8DeferredResidentCheckpointDigestDrift
+N8DeferredResidentCheckpointSizeDrift
+N8DeferredResidentCheckpointGenerationDrift
+```
+
+No mismatch is repaired silently.
+
+### 12.5 Physical file existence decoupling
+
+For a valid active resident authority the former unconditional checks are not source
+truth:
+
+```text
+resolved_checkpoint.is_file()
+fs::metadata(checkpoint_path).len()
+```
+
+`training.rs` accepts the verified resident authority before the legacy
+`BTR27R1JR6APackedSourceMissing` physical gate.
+
+`atlas_runtime_route_admission.rs` obtains checkpoint byte length from the resident
+authority when resident-backed. The legacy filesystem metadata path remains available
+only when deferred mode is not active.
+
+### 12.6 Silent disk fallback prohibition
+
+Deferred mode is fail-closed if the resident authority is absent after resident
+continuation has been admitted.
+
+```text
+N8DeferredResidentCheckpointAuthorityMissing
+N8DeferredResidentCheckpointUnexpectedDiskFallback
+```
+
+The runtime must not respond by:
+
+```text
+creating a placeholder weights.r6pack
+creating a zero-byte file
+copying/spilling the resident payload to satisfy preflight
+using a stale physical file
+silently switching from resident to disk authority
+```
+
+Legacy disk behavior remains unchanged when deferred mode is not admitted.
+
+### 12.7 Range-read continuation
+
+The existing checkpoint range reader already projects bounded reads from resident bytes
+when an active resident session is present and validates request-path identity. The
+closure preserves that mechanism and extends the session identity with generation and
+source digest authority.
+
+Existing resident slice bound failures remain authoritative for out-of-range projection;
+this closure does not weaken those range checks.
+
+### 12.8 Step 2 through step 8 continuation
+
+Primary physical acceptance is:
+
+```text
+step 1 target generation 6
+    -> ResidentWeightPack(6)
+    -> no slot_b/weights.r6pack
+    -> step 2 source generation 6 admitted from resident authority
+```
+
+The same invariant must hold through step 8:
+
+```text
+6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13
+```
+
+Steps 1–7 continue to report zero packed payload bytes. Step 8 retains final triple-pack
+materialization.
 
 ## 13. Runtime evidence
 
-Per-step diagnostic:
+Per-step parent diagnostic:
 
 ```text
 [N8-DEFERRED][STEP]
 ```
 
-reports source/target generation, packed payload bytes, and final-materialization status.
+Resident checkpoint source diagnostic:
 
-On successful finalization R1 writes:
+```text
+[N8-DEFERRED][CHECKPOINT-SOURCE]
+```
+
+For a valid intermediate resident source it reports the resident authority, generation,
+logical path, identity parity, physical-file observation, and:
+
+```text
+disk_fallback=0
+```
+
+Successful finalization writes:
 
 ```text
 n8_deferred_durable_writeback_receipt.json
 ```
 
-both to the runtime output and durable receipt root.
-
-The receipt seals:
-
-```text
-optimizer_steps = 8
-resident_weight_authority = true
-ram_adam_mv_authority = true
-
-intermediate_weight_payload_write_count = 0
-intermediate_adam_m_payload_write_count = 0
-intermediate_adam_v_payload_write_count = 0
-intermediate_*_payload_write_bytes = 0
-
-final_weight_write_count = 1
-final_adam_m_write_count = 1
-final_adam_v_write_count = 1
-
-durable_checkpoint_publication_count = 1
-archive_publication_count = 1
-synthetic_disk_fallback_count = 0
-training_math_change_count = 0
-optimizer_math_change_count = 0
-gradient_math_change_count = 0
-```
+The parent receipt continues to seal zero intermediate packed payload writes, one final
+triple-pack materialization, one durable publication, one archive publication, and zero
+synthetic disk fallback.
 
 ## 14. Static validator and CF1 integration
 
-New validator:
+Canonical validator:
 
 ```text
 tools/validate_ash_basetrain_n8_deferred_durable_writeback_r1_static.py
 ```
 
-It is registered in:
+It remains registered in:
 
 ```text
 tools/run_r27r1j_r6a_r2_r2_cf1_compile_chain.ps1
 ```
 
-The existing RAM final-writeback validator is updated to distinguish:
+The closure extends the same validator rather than introducing a competing authority.
+It seals:
 
 ```text
-legacy RAM run-local mode:   weight payload files = 1
-N8 deferred run-local mode:  packed payload files = 0
-final writeback:              packed payload files = 3
+resident closure identity/revision
+resident session digest/generation ownership
+resident source authority resolver
+path/digest/size/generation hard gates
+resident authority before physical-file requirement
+legacy disk gate preservation
+no deferred disk fallback
+no placeholder pack creation
+resident-valid/file-absent fixture
+resident-absent/file-absent fixture
+path/digest/size/generation negative fixtures
 ```
 
-This is a validator-authority correction required by the new explicit route. The legacy
-runtime route itself is preserved.
+## 15. Implementation surface
 
-## 15. Baked implementation surface
-
-The R1 overlay contains exactly these implementation/validator files:
+Parent R1 implementation surface remains:
 
 ```text
 crates/base_train/src/bin/base_train.rs
@@ -393,38 +532,46 @@ tools/validate_ram_resident_adam_mv_final_writeback_static.py
 tools/run_r27r1j_r6a_r2_r2_cf1_compile_chain.ps1
 ```
 
-The overlay excludes generated artifacts, manifests, `.sha256` sidecars, and Python cache
-output.
+Resident Checkpoint Source Authority Closure adds/modifies:
+
+```text
+crates/base_train/src/base_train_atlas_wave_01_checkpoint_reader.rs
+crates/base_train/src/training.rs
+crates/base_train/src/atlas_runtime_route_admission.rs
+crates/base_train/src/packed_runtime_native_bootstrap_accumulation_wave_residency.rs
+tools/validate_ash_basetrain_n8_deferred_durable_writeback_r1_static.py
+```
+
+Baked overlays exclude generated artifacts, manifests, `.sha256` sidecars, and Python
+cache output.
 
 ## 16. Bake-time structural evidence
 
-Observed in the cumulative bake worktree:
+Observed in the reconstructed cumulative source tree after applying the closure:
 
 ```text
-N8 deferred durable writeback R1:                         56/56 PASS
-RAM resident Adam M/V final writeback:                    70/70 PASS
-N8 source-weight generation SSOT:                         28/28 PASS
-N8 long-horizon continuity:                               70/70 PASS
-RAM weight-pack persistent residency / Atlas readahead:   67/67 PASS
-Storage-root authority:                                   39/39 PASS
-RAM36 process-budget authority:                           63/63 PASS
-VRAM hot-weight-page residency:                           70/70 PASS
-GPU successor weight commit continuity:                   52/52 PASS
-N8 RAM-resident resume-cut determinism:                  118/118 PASS
-RAM Adam M/V PCIe overlap:                                76/76 PASS
+N8 deferred durable writeback + resident checkpoint closure: 87/87 PASS
+N8 source-weight generation SSOT:                            28/28 PASS
+Persistent TensorCube resource validator:                    68/68 PASS
+N8 long-horizon continuity:                                  70/70 PASS
+RAM resident Adam M/V final writeback:                       70/70 PASS
+RAM weight-pack persistent residency / Atlas readahead:      67/67 PASS
+VRAM hot-weight-page residency:                              70/70 PASS
+GPU successor weight commit continuity:                      52/52 PASS
+Storage-root authority:                                      39/39 PASS
+RAM36 process-budget authority:                              63/63 PASS
 ```
 
-The exact-inventory validator also passes its complete current gate set.
+The RAM exact-inventory static validator also exits successfully in the reconstructed
+full source tree.
 
-Some full CF1 validators cannot be executed in the lightweight bake worktree because
-their `specs/cli/...` fixture files are intentionally absent from that reduced tree.
-Cargo/Rust physical compilation is also not claimed from the bake container because the
-Rust toolchain is unavailable there. The authoritative local checkout's Release CF1 is
-therefore a required promotion gate.
+The bake environment has no Cargo/Rust toolchain, so Rust compilation and physical N8
+execution are not claimed here. Release CF1 on the authoritative local checkout is the
+next required gate.
 
 ## 17. Promotion tokens
 
-Static/structural tokens:
+Parent static tokens:
 
 ```text
 PASS_ASH_BASETRAIN_N8_DEFERRED_DURABLE_WRITEBACK_STRUCTURAL_R1
@@ -435,23 +582,57 @@ PASS_ASH_BASETRAIN_N8_SINGLE_DURABLE_CHECKPOINT_PUBLICATION_R1
 PASS_ASH_BASETRAIN_N8_SINGLE_ARCHIVE_PUBLICATION_R1
 ```
 
-Physical token:
+Closure static tokens:
+
+```text
+PASS_ASH_BASETRAIN_N8_DEFERRED_RESIDENT_CHECKPOINT_SOURCE_AUTHORITY_STRUCTURAL_R1
+PASS_ASH_BASETRAIN_N8_DEFERRED_RESIDENT_CHECKPOINT_IDENTITY_PARITY_R1
+PASS_ASH_BASETRAIN_N8_DEFERRED_STEP2_RESIDENT_CONTINUATION_R1
+```
+
+Physical closure token:
+
+```text
+PASS_ASH_BASETRAIN_N8_DEFERRED_RESIDENT_CHECKPOINT_SOURCE_PHYSICAL_R1
+```
+
+Parent physical/final tokens remain:
 
 ```text
 PASS_ASH_BASETRAIN_N8_DEFERRED_DURABLE_WRITEBACK_PHYSICAL_R1
-```
-
-Final promotion token:
-
-```text
 PROMOTE_ASH_BASETRAIN_N8_DEFERRED_DURABLE_WRITEBACK_R1
 ```
 
-Physical and promotion tokens are not satisfied by static bake evidence alone.
+Static evidence alone does not satisfy the physical/final tokens.
 
-## 18. Non-goals / semantic no-change boundary
+## 18. Physical acceptance
 
-R1 does not change:
+The current reproducer must progress beyond the former step-2 physical-file failure.
+Required evidence:
+
+```text
+step 1/8: packed payload bytes = 0
+resident generation 6 created
+physical slot_b/weights.r6pack may be absent
+
+step 2/8: source generation 6
+checkpoint authority = resident
+disk_fallback = 0
+packed payload bytes = 0
+```
+
+The same resident continuation must hold through steps 3–7. Step 8 alone may create the
+final triple-pack and durable/archive publications.
+
+The following former error must not recur for a valid resident intermediate source:
+
+```text
+BTR27R1JR6APackedSourceMissing:<intermediate weights.r6pack>
+```
+
+## 19. Non-goals / semantic no-change boundary
+
+R1 and this closure do not change:
 
 - forward or backward equations,
 - loss or gradient values,
@@ -464,23 +645,30 @@ R1 does not change:
 - exact subgroup32 execution,
 - R14 owner-pin semantics,
 - Stage11 merge semantics,
+- Atlas geometry or parameter ordering,
 - packed checkpoint serialization format,
 - archive format.
 
-R1 changes only the physical persistence timing and next-step resident-source authority
-inside the explicitly admitted N8 transaction.
+They change only physical persistence timing, intermediate resident continuation, and
+checkpoint source backing authority.
 
-## 19. Final SSOT statement
+## 20. Final SSOT statement
 
 ```text
 During an admitted N8 eight-step resident transaction, SourceState generations advance
 through verified resident weights and RAM Adam M/V state.
 
-Optimizer steps 1–7 may write small control/diagnostic state, but they write zero packed
-training payload bytes and expose zero runtime payload files.
+Optimizer steps 1–7 write zero packed training payload bytes and expose zero packed
+runtime payload files.
+
+An intermediate checkpoint path is a logical identity, not an unconditional filesystem
+authority. A verified ResidentWeightPack and active resident range-read session may back
+that identity when path, generation, byte length, and SHA-256 match exactly.
+
+If resident authority is valid, a physical intermediate weights.r6pack is unnecessary.
+If resident authority is absent or mismatched, execution fails closed and never silently
+creates, spills, substitutes, or falls back to disk.
 
 Only step 8 materializes weights.r6pack, adam_m.r6pack, and adam_v.r6pack, after which the
 final durable checkpoint is published once and the archive is published once.
-
-No intermediate disk payload may become a hidden continuation authority or fallback.
 ```
