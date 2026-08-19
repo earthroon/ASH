@@ -11,6 +11,9 @@ Canonical F32 Exponent-Mask Finite Predicate /
 Invalid Static Validator Contract Repair /
 Static PASS = WGPU26-Compatible WGSL /
 
+Naga26 Function Pointer-Space Closure /
+Storage·Workgroup Pointer Argument Elimination /
+
 Exact-Subgroup32 Election Compatibility /
 18 subgroupElect Callsite Closure /
 
@@ -21,7 +24,8 @@ W6 Stale Builtin-Debt Ledger Retirement /
 
 Standalone WGSL Corpus Scan /
 Embedded Rust WGSL Scan /
-Exact Naga26 Physical Parse Gate
+Exact Naga26 Physical Parse Gate /
+Corpus Failure Aggregation
 ```
 
 ## 2. Parent failure and purpose
@@ -29,6 +33,11 @@ Exact Naga26 Physical Parse Gate
 The parent physical failure is a `wgpu 26.0.1` shader-module creation failure in
 `ash_burn_vendor_variable_row_online_softmax.shader`, caused by WGSL source using
 unsupported pseudo-builtins such as `isNan` and `isInf`.
+
+After the first parser debt was closed, the exact Naga26 validator exposed an
+additional pre-existing compatibility debt: user functions accepted pointer
+arguments in address spaces that Naga26 does not admit for function parameters.
+This R1 therefore closes both syntax and validator-level WGSL incompatibilities.
 
 This R1 is not a one-file hotfix. It makes the production WGSL corpus, its static
 validators, and the physical compiler gate agree on one compatibility authority.
@@ -43,7 +52,8 @@ wgpu 26.0.1
 ```
 
 Static validators may describe and enforce the source contract, but they must not
-require syntax that the production parser rejects.
+require syntax or pointer-space structures that the production parser/validator
+rejects.
 
 ## 3. Non-goals
 
@@ -133,6 +143,54 @@ Known validators that must be repaired together with their shaders include:
 Parent source SHA seals that intentionally cover modified shader sources must be
 updated atomically. An old parent SHA must not be retained merely to preserve a
 historical validator count.
+
+## 5A. Naga26 function argument pointer-space closure
+
+Naga26 rejects user-function pointer arguments outside the function/private pointer
+spaces. In particular, passing module-scope `storage` data or `workgroup` arrays by
+pointer into a user helper produces `InvalidArgumentPointerSpace` during Naga
+validation.
+
+R1 therefore forbids production WGSL helper signatures such as:
+
+```wgsl
+fn helper(data: ptr<storage, array<f32>, read>, index: u32) -> f32 { ... }
+fn helper(tile: ptr<workgroup, array<vec4<f32>, 16>>, index: u32) -> f32 { ... }
+```
+
+The repair must preserve state ownership. Preferred transformations are:
+
+1. keep module-scope storage/workgroup objects as the SSOT,
+2. specialize a helper per owned buffer/tile and read the module-scope object directly,
+3. or pass constructible scalar/vector/index values by value,
+4. do not copy the whole storage/workgroup object into function-local state merely to satisfy the validator.
+
+The affected source baseline discovered by the exact Naga26 gate is:
+
+- `crates/burn_webgpu_backend/src/shaders/base_train_atlas_wave_02_headwise_prefill.wgsl`
+- `crates/burn_webgpu_backend/src/shaders/qwave_gradient.wgsl`
+- `crates/burn_webgpu_backend/src/shaders/qwave_tensor.wgsl`
+- `crates/burn_webgpu_backend/src/shaders/tensorcube_atlas_microtile_8x8_workgroup_ref.wgsl`
+
+The intended repairs are ownership-preserving specializations:
+
+- AW02 projection helpers read `qw`, `kw`, and `vw` directly,
+- Q-wave gradient helpers read `delta_k` directly,
+- Q-wave tensor helpers read `grad_t` and `grad_f` directly,
+- TensorCube microtile accessors read `tile_a` and `tile_b` directly.
+
+No attention/Q-wave/TensorCube formula, binding index, workgroup topology, or dispatch
+shape is changed by this closure.
+
+Promotion requires:
+
+```text
+disallowed function pointer argument count = 0
+```
+
+The global static validator must include negative fixtures for at least storage and
+workgroup pointer arguments so this validator-level incompatibility cannot silently
+re-enter the tree.
 
 ## 6. Exact-subgroup32 election compatibility
 
@@ -233,7 +291,12 @@ isNaN(
 isInf(
 subgroupElect(
 enable subgroups
+function argument ptr<storage, ...>
+function argument ptr<workgroup, ...>
 ```
+
+The pointer-space scan must also reject any other user-function pointer argument
+space that Naga26 does not admit for this profile.
 
 It must also validate f16 enable coverage for WGSL source that uses the f16 type.
 
@@ -257,6 +320,7 @@ The embedded scan applies the same forbidden-token contract:
 unsupported finite pseudo-builtin = 0
 subgroupElect = 0
 unsupported subgroup enable = 0
+disallowed function pointer argument = 0
 ```
 
 An embedded block identified as WGSL must not be omitted merely because it has no
@@ -287,6 +351,11 @@ naga::valid::Validator::new(
 
 Parse and semantic validation are separate gates. A source that parses but fails
 Naga validation is not compatible.
+
+The corpus gate must not stop after the first invalid shader. It must visit the full
+discovered corpus, collect every parse/validation failure, print the complete failure
+set, and then return one non-zero result. This prevents compatibility debt from being
+revealed one shader at a time across repeated user runs.
 
 Required token:
 
@@ -363,6 +432,7 @@ The compatibility seal is HOLD if any mandatory production source has:
 - unsupported finite pseudo-builtins,
 - `subgroupElect()`,
 - unsupported subgroup enable syntax,
+- disallowed function argument pointer space,
 - required f16 without `enable f16`,
 - a Naga parse failure,
 - a Naga validation failure,
@@ -371,8 +441,8 @@ The compatibility seal is HOLD if any mandatory production source has:
 - a stale validator that requires invalid WGSL,
 - a W6 debt gate that requires historical unsupported callsites.
 
-Production parser failure is fail-closed. This patch must not hide parser failure by
-silently selecting generic attention, CPU, or other fallback routes.
+Production parser/validator failure is fail-closed. This patch must not hide failure
+by silently selecting generic attention, CPU, or other fallback routes.
 
 ## 16. Packaging contract
 
@@ -394,6 +464,7 @@ The global seal may be promoted only when all applicable mandatory gates are tru
 unsupported finite callsites = 0
 subgroupElect callsites = 0
 production unsupported subgroup-enable count = 0
+disallowed function pointer argument count = 0
 missing f16-enable count = 0
 stale validator contract count = 0
 stale W6 builtin-debt contract count = 0
