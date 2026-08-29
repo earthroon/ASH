@@ -210,7 +210,15 @@ Cost revision:
 
 All runtime routing decisions use checked/saturating integer cost arithmetic. No unversioned host F32 sum decides the expert.
 
-Cost components are represented explicitly as numerical risk, latency, bandwidth, memory, history, safety, and total cost.
+Cost components are represented explicitly as:
+
+- numerical risk;
+- latency cost;
+- bandwidth cost;
+- memory cost;
+- history cost;
+- safety cost;
+- total cost.
 
 Current v1 may leave some terms at zero when no authoritative producer exists.
 
@@ -236,6 +244,8 @@ Safety rank:
 
 Thus exact cost ties bias to safer precision deterministically.
 
+No map/hash iteration order may decide ties.
+
 ### 20. No stochastic routing
 
 R8 does not sample from `exp(-J/T)` and does not use random seeds in expert selection.
@@ -249,13 +259,30 @@ Required final fields:
 
 ### 21. Routing decision identity
 
-Each routed job receives an `McuExpertRoutingDecisionR8` containing canonical job ordinal, feature digest, policy generation/digest, candidate/admissible masks, selected expert/cost, runner-up expert/cost, typed reason code, and decision digest.
+Each routed job receives an `McuExpertRoutingDecisionR8` containing:
+
+- canonical job ordinal;
+- feature digest;
+- policy generation/digest;
+- candidate and admissible masks;
+- selected expert and cost;
+- runner-up expert and cost;
+- typed reason code;
+- decision digest.
+
+No free-form hotpath diagnostic text is required.
 
 ### 22. Assignment manifest
 
-One sealed R6 Wave epoch receives an `McuExpertAssignmentManifestR8` containing deterministic decisions and compact E0/E1/E2 counts.
+One sealed R6 Wave epoch receives an `McuExpertAssignmentManifestR8` containing the deterministic decisions and compact counts for E0/E1/E2.
 
-The manifest records whether the epoch assignment is homogeneous and the homogeneous expert ID if one exists.
+The manifest records:
+
+- assignment count;
+- E0/E1/E2 counts;
+- whether the epoch assignment is homogeneous;
+- homogeneous expert ID if any;
+- manifest digest.
 
 ### 23. Shadow isolation
 
@@ -276,9 +303,14 @@ This is a real physical execution path, not a shadow-only metadata claim.
 
 ### 25. Explicit expert executor override
 
-The R7 executor exposes a child R8 API allowing the caller to select an already-qualified E0/E1/E2 pipeline for one Wave execution without recompiling pipelines or rebuilding the executor.
+The R7 executor now exposes a child R8 API allowing the caller to select an already-qualified E0/E1/E2 pipeline for one Wave execution without recompiling pipelines or rebuilding the executor.
 
-It reuses the same resident partition, source/momentum payload, R5 norm contract, and canonical F32 candidate output ABI.
+It reuses the same:
+
+- resident partition;
+- source/momentum payload;
+- R5 norm contract;
+- canonical F32 candidate output ABI.
 
 ### 26. No per-Wave shader compilation
 
@@ -292,37 +324,66 @@ Current Active path **does not execute** mixed expert buckets because doing so w
 
 Active mixed assignment hard-fails before execution.
 
+No fallback to the R7 run-level expert is allowed.
+
 ### 28. Why host repack is forbidden
 
 A trivial implementation could build E0/E1/E2 host vectors by copying each selected tile into new contiguous source/momentum buffers. R8 explicitly rejects that design because it would restore per-expert host payload materialization and defeat the host-scratch retirement work preceding R8.
 
+The future heterogeneous materialization revision must remain GPU-resident or use exact resident subviews.
+
 ### 29. Canonical job identity preservation
 
-R8 expert assignment changes only execution backend identity. It does not change canonical job ordinal, TensorCube coordinate, Wave membership, Atlas partition digest, source/candidate generation, or output destination identity.
+R8 expert assignment changes only execution backend identity. It does not change:
+
+- canonical job ordinal;
+- TensorCube coordinate;
+- Wave membership;
+- Atlas partition digest;
+- source generation;
+- candidate generation;
+- output destination identity.
 
 ### 30. R6 descriptor adoption
 
-R6 exposes an R8 child API to snapshot immutable descriptors, apply one homogeneous expert ID to a sealed epoch, and recompute the descriptor manifest digest.
+R6 exposes an R8 child API to:
+
+- snapshot the immutable canonical descriptors for routing;
+- apply one homogeneous expert ID to a sealed epoch;
+- recompute the descriptor manifest digest.
 
 Stale queue generation checks remain intact.
 
 ### 31. R7 child authority
 
-R7 exposes child-safe queries for qualified expert bitmask, expert manifest digest, expert qualification state, and job accounting under an R8-selected expert.
+R7 exposes child-safe queries for:
 
-R7 expert definitions remain unchanged.
+- qualified expert bitmask;
+- expert manifest digest;
+- expert qualification state;
+- job accounting under an R8-selected expert.
+
+R7's expert definitions themselves are unchanged.
 
 ### 32. R7 parent receipt
 
-During an R8 run, R7 is emitted as `PARENT_PRESERVED_BY_R8`. It does not pretend the old run-level selected expert remains the sole execution selector.
+During an R8 run, the R7 receipt is emitted as `PARENT_PRESERVED_BY_R8`. It does not pretend that the old run-level selected expert remains the sole execution selector.
+
+R7 expert arithmetic/qualification remains parent authority.
 
 ### 33. R6 parent receipt
 
-During an R8 run, R6 is emitted as `PARENT_PRESERVED_BY_R8` with router presence visible. R6 remains a scheduling parent and does not itself claim the child precision contract changed.
+During an R8 run, R6 is emitted as `PARENT_PRESERVED_BY_R8` with Path-Integral router presence visible.
+
+R6 remains a scheduling parent and does not itself claim the child precision contract changed.
 
 ### 34. No automatic escalation
 
-If the R8-selected E1/E2 expert fails, R8 does not silently rerun it through E0 and does not mutate the current policy.
+If the R8-selected E1/E2 expert fails:
+
+- R8 records a failure;
+- the job is not silently rerun through E0;
+- the current policy does not mutate.
 
 Required:
 
@@ -330,23 +391,48 @@ Required:
 
 ### 35. Policy qualification receipt
 
-Active R8 requires `McuRouterPolicyQualificationReceiptR8` binding the patch ID, compiled policy digest, feature ABI, R7 expert manifest, nonzero shadow/active fixture counts, zero routing/assignment divergences, and `homogeneous_active_execution_materialized=true`.
+Active R8 requires `McuRouterPolicyQualificationReceiptR8` binding:
 
-The receipt also records whether heterogeneous active materialization exists. For R8 it remains false.
+- R8 patch ID;
+- exact compiled policy digest;
+- feature ABI;
+- exact R7 expert manifest;
+- nonzero shadow fixture count;
+- nonzero active homogeneous fixture count;
+- zero routing replay divergence;
+- zero unqualified selection;
+- zero out-of-envelope selection;
+- zero assignment duplicate/missing;
+- `homogeneous_active_execution_materialized=true`.
+
+The receipt also records whether heterogeneous active materialization exists. For R8 it must remain false.
 
 ### 36. Active qualification semantics
 
-R8 production PASS proves deterministic policy compilation, routing replay closure, and one or more homogeneous Active Waves executed through the R8-selected expert.
+R8 production PASS proves:
+
+- deterministic policy compiler closed;
+- per-job routing replay closed;
+- one or more Active homogeneous Waves executed through the R8-selected expert;
+- no heterogeneous Wave was silently downgraded or host-repacked.
 
 It does **not** prove heterogeneous multi-expert dispatch.
 
 ### 37. Router replay
 
-Same feature vector, policy digest, and qualified expert mask must yield the same selected expert and decision digest.
+Same:
+
+- feature vector;
+- policy digest;
+- qualified expert mask;
+
+must yield the same selected expert and decision digest.
 
 No timing value participates in feature or policy digest.
 
 ### 38. Path-Integral source vs compiled policy
+
+Required distinction:
 
 `PathIntegralPolicySource != CompiledRouterPolicy`.
 
@@ -368,47 +454,138 @@ R8 does not apply Hebbian/coactivation updates to the active policy. Observed ex
 
 R8 v1 does not add a learned neural precision classifier. The compiled policy is bounded fixed-point cost logic.
 
+This keeps the first router auditable and replayable.
+
 ### 42. No full tensor router features
 
 Full TensorCube values must not become router-state history or CPU policy input. Features remain compact.
 
-### 43. Parent preservation
+### 43. R2-B lifetime preservation
+
+Router decisions and manifests must not extend full ParameterTransient payload lifetime.
 
 Required:
 
-- `parameter_lifetime_closure_preserved=true`
-- `step_compact_state_closure_preserved=true`
-- `hotpath_instrumentation_r3_preserved=true`
-- `softmatrix_r4_preserved=true`
-- `deterministic_norm_r5_preserved=true`
-- `global_job_queue_r6_preserved=true`
-- `expert_abi_r7_preserved=true`
+`parameter_lifetime_closure_preserved=true`.
 
-### 44. Atlas limitation preserved
+### 44. R2-C compact-state preservation
 
-R8 does not solve R6's unavailable exact AW01 slot lease generation. `atlas_slot_lease_generation_available=false` remains honest until separately threaded.
+Detailed assignment decisions are epoch-scoped routing evidence. They must not accumulate as an unbounded step history.
 
-### 45. Static validation
+Required:
 
-The R8 validator proves R8 module/export, Shadow default, Path-Integral source/compiled policy digest, fixed feature/cost ABI, explicit E0 safety tie-break, stochastic/online/escalation disabled, R7 expert qualification filtering, R6 descriptor snapshot/adoption, explicit executor override, Shadow isolation, heterogeneous Active fail-closed, no host expert-bucket repack, and parent validator preservation.
+`step_compact_state_closure_preserved=true`.
 
-### 46. Physical qualification sequence
+### 45. R3 instrumentation preservation
 
-`R8 static -> R7/R6/R5/R4/R3/R2 static regressions -> cargo check -> Rust tests -> WGSL validation -> Shadow router replay fixtures -> homogeneous E0 Active fixture -> homogeneous E1/E2 Active fixtures where qualified -> policy qualification receipt -> release build -> fresh Native CF1 -> fresh cross-release -> immutable Physical N2 -> Exact N8`.
+Normal R8 does not print one line per cost term/job. One compact epoch-level routing witness is sufficient in normal execution.
 
-Heterogeneous physical dispatch is intentionally not an R8 PASS requirement.
+### 46. R4/R5 preservation
 
-### 47. Runtime witnesses
+R8 does not change SoftMatrix mapping or the deterministic F32 norm contract.
 
-Per epoch:
+### 47. R6 preservation
+
+R8 does not change mutable output ranges, Atlas geometry, queue capacity, or independent-work proof.
+
+### 48. R7 preservation
+
+R8 selects only existing R7 expert IDs. It does not modify E0/E1/E2 shader arithmetic or their qualification receipts.
+
+### 49. Atlas limitation preserved
+
+R8 does not solve R6's currently unavailable exact AW01 slot lease generation. The honest parent declaration remains:
+
+`atlas_slot_lease_generation_available=false`.
+
+### 50. Static validation
+
+The R8 static validator must prove at least:
+
+- R8 module/export exists;
+- mode defaults to Shadow;
+- Path-Integral source and compiled-policy digest exist;
+- fixed feature ABI exists;
+- integer/fixed-point cost exists;
+- E0 safety tie-break is explicit;
+- stochastic routing disabled;
+- online mutation disabled;
+- automatic escalation disabled;
+- R7 expert manifest/qualification filters are used;
+- R6 descriptor snapshot and homogeneous child adoption exist;
+- executor has explicit R8 expert override;
+- Shadow does not mutate descriptors;
+- Active heterogeneous assignment fails with the exact materialization error;
+- no host expert-bucket repack path is introduced;
+- R6/R7 parent validators remain unchanged/passing.
+
+### 51. Unit tests
+
+Required source tests include:
+
+- stable safety rank E0 < E1 < E2;
+- genesis policy self-digest;
+- same feature/policy -> same decision;
+- unavailable expert filtered;
+- exact cost tie chooses safer expert;
+- Shadow manifest can be heterogeneous without execution mutation;
+- Active heterogeneous manifest rejected;
+- homogeneous Active expert override preserves job count/identity;
+- stale R6 seal remains rejected;
+- policy source digest drift rejected.
+
+Physical toolchain execution is separate from bake-time static closure.
+
+### 52. Physical qualification sequence
+
+`R8 static -> R7/R6/R5/R4/R3/R2 static regressions -> cargo check -> Rust tests -> WGSL validation -> Shadow router replay fixtures -> homogeneous E0 Active fixture -> homogeneous E1 Active fixture if qualified -> homogeneous E2 Active fixture if qualified -> policy qualification receipt -> release build -> fresh Native CF1 -> fresh cross-release -> immutable Physical N2 -> Exact N8`.
+
+Heterogeneous physical dispatch is **not** an R8 PASS requirement because it is intentionally not materialized in this revision.
+
+### 53. Runtime witnesses
+
+Per epoch compact witness:
 
 `[ASH-MCU-DETERMINISTIC-PRECISION-EXPERT-ROUTER-R8]`
 
-Final:
+Minimum:
+
+- queue generation/epoch;
+- policy generation/digest;
+- job count;
+- E0/E1/E2 assignment counts;
+- heterogeneous assignment boolean;
+- assignment manifest digest;
+- mode.
+
+Final receipt:
 
 `[ASH-BASETRAIN-UNIFIED-ATLAS-MCU-DETERMINISTIC-PRECISION-EXPERT-ROUTER-AND-PATH-INTEGRAL-POLICY-COMPILER-R8]`.
 
-### 48. PASS token
+### 54. Final receipt minimum fields
+
+- patch ID;
+- mode;
+- policy generation/digest;
+- Path-Integral source digest;
+- feature/cost ABI revisions;
+- R7 expert manifest digest;
+- qualified expert count;
+- total routed jobs;
+- E0/E1/E2 assignment counts;
+- heterogeneous assignment epoch count;
+- homogeneous Active execution epoch count;
+- `heterogeneous_active_execution_materialized=false`;
+- unknown/unqualified/out-of-envelope selection count = 0;
+- replay divergence count = 0;
+- assignment duplicate/missing count = 0;
+- stochastic routing = false;
+- online policy mutation = false;
+- automatic escalation = false;
+- canonical job identity preserved = true;
+- verdict.
+
+### 55. PASS token
 
 Only physically qualified homogeneous Active routing may emit:
 
@@ -416,26 +593,58 @@ Only physically qualified homogeneous Active routing may emit:
 
 Shadow mode emits no production PASS token.
 
-### 49. Explicit non-goals
+### 56. Explicit non-goals
 
-R8 does not physically execute heterogeneous expert buckets, host-repack source/momentum by expert, add persistent GPU work stealing, mutate Path-Integral/Hebbian policy online, sample experts stochastically, automatically requeue failed experts, change expert arithmetic, promote B05/B06 commit, retire D2H/exact waits, enable ActiveAsync, change Atlas geometry, or mutate Physical N2/RAM36.
+R8 does not:
 
-### 50. Next execution-materialization revision
+- execute heterogeneous expert buckets physically;
+- host-repack source/momentum by expert;
+- introduce persistent GPU work stealing;
+- mutate Path-Integral/Hebbian policy online;
+- sample experts stochastically;
+- automatically requeue a failed expert to E0;
+- change expert arithmetic;
+- promote B05/B06 device commit;
+- retire D2H or exact waits;
+- enable ActiveAsync;
+- change Atlas 16 MiB / 3-slot geometry;
+- mutate Physical N2 or RAM36.
+
+### 57. Next execution-materialization revision
+
+The natural next revision after R8 is **not** precision escalation yet if heterogeneous assignments are observed in Shadow.
 
 Recommended immediate child:
 
 `ASH-BASETRAIN-UNIFIED-ATLAS-MCU-GPU-RESIDENT-EXPERT-BUCKET-VIEW-AND-HETEROGENEOUS-DISPATCH-R8A`
 
-R8A should provide GPU-resident expert bucket index lists or resident subviews, no host source/momentum repack, stable per-expert bucket ordering, one canonical output destination map, R6 queue identity preservation, and exact bucket coverage/duplicate gates.
+R8A should provide:
 
-### 51. Authority declaration
+- GPU-resident expert bucket index lists or resident subviews;
+- no host source/momentum repack;
+- stable per-expert bucket ordering;
+- one canonical output destination map;
+- R6 queue identity preservation;
+- exact bucket coverage/duplicate gates.
+
+Only after R8A physical closure should a precision-escalation/requeue revision be activated.
+
+### 58. Later precision escalation
+
+After heterogeneous dispatch is physically closed, a later revision may implement bounded attempt identities such as:
+
+`E2 failure -> E1 -> E0`.
+
+That remains outside R8.
+
+### 59. Authority declaration
 
 Before R8, R6 provides canonical jobs and R7 provides independently qualified execution experts, but there is no deterministic policy authority linking the two.
 
-After R8, every R6 job can be evaluated against one immutable Path-Integral-derived fixed-point policy using one canonical feature ABI. The selected expert is reproducible from feature digest, policy digest, and qualified expert mask. Shadow mode can expose true heterogeneous per-job assignment distributions without changing execution. Active mode physically selects the routed expert only when the current Wave can honor the decision without introducing a new host repack or resident-partition topology.
+After R8, every R6 job can be evaluated against one immutable Path-Integral-derived fixed-point policy using one canonical feature ABI. The selected expert is reproducible from feature digest, policy digest, and qualified expert mask. Shadow mode can expose true heterogeneous per-job assignment distributions without changing execution. Active mode physically selects the routed expert only when the current Wave can be executed without introducing a new host repack or resident-partition topology.
 
 Thus R8 closes **routing policy authority** without falsely claiming that the current R6 Wave-resident payload topology already supports heterogeneous multi-pipeline dispatch.
 
-### 52. Center sentence
+### 60. Center sentence
 
 **R8 finally lets the MCU decide who should do the job, but it does not lie about the road from the dispatcher to the GPU. The policy can already say “this tile wants E0 and that tile wants E2”; Shadow records that exactly. Active execution is allowed only when the current resident Wave can honor the decision without resurrecting host repacking. The policy SSOT is closed now; heterogeneous GPU materialization gets its own receipt instead of being smuggled into the router.**
