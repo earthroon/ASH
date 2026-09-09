@@ -245,10 +245,18 @@ crates/base_train/src/lib.rs
 crates/base_train/src/production_multistep_loop_accumulation8_scheduler.rs
 ```
 
-Source delta digest:
+Initial R1A source delta digest before CF1 CLI-dispatch correction:
 
 ```text
 fab94609a24308d4bcc641e8add3093561ea7e011868c6ccd8e47bae0e53684a
+```
+
+Correction scope after user-machine CLI failure:
+
+```text
+MOD 1
+crates/base_train/src/bin/base_train.rs
+SHA-256 3339dfb0a63717693b302da5e652c37e20430562881020db852ce7d54954e2f9
 ```
 
 ### 12. Code-only bake
@@ -256,9 +264,9 @@ fab94609a24308d4bcc641e8add3093561ea7e011868c6ccd8e47bae0e53684a
 Full:
 
 ```text
-ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1A_FRESH_R6_SOURCE_GENESIS_CODE_ONLY.zip
+ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1A_CF1_CLI_DISPATCH_COMPILE_FIX_CODE_ONLY.zip
 SHA-256:
-7195be83001159cdafd982bbd7352776f0b1cda65529d19a9a11d28d9995f873
+9477681027d37d70ef110e39b4bbfc68137577b0e072aecddbf8205dd3a148cc
 Files: 8422
 CRC: PASS
 ```
@@ -266,14 +274,34 @@ CRC: PASS
 Overlay:
 
 ```text
-ASH_EVE_MCU_CLOSE_R2_PHYS_R1A_FRESH_R6_SOURCE_GENESIS_OVERLAY_REVIEW_ONLY_CODE_ONLY.zip
+ASH_EVE_MCU_CLOSE_R2_PHYS_R1A_CF1_CLI_DISPATCH_COMPILE_FIX_OVERLAY_CODE_ONLY.zip
 SHA-256:
-de3c3a8f62aa6e3d7c0cd12a3abdae6f84e589964470a3ee383b2feda5aa8103
+f658c37f2ea0b3293cee1f53383ae2963f41e7a0f06b703c3f3b769ee5e3074c
 Files: 6
 CRC: PASS
 ```
 
 Generated manifest, static artifact, report and this specification are excluded from both code-only ZIPs.
+
+### 12A. CF1 CLI-dispatch correction
+
+Observed user-machine failure:
+
+```text
+error: unexpected argument '--eve-mcu-close-r2-phys-r1a-source-genesis' found
+```
+
+This means the executed/local `base_train.exe` reached the legacy `Cli::parse()` path instead of the R1A early dispatch. Static inspection of the first R1A bake also found a duplicate `#[derive(Debug, Parser)]` on `EveMcuCloseR2PhysR1ACli`.
+
+The corrected bake preserves the exact selector:
+
+```text
+--eve-mcu-close-r2-phys-r1a-source-genesis
+```
+
+and preserves early dispatch before legacy `Cli::parse()`. The duplicate derive was removed. No fresh-genesis semantics changed.
+
+After applying the corrected six-file overlay, `base_train` must be rebuilt and Native CF1 must be regenerated before source-genesis execution.
 
 ### 13. Validation boundary
 
