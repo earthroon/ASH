@@ -385,14 +385,14 @@ Bake environment has no usable Cargo/rustc toolchain. Current-revision `cargo me
 Overlay review-only:
 ASH_WGPU26_VENDOR_R2_CUBECL_WGPU_EXACT_PATH_FORK_ACTIVATION_OVERLAY_REVIEW_ONLY_CODE_ONLY.zip
 SHA-256:
-51d65d3efc4f45ca5a5d94dbc6e3bbf121fab8a3f2493c7b47469cb02b6a40f8
+69f4d4902b87292aea0c33fbd1fd8832a531b4c830c44333b3937fc29b5d30fd
 Files: 6
 CRC: PASS
 
 Full applied code-only:
 ASH_PASS3_WGPU26_VENDOR_R2_CUBECL_WGPU_EXACT_PATH_FORK_ACTIVATION_CODE_ONLY.zip
 SHA-256:
-d3d721ce6fc018aef9fb9847ad11aecbf4fb035311c7d856cde83266dc1237c2
+3193ceb019adb2d2518d6cb81a60aa95fbf92f626fae8015885d685e54f75cdb
 Files: 8,420
 CRC: PASS
 
@@ -405,7 +405,7 @@ cff00554f751de7f0277ec6795f35b0131275f095ae45742ce66d3984dab8946
 ZIP freshness:
 
 ```text
-bake timestamp: 2026-09-09 15:18:42 Asia/Seoul
+bake timestamp: 2026-09-09 15:25:00 Asia/Seoul
 changed/new entries at bake mtime: 6/6 PASS
 unchanged surviving parent entries preserve parent mtime: 8,414/8,414 PASS
 ```
