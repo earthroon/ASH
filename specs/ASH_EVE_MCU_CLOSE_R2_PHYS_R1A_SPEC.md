@@ -245,45 +245,37 @@ crates/base_train/src/lib.rs
 crates/base_train/src/production_multistep_loop_accumulation8_scheduler.rs
 ```
 
-Initial R1A source delta digest before CF1 CLI-dispatch correction:
+Initial R1A source delta digest before CLI corrections:
 
 ```text
 fab94609a24308d4bcc641e8add3093561ea7e011868c6ccd8e47bae0e53684a
 ```
 
-Correction scope after user-machine CLI failure:
-
-```text
-MOD 1
-crates/base_train/src/bin/base_train.rs
-SHA-256 3339dfb0a63717693b302da5e652c37e20430562881020db852ce7d54954e2f9
-```
-
 ### 12. Code-only bake
 
-Full:
+Current corrected full code-only ZIP:
 
 ```text
-ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1A_CF1_CLI_DISPATCH_COMPILE_FIX_CODE_ONLY.zip
+ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1A_PARSER_DERIVE_RESTORE_CODE_ONLY.zip
 SHA-256:
-9477681027d37d70ef110e39b4bbfc68137577b0e072aecddbf8205dd3a148cc
+da2d8ab6aefe10ade710b331ac658f890760cf983750639b2daa3fcbf2386c11
 Files: 8422
 CRC: PASS
 ```
 
-Overlay:
+Current corrected overlay:
 
 ```text
-ASH_EVE_MCU_CLOSE_R2_PHYS_R1A_CF1_CLI_DISPATCH_COMPILE_FIX_OVERLAY_CODE_ONLY.zip
+ASH_EVE_MCU_CLOSE_R2_PHYS_R1A_PARSER_DERIVE_RESTORE_OVERLAY_CODE_ONLY.zip
 SHA-256:
-f658c37f2ea0b3293cee1f53383ae2963f41e7a0f06b703c3f3b769ee5e3074c
-Files: 6
+5bce971f06fb20b8d810a916d7a0d7b4a852fd54c0c925c90c440e9f7c6f96d8
+Files: 1
 CRC: PASS
 ```
 
 Generated manifest, static artifact, report and this specification are excluded from both code-only ZIPs.
 
-### 12A. CF1 CLI-dispatch correction
+### 12A. R1A CLI dispatch correction
 
 Observed user-machine failure:
 
@@ -291,17 +283,50 @@ Observed user-machine failure:
 error: unexpected argument '--eve-mcu-close-r2-phys-r1a-source-genesis' found
 ```
 
-This means the executed/local `base_train.exe` reached the legacy `Cli::parse()` path instead of the R1A early dispatch. Static inspection of the first R1A bake also found a duplicate `#[derive(Debug, Parser)]` on `EveMcuCloseR2PhysR1ACli`.
-
-The corrected bake preserves the exact selector:
+The R1A selector remains:
 
 ```text
 --eve-mcu-close-r2-phys-r1a-source-genesis
 ```
 
-and preserves early dispatch before legacy `Cli::parse()`. The duplicate derive was removed. No fresh-genesis semantics changed.
+and is dispatched before legacy `Cli::parse()`.
 
-After applying the corrected six-file overlay, `base_train` must be rebuilt and Native CF1 must be regenerated before source-genesis execution.
+### 12B. PHYS-R1 Parser derive restoration correction
+
+Observed user-machine compile failure:
+
+```text
+cannot find attribute `arg` in this scope
+EveMcuCloseR2PhysR1Cli::parse() not found
+```
+
+Root cause:
+
+```text
+The previous R1A CLI-dispatch correction removed the duplicate derive on
+EveMcuCloseR2PhysR1ACli, but also removed the required
+#[derive(Debug, Parser)] immediately preceding EveMcuCloseR2PhysR1Cli.
+```
+
+Corrected source requires exactly one Parser derive for each PHYS CLI:
+
+```rust
+#[derive(Debug, Parser)]
+struct EveMcuCloseR2PhysR1ACli { ... }
+
+#[derive(Debug, Parser)]
+struct EveMcuCloseR2PhysR1Cli { ... }
+```
+
+Correction scope:
+
+```text
+MOD 1
+crates/base_train/src/bin/base_train.rs
+SHA-256 090515489e75129fe1a9fcd1cc4b35c0b6cc53b3f92a23e62f1246a2a979f28e
+```
+
+This correction changes no PHYS-R1 or R1A execution semantics. It restores the Clap derive required for the existing PHYS-R1 CLI struct. Rebuild `base_train.exe` and regenerate Native CF1 after applying it.
 
 ### 13. Validation boundary
 
@@ -321,7 +346,7 @@ PERFORMANCE: unknown
 
 ### 14. Fresh source-genesis command
 
-After applying the R1A bake and rebuilding/sealing a new CF1, execute:
+After applying the corrected R1A bake and rebuilding/sealing a new CF1, execute:
 
 ```powershell
 $OUT = ".\workspace\runtime\eve_mcu_close_r2_phys_r1"
