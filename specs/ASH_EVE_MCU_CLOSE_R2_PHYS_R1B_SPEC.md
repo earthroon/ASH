@@ -99,19 +99,48 @@ Modified: `bin/base_train.rs`, `config.rs`, `eve_mcu_close_physical_campaign_r1.
 
 ### 11. Code-only bake identity
 
+Current corrected full bake:
+
 ```text
-Full: ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1B_N8_FRESH_GENESIS_FULL_PRODUCTION_CODE_ONLY.zip
-SHA-256: 4dd71dbb985368f8fa92164ac1cff9cc216b4d102583330b17cd32098fa01e84
+Full: ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_R1B_MOVE_OWNERSHIP_FIX_CODE_ONLY.zip
+SHA-256: d333d432c2fc2eb1d5c2ee92adfc7503bae4c907285cb6eebe380636ce2b56df
 Files: 8423
 CRC: PASS
 
-Overlay: ASH_EVE_MCU_CLOSE_R2_PHYS_R1B_N8_FRESH_GENESIS_OVERLAY_REVIEW_ONLY_CODE_ONLY.zip
-SHA-256: abb3a48197bb6b14f241f5ef72ecd82bd63b64c44ff77997c1a274b8ea1b8a48
-Files: 8
+Overlay: ASH_EVE_MCU_CLOSE_R2_PHYS_R1B_MOVE_OWNERSHIP_FIX_OVERLAY_CODE_ONLY.zip
+SHA-256: 36ce6969280e885479e320b87bca0ff997e1a2aca4a4f48f3d7630c21695f46d
+Files: 1
 CRC: PASS
 ```
 
 Generated manifest/artifact/report/spec are excluded from both code-only ZIPs.
+
+### 11A. Campaign output ownership correction
+
+Observed compile failure:
+
+```text
+error[E0382]: use of moved value: request.campaign_output_root
+```
+
+Root cause: `request.campaign_output_root` was moved into `PhysicalCampaignInputR1.output_root` and then read again after the parent campaign returned.
+
+The corrected R1B runner does not add a clone. The parent campaign already returns its promotion receipt path, so R1B derives the authoritative campaign root from that receipt:
+
+```rust
+let campaign_root = promotion
+    .parent()
+    .context("E_R1B_PARENT_CAMPAIGN_ROOT_MISSING")?;
+```
+
+The campaign-root consumer calls now borrow that recovered `&Path`. This changes no A/B/C, FreshGenesis, N8, RAM-Adam, Muon, R2, or promotion semantics.
+
+Corrected source file:
+
+```text
+crates/base_train/src/eve_mcu_close_r2_physical_campaign_r1b.rs
+SHA-256: ab16e8c9cc547d7a3af6b952ee86bd50ca09b7c2ad59b0b753c424affb0de43c
+```
 
 ### 12. Validation boundary
 
