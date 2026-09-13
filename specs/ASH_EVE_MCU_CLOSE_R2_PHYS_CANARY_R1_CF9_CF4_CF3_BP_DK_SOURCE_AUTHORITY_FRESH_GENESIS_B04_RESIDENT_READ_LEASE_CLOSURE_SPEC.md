@@ -138,25 +138,58 @@ otherwise
 
 ## 4. Committed segmented preservation
 
-When canonical committed segmented source exists, `COMMITTED_SEGMENTED` remains the existing BP-DK source authority. CF3 does not redirect later generations through the FreshGenesis live-source path.
+When canonical committed segmented source exists:
+
+```text
+COMMITTED_SEGMENTED
+```
+
+remains the existing BP-DK source authority.
+
+CF3 does not redirect later generations through the FreshGenesis live-source path.
 
 ---
 
 ## 5. FreshGenesis source authority
 
-For the admitted generation-zero campaign before `committed_device_source.muon` is installed, source generation is 0 and target generation is 1. Source Weight/Momentum are observed from the exact live Atlas source projection already used by candidate execution. No fake `MuonDeviceSegmentedGenerationR1` is constructed.
+For the admitted generation-zero campaign before `committed_device_source.muon` is installed:
+
+```text
+source generation = 0
+target generation = 1
+```
+
+source Weight/Momentum are observed from the exact live Atlas source projection already used by candidate execution.
+
+No fake `MuonDeviceSegmentedGenerationR1` is constructed.
 
 ---
 
 ## 6. No candidate authority regression
 
-CF4-CF2 remains authoritative for candidate Weight, candidate Momentum and orthogonal Update through the parameter assembly. CF3 does not restore `partition_view_by_key_cf4(...)` for Atlas candidate backings. Candidate ResidentGraph lookup remains prohibited.
+CF4-CF2 remains authoritative for candidate evidence:
+
+```text
+candidate Weight      → parameter assembly
+candidate Momentum    → parameter assembly
+orthogonal Update     → parameter assembly
+```
+
+CF3 does not restore:
+
+```text
+partition_view_by_key_cf4(...)
+```
+
+for Atlas candidate backings.
+
+Candidate ResidentGraph lookup remains prohibited.
 
 ---
 
 ## 7. Source/candidate authority split
 
-FreshGenesis physical observation has two legitimate backing lifetimes:
+FreshGenesis physical observation now has two legitimate backing lifetimes:
 
 ```text
 SOURCE W/M
@@ -177,17 +210,23 @@ This is one semantic BP-DK observation, not two competing policies.
 
 CF3 does not allocate a second full source Weight/Momentum buffer for BP-DK.
 
+Required:
+
 ```text
 BP-DK source GPU copy bytes = 0
 BP-DK source D2H bytes      = 0
 BP-DK source H2D bytes      = 0
 ```
 
+Important scope:
+
 The existing Atlas candidate path may already upload RAM-canonical source data into its transient source projection. CF3 adds no additional source H2D and no additional source full-buffer copy for BP-DK.
 
 ---
 
 ## 9. Live source read boundary
+
+For each Atlas physical batch:
 
 ```text
 candidate execution exact completion
@@ -208,97 +247,310 @@ CF4-CF2 candidate assembly submission/completion
 original wave backings reclaim
 ```
 
-Source reads occur before the original A02 source lease reclaim.
+Source reads therefore occur before the original A02 source lease reclaim.
 
 ---
 
 ## 10. Source read lease authority
 
-CF3 uses the existing A01 submission lease authority over the exact live physical source/candidate/update allocations. The BP-DK source read submission obtains a real `SubmissionEpoch` and exact-waits it before returning to the wave reclaim path. This is the physical source-read pin.
+CF3 uses the existing A01 submission lease authority over the exact live physical allocations:
+
+```text
+source Weight allocation
+source Momentum allocation
+candidate Weight allocation
+candidate Momentum allocation
+Update allocation
+```
+
+The BP-DK source read submission obtains a real `SubmissionEpoch` and exact-waits it before returning to the wave reclaim path.
+
+This is the physical source-read pin.
 
 ---
 
 ## 11. Source physical identity
 
-Each source observation records canonical parameter index, source generation, source Weight/Momentum `PhysicalAllocationId`, canonical tile coverage, wave provenance and real `SubmissionEpoch`. Physical allocation identity is attribution, not a lifetime extension.
+Each source observation records:
+
+```text
+canonical parameter index
+source generation
+source Weight PhysicalAllocationId
+source Momentum PhysicalAllocationId
+canonical tile coverage
+wave provenance
+real SubmissionEpoch
+```
+
+Physical allocation identity is attribution, not a lifetime extension.
 
 ---
 
 ## 12. Source generation parity
 
-`target_generation = source_generation + 1` is required with checked arithmetic. No saturating generation repair is accepted.
+Required:
+
+```text
+target_generation = source_generation + 1
+```
+
+with checked arithmetic.
+
+No saturating generation repair is accepted.
 
 ---
 
 ## 13. Source geometry
 
-Each live observation batch requires `element_count > 0` and `element_count % 256 = 0`. Canonical local/fused tile ordinals are derived from authoritative parameter element offsets. No semantic tail padding.
+Each live observation batch requires:
+
+```text
+element_count > 0
+element_count % 256 = 0
+```
+
+Canonical local/fused tile ordinals are derived from already-authoritative parameter element offsets.
+
+No semantic tail padding.
 
 ---
 
-## 14. Local and fused mapping
+## 14. Local wave mapping
 
-Local physical tiles map to canonical tile ordinals from `gradient_tile_base_element_offset / 256`. Fused local tiles map to canonical lhs/rhs tiles and the existing canonical pair ordinal. Pair topology comes from the existing fusion plan descriptors. No second pair planner is introduced.
+For local Muon batches:
 
----
+```text
+local physical tile 0..K
+    → canonical tile ordinal from gradient_tile_base_element_offset / 256
+```
 
-## 15. Compact source observation
-
-The existing BP-DK reduction/pair WGSL is reused. A FreshGenesis batch emits only tile RMS observations and pair cosine/status observations. The batch path does not dispatch target SHA-256.
-
----
-
-## 16. Exact target/update digest
-
-After CF4-CF2 seals the full candidate assembly, CF3 performs one exact target-only digest submission using the existing SHA-256 pipeline over assembled candidate Weight, candidate Momentum and orthogonal Update. No per-wave digest-of-digests is accepted.
+There are no pair observations in a local-only batch.
 
 ---
 
-## 17. Persistent pipeline reuse
+## 15. Fused wave mapping
 
-CF3 does not rebuild BP-DK pipelines per parameter. `BpDkDevicePostUpdateRuntimeR1` owns the producer through shared `Arc` authority and exposes a process-local producer handle. FreshGenesis observation therefore reuses the persistent reduction, pair and SHA-256 pipelines already owned by BP-DK runtime.
+For fused pairs:
 
----
+```text
+local tile 2i     → canonical lhs tile
+local tile 2i + 1 → canonical rhs tile
+local pair i      → canonical pair_ordinal
+```
 
-## 18. Compact evidence collector
+Pair topology comes from the existing fusion plan descriptors.
 
-`BpDkFreshGenesisObservationCollectorCf3` owns a shared producer handle, tile/pair compact observations, source attribution digest, compact D2H byte count and source observation SubmissionEpoch list. It does not own a duplicate full source tensor.
-
----
-
-## 19. Exact coverage
-
-Before semantic receipt construction, observed tile and pair counts must equal the semantic plan counts. Duplicate canonical tile or pair ordinals fail closed.
+No second pair planner is introduced.
 
 ---
 
-## 20. Semantic SSOT
+## 16. Compact source observation
 
-Final semantic authority remains `AshBpDkPostUpdateParameterReceipt`, reconstructed through the existing `AshBpDkPostUpdateStreamingBuilder::finalize_from_device_evidence_r1`. No CF3-specific semantic receipt universe is introduced.
+The existing BP-DK reduction/pair WGSL is reused.
 
----
+A FreshGenesis batch emits only:
 
-## 21. CF4-CF2 preservation
+```text
+tile RMS observations
+pair cosine/status observations
+```
 
-Candidate W/M/update pre-reclaim copy, real copy SubmissionEpoch, exact coverage, zero gap/overlap and reclaim-after-copy-completion remain unchanged.
+The batch path does NOT dispatch target SHA-256.
 
----
-
-## 22. C08 / P5 preservation
-
-The current CANARY remains B04 ActiveVerified, B05 ActiveDeviceCandidate, B06 ActiveVerified, C07 ActiveCompact, C08 MirrorVerified. CF3 does not claim C08 ActiveAsync, P5 production cutover or exact-wait retirement.
-
----
-
-## 23. No optimizer math change
-
-CF3 changes evidence transport/lifetime authority only. Adam math, Muon math, orthogonalization, BP-DK semantic math, fusion planner policy, router policy and optimizer commit order are unchanged.
+This avoids duplicate whole-target hashing per wave.
 
 ---
 
-## 24. Required witnesses
+## 17. Exact target/update digest
 
-FreshGenesis source authority:
+After CF4-CF2 seals the full candidate assembly, CF3 performs one exact target-only digest submission using the existing SHA-256 pipeline over:
+
+```text
+assembled candidate Weight
+assembled candidate Momentum
+assembled orthogonal Update
+```
+
+This produces the existing canonical three digests.
+
+---
+
+## 18. No per-wave digest-of-digests
+
+Forbidden:
+
+```text
+per-wave candidate SHA
+→ hash of hashes
+```
+
+The exact target/update SHA is computed over the full canonical assembled f32 sequence using the existing digest ABI.
+
+---
+
+## 19. Persistent pipeline reuse
+
+CF3 MUST NOT rebuild BP-DK pipelines per parameter.
+
+`BpDkDevicePostUpdateRuntimeR1` now owns the producer through shared `Arc` authority and exposes a process-local producer handle for CF3.
+
+Thus FreshGenesis source observation reuses the same persistent:
+
+```text
+reduction pipeline
+pair pipeline
+SHA-256 pipeline
+```
+
+already owned by BP-DK runtime.
+
+---
+
+## 20. Compact evidence collector
+
+`BpDkFreshGenesisObservationCollectorCf3` is parameter-local metadata/evidence state.
+
+It owns:
+
+```text
+shared producer handle
+tile observation map
+pair observation map
+source identity attribution digest
+compact D2H byte count
+source observation SubmissionEpoch list
+```
+
+It does not own a duplicate full source tensor.
+
+---
+
+## 21. Exact tile/pair coverage
+
+Before semantic receipt construction:
+
+```text
+observed_tile_count == expected_tile_count
+observed_pair_count == expected_pair_count
+```
+
+Duplicate canonical tile or pair ordinals fail closed.
+
+---
+
+## 22. Source attribution digest
+
+FreshGenesis source attribution digest binds:
+
+```text
+patch/source policy
+canonical parameter
+source generation
+target generation
+source physical allocation identities
+canonical tile ordinals
+batch provenance
+```
+
+It is an attribution identity, not a replacement for source tensor content SHA.
+
+---
+
+## 23. Existing semantic receipt SSOT
+
+Final semantic authority remains:
+
+```text
+AshBpDkPostUpdateParameterReceipt
+```
+
+CF3 reconstructs it through the existing:
+
+```text
+AshBpDkPostUpdateStreamingBuilder::finalize_from_device_evidence_r1
+```
+
+No CF3-specific semantic receipt universe.
+
+---
+
+## 24. Compact finalization adapter
+
+`BpDkDevicePostUpdateRuntimeR1` gains a compact-evidence finalization entry point for already-collected CF3 evidence.
+
+It preserves the existing checks for:
+
+```text
+reduction policy
+digest policy
+full_candidate_d2h_bytes = 0
+host_candidate_materialization_count = 0
+semantic plan digest parity
+```
+
+---
+
+## 25. CF4-CF2 assembly preservation
+
+CF3 does not change the CF4-CF2 candidate assembly contract:
+
+```text
+candidate W/M/update copied pre-reclaim
+copy SubmissionEpoch exact completion
+coverage exact
+gap_count = 0
+overlap_count = 0
+reclaim only after completed copy
+```
+
+---
+
+## 26. C08 / P5 preservation
+
+Current CANARY remains:
+
+```text
+B04 ActiveVerified
+B05 ActiveDeviceCandidate
+B06 ActiveVerified
+C07 ActiveCompact
+C08 MirrorVerified
+```
+
+CF3 does not claim:
+
+```text
+C08 ActiveAsync
+P5 production queue cutover
+exact-wait retirement
+```
+
+Exact waits are accepted physical safety boundaries in this non-promoting CANARY.
+
+---
+
+## 27. No optimizer math change
+
+CF3 changes only evidence transport/lifetime authority.
+
+No change to:
+
+```text
+Adam math
+Muon math
+orthogonalization
+BP-DK semantic math
+fusion planner policy
+router policy
+optimizer commit order
+```
+
+---
+
+## 28. Source authority witnesses
+
+FreshGenesis expected:
 
 ```text
 [ASH-BP-DK-CF9-CF4-CF3][source-authority]
@@ -312,17 +564,35 @@ bpdk_source_h2d_bytes=0
 bpdk_source_gpu_copy_bytes=0
 ```
 
-Source read lease:
+Later generation expected:
+
+```text
+selected_authority=COMMITTED_SEGMENTED
+```
+
+---
+
+## 29. Source read witnesses
+
+Before each live source reduction:
 
 ```text
 [ASH-BP-DK-CF9-CF4-CF3][source-read-lease]
 lease_state=ACQUIRED
-...
+```
+
+After exact physical completion:
+
+```text
 lease_state=RELEASED_AFTER_EXACT_COMPLETION
 submission_epoch=<real epoch>
 ```
 
-Source buffer:
+---
+
+## 30. Source buffer witness
+
+Expected:
 
 ```text
 [ASH-BP-DK-CF9-CF4-CF3][source-buffer]
@@ -334,7 +604,11 @@ bpdk_source_h2d_bytes=0
 bpdk_source_gpu_copy_bytes=0
 ```
 
-Source/target parity:
+---
+
+## 31. Source/target parity witness
+
+Before final compact receipt:
 
 ```text
 [ASH-BP-DK-CF9-CF4-CF3][source-target-parity]
@@ -347,13 +621,31 @@ admitted=true
 
 ---
 
-## 25. Failure retirement
+## 32. Parent failure retirement
 
-For admitted FreshGenesis Atlas-wave source, CF3 must retire `E_CF9_CF4_SOURCE_GENERATION_MISSING`. Earlier `BpDkPostUpdateCandidateCardinality`, `E_CF9_CF4_RESIDENT_PARTITION_VIEW_MISSING`, and `E_DEVICE_SOFT_SUBGROUP_ARENA_PAGE_MISSING` must remain retired.
+For admitted FreshGenesis Atlas-wave source, CF3 must retire:
+
+```text
+E_CF9_CF4_SOURCE_GENERATION_MISSING
+```
+
+The token may remain valid only in the explicit `COMMITTED_SEGMENTED` branch when that branch's required source is actually absent.
 
 ---
 
-## 26. Forbidden fixes
+## 33. Earlier failures remain retired
+
+CF3 must not regress:
+
+```text
+BpDkPostUpdateCandidateCardinality
+E_CF9_CF4_RESIDENT_PARTITION_VIEW_MISSING
+E_DEVICE_SOFT_SUBGROUP_ARENA_PAGE_MISSING
+```
+
+---
+
+## 34. Forbidden fixes
 
 ```text
 fake MuonDeviceSegmentedGenerationR1 for FreshGenesis
@@ -372,7 +664,9 @@ P5 cutover promotion
 
 ---
 
-## 27. Static acceptance
+## 35. Static acceptance
+
+Required:
 
 ```text
 explicit source authority classification                 present
@@ -386,7 +680,8 @@ fake segmented source generation                         zero
 shared persistent BP-DK producer                         present
 source live reduction before source arena reclaim        present
 exact source observation SubmissionEpoch wait            present
-canonical tile/fused-pair remap                          present
+canonical tile remap                                     present
+canonical fused pair remap                               present
 exact tile/pair coverage                                 present
 CF4-CF2 candidate assembly                               preserved
 existing semantic finalizer                              reused
@@ -394,22 +689,41 @@ existing semantic finalizer                              reused
 
 ---
 
-## 28. Static validation record
+## 36. Static validation record
+
+Parent and CF3 observed identical historical validator results:
 
 ```text
 R7A parent     79 / 83 PASS
 R7A CF3        79 / 83 PASS
+
 R7A1 parent    77 / 82 PASS
 R7A1 CF3       77 / 82 PASS
 ```
 
-Remaining failures are pre-existing source-pattern drift in historical validators. No new CF3 validator regression was observed. Static validation is not compile/WGPU proof.
+The remaining failures are pre-existing source-pattern drift in those historical validators. No new CF3 validator regression was observed.
+
+This static record is not compile or WGPU physical proof.
 
 ---
 
-## 29. Compile / single-build CF1 acceptance
+## 37. Compile acceptance
 
-Use the existing single-build workflow:
+Required native authority:
+
+```text
+base_train --release --locked
+```
+
+Compile PASS must come from the user's native CF1 run.
+
+The bake environment does not claim compilation.
+
+---
+
+## 38. Single-build CF1 law
+
+Operational sequence:
 
 ```text
 apply overlay
@@ -421,44 +735,75 @@ apply overlay
 → 2-step CANARY
 ```
 
-The bake environment does not claim native compilation.
+Do not run a redundant standalone `cargo build base_train` before CF1.
 
 ---
 
-## 30. Physical acceptance
+## 39. Physical acceptance
 
 One real CANARY must reach:
 
 ```text
 CF4-CF2 assembly-seal admitted=true
-→ CF3 source-authority B04_ATLAS_WAVE_FRESH_GENESIS
-→ source-read-lease ACQUIRED
-→ source-buffer physical IDs
-→ source-read-lease RELEASED_AFTER_EXACT_COMPLETION
-→ source-target-parity admitted=true
-→ CF4 device-post-collect
-→ canonical post-receipt
+↓
+CF3 source-authority selected_authority=B04_ATLAS_WAVE_FRESH_GENESIS
+↓
+CF3 source-read-lease ACQUIRED
+↓
+CF3 source-buffer physical IDs
+↓
+CF3 source-read-lease RELEASED_AFTER_EXACT_COMPLETION
+↓
+CF3 source-target-parity admitted=true
+↓
+CF4 device-post-collect
+↓
+CF4 canonical post-receipt
 ```
 
-with full candidate D2H and host candidate materialization zero, and BP-DK-specific source D2H/H2D/GPU copy zero.
+with:
+
+```text
+full_candidate_d2h_bytes=0
+host_candidate_materialization_count=0
+bpdk_source_d2h_bytes=0
+bpdk_source_h2d_bytes=0
+bpdk_source_gpu_copy_bytes=0
+```
 
 ---
 
-## 31. PASS token
+## 40. PASS token
+
+Reserved:
 
 ```text
 PASS_EVE_MCU_CLOSE_R2_PHYS_CANARY_R1_CF9_CF4_CF3
 ```
 
----
+Meaning:
 
-## 32. Non-claims
-
-CF3 does not claim C08 ActiveAsync, P5 queue cutover, all exact waits retired, full BP-DK numerical qualification, full R1B campaign, A/B/C promotion, or final resource geometry for all future generations.
+> The BP-DK source authority is explicitly classified. Canonical committed segmented source remains authoritative when present. During FreshGenesis Atlas-wave streaming before segmented source installation, BP-DK reads the exact live source Weight/Momentum projection in place before reclaim, pins the read through a real SubmissionEpoch, retains only compact source-dependent observations, combines them with exact SHA-256 from the CF4-CF2 sealed target assembly, and reconstructs the existing canonical semantic receipt without source D2H, additional source H2D, source GPU duplication, fake segmented generation, or candidate ResidentGraph reconstruction.
 
 ---
 
-## 33. Code bake record
+## 41. Non-claims
+
+CF3 does not claim:
+
+```text
+C08 ActiveAsync
+P5 queue cutover
+all exact waits retired
+full BP-DK numerical qualification complete
+full R1B campaign complete
+A/B/C promotion complete
+resource geometry final for all future generations
+```
+
+---
+
+## 42. Code bake record
 
 ```text
 Direct parent files: 8424
@@ -489,18 +834,22 @@ crates/burn_webgpu_backend/src/tensorcube_fused_pair_muon.rs
 
 ---
 
-## 34. Artifacts
+## 43. Artifacts
+
+Full code-only:
 
 ```text
-Full code-only:
 ASH_PASS3_EVE_MCU_CLOSE_R2_PHYS_CANARY_R1_CF9_CF4_CF3_BP_DK_SOURCE_AUTHORITY_FRESH_GENESIS_B04_LIVE_SOURCE_READ_CLOSURE_CODE_ONLY.zip
 SHA-256: af8ddce448fa02c7b26e94394a208eb3d74e9cf067e2099cbb00f3f04833ab22
 Files: 8424
 CRC: PASS
 specs/: 0
 artifacts/: 0
+```
 
 Overlay code-only:
+
+```text
 ASH_EVE_MCU_CLOSE_R2_PHYS_CANARY_R1_CF9_CF4_CF3_BP_DK_SOURCE_AUTHORITY_FRESH_GENESIS_B04_LIVE_SOURCE_READ_CLOSURE_OVERLAY_CODE_ONLY.zip
 SHA-256: 0e8797ed929def96fc3c03ed7c653bf27c79a5ff6df1e4ce3777ce8e7b2de511
 Files: 5
