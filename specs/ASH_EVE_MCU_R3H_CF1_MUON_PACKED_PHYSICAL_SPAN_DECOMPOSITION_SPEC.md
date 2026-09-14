@@ -197,6 +197,8 @@ All subspans remain entries in the existing `copies` vector and are encoded into
 
 No new `wait_for_submission_exact` callsite is introduced.
 
+The existing logical `successor_gpu_projection_entry_count` semantics are preserved: one Muon logical projection route still contributes exactly one logical projection entry even when it decomposes into multiple physical copy commands. Physical `copy_command_count` is reported separately by the CF1 witness and is not reinjected into logical topology counters.
+
 ## 12. Runtime witness
 
 CF1 emits:
@@ -311,7 +313,7 @@ changed Rust delimiter balance = PASS
 The production scheduler SHA-256 after bake is:
 
 ```text
-e215d5afeb1ab2f6715a12abda92f5d76269dcfb84d237723f981f524babdf94
+0d6e2491d7fdb5de14795faedb0185de40f9f5173ae20beb60425c5e8a623b22
 ```
 
 ## 17. Parent byte-preservation hashes
@@ -340,7 +342,7 @@ Full code-only archive:
 
 ```text
 ASH_PASS3_EVE_MCU_R3H_CF1_MUON_PACKED_PHYSICAL_SPAN_DECOMPOSITION_CODE_ONLY.zip
-SHA-256 85bc0c40009e74545fa28329c8d9124249feb239b07373a6ceef7dac8a50b4aa
+SHA-256 f7acb57ad1fd8f682b52738e851cfd8a13503f0e22205296d732051b12e135be
 Files 8426
 CRC PASS
 ```
@@ -349,7 +351,7 @@ Overlay:
 
 ```text
 ASH_EVE_MCU_R3H_CF1_MUON_PACKED_PHYSICAL_SPAN_DECOMPOSITION_OVERLAY_CODE_ONLY.zip
-SHA-256 49cf498504f685b7308122d3bf1c00fbccc1fb16d6a6f734e68ba06dc143a09a
+SHA-256 d948e26f3a518485abb1700ef1b163720d281f872e861912a30a534903bd0637
 Files 1
 CRC PASS
 ```
