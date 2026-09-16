@@ -17,6 +17,8 @@
 + NO CANDIDATE HOST DEMOTION CLAIM
 ```
 
+---
+
 ## 1. Purpose
 
 The parent R7A arena returned completed leases to a reusable free page but retained the underlying `Arc<wgpu::Buffer>` indefinitely. Consequently a session could preserve its arena high-water VRAM even after pages were logically free.
@@ -35,9 +37,32 @@ submission completion
 → decrement retained bytes / page count
 ```
 
-This revision intentionally does **not** claim that generation-wide Adam candidate W/M/V residency has been moved to CPU RAM. Those pages are still live while `AdamWDeviceSegmentedGenerationR1` owns them and therefore are not trim-eligible. Candidate host demotion remains the next residency revision.
+This revision intentionally does **not** claim that the generation-wide Adam candidate W/M/V residency has been moved to CPU RAM. Those pages are still live while `AdamWDeviceSegmentedGenerationR1` owns them and therefore are not trim-eligible. Candidate host demotion remains the next residency revision.
 
-## 2. Physical retention target
+---
+
+## 2. Parent problem
+
+Parent reclaim ended at:
+
+```text
+page.in_use = false
+active_lease_count -= 1
+```
+
+The page remained in `ArenaRuntime.pools` and retained its `Arc<wgpu::Buffer>`.
+
+Therefore:
+
+```text
+logical free != physical VRAM return
+```
+
+CF9-CF2 closes only the physical free-page half of that gap.
+
+---
+
+## 3. Physical retention target
 
 The session's original R7A arena budget is captured before CF9 resource reseal:
 
@@ -58,7 +83,9 @@ physical free-page target  = original bootstrap arena budget
 
 The physical target is registered against every replacement R7A domain created by CF8/CF9 reseal.
 
-## 3. Trim law
+---
+
+## 4. Trim law
 
 A page is trim-eligible only when all of the following are true:
 
@@ -82,7 +109,9 @@ or no eligible free page remains.
 
 Live pages are never destroyed merely to satisfy the target.
 
-## 4. Allocation registry retirement
+---
+
+## 5. Allocation registry retirement
 
 CF9-CF2 adds:
 
@@ -91,11 +120,19 @@ assert_owned_physical_allocation_retirable
 retire_owned_physical_allocation
 ```
 
-Retirement fails closed when the allocation is unknown or any Live logical lease still references it.
+Retirement fails closed when:
+
+```text
+allocation is unknown
+or
+any Live logical lease still references it
+```
 
 The A01 allocation→queue binding is removed before the destroyed page can be mistaken for a valid owned allocation later.
 
-## 5. Lock-order / destruction law
+---
+
+## 6. Lock-order / destruction law
 
 `Buffer::destroy()` is not executed while holding the arena mutex.
 
@@ -112,7 +149,9 @@ A02 snapshot / candidate selection
 
 This avoids introducing an A02-held physical destruction path and prevents the destroyed page from remaining discoverable in the reusable pool.
 
-## 6. Accounting
+---
+
+## 7. Accounting
 
 `McuArenaTelemetryR7A` now includes:
 
@@ -141,7 +180,9 @@ physical_destroy_*  += exact destroyed amount
 
 Peak retained bytes remain historical high-water telemetry and are not decremented.
 
-## 7. Runtime receipt
+---
+
+## 8. Runtime receipt
 
 The generation resource summary marker becomes:
 
@@ -166,7 +207,9 @@ Each destroyed page may emit:
 
 containing only bounded scalar allocation/page identity and destroyed byte count.
 
-## 8. Preserved execution semantics
+---
+
+## 9. Preserved execution semantics
 
 CF9-CF2 does not modify:
 
@@ -188,7 +231,9 @@ B06 generation ticket semantics
 
 Logical lease reclaim still requires exact tracked completion before a page can become free.
 
-## 9. Explicit non-closure
+---
+
+## 10. Explicit non-closure
 
 The current source still owns completed AdamW candidate GPU segments in:
 
@@ -217,7 +262,9 @@ GPU → HOST CANDIDATE DEMOTION
 
 That revision must change the full-device-generation ownership contract rather than merely shrinking an arena budget number.
 
-## 10. Source delta
+---
+
+## 11. Source delta
 
 ```text
 ADD 0
@@ -241,7 +288,7 @@ buffer_submission_lease.rs
 2fb1df20664435104606723b5436daed79b5a492780159dadeef158018fe548a
 
 usage_segregated_buffer_arena.rs
-e93a7052a9d65552b1f951af92b928fe3c7832d6396c5eab2ccee0cd9a8db3d9
+586226aeeffa8f297e53e7d5de15bbe8746b94705a6919b37156ff052b2b0537
 
 mcu_device_resource_runtime_r7a.rs
 39a86c45e9787c0a8ff85148a14e877a5a44196a5bf1368b5a7f49b167894b37
@@ -250,7 +297,9 @@ production_multistep_loop_accumulation8_scheduler.rs
 73474c21ddc3b268ff47c301ecf2e4db1a20ad84bbadaa149be9f8328f616375
 ```
 
-## 11. Code-only archives
+---
+
+## 12. Code-only archives
 
 Parent full code-only archive:
 
@@ -263,7 +312,7 @@ Overlay:
 
 ```text
 ASH_EVE_MCU_R7A_CF9_CF2_PHYSICAL_FREE_PAGE_TRIM_OVERLAY_CODE_ONLY.zip
-SHA-256 1389528a6868686639f6b8fe657869e29c9539dfa05434bc25a292f8aff07b86
+SHA-256 cb314f12be44e004cc7341be1946852d24965f24f877b44e265ef82f1a3a38e7
 FILES 4
 CRC PASS
 ```
@@ -272,7 +321,7 @@ Full applied code-only:
 
 ```text
 ASH_PASS3_EVE_MCU_R7A_CF9_CF2_PHYSICAL_FREE_PAGE_TRIM_CODE_ONLY.zip
-SHA-256 a1dcb8b09b638bc3dc5a0bc791821d99b06497c166b08f32c8e24ed5cd5475f8
+SHA-256 400e94cdd7c4cdab2774dfa8d279f60bafe84eeecb4f044bd588d08213adf060
 FILES 8426
 CRC PASS
 ```
@@ -288,7 +337,9 @@ Markdown     0
 
 Build inputs such as `Cargo.toml` and `Cargo.lock` remain in the full archive.
 
-## 12. Qualification
+---
+
+## 13. Qualification
 
 Added source test:
 
@@ -313,21 +364,33 @@ Physical qualification requires an R7A physical run and inspection of:
 
 A successful trim must demonstrate nonzero `physical_destroyed_bytes` when free retained pages exceed the target.
 
-## 13. Evidence boundary at bake time
+---
+
+## 14. Evidence boundary at bake time
 
 ```text
 SOURCE / STATIC       PASS
 ARCHIVE / CRC         PASS
-RUST COMPILE          UNVERIFIED
+FIRST USER COMPILE    FAIL / MISSING anyhow::Context IMPORT
+COMPILEFIX SOURCE     APPLIED
+RUST RECOMPILE        REQUIRED / UNVERIFIED
 RUST TEST             UNVERIFIED
 PHYSICAL              UNVERIFIED
 VRAM PERFORMANCE      UNMEASURED
 CANDIDATE HOST DEMOTE NOT IMPLEMENTED / NOT CLAIMED
 ```
 
-The bake environment does not contain `cargo`, `rustc`, or `rustfmt`, so compile/runtime/physical promotion is not claimed.
+The first user-side Rust compile exposed a source-level import omission in `usage_segregated_buffer_arena.rs`: the CF9-CF2 implementation used `.context(...)` without importing the `anyhow::Context` trait. The code-only archives were re-sealed with:
 
-## 14. Promotion tokens
+```rust
+use anyhow::{anyhow, ensure, Context, Result};
+```
+
+This compilefix closes the reported E0599 source defect only. A successful user-side recompile is still required before compile promotion. The bake environment does not contain `cargo`, `rustc`, or `rustfmt`, so runtime/physical promotion is not claimed.
+
+---
+
+## 15. Promotion tokens
 
 Static / compile qualification:
 
@@ -353,7 +416,9 @@ The following token is explicitly unavailable in this revision:
 PASS_EVE_MCU_R7A_WAVE_BOUNDED_CANDIDATE_RESIDENCY
 ```
 
-## 15. Completion law
+---
+
+## 16. Completion law
 
 CF9-CF2 is complete only when:
 
