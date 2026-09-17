@@ -37,354 +37,341 @@ CF9-CF3 max in-flight segments:
 
 CF9-CF3 observed host M/V duplicate retirement:
 1,582,088,192 bytes
-
-terminal host allocation failure:
-2,147,483,648 bytes
 ```
 
-For the admitted Adam geometry:
+For the current Adam geometry:
 
 ```text
-planned segment count        = 93
-planned Adam element count   = 197,761,024
-full candidate M/V raw bytes = 197,761,024 × 4 × 2
-                           = 1,582,088,192
+planned_adam_element_count=197761024
+197761024 × 4 × 2 = 1582088192
 ```
 
-Therefore the CF3 `host-mv-retire-after-r3b` payload was exactly one extra full-generation M/V representation.
+Therefore the retired host M/V payload exactly matched one extra complete candidate M/V generation copy.
 
-CF3A removes that duplicate lifetime while preserving the CF3 device-residency cutover.
+The same run later failed with:
+
+```text
+memory allocation of 2147483648 bytes failed
+```
+
+The exact 2 GiB allocation owner remains unproven at the parent evidence level.
 
 ---
 
-## 2. Ownership law
+## 2. Parent duplication
 
-Production ownership after CF3A:
+CF9-CF3 fixed generation-wide candidate VRAM retention by demoting completed W/M/V segments to host payload objects.
 
-```text
-VRAM
-    bounded active / in-flight Adam segments
+However, the parent direct-host staging still retained payload-owning completed segment entries before later canonical host adoption.
 
-CPU RAM source
-    current ResidentWeightPack
-    current committed RamResidentAdamMv
-
-CPU RAM candidate
-    one ResidentWeightPackBuilder / ResidentWeightPack successor
-    one RamResidentAdamMv candidate M/V authority
-
-Generation ledger
-    metadata + digests + R3G completion receipts only
-```
-
-Forbidden in the CF3A direct path:
+The unwanted shape is:
 
 ```text
-full generation demoted Vec<W>
-full generation demoted Vec<M>
-full generation demoted Vec<V>
-payload-owning completed-segment generation map
+GPU candidate W/M/V
+→ host-demoted segment Vec<W/M/V>
+→ generation ledger retains segment payload
+→ later canonical candidate W/M/V authority receives the same payload
+→ duplicate generation payload finally dropped
 ```
 
-Committed and candidate transactional state may coexist. CF3A removes only the third duplicate demotion representation.
+CF3A replaces this with:
+
+```text
+GPU W
+→ bounded readback
+→ ResidentWeightPackBuilder canonical destination
+
+GPU M/V
+→ bounded readback
+→ RamResidentAdamMv candidate destination
+
+completed generation ledger
+→ metadata / digest / R3G receipt only
+```
 
 ---
 
-## 3. Direct W demotion
+## 3. Direct candidate authorities
 
-After exact physical completion and R3G receipt capture, candidate W bytes are copied from bounded mapped readback directly into:
+Candidate W authority:
+
+```text
+ResidentWeightPackBuilder
+→ ResidentWeightPack
+```
+
+Candidate M/V authority:
+
+```text
+RamResidentAdamMv
+CandidateFilling
+→ direct candidate segment writes
+→ CandidateComplete
+```
+
+No additional generation-wide W/M/V payload authority is permitted in direct CF3A mode.
+
+---
+
+## 4. Direct W demotion
+
+Each completed Adam candidate W segment is copied through the bounded CF3A readback staging allocation and written directly to:
 
 ```text
 ResidentWeightPackBuilder::write_at(...)
 ```
 
-using the canonical host packed byte offset resolved for the Adam segment.
+using the canonical parameter weight byte offset plus segment-local byte offset.
 
-The completed generation metadata does not retain W payload.
+The completed host generation entry retains only:
 
-For later full-trainable projection, already initialized Adam W ranges are read from the candidate builder through the bounded projection helper rather than reconstructed from segment payload vectors.
+```text
+range identity
+historical physical allocation IDs
+transfer evidence
+W digest
+M digest
+V digest
+R3G mutation receipts
+```
+
+and zero candidate payload Vecs.
 
 ---
 
-## 4. Direct M/V demotion
+## 5. Direct M/V demotion
 
-After exact physical completion, mapped candidate M/V are decoded in bounded chunks and written directly through:
+Mapped M/V bytes are consumed in bounded chunks and written directly to:
 
 ```text
 RamResidentAdamMv::write_candidate_adam_segment_cf3a(...)
 ```
 
-into the existing route-sparse transactional candidate slots.
-
-The direct M/V path records exact packed/canonical coverage and performs no generation-wide segment M/V retention.
-
-At R3B, production direct mode calls:
+The direct write validates:
 
 ```text
-admit_mcu_eve_adamw_direct_candidate_r3b_cf3a(...)
+CandidateFilling phase
+canonical parameter identity
+route-local segment bounds
+exact M/V cardinality
+no overlap
+no replay
+no overrun
 ```
 
-R3B validates/seals the already-populated candidate M/V and performs:
-
-```text
-late GPU M D2H = 0
-late GPU V D2H = 0
-staging slots  = 0
-```
-
-The parent `host-mv-retire-after-r3b` operation remains only on the legacy CF3 path. It is not executed on CF3A direct production.
+Candidate M/V coverage is therefore advanced during physical segment collection instead of a later full-generation R3B copy.
 
 ---
 
-## 5. M/V exact digest closure
+## 6. R3B seal-only path
 
-Physical segment completion order is not promoted as canonical digest order.
-
-CF3A direct sealing performs one canonical host read pass over:
+When the generation is direct-host-demoted:
 
 ```text
-Muon-inherited M/V → committed authority
-Explicit-AdamW M/V → candidate compact overlay
+AdamWHostDemotedGenerationCf3.direct_host_demoted_cf3a == true
 ```
 
-and computes the exact canonical candidate M/V SHA-256 values.
+R3B no longer materializes M/V from a host-demoted payload copy.
 
-This is a bounded host read pass. It does not materialize another full candidate M/V payload.
+Instead it requires:
+
+```text
+resident phase == CandidateFilling
+candidate coverage exact
+candidate generation == target generation
+```
+
+then performs:
+
+```text
+seal_candidate_r1(...)
+```
+
+and publishes the existing R3B receipt.
+
+The old runtime event:
+
+```text
+[ASH-MCU-R7A-CF9-CF3][host-mv-retire-after-r3b]
+```
+
+is absent in the direct CF3A path because there is no duplicate M/V generation payload to retire.
 
 ---
 
-## 6. Metadata-only segment representation
+## 7. B06 schema realignment
 
-The existing CF3 segment type remains dual-mode for qualification compatibility.
+The parent B06 schema assumed any host-demoted Adam generation had produced host candidate Vec materializations.
 
-Legacy CF3 constructor:
-
-```text
-legacy_weight = Some(Vec<f32>)
-legacy_m      = Some(Vec<f32>)
-legacy_v      = Some(Vec<f32>)
-direct_host_cf3a = false
-```
-
-CF3A direct constructor:
-
-```text
-legacy_weight = None
-legacy_m      = None
-legacy_v      = None
-direct_host_cf3a = true
-```
-
-Direct generation admission requires:
-
-```text
-host_payload_vec_materialization_count_cf3a() == 0
-```
-
-The generation keeps only segment range identity, transfer evidence, W/M/V digests, submission epoch identity, physical-allocation provenance IDs, and prepared R3G receipts.
-
-Historical physical IDs are evidence only after retirement and must not be reused as live allocations.
-
----
-
-## 7. R3G law
-
-R3G exact completion evidence is captured while the candidate physical allocations are still live:
-
-```text
-GPU writer completion
-→ PreparedGpuMutationReceiptR3G2
-→ direct host write
-→ host validation
-→ metadata publication
-→ GPU segment retirement
-```
-
-Generation seal reconstructs its R3G completion set from retained immutable receipts rather than requiring old live allocations to remain resident.
-
-No fabricated completion receipt is allowed after physical retirement.
-
----
-
-## 8. B06 schema realignment
-
-CF3A direct generation tickets use:
+CF3A adds:
 
 ```text
 ASH_MCU_ADAMW_DIRECT_HOST_DEMOTED_GENERATION_CF3A
 ```
 
-Direct-host B06 contract:
+For this schema:
 
 ```text
-host_demoted = true
-candidate W/M/V D2H bytes > 0
-candidate W/M/V component bytes exact
+host_demoted_segment_count == expected segment count
 host_candidate_vec_materialization_count == 0
-device_sealed = false
+candidate W D2H bytes > 0
+candidate M D2H bytes > 0
+candidate V D2H bytes > 0
 ```
 
-Legacy CF3 host-demoted tickets retain the previous contract requiring payload materialization count `> 0`.
+Legacy CF3 host-demoted schema preserves the previous positive host Vec requirement.
 
-Unknown host-demoted schema revisions fail closed.
+Therefore zero Vec materialization is interpreted as successful direct canonical host ownership rather than missing candidate materialization.
 
 ---
 
-## 9. Bounded device residency
+## 8. RAM36 successor reservation realignment
 
-CF3A preserves the CF3 pending-generation bound and direct collection path.
+Direct CF3A materializes the candidate weight successor before the later R3H reservation site.
 
-Completed candidate segments are demoted while the generation is still open. Successful direct host demotion therefore does not migrate completed segments into a generation-wide GPU payload owner.
+Without realignment, the later projection can treat the already-existing candidate W as a future requested allocation and double-count host headroom.
 
-The physical target remains:
+CF3A therefore binds the R3H reservation request to:
 
 ```text
-peak live Adam candidate segments
-    <= bounded producer / demotion depth
+existing candidate weight successor present
+    → additional requested successor bytes = 0
 
-terminal live Adam candidate segment count
-    == 0 before consuming commit
+candidate weight successor absent
+    → existing parent requested-byte projection
 ```
 
-CF9-CF2 remains the physical free-page reuse/trim authority.
+The already-resident candidate remains visible through process-private accounting.
+
+CF3A does not discount actual resident memory from RAM36.
 
 ---
 
-## 10. Resident weight successor authority
+## 9. Physical device residency preservation
 
-CF3A opens the candidate weight successor before Adam direct demotion when the direct path is active.
-
-That candidate is the single candidate W destination used by:
+CF3A preserves CF3's device-side behavior:
 
 ```text
-Adam direct W demotion
-full-trainable projection
-final ResidentWeightPack successor
+max_in_flight_segments bounded
+completed physical candidate segment
+→ R3G completion receipt
+→ direct host destination
+→ GPU segment retirement
 ```
 
-The later R3H replacement stage recognizes the already-materialized direct successor and emits a direct-host materialization receipt with no second W D2H.
+Generation-wide W/M/V candidate GPU residency remains forbidden.
 
-If no direct successor exists, the legacy R3H materialization path remains available for non-CF3A paths.
+CF9-CF2 continues to manage reusable free pages and physical trim.
 
 ---
 
-## 11. RAM36 accounting closure
+## 10. Direct-generation metadata
 
-Creating the direct candidate W earlier means it is already a real reserved/allocated host authority before the later R3H replacement phase.
-
-CF3A therefore changes the R3H projection request law:
+`AdamWHostDemotedCandidateSegmentCf3` remains the segment receipt type for compatibility, but direct CF3A construction uses:
 
 ```text
-candidate successor already exists
-    → additional successor request bytes = 0
-
-candidate successor absent
-    → legacy successor request bytes
+new_direct_cf3a(...)
 ```
 
-This prevents the same already-materialized candidate W from being counted again as a hypothetical future allocation.
+with:
 
-It does not discount actual process-private bytes.
+```text
+legacy_weight = None
+legacy_m = None
+legacy_v = None
+```
 
-RAM36 hard limit remains unchanged.
+Direct generation admission requires every segment to report:
+
+```text
+direct_host_cf3a == true
+```
+
+and generation-level:
+
+```text
+host_payload_vec_materialization_count == 0
+```
 
 ---
 
-## 12. Large host allocation tracing
+## 11. 2 GiB allocation tracing
 
-The exact owner of the observed `2,147,483,648` byte host allocation remains unknown at bake time.
-
-CF3A preserves existing traces:
+The parent already traced:
 
 ```text
 [ASH-R3H-HOST-ALLOC-TRACE][resident-weight-builder]
 [ASH-R3H-HOST-ALLOC-TRACE][objective-probe-read-range]
 ```
 
-and adds:
+CF3A adds or preserves large-allocation attribution at canonical host owners, including:
 
 ```text
 [ASH-R3H-HOST-ALLOC-TRACE][resident-weight-load-once]
 [ASH-R3H-HOST-ALLOC-TRACE][ram-adam-mv-slot]
 ```
 
-The new traces emit only for large allocations and carry scalar request/capacity context. No per-wave success logging is added.
+The exact failing 2 GiB allocation remains `UNKNOWN` until a trace site immediately identifies the matching requested size.
 
-Attribution is promoted only when the failing allocation size is matched to a concrete preceding allocation trace.
-
----
-
-## 13. Runtime summary
-
-Direct production emits one aggregate marker:
-
-```text
-[ASH-MCU-R7A-CF9-CF3A][direct-host-demotion-summary]
-```
-
-The receipt includes:
-
-```text
-planned_segment_count
-direct_demoted_segment_count
-planned_element_count
-weight_direct_written_elements
-m_direct_written_elements
-v_direct_written_elements
-duplicate_candidate_weight_bytes=0
-duplicate_candidate_m_bytes=0
-duplicate_candidate_v_bytes=0
-host_payload_vec_materialization_count
-peak_live_device_segment_count
-terminal_live_adam_candidate_segment_count
-admitted=true
-```
-
-No per-segment success receipt is introduced.
+CF3A does not infer a root cause from the byte count alone.
 
 ---
 
-## 14. Current physical acceptance target
+## 12. Logging law
 
-For the current campaign:
+No per-segment direct-demotion success logging is introduced.
 
-```text
-planned_segment_count             = 93
-direct_demoted_segment_count      = 93
-planned_element_count             = 197761024
-weight_direct_written_elements    = 197761024
-m_direct_written_elements         = 197761024
-v_direct_written_elements         = 197761024
-duplicate_candidate_weight_bytes  = 0
-duplicate_candidate_m_bytes       = 0
-duplicate_candidate_v_bytes       = 0
-host_payload_vec_materialization_count = 0
-terminal_live_adam_candidate_segment_count = 0
-```
+Successful direct demotion remains aggregated in the generation summary.
 
-The direct path must not emit a successful `host-mv-retire-after-r3b` event because there is no full duplicate demoted M/V payload to retire.
+CF9-CF2 per-page physical trim success lines remain compacted as established by CF3.
+
+Failure attribution remains detailed and fail-closed.
 
 ---
 
-## 15. Explicit non-scope
+## 13. Preserved semantics
+
+CF3A changes no:
+
+```text
+AdamW arithmetic
+Muon / HiMuon arithmetic
+WGSL
+Device / Queue authority
+R3G completion-before-retirement
+R3C consuming commit semantics
+CF6 packed validation
+CF8 runtime evidence compaction
+CF9-CF2 physical free-page trim
+```
+
+The ownership change is host-representation only:
+
+```text
+payload-owning demotion ledger
+→ direct canonical candidate destinations
+```
+
+---
+
+## 14. Explicit non-scope
 
 CF3A does not implement:
 
 ```text
-CPU historical/evidence RAM → disk write-through
+CPU historical evidence → disk write-through
 planner snapshot streaming
 objective-probe bounded digest scratch
 packed GPU gather
-new optimizer mathematics
-new WGSL
-Device / Queue reconstruction
+new optimizer algorithm
+new tensor-parallel policy
 ```
 
-Canonical source and candidate training state legitimately remain in RAM through the transaction.
+Canonical transactional source and candidate W/M/V remain in CPU RAM until the consuming commit/abort lifecycle resolves them.
 
 ---
 
-## 16. Source delta
+## 15. Source delta
 
 ```text
 ADD 1
@@ -413,38 +400,34 @@ crates/burn_webgpu_backend/src/hybrid_optimizer_device_commit.rs
 tools/validate_ash_basetrain_unified_atlas_mcu_full_model_device_segmented_successor_adamw_active_candidate_r1_static.py
 ```
 
-Source SHA-256 after bake:
+---
+
+## 16. Runtime target
+
+The direct path must close:
 
 ```text
-d70d4df1ae039d7ea03bdfae020dfe157f0d105b18c77e74c224b506a6ef3171  production_multistep_loop_accumulation8_scheduler.rs
-015f379006c9be6e9aaa5873b43b3e6e2365b8ec439f7ac60c57933d7919c27b  ram_resident_adam_mv.rs
-720210e9623c500466591ae7f523798963d0431de64b6216a2bc931225035c16  ram_weight_pack_persistent_residency.rs
-ff7e9cd6662dc3ee3c8756abc3e6c3f571558f2aca1540b94ff518ac6c59048d  resident_weight_replacement_authority_r3h.rs
-31e32005c5e5290fd7e723cdb7f5a33ab61fd32f6c778b85dd8d2dc9ae7ca599  tensorcube_local_muon_production_callsite_adoption.rs
-cc271cd2463bbff4e4ec2d9dbd534a8ac54eec7e9bca003e8bfbca8cdf148093  unified_atlas_mcu_adamw_active_device_pending_generation_scheduler_r1.rs
-ec7c20f4de8e590244ba68e686c2a4028277ce29a2efa6576c03bd9e6ffe1ef7  unified_atlas_mcu_eve_adamw_target_ram_writeback_r3b.rs
-f1755aec057b51d3bdc919cbd3208962e1f8d59e814bb416bb510f20c3299b8d  unified_atlas_mcu_full_model_device_segmented_successor_r1.rs
-f1b5486df4056c6c6f17145c5e9744314d596d85d1b28e9aecad24a333b01a29  hybrid_optimizer_device_commit.rs
-ee921c3a3186832d1b2c29fd8d93339e897c1b0841b9216fb8f607626fcce661  validate_ash_basetrain_unified_atlas_mcu_full_model_device_segmented_successor_adamw_active_candidate_r1_static.py
-861978eecc2234f9f622486e5e23a44136e8b622a0353b69bcaffadf74be74bf  validate_ash_eve_mcu_r7a_cf9_cf3a_static.py
+planned_segment_count=93
+direct_demoted_segment_count=93
+planned_element_count=197761024
+weight_direct_written_elements=197761024
+m_direct_written_elements=197761024
+v_direct_written_elements=197761024
+host_payload_vec_materialization_count=0
+terminal_live_adam_candidate_segment_count=0
 ```
+
+The parent duplicate M/V retirement marker must have count zero.
 
 ---
 
 ## 17. Code-only archives
 
-Parent:
-
-```text
-ASH_PASS3_EVE_MCU_R7A_CF9_CF3_GPU_HOST_CANDIDATE_DEMOTION_WAVE_BOUNDED_DEVICE_RESIDENCY_CODE_ONLY.zip
-SHA-256 1f642da5bb444f6550932073d6df7c11b1adce23a9662a3f0e4ca4caf8136b5d
-```
-
 Overlay:
 
 ```text
 ASH_EVE_MCU_R7A_CF9_CF3A_DIRECT_HOST_DEMOTION_OVERLAY_CODE_ONLY.zip
-SHA-256 507e688a6904580c5d20e0342152cb3c03e20172dfeefeef214db0c55c5dc059
+SHA-256 24667c1426e118d630b3f4a8c6e46bfc168935fbb4927156444135875c915d1a
 FILES 11
 CRC PASS
 ```
@@ -453,7 +436,7 @@ Full applied code-only:
 
 ```text
 ASH_PASS3_EVE_MCU_R7A_CF9_CF3A_DIRECT_HOST_DEMOTION_CODE_ONLY.zip
-SHA-256 27454cc4d0e5807b798d44855021fbcbbfb5fb969a7d0eab746cd1a0ac531fb4
+SHA-256 4321fcf0ff3489c411216e756feaf7b24b62b3d33203328ee3e9020a98c95242
 FILES 8428
 CRC PASS
 ```
@@ -488,6 +471,64 @@ PASS_ASH_BASETRAIN_RAM36_RESERVATION_PROJECTION_REMAINING_UNDERFLOW_ATTRIBUTION_
 ```
 
 Modified Python validators also passed Python AST parsing.
+
+---
+
+## 18A. User compile failure and compilefix-1
+
+The first user-side `base_train` compile exposed two source-migration omissions rather than a numerical or ownership-contract failure.
+
+Observed compile errors:
+
+```text
+production_multistep_loop_accumulation8_scheduler.rs
+    submit_adamw_active_device_pending_segment_r1(...)
+    4 legacy/reference callsites still supplied the pre-CF3A 17-argument ABI
+
+unified_atlas_mcu_adamw_active_device_pending_generation_scheduler_r1.rs
+    collect_ready_once(...) still referenced demote_segment_to_host_cf3(...)
+    after the legacy/reference demotion helper had been removed
+```
+
+Compilefix-1 preserves the CF3A production semantics. It only closes the reference/legacy ABI migration:
+
+```text
+legacy scheduler callsites:
+    host_parameter_weight_byte_offset = src.weight_byte_offset
+    direct_host_cf3a = false
+
+legacy collect_ready_once:
+    restore the parent CF3 demote_segment_to_host_cf3(...) implementation
+
+direct production path:
+    demote_segment_to_host_cf3a(...) unchanged
+    direct_host_cf3a = true path unchanged
+```
+
+No optimizer math, direct-host ownership, R3G ordering, RAM36 policy or physical residency law changes.
+
+Compilefix source SHA-256:
+
+```text
+production_multistep_loop_accumulation8_scheduler.rs
+4604f0a641d0c944faea92b8a537a0e6eab35aa4a46357ffa254961d62894b40
+
+unified_atlas_mcu_adamw_active_device_pending_generation_scheduler_r1.rs
+3ddb5f7c74dbf0dc36d2a2c293981330acc9eec772749d6cc478a5492f377a84
+```
+
+Static validators were rerun after compilefix and remained PASS.
+
+Evidence boundary after compilefix bake:
+
+```text
+FIRST USER COMPILE    FAIL
+CAUSE                 legacy/reference callsite ABI migration incomplete
+COMPILEFIX-1          APPLIED
+SOURCE / STATIC       PASS
+RECOMPILE             REQUIRED
+RUNTIME / PHYSICAL    UNVERIFIED
+```
 
 ---
 
