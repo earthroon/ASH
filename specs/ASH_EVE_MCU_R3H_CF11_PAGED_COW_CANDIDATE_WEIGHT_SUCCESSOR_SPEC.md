@@ -378,7 +378,7 @@ tools/validate_ash_eve_mcu_r3h_cf11_paged_cow_candidate_weight_successor_static.
 Current bake result:
 
 ```text
-PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=54
+PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=64
 ```
 
 Preserved static results:
@@ -429,8 +429,8 @@ Overlay:
 
 ```text
 ASH_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_OVERLAY_CODE_ONLY.zip
-SHA-256 3497cd6374624e467a8e43751a9263983485fda8d9d215a47daa27e51f386b46
-FILES 5
+SHA-256 5e61239d167b625ee5a61e1fe2577f35e804e0146e4d6e3d5d4c57fdab9a060e
+FILES 9
 CRC PASS
 ```
 
@@ -438,7 +438,7 @@ Full:
 
 ```text
 ASH_PASS3_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_CODE_ONLY.zip
-SHA-256 020e8e30d0ee9158eab26ceb2567f7563a7017fecc57bd36ab8a51c63564eb68
+SHA-256 018af076ecc8592208b0cf53667f63cca7b35fee3fdd62e4c453b11c3cab13a7
 FILES 8433
 CRC PASS
 ```
@@ -551,3 +551,38 @@ Performance promotion additionally requires measured step wall time and spool/re
 > No late operation may reconstruct a second full candidate pack while the old source is still resident.
 
 > Memory admission is established before any performance claim; the additional disk I/O must be measured against the `base_train <= ~120 s/step` project target.
+
+
+### Compilefix-2: CF10 backend ABI closure bundled into CF11 overlay
+
+User compile exposed:
+
+```text
+error[E0432]: unresolved import `burn_webgpu_backend::Cf10EvidenceEvent`
+error[E0599]: no method named `cf10_reduce_terminal_evidence`
+```
+
+The CF11 Full artifact already contained the CF10 backend implementation. The CF11 Overlay did not bundle that backend dependency, so base_train could be newer than the backend public ABI.
+
+Compilefix-2 makes the Overlay self-contained by bundling:
+
+```text
+crates/burn_webgpu_backend/src/lib.rs
+crates/burn_webgpu_backend/src/base_train_tensorcube_local_muon.rs
+crates/burn_webgpu_backend/src/gpu_resident_evidence_reduction_cf10.rs
+crates/burn_webgpu_backend/src/shaders/gpu_resident_evidence_reduction_cf10.wgsl
+```
+
+Static validation now directly checks the type definition, root module/re-export, executor method and WGSL presence.
+
+```text
+PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=64
+```
+
+Compilefix-2 status:
+
+```text
+SOURCE    APPLIED
+STATIC    PASS 64/64
+COMPILE   USER RE-RUN REQUIRED
+```
