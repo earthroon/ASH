@@ -378,7 +378,7 @@ tools/validate_ash_eve_mcu_r3h_cf11_paged_cow_candidate_weight_successor_static.
 Current bake result:
 
 ```text
-PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=51
+PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=54
 ```
 
 Preserved static results:
@@ -407,6 +407,7 @@ The same five R3C1 checks fail on the untouched CF4 parent, so this is not class
 MOD crates/base_train/src/production_multistep_loop_accumulation8_scheduler.rs
 MOD crates/base_train/src/ram_weight_pack_persistent_residency.rs
 MOD crates/base_train/src/resident_weight_replacement_authority_r3h.rs
+MOD crates/base_train/src/tensorcube_local_muon_production_callsite_adoption.rs
 ADD tools/validate_ash_eve_mcu_r3h_cf11_paged_cow_candidate_weight_successor_static.py
 ```
 
@@ -416,7 +417,8 @@ Source SHA-256:
 94e739c83b4fc25f599f8be5d7ae4255feb282215e22b316a159bfc7f69a1f6c  ram_weight_pack_persistent_residency.rs
 def162b05fa130a7b76c52630b3220e112ac1f634da68b81814b2573040846a0  production_multistep_loop_accumulation8_scheduler.rs
 a58359472ef8f6d962b3471414a5c648fa8a3f290ebfed8f03854be31b2dacec  resident_weight_replacement_authority_r3h.rs
-24602bd9878be0efe6701d4a20ef0cf58e999683bdd94fc237da86a643403912  validate_ash_eve_mcu_r3h_cf11_paged_cow_candidate_weight_successor_static.py
+225a281c550f3a0e1505755626f0aff8201b47d7d0a7220296c6c54cbdd496b8  tensorcube_local_muon_production_callsite_adoption.rs
+246c7b3c0e98a4b85b6eae2bbdbe9de2d49d9a4de7017b689050582ff41e5f62  validate_ash_eve_mcu_r3h_cf11_paged_cow_candidate_weight_successor_static.py
 ```
 
 ---
@@ -427,8 +429,8 @@ Overlay:
 
 ```text
 ASH_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_OVERLAY_CODE_ONLY.zip
-SHA-256 80bd594977d23050d9a34e80a7ce1dc96e8fd81ab6a7ca31f331f2e7e02b01d2
-FILES 4
+SHA-256 3497cd6374624e467a8e43751a9263983485fda8d9d215a47daa27e51f386b46
+FILES 5
 CRC PASS
 ```
 
@@ -436,7 +438,7 @@ Full:
 
 ```text
 ASH_PASS3_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_CODE_ONLY.zip
-SHA-256 6151d9bc91c33ef6500d1aef878dcac07865b42fe19ded989147d231f90a9b8c
+SHA-256 020e8e30d0ee9158eab26ceb2567f7563a7017fecc57bd36ab8a51c63564eb68
 FILES 8433
 CRC PASS
 ```
@@ -471,6 +473,40 @@ PERFORMANCE           UNMEASURED
 ```
 
 No Rust toolchain is installed in the bake environment, therefore no compile/runtime claim is made.
+
+### Compilefix-1: successor builder reborrow
+
+First user compile exposed:
+
+```text
+error[E0382]: borrow of moved value: successor_weight_builder
+```
+
+The streaming call consumed `Option<&mut ResidentWeightPackBuilder>` by value and the later CF4 direct demotion attempted to borrow the same option again.
+
+Compilefix-1 changes only the streaming callsite:
+
+```text
+successor_weight_builder
+-> successor_weight_builder.as_deref_mut()
+```
+
+This is a short mutable reborrow; ownership of the outer `Option<&mut ...>` remains available for the later direct demotion.
+
+Static validation now rejects both:
+
+```text
+missing reborrow
+legacy bare move into streaming call
+```
+
+Compilefix-1 status:
+
+```text
+SOURCE    APPLIED
+STATIC    PASS 54/54
+COMPILE   USER RE-RUN REQUIRED
+```
 
 ---
 
