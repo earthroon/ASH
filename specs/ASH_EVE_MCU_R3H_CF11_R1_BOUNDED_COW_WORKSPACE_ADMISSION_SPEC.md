@@ -558,8 +558,8 @@ No optimizer kernel changes.
 40134763d9f75d27d44d3ac8fb8f3a62904497991f7e58f4218c0332b1cf79d6  crates/base_train/src/ram36_process_budget.rs
 42b57a09968e15c2d84171345e625653ff3fdc7ab4a94ff35c0af8dbe3559b80  crates/base_train/src/ram_weight_pack_persistent_residency.rs
 a0368f39edc1061550924d9adbca1d4abe6a4ea0f2a3a6b6b377de72c9c418c5  crates/base_train/src/resident_weight_replacement_authority_r3h.rs
-500ba42648b425d5acae9217dc7bc466198f4b7985a62c29d7d64baafea429c1  crates/base_train/src/production_multistep_loop_accumulation8_scheduler.rs
-f91b03d7e90bf28943d00ecab1e95895b2228cab2a824bc7047f6b8ee41dd2ee  tools/validate_ash_eve_mcu_r3h_cf11_r1_bounded_cow_workspace_static.py
+969c15971283bb60fcd3876f044e7df20ed9a2d5d7d8e2cead48504ca769d040  crates/base_train/src/production_multistep_loop_accumulation8_scheduler.rs
+e17447ba7e32c2718fca2d3e5b8d4576a50abda3bcdad4997887761247f6f65e  tools/validate_ash_eve_mcu_r3h_cf11_r1_bounded_cow_workspace_static.py
 ```
 
 ---
@@ -569,7 +569,7 @@ f91b03d7e90bf28943d00ecab1e95895b2228cab2a824bc7047f6b8ee41dd2ee  tools/validate
 Passed in bake environment:
 
 ```text
-PASS_EVE_MCU_R3H_CF11_R1_BOUNDED_COW_WORKSPACE_STATIC checks=20
+PASS_EVE_MCU_R3H_CF11_R1_BOUNDED_COW_WORKSPACE_STATIC checks=22
 PASS_EVE_MCU_R3H_CF11_PAGED_COW_CANDIDATE_WEIGHT_SUCCESSOR_STATIC checks=64
 PASS_EVE_MCU_R7A_CF9_CF4_MUON_WAVE_BOUNDED_DEVICE_SUCCESSOR_STATIC checks=47
 PASS_EVE_MCU_R7A_CF9_CF3A_DIRECT_HOST_DEMOTION_STATIC
@@ -615,7 +615,7 @@ Overlay:
 
 ```text
 ASH_EVE_MCU_R3H_CF11_R1_BOUNDED_COW_WORKSPACE_ADMISSION_OVERLAY_CODE_ONLY.zip
-SHA-256 7567e7a1a505048f57a905395e8a5f3847743275d0b4a646f8432f0751f4cc68
+SHA-256 2094e8db032555a920770d66c327e18a73981b7402a269805e0c8813feb96c5f
 FILES 5
 CRC PASS
 ```
@@ -624,7 +624,7 @@ Full:
 
 ```text
 ASH_PASS3_EVE_MCU_R3H_CF11_R1_BOUNDED_COW_WORKSPACE_ADMISSION_CODE_ONLY.zip
-SHA-256 00df8604da109e73ad5b2aa398df0bf14e81862c4e63377439c66d4536202b83
+SHA-256 85d09432d065e49af5ef998748c9b41cda386ce13d95251caad366c08809e1ff
 FILES 8434
 CRC PASS
 ```
@@ -790,3 +790,91 @@ SOURCE < STATIC < COMPILE < RUNTIME < PHYSICAL < PERFORMANCE < PROMOTED
 > Application ownership retirement is not automatically promoted to proof of immediate operating-system page decommit.
 
 > No optimizer numerical semantics, WGSL, R3C atomic promotion semantics, checkpoint format, dataset or tokenizer semantics change in this revision.
+
+
+---
+
+## 28. Compilefix-1: consume_window successor builder reborrow closure
+
+First user compile of the R1 bake exposed:
+
+```text
+error[E0502]: cannot borrow `resident_weight_successor_builder` as immutable
+because it is also borrowed as mutable
+```
+
+Exact locus:
+
+```text
+production_multistep_loop_accumulation8_scheduler.rs
+consume_window closure
+```
+
+The original R1 closure captured:
+
+```text
+resident_weight_successor_builder
+```
+
+through both:
+
+```text
+.as_deref()
+.as_deref_mut()
+```
+
+Because the closure later invokes the mutable form, Rust treats the captured outer builder as mutably borrowed for the closure lifetime. The direct-CF4 empty-copy path then attempted an immutable borrow of the same outer option before the closure's final use.
+
+Compilefix-1 changes no ownership authority and no allocation ordering.
+
+The closure now receives a short reborrow explicitly:
+
+```rust
+let mut consume_window = |
+    base_weight_bytes: &[u8],
+    mut successor_weight_builder: Option<&mut ResidentWeightPackBuilder>,
+| -> Result<()> {
+    ...
+};
+```
+
+Both call sites pass:
+
+```text
+resident_weight_successor_builder.as_deref_mut()
+```
+
+The direct CF4 pre-read remains outside the closure and may therefore take its existing immutable borrow before the short mutable reborrow begins.
+
+Preserved semantics:
+
+```text
+CF4 direct initialized successor read
+CF3A weight overlay
+CF11 append_or_verify_initialized
+candidate hash order
+workspace admission / release
+source-retirement ordering
+optimizer numerics
+R3C atomic promotion
+```
+
+Static validation adds explicit guards that:
+
+```text
+consume_window does not capture resident_weight_successor_builder
+consume_window receives explicit Option<&mut ResidentWeightPackBuilder>
+call sites use short as_deref_mut() reborrows
+```
+
+Compilefix evidence:
+
+```text
+SOURCE    APPLIED
+STATIC    PASS 22/22
+COMPILE   USER RE-RUN REQUIRED
+RUNTIME   UNVERIFIED
+PHYSICAL  UNVERIFIED
+```
+
+The compilefix does not claim E0502 closure until the user reruns Rust compilation.
