@@ -8,7 +8,7 @@ Patch ID:
 ASH-BASETRAIN-R2B-FFN-PERSISTENT-FUSED-EXACT-BACKING-PAIR-ATTRIBUTION-CF2
 
 Build revision:
-r2b-cf2-ffn-persistent-fused-exact-backing-pair-attribution
+basetrain-r2b-ffn-persistent-fused-exact-backing-pair-attribution-cf2
 
 Class:
 PHYSICAL WGPU BINDING ATTRIBUTION
@@ -17,132 +17,290 @@ DIAGNOSTIC ONLY
 NO FIX
 ```
 
-Direct parent: R2B-CF1 FIRST PHYSICAL FORWARD DISPATCH STORAGE ACCESS / BACKING IDENTITY ATTRIBUTION.
-
-## 1. Parent physical evidence
+Direct parent:
 
 ```text
-exit=101
+R2B-CF1
+FIRST PHYSICAL FORWARD DISPATCH STORAGE ACCESS / BACKING IDENTITY ATTRIBUTION
+```
+
+## 1. Authoritative parent evidence
+
+Release execution reproduced the canonical WGPU failure:
+
+```text
 wgpu error: Validation Error
 In a CommandEncoder
   In a dispatch command, indirect:false
-Current usage BufferUses(STORAGE_READ_ONLY)
-new usage BufferUses(STORAGE_READ_WRITE)
-
-backtrace:
-wgpu::CommandEncoder::finish
-→ BaseTrainFfnTensorCubePersistentExecutor::execute
-→ actual_decoder_block_split_forward
-→ atlas_runtime_forward_wave_execution
+Attempted to use Buffer with conflicting usages
+STORAGE_READ_ONLY
+STORAGE_READ_WRITE
+EXIT=101
 ```
 
-CF1 generic CubeCL tracing observed pooled same-storage disjoint-range pairs with READ_WRITE ↔ READ_WRITE. CF2 therefore narrows to the FFN persistent fused dynamic BindGroup.
-
-## 2. Exact candidate set
+The physical backtrace closed the local execution locus to:
 
 ```text
-binding 0 = input_hidden     READ
-binding 1 = gate_pre_out     READ_WRITE
-binding 2 = silu_gate_out    READ_WRITE
-binding 3 = up_linear_out    READ_WRITE
-binding 4 = ffn_product_out  READ_WRITE
-
-candidate pairs:
-0↔1
-0↔2
-0↔3
-0↔4
+wgpu::CommandEncoder::finish
+↓
+burn_webgpu_backend::base_train_ffn_tensorcube_persistent_executor::
+BaseTrainFfnTensorCubePersistentExecutor::execute
+↓
+model_core::actual_decoder_block_split_forward
+↓
+atlas_runtime_forward_wave_execution
 ```
 
-## 3. Exact backing authority
+CF1 also observed CubeCL pooled storage sharing across disjoint ranges, but those observed generic dispatch pairs were `READ_WRITE ↔ READ_WRITE`, not the canonical mixed-access pair.
 
-For every candidate output CF2 evaluates:
+## 2. Exact fused dynamic binding authority
 
-```rust
-Arc::ptr_eq(&input_hidden.buffer, &candidate.buffer)
+The existing fused dynamic bind-group layout remains unchanged:
+
+```text
+binding 0  input_hidden      STORAGE_READ_ONLY
+binding 1  gate_pre_out      STORAGE_READ_WRITE
+binding 2  silu_gate_out     STORAGE_READ_WRITE
+binding 3  up_linear_out     STORAGE_READ_WRITE
+binding 4  ffn_product_out   STORAGE_READ_WRITE
 ```
 
-This is the authoritative CF2 same-backing test inside one executor invocation.
+Population dynamic buffers remain read-only and are excluded from the primary mixed-access candidate set by source.
 
-## 4. Diagnostic activation
+## 3. Purpose
+
+R2B-CF2 answers only:
+
+```text
+Q1. Which binding 1..4 shares the exact same Arc<BackendBuffer> with binding 0?
+Q2. What are the two binding windows and their range relation?
+Q3. Are multiple output bindings sharing the input backing simultaneously?
+Q4. Does the canonical WGPU failure follow the attributed fused binding set in the same execute invocation?
+```
+
+## 4. Non-goals
+
+CF2 does not change:
+
+```text
+WGSL
+BindGroupLayout access flags
+bind ordering
+allocator policy
+CubeCL pooled storage policy
+Fusion behavior
+RawWgpuBufferLease ownership
+residency policy
+model values
+optimizer state
+gradient math
+training math
+```
+
+CF2 does not add GPU copies, GPU maps, GPU waits, fallback execution, detached output buffers, or access-class repair.
+
+## 5. Diagnostic activation
 
 ```text
 ASH_R2B_CF2_FFN_FUSED_ALIAS_TRACE=1
-ASH_R2B_CF2_TRACE_ROOT=<trace directory>
+ASH_R2B_CF2_TRACE_ROOT=<trace root>
 ASH_R2B_CF2_PROCESS_RUN_ID=<run id>
 ```
 
-Default OFF. Trace file:
+Default is OFF. With the trace gate absent, the new exact-pair instrumentation path is not entered.
+
+Output:
 
 ```text
 r2b_cf2_ffn_fused_alias_trace.jsonl
 ```
 
-## 5. Pair witness
+Each event is host-side append + flush only and adds no GPU work.
 
-Every pair records execute_sequence, layer_index, source_weight_generation, tensor_set_digest, binding roles/access, same_buffer, range_relation, offset/size/len windows, shapes, primitive IDs, stream IDs, bridge modes, active states, and classification.
+## 6. Exact backing authority
 
-```text
-same_buffer=true
-→ FFN_FUSED_MIXED_ACCESS_SHARED_BACKING
+For every output candidate CF2 evaluates:
 
-same_buffer=false
-→ DISTINCT_BACKING
+```rust
+Arc::ptr_eq(&input_hidden.buffer, &candidate.buffer)
 ```
 
-Range relation:
+Candidate set:
+
+```text
+0 ↔ 1 gate_pre_out
+0 ↔ 2 silu_gate_out
+0 ↔ 3 up_linear_out
+0 ↔ 4 ffn_product_out
+```
+
+`Arc::ptr_eq()` is the authoritative CF2 same-backing test inside the FFN executor. Debug label equality, size equality, and textual identity are not used for promotion.
+
+## 7. Range relation
+
+Using the exact bind windows:
+
+```text
+buffer_offset
+buffer_size
+len_bytes
+```
+
+CF2 classifies each pair as:
 
 ```text
 EXACT_RANGE
 OVERLAPPING_RANGE
 DISJOINT_RANGE
-RANGE_OVERFLOW
 ```
 
-Range disjointness does not exonerate the shared WGPU Buffer.
+Disjoint byte ranges do not exonerate a shared WGPU Buffer from usage-scope validation.
 
-## 6. Complete candidate preservation
+## 8. Pair event
 
-All four pairs are logged. Summary fields:
+For all four candidates CF2 emits `FFN_FUSED_ALIAS_PAIR` with:
+
+```text
+execute_sequence
+layer_index
+source_weight_generation
+tensor_set_digest
+binding_a=0
+role_a=input_hidden
+access_a=READ
+offset_a
+size_a
+len_a
+shape_a
+primitive_id_a
+stream_id_a
+binding_b
+role_b
+access_b=READ_WRITE
+offset_b
+size_b
+len_b
+shape_b
+primitive_id_b
+stream_id_b
+same_buffer
+range_relation
+classification
+```
+
+Classification:
+
+```text
+same_buffer=true
+  -> FFN_FUSED_MIXED_ACCESS_SHARED_BACKING
+
+same_buffer=false
+  -> DISTINCT_BACKING
+```
+
+All four pairs are emitted; CF2 does not stop at the first match.
+
+## 9. Summary event
+
+CF2 emits `FFN_FUSED_ALIAS_SUMMARY` with:
 
 ```text
 shared_backing_pair_count
 shared_binding_mask
+exact_range_count
+overlap_count
+disjoint_count
+shared_bindings
 mixed_access_shared_backing_present
 ```
 
-Multiple true pairs remain a multi-pair attribution. CF2 never invents one winner.
+The bit mask maps candidate bindings 1..4 to bits 0..3.
 
-## 7. Encoder finish witness
+## 10. Encoder-finish crash witness
 
-Immediately before encoder.finish() CF2 flushes:
+Immediately before the existing:
 
-```text
-[R2B-CF2][encoder-finish-begin]
+```rust
+self.queue.submit(Some(encoder.finish()));
 ```
 
-The original GPU path remains encoder.finish() → queue.submit(command_buffer).
+CF2 emits and flushes:
 
-## 8. Non-goals
+```text
+ENCODER_FINISH_BEGIN
+```
 
-CF2 changes no BindGroupLayout access flag, WGSL, bind ordering, allocator policy, CubeCL pooled storage, RawWgpuBufferLease ownership, Fusion semantics, residency semantics, optimizer state, model value, training math, or gradient math.
+with the exact pair summary. The original `encoder.finish()` behavior is preserved and the WGPU validation panic is not intercepted or suppressed.
 
-CF2 adds no GPU dispatch, GPU copy, GPU map, GPU wait, CPU fallback, selective materialization, access unification, or allocator split.
+## 11. Promotion law
 
-## 9. Source scope
+Physical attribution requires, in the same release process run:
+
+```text
+one or more FFN_FUSED_MIXED_ACCESS_SHARED_BACKING records
++
+ENCODER_FINISH_BEGIN for the same execute_sequence
++
+canonical WGPU STORAGE_READ_ONLY / STORAGE_READ_WRITE validation failure
+```
+
+If exactly one output binding shares backing:
+
+```text
+EXACT_FFN_FUSED_ALIAS_PAIR_ISOLATED
+```
+
+If multiple output bindings share backing:
+
+```text
+MULTI_FFN_FUSED_ALIAS_PAIR_ISOLATED
+```
+
+Do not arbitrarily select one pair when multiple are present.
+
+If no `0 ↔ 1..4` pair shares backing while the canonical failure still reproduces:
+
+```text
+HOLD_R2B_CF2_NO_SHARED_BACKING_PAIR
+```
+
+## 12. Repair deferral
+
+CF2 does not implement any repair. Only after exact physical closure may a later revision compare:
+
+```text
+access-class unification
+selective detached backing
+raw-lease / pooled-storage export authority
+```
+
+## 13. Baked source delta
 
 ```text
 MOD crates/burn_webgpu_backend/src/base_train_ffn_tensorcube_persistent_executor.rs
 ADD tools/validate_ash_r2b_cf2_ffn_fused_exact_backing_pair_static.py
 DEL 0
-
-Cargo.toml delta = 0
-Cargo.lock delta = 0
-shader delta = 0
-CubeCL vendor delta = 0
 ```
 
-## 10. Static acceptance
+No `Cargo.toml`, `Cargo.lock`, WGSL, or CubeCL source delta.
+
+Source-delta digest:
+
+```text
+8222f14279b5f58691d29ae376223432ebb21616636a34516057e5e1d16ec0ce
+```
+
+Changed source SHA-256:
+
+```text
+base_train_ffn_tensorcube_persistent_executor.rs
+b388912d2e936f0f0ec7ed67f938f62b807ef65120118b6f3ca27f2e0357c81b
+
+validate_ash_r2b_cf2_ffn_fused_exact_backing_pair_static.py
+fdce2fa86fc1ad665e1b2e02ffa6f7e975a139d35850cc11176745c2804f4962
+```
+
+## 14. Static acceptance
 
 ```powershell
 python .\tools\validate_ash_r2b_cf2_ffn_fused_exact_backing_pair_static.py
@@ -151,50 +309,41 @@ python .\tools\validate_ash_r2b_cf2_ffn_fused_exact_backing_pair_static.py
 Baked result:
 
 ```text
-PASS_R2B_CF2_FFN_FUSED_EXACT_BACKING_PAIR_STATIC checks=62
+PASS_R2B_CF2_FFN_FUSED_EXACT_BACKING_PAIR_STATIC checks=48
 ```
 
-## 11. Physical closure
+## 15. Compile acceptance
 
-Promote PASS_R2B_CF2_PHYSICAL_FFN_FUSED_ALIAS_PAIR_ATTRIBUTED only when the same release run contains an exact Arc::ptr_eq shared-backing pair, binding 0 READ, output binding READ_WRITE, ENCODER_FINISH_BEGIN for the same execute_sequence, and the canonical WGPU STORAGE_READ_ONLY / STORAGE_READ_WRITE failure.
+The bake environment does not expose `cargo` or `rustc`, therefore compile evidence is not promoted by this bake.
 
-Otherwise use:
+Authoritative local checks:
 
-```text
-HOLD_R2B_CF2_NO_SHARED_BACKING_PAIR
-HOLD_R2B_CF2_BASELINE_NOT_REPRODUCED
-HOLD_R2B_CF2_TRACE_INCOMPLETE
+```powershell
+cargo check -p burn_webgpu_backend --lib --release --locked
+cargo check -p base_train --bin base_train --release --locked -j 1
 ```
 
-## 12. Repair deferral
-
-CF2 does not implement CF3-A ACCESS-CLASS UNIFICATION, CF3-B SELECTIVE DETACHED OUTPUT BACKING, or CF3-C RAW-LEASE / POOLED-STORAGE EXPORT AUTHORITY.
-
-## 13. Bake hashes
+## 16. Bake artifacts
 
 ```text
-executor source SHA-256
-b2152b16d22913810a07f1697cada6d9aeab0cb8aa6b8c3013f83c8b3ba2fbf7
-
-validator SHA-256
-9b96daa5f658a8a1e9713382f320d57e4e50aacc35b81f0462a7047d01bf3378
-
-overlay ZIP
-bf30e960eda1beb92c720c9a268a99b1f44542357d9cf5fa42e9f4313cf8c9c4
+Overlay:
+ASH_R2B_CF2_FFN_FUSED_EXACT_BACKING_PAIR_ATTRIBUTION_OVERLAY_CODE_ONLY.zip
+SHA-256 0a5fb0fc7dd2c29c6ba8d0c5494483d20e7e01d0de5d6d9e4a34d77cf118a92f
 files=2
 CRC=PASS
 
-full ZIP
-9b9f193878d23fd88f3e6f3b82b59ce1fe04f389cb3cc52c44e3acaec013581c
+Full:
+ASH_PASS3_R2B_CF2_FFN_FUSED_EXACT_BACKING_PAIR_ATTRIBUTION_CODE_ONLY.zip
+SHA-256 eff71d5f25fec6111fce747d971b6cc87c4cd70850a5501b255c3c726d8e8512
 files=8483
 CRC=PASS
 ```
 
-## 14. Evidence state at bake time
+## 17. Evidence state at bake time
 
 ```text
 SOURCE       CONFIRMED
-STATIC       PASS 62/62
+STATIC       PASS 48/48
 ARCHIVE      CRC PASS
 COMPILE      UNVERIFIED
 RUNTIME      UNVERIFIED
@@ -202,18 +351,16 @@ PHYSICAL     UNVERIFIED
 PERFORMANCE  UNVERIFIED
 ```
 
-The bake environment has no cargo/rustc executable, so compile/runtime/physical status is not promoted.
+## 18. Final law
 
-## 15. Final law
-
-> R2B-CF2 narrows the physical failure to exact RawWgpuBufferLease backing identity inside the FFN persistent fused dynamic BindGroup.
+> R2B-CF2 instruments only the FFN persistent fused dynamic buffer set that the release backtrace identified.
 >
-> Arc::ptr_eq() is the same-backing authority. All four candidate pairs are preserved.
+> Binding 0 remains READ and bindings 1..4 remain READ_WRITE; no access semantics are modified.
 >
-> Range relation is diagnostic only and does not override same-buffer identity.
+> Exact shared backing is admitted only through `Arc::ptr_eq()` on the live `RawWgpuBufferLease.buffer` values.
 >
-> CF2 flushes a witness immediately before encoder.finish() and then executes the original command path unchanged.
+> All four input/output relations are recorded and flushed before `encoder.finish()`.
 >
-> No access mode, allocator, WGSL, Fusion behavior, storage ownership, optimizer state, model value, or training math is changed.
+> The canonical WGPU validation failure must remain observable in the same execute invocation.
 >
-> If the exact shared mixed-access pair is not physically observed in the same run as the canonical WGPU failure, the correct result is HOLD.
+> No repair is permitted until the exact physical pair set is closed.
