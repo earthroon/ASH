@@ -13,7 +13,16 @@
 
 ## 1. Parent physical SSOT
 
-R4 is designed against the physically passed R3 bundle whose observed state is:
+R4 is designed against the physically passed R3 generation-1 checkpoint bundle after the promoted R2B-CF3 / CF3-R1 closure.
+
+The current prerequisite chain is:
+
+- `PASS_R2B_CF3_FFN_FUSED_READ_INPUT_PHYSICAL_BACKING_SEGREGATION`
+- `PASS_R2B_CF3_FULL_CAMPAIGN_EXACT_PARITY`
+- `PASS_ASH_BASETRAIN_BT_WGSL_ATLAS_RUNTIME_COMMITTED_GENERATION_CHECKPOINT_EXPORT_06C_R27_R1J_R3`
+- intended R3 terminal boundary: `HOLD_ASH_BASETRAIN_R1J_R3_GENERATION1_CHECKPOINT_BUNDLE_EXPORTED_R1J_E0_TO_E5_PROVENANCE_COMPLETE_RELOAD_CONTINUATION_NOT_YET_ADMITTED`
+
+R3 source-state invariants remain:
 
 - model logical tensor count: `201`
 - optimizer-state logical tensor count: `402`
@@ -29,12 +38,9 @@ R4 is designed against the physically passed R3 bundle whose observed state is:
 - physical microbatch accumulation: `1`
 - production accumulation adoption: `0`
 
-The R3 physical checkpoint identities used by the current parent run are:
+R4 does not accept a specification literal as physical checkpoint identity. The authoritative checkpoint SHA values are read from the committed bundle manifest and independently recomputed from the actual `model.safetensors` and `optimizer.safetensors` bytes in the fresh R4 process.
 
-- model SHA256: `5a369a1e6b747bfaf7a10e0adef6355eb4f54db201d8de051d0a3d7752d607ce`
-- optimizer SHA256: `46b0ed637a52d6d50ed9b3a50153270eb963be67c5d88f44c9ddff3350f2b8de`
-
-R4 never hardcodes those hashes as substitute source data. It reads the bundle manifest and recomputes the actual file digests.
+R4 is also independent of the retired CF3-R1 qualification environment variable. CF3 backing segregation remains production behavior, but exact-parity instrumentation is not an R4 runtime prerequisite.
 
 ## 2. Fresh-process boundary
 
@@ -511,9 +517,20 @@ R4 static validator:
 
 `tools/validate_r27r1j_r4_checkpoint_reload_parity_step2_continuation_static.py`
 
+Current seal result:
+
+`RESULT 120/120`
+
 It verifies runtime, backend, WGSL, CLI/config/pipeline wiring, committed-generation plan wrapper, structural chain, 40-wave receipt, 56 gates, 119 canaries, fresh-process firewalls, digest/parity gates, step2 m/v continuation, and generation2 atomic promotion.
 
-Parent validators R1J through R3 are updated only to recognize R4 as the new terminal structural child; their original patch contracts remain unchanged.
+The refreshed seal additionally verifies:
+
+- the current structural chain continues through R5/R6/R6A and its present `R6A-R2-R2-CF1` terminal child,
+- model/optimizer physical SHA authority comes from the actual file bytes plus bundle-manifest `physicalSha256`,
+- historical R3 SHA literals are not embedded in the R4 runtime as authority,
+- R4 has no runtime dependency on `ASH_R2B_CF3_R1_EXACT_PARITY`.
+
+Parent validators R1J through R3 retain their original patch contracts.
 
 ## 30. PASS meaning
 
@@ -553,3 +570,34 @@ Generation2 checkpoint export remains closed.
 The R4 boundary is:
 
 `FRESH R3 RELOAD -> EXACT GENERATION1 + M1/V1 -> REAL STEP2 -> VALIDATED GENERATION2 + M2/V2 -> ATOMIC GENERATION2 COMMIT`
+
+
+## 33. Current seal bake
+
+Current implementation-preserving seal bake:
+
+```text
+Production source delta: 0 files
+Static validator delta: 1 file
+
+R27-R1J-R4 static: 120/120 PASS
+R2B-CF3-R1 static: 76/76 PASS
+R2B-CF3 static: 60/60 PASS
+R2B-CF2-R1 static: 67/67 PASS
+```
+
+Artifacts:
+
+```text
+Overlay ZIP
+SHA-256 99ee37c7cb51aae932ddfe29776ebf1746d3ae16e81d9ea08977a0c533824103
+files 1
+CRC PASS
+
+Full code-only ZIP
+SHA-256 6f638970f61262b700bb38747af34ba92a74db03d1c37dcc248ce57ff2982b57
+files 8,487
+CRC PASS
+```
+
+The bake does not claim compile, runtime reload, or physical step2 PASS. Those evidence tiers require operator execution.
