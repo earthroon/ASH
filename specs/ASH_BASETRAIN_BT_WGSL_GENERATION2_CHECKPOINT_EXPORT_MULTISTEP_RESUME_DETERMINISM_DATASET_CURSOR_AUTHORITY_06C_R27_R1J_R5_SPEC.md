@@ -14,10 +14,16 @@
 
 ## 1. R4 physical parent SSOT
 
-R5 starts only from the physically passed R4 state:
+R5 starts only from the physically passed R4 state.
+
+Current observed R4 authority:
 
 - fresh process reload `1`
 - R3 model/optimizer physical and logical parity `1`
+- R1J provenance parity `1`
+- model logical tensors `201`
+- optimizer logical state tensors `402`
+- combined generation1 state parity `1`
 - genesis fallback `0`
 - zero-moment fallback `0`
 - optimizer state origin `RELOADED_R3_STEP1_STATE`
@@ -26,10 +32,25 @@ R5 starts only from the physically passed R4 state:
 - production accumulation adoption `0`
 - step1 batch ordinal `0`
 - step2 batch ordinal `1`
+- step2 real forward/loss/backward count `1/1/1`
 - step2 logical gradient tensors `201`
+- gradient missing/nonfinite `0/0`
+- backward replay count `1`
+- backward replay parity `1`
+- candidate parameter count `201`
+- candidate gap/duplicate/nonfinite `0`
 - generation transition `1 -> 2`
 - optimizer step transition `1 -> 2`
+- R3 checkpoint mutation `0`
 - generation-2 checkpoint write/export at R4 `0`
+
+Observed parent evidence:
+
+- candidate parameter-set digest `1c5694fc5f12fcc49ce2d1054280e39ededed6f76e4fe65ec88803fb2df284ba`
+- training-step state digest `eaab2c4779e0c36c42591760ce8ba90bf9ec8da454ce6b591637a7e883d3a2a8`
+- candidate manifest digest `6fb603c000f9a9aba8b0757407be69dd4eb9bdb4d8a92057f328412e3fa47e87`
+
+These observed digests are parent evidence only. R5 does not hardcode them as source authority; export re-reads the actual committed R4 state, re-hashes the referenced candidate manifest and reconstructs the generation2 state digest.
 
 R5 exports the already committed generation-2 runtime state. It never rebuilds generation2 from R3, gradients, or deltas.
 
@@ -493,3 +514,54 @@ Generation3, optimizer step3 and cursor-next3 are one canonical transaction. Gen
 The R5 boundary is:
 
 `REAL GENERATION2 -> CHECKPOINT2 + CURSOR2 -> FRESH STEP3 PRIMARY + FRESH STEP3 SHADOW -> EXACT COMPARE -> ATOMIC GENERATION3 + STEP3 + CURSOR3`
+
+
+## 37. Current implementation-preserving seal bake
+
+Current bake preserves the existing R5 runtime/backend/WGSL implementation.
+
+```text
+production source delta = 0 files
+static validator delta = 1 file
+structural CLI contract materialization:
+  R5 flags 001..064
+  R4 flags 001..056
+```
+
+Refreshed static seal:
+
+```text
+R27-R1J-R5 105/105 PASS
+R27-R1J-R4 120/120 PASS
+R2B-CF3-R1 76/76 PASS
+R2B-CF3 60/60 PASS
+R2B-CF2-R1 67/67 PASS
+R2B-CF2 48/48 PASS
+```
+
+The R5 validator now follows the current structural chain through `R6A-R2-R2-CF1` rather than the stale `R6A-R2-R1` terminal child.
+
+The seal additionally verifies:
+
+- R4 parent candidate/training-step digests are bound from runtime evidence,
+- current observed R4 digest literals are absent from R5 runtime source,
+- R5 runtime has no dependency on the retired qualification-only `ASH_R2B_CF3_R1_EXACT_PARITY` environment variable.
+
+Artifacts:
+
+```text
+Overlay ZIP
+SHA-256 1cd81c6862ddaa127fcbbaa65ee7bc9a17ce1f2d9a223080473255bad455c586
+files 3
+CRC PASS
+
+Full code-only ZIP
+SHA-256 308f3cb5b3d187e0cab094b2637375c7c14982a85debbbb43de381a789fd87ab
+files 8,489
+CRC PASS
+
+Seal specification
+SHA-256 6e49a5b032aff1f1e3f7c0e0758878d65a8045737e8871ae3a390878b0e12eb4
+```
+
+At bake time only SOURCE / STATIC / ARCHIVE are promoted. Compile, runtime, physical and R5 promotion require operator execution.
