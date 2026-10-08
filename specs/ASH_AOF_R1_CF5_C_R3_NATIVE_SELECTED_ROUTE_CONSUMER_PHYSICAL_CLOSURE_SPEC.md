@@ -571,27 +571,27 @@ This annex records the *implemented partial candidate source* and its bounded ev
 
 ### Exact artifact lineage
 
-- Parent full code-only: \`ASH_PASS3_AOF_R1_CF5_C_R2_VERIFIER_NATIVE_SEAM_CHECKPOINT_LINEAGE_QUALIFICATION_CODE_ONLY.zip\`
-- Parent SHA256: \`461e7509db39278bf1a1d05f7673d0fda8a0a3d17abdca63b84ca77b0d8038cb\`; 8,734 files
-- Baked full: \`ASH_PASS3_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_CODE_ONLY.zip\`
-- Baked full SHA256: \`6372140b21d5eb30fbe32fa6b3474849b9b3f987487f8ea53cf2e3ec54359558\`; **8,735 files**
-- Baked overlay: \`ASH_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_OVERLAY_CODE_ONLY.zip\`
-- Overlay SHA256: \`10f76d9a56db994cf2f83c1b614f9e5a768a58508d27c5a598e35bd42703514a\`
+- Parent full code-only: `ASH_PASS3_AOF_R1_CF5_C_R2_VERIFIER_NATIVE_SEAM_CHECKPOINT_LINEAGE_QUALIFICATION_CODE_ONLY.zip`
+- Parent SHA256: `461e7509db39278bf1a1d05f7673d0fda8a0a3d17abdca63b84ca77b0d8038cb`; 8,734 files
+- Baked full: `ASH_PASS3_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_CODE_ONLY.zip`
+- Baked full SHA256: `6372140b21d5eb30fbe32fa6b3474849b9b3f987487f8ea53cf2e3ec54359558`; **8,735 files**
+- Baked overlay: `ASH_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_OVERLAY_CODE_ONLY.zip`
+- Overlay SHA256: `10f76d9a56db994cf2f83c1b614f9e5a768a58508d27c5a598e35bd42703514a`
 - Exact delta **ADD 1 / MOD 7 / DEL 0**. Full and overlay ZIP CRC, per-entry source-byte comparison PASS.
-- Detailed digest manifest: \`ASH_AOF_R1_CF5_C_R3_BAKE_MANIFEST.json\`; test report: \`ASH_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_BAKE_REPORT.md\`.
+- Detailed digest manifest: `ASH_AOF_R1_CF5_C_R3_BAKE_MANIFEST.json`; test report: `ASH_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_CONSUMER_PHYSICAL_CLOSURE_BAKE_REPORT.md`.
 
 ### Modified SOURCE
 
-- \`crates/burn_webgpu_backend/src/aof_r1_lookahead.rs\`: \`Arc::ptr_eq\` real verifier-instance currentness; reject wrong verifier owner.
-- \`crates/burn_webgpu_backend/src/aof_r1_cf5_c_r2_verifier_observe.rs\`: optional actual \`jacobi_iteration\` and \`window_epoch\` fields; Tree receipts remain compatible with legacy optional values.
-- \`crates/model_core/src/aof_r1_lookahead.rs\`: same natural \`aof_r1_jacobi_choices\` call wrapped in \`linear_oracle=true\` scope per real iteration, actual ping-pong Tree, original verifier Arc, session/round/physical bindings; guard lifetime closed before advance.
-- \`crates/model_core/src/aof_r1_runtime.rs\`: completed parked KV read views materialized before actual Jacobi scope; existing Tree and normal canonical routes unchanged.
-- \`crates/model_core/src/aof_r1_kv_consumer_bridge.rs\`: typed selection receipts \`IncrementalBurn/Headwise/TensorCubeActual\`, \`ChunkedBurn/Headwise\` with native selected output/position/generation lineage, explicitly UNKNOWN GPU candidate comparison for unimplemented routes.
-- \`crates/model_core/src/decode_state.rs\`: only actual selected incremental/chunked output produces evidence; TensorCube actual requires W9A receipt digest. No Headwise/TensorCube output reclassified as Burn, no canonical result substitution.
-- \`crates/orchestrator_local/src/aof_r1_cf5_qualification_cli.rs\`: actual Tree/Linear backend layer rows and selected-native evidence aggregated per route; absent rows are \`UNOBSERVED_SELECTION_UNKNOWN\`, **not** proof the route was unselected. \`full_r3_pass_token=null\`, \`physical_campaign_qualified=false\`, \`active_canonical_kv=false\` and no performance promotion.
+- `crates/burn_webgpu_backend/src/aof_r1_lookahead.rs`: `Arc::ptr_eq` real verifier-instance currentness; reject wrong verifier owner.
+- `crates/burn_webgpu_backend/src/aof_r1_cf5_c_r2_verifier_observe.rs`: optional actual `jacobi_iteration` and `window_epoch` fields; Tree receipts remain compatible with legacy optional values.
+- `crates/model_core/src/aof_r1_lookahead.rs`: same natural `aof_r1_jacobi_choices` call wrapped in `linear_oracle=true` scope per real iteration, actual ping-pong Tree, original verifier Arc, session/round/physical bindings; guard lifetime closed before advance.
+- `crates/model_core/src/aof_r1_runtime.rs`: completed parked KV read views materialized before actual Jacobi scope; existing Tree and normal canonical routes unchanged.
+- `crates/model_core/src/aof_r1_kv_consumer_bridge.rs`: typed selection receipts `IncrementalBurn/Headwise/TensorCubeActual`, `ChunkedBurn/Headwise` with native selected output/position/generation lineage, explicitly UNKNOWN GPU candidate comparison for unimplemented routes.
+- `crates/model_core/src/decode_state.rs`: only actual selected incremental/chunked output produces evidence; TensorCube actual requires W9A receipt digest. No Headwise/TensorCube output reclassified as Burn, no canonical result substitution.
+- `crates/orchestrator_local/src/aof_r1_cf5_qualification_cli.rs`: actual Tree/Linear backend layer rows and selected-native evidence aggregated per route; absent rows are `UNOBSERVED_SELECTION_UNKNOWN`, **not** proof the route was unselected. `full_r3_pass_token=null`, `physical_campaign_qualified=false`, `active_canonical_kv=false` and no performance promotion.
 
 Added:
-- \`tools/validate_ash_aof_r1_cf5_c_r3_selected_route_static.py\`: exact source/lineage and 15 negative mutation gates.
+- `tools/validate_ash_aof_r1_cf5_c_r3_selected_route_static.py`: exact source/lineage and 15 negative mutation gates.
 
 ### Scope distinction
 
@@ -599,11 +599,11 @@ Added:
 - **R3-B/C/D: selected-native receipt SOURCE implemented, but capacity-strided Headwise/TensorCube shadow comparison is NOT_IMPLEMENTED.** Their numerical and physical admission stays HOLD. Existing Burn scalar observations are **not** bitwise proof.
 - **R3-E: source-only truthful route evidence inventory implemented**; no inference from zero rows to NOT_SELECTED.
 - **R3-P0/F:** exact Cargo/Naga baseline and D1/D2/D4 physical campaign NOT_RUN. Full R3 PASS cannot be emitted.
-- The existing 19-input head-training checkpoint source digest is byte-identical: \`e20f93b19bcb8a93a96809a28d2faf5c72c68896da060002d36a43e2286b8283\`. No training-digest input, legacy checkpoint admission, canonical KV publication or AOF production promotion was modified.
+- The existing 19-input head-training checkpoint source digest is byte-identical: `e20f93b19bcb8a93a96809a28d2faf5c72c68896da060002d36a43e2286b8283`. No training-digest input, legacy checkpoint admission, canonical KV publication or AOF production promotion was modified.
 
 ### Observed SOURCE/STATIC tests
 
-\`\`\`text
+```text
 R3 SOURCE/STATIC          60/60 PASS
 R3 negative source       15/15 mutations rejected
 R2 parent STATIC         44/44 PASS
@@ -613,12 +613,12 @@ CF5-A/B parent STATIC    73/73 PASS
 CF4 parent STATIC        65/65 PASS
 CF3 parent STATIC        51/51 PASS
 CF1/CF2/VH6 historical   51/52 FAIL
-\`\`\`
+```
 
-The 1 historic failure is the **CF4-superseded byte-identity requirement** for \`aof_r1_prefix_commit.rs\`; it is retained as an unresolved parent static incompatibility, not relabeled PASS.
+The 1 historic failure is the **CF4-superseded byte-identity requirement** for `aof_r1_prefix_commit.rs`; it is retained as an unresolved parent static incompatibility, not relabeled PASS.
 
-\`cargo\` / \`rustc\` unavailable in this packaging environment. Exact external workspace \`sherpa-rs\` path input absent. **COMPILE NOT_RUN, Naga NOT_RUN, RUNTIME NOT_RUN, PHYSICAL NOT_RUN, PERFORMANCE NOT_MEASURED.** The source test success is not physical or numerical proof.
+`cargo` / `rustc` unavailable in this packaging environment. Exact external workspace `sherpa-rs` path input absent. **COMPILE NOT_RUN, Naga NOT_RUN, RUNTIME NOT_RUN, PHYSICAL NOT_RUN, PERFORMANCE NOT_MEASURED.** The source test success is not physical or numerical proof.
 
 ### Next binding and HOLD law
 
-First restore exact Cargo path input and run actual backend/model_core/orchestrator release compilation, then real Naga shader qualification and same-source Tree/Linear D1/D2/D4 physical parity and retirement. Build native selected Headwise/TensorCube capacity-strided attention consumers with exact causal visibility and actual output comparison before an all-route physical matrix. The full \`PASS_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_PHYSICAL_QUALIFICATION\` and CF5-D \`ACTIVE\` must remain **HOLD** until every applicable consumer is proven.
+First restore exact Cargo path input and run actual backend/model_core/orchestrator release compilation, then real Naga shader qualification and same-source Tree/Linear D1/D2/D4 physical parity and retirement. Build native selected Headwise/TensorCube capacity-strided attention consumers with exact causal visibility and actual output comparison before an all-route physical matrix. The full `PASS_AOF_R1_CF5_C_R3_NATIVE_SELECTED_ROUTE_PHYSICAL_QUALIFICATION` and CF5-D `ACTIVE` must remain **HOLD** until every applicable consumer is proven.
