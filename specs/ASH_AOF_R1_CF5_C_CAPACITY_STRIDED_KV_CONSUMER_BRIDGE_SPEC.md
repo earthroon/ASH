@@ -667,6 +667,7 @@ CF5-C PASS != CF5-E PERFORMANCE PROMOTION
 ```
 
 **Implementation-state supersession:** This original target contract is now accompanied by a partial source-bake annex. No full CF5-C PASS has been achieved; only the explicit implementation subset described below has been applied to the code-only ZIP. GitHub records specification/evidence only, not runtime source.
+
 ---
 
 ## 23. Exact source-bake and evidence annex (2026-10-08)
