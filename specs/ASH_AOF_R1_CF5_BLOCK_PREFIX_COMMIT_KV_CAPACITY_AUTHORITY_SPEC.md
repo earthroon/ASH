@@ -8,7 +8,7 @@
 **Parent:** AOF-R1-CF4 PREFIX COMMIT TRANSFER ATTRIBUTION  
 **Successor:** AOF-R1-CF6 PACKED/FUSED PRODUCTION PROMOTION (separate approval)  
 **Class:** Canonical KV backing / logical-view / transactional publication optimization  
-**Status:** SPECIFICATION ONLY. SOURCE/COMPILE/RUNTIME/PHYSICAL/PERFORMANCE implementation evidence for CF5: **NOT_RUN**.  
+**Status:** Full A/B/C/D/E contract remains a target. **A/B OBSERVE source/static implemented (73/73 PASS); C/D/E ACTIVE not implemented (HOLD). Rust COMPILE/RUNTIME/PHYSICAL/PERFORMANCE: NOT_RUN / NOT_MEASURED.**  
 **Reference package:** `ASH_PASS3_AOF_R1_CF4_PREFIX_COMMIT_TRANSFER_ATTRIBUTION_CODE_ONLY.zip` (SHA-256 `0b0904f845755d96b96f7a7da4605d1ae6da82bbf88ae93ef311b46c9434a231`).
 
 ```text
